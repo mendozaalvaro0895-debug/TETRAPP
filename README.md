@@ -1,2 +1,2 @@
-# TETRAPLASTIC-APP
+# TETRAPP
 Ecosistema digital para registro y seguimiento de procesos en tiempo real.
