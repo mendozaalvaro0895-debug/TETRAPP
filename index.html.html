@@ -322,7 +322,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--dark);min-height:1
               <select class="fi" style="font-size:11px;padding:4px 7px;height:26px" id="filtroTapas" onchange="renderListas()">
                 <option value="">Todas</option>
                 <option value="nueva">Nuevas</option>
-                <option value="programada">Programadas</option>
+    
                 <option value="proceso">En proceso</option>
                 <option value="lista">Listas</option>
               </select>
@@ -456,7 +456,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--dark);min-height:1
       <div class="fr">
         <div class="fg">
           <div class="fl">Fecha límite de entrega</div>
-          <input class="fi" id="fFecha" type="date" oninput="calcular()">
+          <input class="fi" id="fFecha" type="date" oninput="calcular();this.style.borderColor=''">
         </div>
         <div class="fg">
           <div class="fl">Prioridad</div>
@@ -1127,9 +1127,8 @@ function mostrarDetalle(s, view) {
   const det = document.getElementById(cid);
 
   const etapas = [
-    { t:'Solicitud recibida', s:`De: ${s.cliente}`, tm:s.created, done:true },
-    { t:'Programada en producción', s:`Operadores: ${opsNombres}`, tm:['proceso','lista','entregada'].includes(s.estado)?s.created:'', done:['proceso','lista','entregada'].includes(s.estado), active:s.estado==='programada' },
-    { t:'En proceso', s:`${PROCS[s.tipo]?.label} · ${nOps} op. · ${cap.toLocaleString()} und/h`, tm:s.estado==='proceso'?'Turno AM en curso':'', done:['lista','entregada'].includes(s.estado), active:s.estado==='proceso' },
+    { t:'Solicitud recibida de Ventas', s:`Cliente: ${s.cliente} · ${s.area_sol||'Ventas'}`, tm:s.created, done:true },
+    { t:'En proceso', s:`${s.tipo.split('+').map(p=>PROCS[p]?.label||p).join(' + ')} · ${nOps} op. · ${cap.toLocaleString()} und/h`, tm:s.estado==='proceso'?'Turno AM en curso':'', done:['lista','entregada'].includes(s.estado), active:s.estado==='proceso'||s.estado==='nueva' },
     { t:'Lista · Revisión de calidad', s:`${s.cant.toLocaleString()} unidades completadas`, tm:s.estado==='lista'?s.fecha_lim:'', done:s.estado==='entregada', active:s.estado==='lista' },
     { t:'Entregada a Bodega', s:'Registro SKU PT · cierre de talonario', tm:'', done:s.estado==='entregada', active:false },
   ];
@@ -1141,8 +1140,7 @@ function mostrarDetalle(s, view) {
         <div class="ph-sub">${s.sku} · ${s.desc}</div>
       </div>
       <div class="ph-r">
-        ${s.estado==='nueva'?`<button class="btn ${isT?'btn-t':'btn-s'} btn-xs" onclick="cambiarEstado('${s.id}','programada','${view}')">Programar</button>`:''}
-        ${s.estado==='programada'?`<button class="btn ${isT?'btn-t':'btn-s'} btn-xs" onclick="cambiarEstado('${s.id}','proceso','${view}')">▶ Iniciar</button>`:''}
+        ${(s.estado==='nueva'||s.estado==='programada')?`<button class="btn ${isT?'btn-t':'btn-s'} btn-xs" onclick="cambiarEstado('${s.id}','proceso','${view}')">▶ Iniciar</button>`:''}
         ${s.estado==='proceso'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista','${view}')">✓ Lista</button>`:''}
         ${s.estado==='lista'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada','${view}')">📦 Entregar</button>`:''}
         ${ePill(s.estado)} ${pPill(s.prio)}
@@ -1554,7 +1552,22 @@ function calcular() {
   document.getElementById('cHoras').textContent = h.toFixed(1)+'h';
   document.getElementById('cTurnos').textContent = t+(t>1?' turnos':' turno');
   document.getElementById('cCap').textContent = cap.toLocaleString();
-  document.getElementById('cFecha').textContent = fechaEst(t);
+
+  // Fecha estimada con color según si cumple el límite
+  const fechaLimStr = document.getElementById('fFecha').value;
+  const fechaEstDate = new Date(); fechaEstDate.setDate(fechaEstDate.getDate() + t);
+  const fechaLimDate = fechaLimStr ? new Date(fechaLimStr) : null;
+  const enTiempo = !fechaLimDate || fechaEstDate <= fechaLimDate;
+  const fechaEl = document.getElementById('cFecha');
+  fechaEl.textContent = fechaEst(t);
+  fechaEl.style.color = enTiempo ? 'var(--green)' : 'var(--red)';
+  // También mostrar la diferencia en días
+  if (fechaLimDate) {
+    const diffDias = Math.round((fechaLimDate - fechaEstDate) / (1000*60*60*24));
+    const diffTxt = diffDias === 0 ? ' (justo)' : diffDias > 0 ? ` (+${diffDias}d)` : ` (${diffDias}d tarde)`;
+    fechaEl.textContent = fechaEst(t) + diffTxt;
+  }
+
   document.getElementById('cNote').textContent =
     `${procNames} · ${nOps} operador${nOps>1?'es':''} · ${CFG.cap_und_h.toLocaleString()} und/h · Turno ${CFG.turno_h}h${procs.length>1?' · +'+Math.round((procFactor-1)*100)+'% por procesos combinados':''}`;
 
