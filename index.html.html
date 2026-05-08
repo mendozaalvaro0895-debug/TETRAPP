@@ -1146,6 +1146,7 @@ function mostrarDetalle(s, view) {
         ${s.estado==='proceso'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista','${view}')">✓ Lista</button>`:''}
         ${s.estado==='lista'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada','${view}')">📦 Entregar</button>`:''}
         ${ePill(s.estado)} ${pPill(s.prio)}
+        <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #f5c0c0;margin-left:4px" onclick="confirmarBorrar('${s.id}','${s.id_display||s.id}','${view}')">🗑 Borrar</button>
       </div>
     </div>
     <div class="det-scroll">
@@ -1270,6 +1271,54 @@ function mostrarDetalle(s, view) {
 }
 
 // ══ ACCIONES ══════════════════════════════════════════════
+async function confirmarBorrar(id, codigo, view) {
+  const confirma = window.confirm(
+    '¿Eliminar la solicitud ' + codigo + '?\n\nEsta acción no se puede deshacer.'
+  );
+  if (!confirma) return;
+  await borrarSolicitud(id, view);
+}
+
+async function borrarSolicitud(id, view) {
+  // Buscar dbId real
+  const s = solicitudes.find(x => x.id === id);
+  const dbId = s?.dbId || id;
+
+  try {
+    // Borrar en cascada desde Supabase
+    await db.from('solicitud_operadores').delete().eq('solicitud_id', dbId);
+    await db.from('solicitud_historial').delete().eq('solicitud_id', dbId);
+    await db.from('solicitud_lineas').delete().eq('solicitud_id', dbId);
+    const { error } = await db.from('solicitudes').delete().eq('id', dbId);
+
+    if (error) throw error;
+
+    // Limpiar del estado local
+    solicitudes = solicitudes.filter(x => x.id !== id);
+
+    // Limpiar detalle
+    const detId = view==='serig'?'detSerig':view==='todas'?'detTodas':'detTapas';
+    const det = document.getElementById(detId);
+    if (det) det.innerHTML = `
+      <div class="det-empty">
+        <div class="det-empty-ico">🗑️</div>
+        <div class="det-empty-txt">Solicitud eliminada</div>
+      </div>`;
+
+    renderListas();
+
+    // Toast confirmación
+    const toast = document.createElement('div');
+    toast.textContent = '🗑 Solicitud eliminada correctamente';
+    toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--red);color:white;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+
+  } catch(e) {
+    alert('Error al eliminar: ' + e.message);
+  }
+}
+
 async function cambiarEstado(id, nuevo, view) {
   const s = solicitudes.find(x=>x.id===id);
   if (!s) return;
