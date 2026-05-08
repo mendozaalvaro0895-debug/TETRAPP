@@ -397,7 +397,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--dark);min-height:1
 </div>
 
 <!-- FORM MODAL -->
-<div class="overlay" id="overlay" onclick="cerrarFormFuera(event)">
+<div class="overlay" id="overlay">
   <div class="modal">
     <div class="mh">
       <div class="mh-title" id="mTitle">Nueva solicitud</div>
@@ -556,7 +556,7 @@ function buscarSKU(query) {
   const q = query.toLowerCase();
   return INVENTARIO.filter(i =>
     i.sku.includes(q) || i.descripcion.toLowerCase().includes(q)
-  ).slice(0, 8);
+  ).slice(0, 30);
 }
 
 // ══ LÍNEAS DE PEDIDO ══════════════════════════════════════
@@ -643,7 +643,7 @@ function renderLineas() {
             oninput="onSkuInput(${i},this.value)"
             onblur="setTimeout(()=>hideDrop(${i}),150)"
             autocomplete="off">
-          <div id="lDrop_${i}" style="display:none;position:fixed;background:white;border:1.5px solid var(--teal-l);border-radius:7px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;max-height:260px;overflow-y:auto;min-width:420px"></div>
+          <div id="lDrop_${i}" style="display:none;position:fixed;background:white;border:1.5px solid var(--teal-l);border-radius:7px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;max-height:320px;overflow-y:scroll;min-width:440px;overscroll-behavior:contain"></div>
         </div>
         <div style="position:relative;width:100%">
           <input class="fi" id="lDesc_${i}" value="${l.desc}"
@@ -652,7 +652,7 @@ function renderLineas() {
             oninput="onDescInput(${i},this.value)"
             onblur="setTimeout(()=>hideDescDrop(${i}),150)"
             autocomplete="off">
-          <div id="lDescDrop_${i}" style="display:none;position:fixed;background:white;border:1.5px solid var(--teal-l);border-radius:7px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;max-height:260px;overflow-y:auto;min-width:420px"></div>
+          <div id="lDescDrop_${i}" style="display:none;position:fixed;background:white;border:1.5px solid var(--teal-l);border-radius:7px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;max-height:320px;overflow-y:scroll;min-width:440px;overscroll-behavior:contain"></div>
         </div>
         <input class="fi" id="lCant_${i}" value="${l.cant||''}"
           type="number" placeholder="0"
@@ -1485,7 +1485,7 @@ function calcular() {
 }
 
 function cerrarForm() { document.getElementById('overlay').classList.remove('open'); }
-function cerrarFormFuera(e){ if(e.target===document.getElementById('overlay')) cerrarForm(); }
+function cerrarFormFuera(e){ /* deshabilitado — cerrar solo con X */ }
 
 async function guardar() {
   const cli    = document.getElementById('fCli').value;
