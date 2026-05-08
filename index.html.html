@@ -501,13 +501,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--dark);min-height:1
         </div>
       </div>
 
-      <div class="fg full">
-        <div class="fl" style="display:flex;align-items:center;justify-content:space-between">
-          <span>Operadores disponibles hoy <span style="color:var(--gray);font-weight:400;text-transform:none">(opcional — puedes asignar después)</span></span>
-          <span id="opsDisponiblesCount" style="font-size:10px;color:var(--teal);font-weight:700"></span>
-        </div>
-        <div class="ops-sel" id="opsSel" style="margin-top:6px"></div>
-        <div style="font-size:10px;color:var(--gray);margin-top:4px">Solo aparecen operadores marcados como presentes hoy. Puedes dejar sin asignar y completar luego.</div>
+      <!-- Operadores asignados por línea de pedido (arriba) — sin selector global -->
+      <div style="font-size:10px;color:var(--gray);padding:2px 0 4px">
+        💡 Asigna el operador directamente en cada línea de pedido.
       </div>
 
       <!-- CÁLCULO AUTOMÁTICO -->
@@ -567,7 +563,7 @@ let lineas = [];
 function addLinea() {
   if (lineas.length >= MAX_LINEAS) return;
   const idx = lineas.length;
-  lineas.push({ sku:'', desc:'', cant:0, procs:[], existencia:undefined, operador:'' });
+  lineas.push({ sku:'', desc:'', cant:0, procs:[], existencia:undefined, operadores:[] });
   renderLineas();
   // focus the new SKU input
   setTimeout(() => {
@@ -594,6 +590,25 @@ const ALL_PROCS_SERIG = [
 
 function getProcList() {
   return fArea === 'tapas' ? ALL_PROCS_TAPAS : ALL_PROCS_SERIG;
+}
+
+function toggleLineaOp(lineaIdx, opId) {
+  if (!lineas[lineaIdx].operadores) lineas[lineaIdx].operadores = [];
+  const arr = lineas[lineaIdx].operadores;
+  const pos = arr.indexOf(opId);
+  if (pos >= 0) arr.splice(pos, 1);
+  else arr.push(opId);
+  // Update chip visuals without full re-render
+  const chips = document.querySelectorAll(`[id^="lOpChip_${lineaIdx}_"]`);
+  chips.forEach(c => {
+    const cId = c.id.replace(`lOpChip_${lineaIdx}_`, '');
+    if (arr.includes(cId)) {
+      c.classList.add('sel-op');
+    } else {
+      c.classList.remove('sel-op', 'sel-op-tapas', 'sel-op-serig');
+    }
+  });
+  calcular();
 }
 
 function toggleLineaProc(lineaIdx, procVal) {
@@ -672,14 +687,20 @@ function renderLineas() {
         </div>
         <div style="display:flex;align-items:center;gap:5px;margin-top:4px">
           <span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Operador:</span>
-          <select id="lOp_${i}" onchange="lineas[${i}].operador=this.value"
-            style="font-size:11px;padding:3px 8px;border:1.5px solid var(--border);border-radius:6px;background:white;font-family:var(--font);color:var(--mid);flex:1;max-width:200px">
-            <option value="">— Asignar después —</option>
+<div style="display:flex;flex-wrap:wrap;gap:4px" id="lOpChips_${i}">
             ${(fArea==='tapas'?personal.tapas:personal.serig)
               .filter(p=>p.rol!=='supervisor' && p.presente)
-              .map(p=>`<option value="${p.id}" ${l.operador===p.id?'selected':''}>${p.nombre}</option>`)
-              .join('')}
-          </select>
+              .map(p=>{
+                const sel = (l.operadores||[]).includes(p.id);
+                return `<div class="op-chip ${sel?'sel-op sel-op-'+fArea:''}"
+                  id="lOpChip_${i}_${p.id}"
+                  onclick="toggleLineaOp(${i},'${p.id}')"
+                  style="font-size:10px;padding:3px 8px;${sel?'':''}">
+                  <div style="width:14px;height:14px;border-radius:50%;background:${p.color};display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:800;color:white">${p.ini}</div>
+                  ${p.nombre.split(' ')[0]}
+                </div>`;
+              }).join('')}
+          </div>
         </div>
       </div>
     </div>`;
@@ -741,7 +762,11 @@ function getOperadoresOcupados() {
   const ocupados = new Set();
   solicitudes
     .filter(s => s.estado === 'proceso')
-    .forEach(s => (s.ops || []).forEach(op => ocupados.add(op)));
+    .forEach(s => {
+      // Check both global ops and per-line operadores
+      (s.ops || []).forEach(op => ocupados.add(op));
+      (s.lineas || []).forEach(l => (l.operadores || []).forEach(op => ocupados.add(op)));
+    });
   return ocupados;
 }
 
@@ -918,7 +943,7 @@ async function guardarEnSupabase(datos) {
         cantidad:        l.cant || 0,
         existencia_snap: l.existencia || 0,
         procesos:        l.procs || [],
-        operador_codigo: l.operador || null,
+        operadores_ids: l.operadores || [],
       }));
       const { error: err2 } = await db.from('solicitud_lineas').insert(lineasInsert);
       if (err2) throw err2;
@@ -1198,7 +1223,7 @@ function mostrarDetalle(s, view) {
               <td>${l.desc||'—'}</td>
               <td style="text-align:right;font-weight:700;font-family:var(--mono)">${(l.cant||0).toLocaleString()}</td>
               <td style="text-align:right;font-family:var(--mono);color:${(l.existencia||0) >= (l.cant||0) ? 'var(--green)' : 'var(--amber)'}">${l.existencia !== undefined ? l.existencia.toLocaleString() : '—'}</td>
-              <td style="font-size:11px;color:var(--mid)">${l.operador ? (opObj(l.operador)?.nombre||l.operador) : '<span style=\'color:var(--gray-l)\'>Sin asignar</span>'}</td>
+              <td style="font-size:11px;color:var(--mid)">${(l.operadores&&l.operadores.length) ? l.operadores.map(oid=>opObj(oid)?.nombre.split(' ')[0]||oid).join(', ') : '<span style="color:var(--gray-l)">Sin asignar</span>'}</td>
             </tr>`).join('')}
             <tr style="background:var(--bg)">
               <td colspan="3" style="font-weight:700;font-size:11px">TOTAL</td>
