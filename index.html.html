@@ -520,6 +520,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--dark);min-height:1
           <div class="c-item"><div class="c-val" id="cFecha">—</div><div class="c-lbl2">Entrega est.</div></div>
         </div>
         <div class="c-note" id="cNote"></div>
+        <div id="cAlerta" style="display:none;font-size:11px;font-weight:700;margin-top:6px;padding:5px 8px;border-radius:6px;background:rgba(0,0,0,0.04)"></div>
       </div>
 
       <div class="fg full">
@@ -566,7 +567,7 @@ let lineas = [];
 function addLinea() {
   if (lineas.length >= MAX_LINEAS) return;
   const idx = lineas.length;
-  lineas.push({ sku:'', desc:'', cant:0, procs:[], existencia:undefined });
+  lineas.push({ sku:'', desc:'', cant:0, procs:[], existencia:undefined, operador:'' });
   renderLineas();
   // focus the new SKU input
   setTimeout(() => {
@@ -668,6 +669,18 @@ function renderLineas() {
       <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
         <span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Proceso:</span>
         ${procChips}
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:4px">
+          <span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Operador:</span>
+          <select id="lOp_${i}" onchange="lineas[${i}].operador=this.value"
+            style="font-size:11px;padding:3px 8px;border:1.5px solid var(--border);border-radius:6px;background:white;font-family:var(--font);color:var(--mid);flex:1;max-width:200px">
+            <option value="">— Asignar después —</option>
+            ${(fArea==='tapas'?personal.tapas:personal.serig)
+              .filter(p=>p.rol!=='supervisor' && p.presente)
+              .map(p=>`<option value="${p.id}" ${l.operador===p.id?'selected':''}>${p.nombre}</option>`)
+              .join('')}
+          </select>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -905,6 +918,7 @@ async function guardarEnSupabase(datos) {
         cantidad:        l.cant || 0,
         existencia_snap: l.existencia || 0,
         procesos:        l.procs || [],
+        operador_codigo: l.operador || null,
       }));
       const { error: err2 } = await db.from('solicitud_lineas').insert(lineasInsert);
       if (err2) throw err2;
@@ -1176,7 +1190,7 @@ function mostrarDetalle(s, view) {
         <div class="dc-h">Líneas del pedido <span style="font-weight:400;text-transform:none;font-size:10px">${s.lineas.length} producto${s.lineas.length>1?'s':''} · ${s.cant.toLocaleString()} und total</span></div>
         <div class="dc-b" style="padding:0">
           <table class="dt">
-            <tr><th>#</th><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Existencia</th></tr>
+            <tr><th>#</th><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Existencia</th><th>Operador</th></tr>
             ${s.lineas.map((l,i) => `
             <tr>
               <td style="color:var(--gray-l)">${i+1}</td>
@@ -1184,6 +1198,7 @@ function mostrarDetalle(s, view) {
               <td>${l.desc||'—'}</td>
               <td style="text-align:right;font-weight:700;font-family:var(--mono)">${(l.cant||0).toLocaleString()}</td>
               <td style="text-align:right;font-family:var(--mono);color:${(l.existencia||0) >= (l.cant||0) ? 'var(--green)' : 'var(--amber)'}">${l.existencia !== undefined ? l.existencia.toLocaleString() : '—'}</td>
+              <td style="font-size:11px;color:var(--mid)">${l.operador ? (opObj(l.operador)?.nombre||l.operador) : '<span style=\'color:var(--gray-l)\'>Sin asignar</span>'}</td>
             </tr>`).join('')}
             <tr style="background:var(--bg)">
               <td colspan="3" style="font-weight:700;font-size:11px">TOTAL</td>
