@@ -1480,6 +1480,43 @@ async function guardar() {
   } else {
     alert('Error al guardar:\n' + (result.error || 'Error desconocido'));
   }
-} else {
-    alert('Error al guardar: ' + result.error + '\n\nRevisa la consola para más detalles.');
+
+} // end guardar
+
+// ══ NAVEGACIÓN ════════════════════════════════════════════
+function switchTab(view, tabEl, snBtn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.sn-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const vEl = document.getElementById('view-' + view);
+  if (vEl) vEl.classList.add('active');
+  if (tabEl) {
+    tabEl.classList.add('active');
+  } else {
+    const tEl = document.getElementById('tab-' + view);
+    if (tEl) tEl.classList.add('active');
   }
+  if (snBtn) snBtn.classList.add('active');
+}
+
+// ══ RELOJ ══════════════════════════════════════════════════
+function tick() {
+  const n = new Date();
+  const el = document.getElementById('clk');
+  if (!el) return;
+  el.textContent =
+    n.toLocaleDateString('es-GT',{weekday:'short',day:'2-digit',month:'short'}) +
+    ' · ' +
+    n.toLocaleTimeString('es-GT',{hour:'2-digit',minute:'2-digit'});
+}
+tick();
+setInterval(tick, 30000);
+
+// ══ INIT ══════════════════════════════════════════════════
+(async () => {
+  await cargarInventarioDB();
+  await cargarSolicitudes();
+})();
+</script>
+</body>
+</html>
