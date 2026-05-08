@@ -79,9 +79,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--dark);min-height:1
 .view.active{display:flex}
 
 /* SPLIT */
-.split{display:flex;flex:1;overflow:hidden;min-width:0}
+.split{display:flex;flex:1;overflow:hidden;min-width:0;min-height:0}
 .pane-l{width:400px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
-.pane-r{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.pane-r{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;height:100%}
 
 /* PANE HEADER */
 .ph{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;background:var(--card);flex-shrink:0}
@@ -133,7 +133,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--dark);min-height:1
 .pr-pct{font-size:9px;font-weight:700;font-family:var(--mono);color:var(--gray);min-width:28px;text-align:right}
 
 /* DETAIL */
-.det-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.det-scroll{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0}
 .det-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--gray-l)}
 .det-empty-ico{font-size:36px;opacity:.35}
 .det-empty-txt{font-size:12px}
@@ -331,7 +331,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--dark);min-height:1
           <div class="sol-list" id="listTapas"></div>
         </div>
         <div class="pane-r">
-          <div id="detTapas" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+          <div id="detTapas" style="display:flex;flex-direction:column;height:100%;overflow:hidden">
             <div class="det-empty"><div class="det-empty-ico">📋</div><div class="det-empty-txt">Selecciona una solicitud</div></div>
           </div>
         </div>
@@ -353,7 +353,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--dark);min-height:1
           <div class="sol-list" id="listSerig"></div>
         </div>
         <div class="pane-r">
-          <div id="detSerig" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+          <div id="detSerig" style="display:flex;flex-direction:column;height:100%;overflow:hidden">
             <div class="det-empty"><div class="det-empty-ico">🎨</div><div class="det-empty-txt">Selecciona una solicitud de serigrafía</div></div>
           </div>
         </div>
@@ -368,7 +368,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--dark);min-height:1
           <div class="sol-list" id="listTodas"></div>
         </div>
         <div class="pane-r">
-          <div id="detTodas" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+          <div id="detTodas" style="display:flex;flex-direction:column;height:100%;overflow:hidden">
             <div class="det-empty"><div class="det-empty-ico">📋</div><div class="det-empty-txt">Selecciona una solicitud</div></div>
           </div>
         </div>
@@ -1299,6 +1299,38 @@ function mostrarDetalle(s, view) {
       </div>
 
       <div class="dc">
+        <div class="dc-h">Reasignar operadores por línea
+          <span style="font-weight:400;text-transform:none;font-size:10px;color:var(--gray);margin-left:6px">Toca para asignar / quitar</span>
+        </div>
+        <div class="dc-b" style="display:flex;flex-direction:column;gap:8px">
+          ${(s.lineas||[]).map((ln,li) => {
+            const listaR = isT ? personal.tapas : personal.serig;
+            const ocupR = getOperadoresOcupados();
+            const chips = listaR.filter(p=>p.rol!=='supervisor'&&p.presente).map(p=>{
+              const selR = (ln.operadores||[]).includes(p.id);
+              const busyR = !selR && ocupR.has(p.id);
+              return '<div class="op-chip '+(selR?'sel-op':'')+'" '+
+                'onclick="'+(busyR?'':('reasignarOp(\''+s.id+'\','+li+',\''+p.id+'\',\''+view+'\''+')'))+'" '+
+                'title="'+(busyR?'En proceso en otra orden':selR?'Quitar':'Asignar')+'" '+
+                'style="font-size:10px;padding:3px 8px;'+(busyR?'opacity:.3;cursor:not-allowed;pointer-events:none;':'cursor:pointer;')+'">' +
+                '<div style="width:14px;height:14px;border-radius:50%;background:'+p.color+';display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:800;color:white">'+p.ini+'</div>' +
+                p.nombre.split(' ')[0] +
+                (busyR?'<span style="font-size:7px;color:var(--red)">●</span>':'') +
+                '</div>';
+            }).join('');
+            return '<div style="background:var(--bg);border-radius:8px;padding:10px 12px">' +
+              '<div style="font-size:11px;font-weight:700;color:var(--dark);margin-bottom:5px">' +
+              'Línea '+(li+1)+': <span style="font-family:var(--mono);color:var(--teal)">'+(ln.sku||'—')+'</span> · '+(ln.desc||'—')+' · <strong>'+(ln.cant||0).toLocaleString()+' und</strong>' +
+              '</div>' +
+              '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">'+chips+'</div>' +
+              '<div style="font-size:10px;color:var(--gray)">Asignados: <strong style="color:var(--teal)">' +
+              ((ln.operadores&&ln.operadores.length)?ln.operadores.map(oid=>opObj(oid)?.nombre.split(' ')[0]||oid).join(', '):'Ninguno') +
+              '</strong></div></div>';
+          }).join('')}
+        </div>
+      </div>
+
+      <div class="dc">
         <div class="dc-h">Actualizar progreso del supervisor</div>
         <div class="dc-b">
           <div style="display:flex;gap:8px;align-items:center">
@@ -1316,6 +1348,38 @@ function mostrarDetalle(s, view) {
 }
 
 // ══ ACCIONES ══════════════════════════════════════════════
+async function reasignarOp(solId, lineaIdx, opId, view) {
+  const s = solicitudes.find(x => x.id === solId);
+  if (!s || !s.lineas[lineaIdx]) return;
+  const l = s.lineas[lineaIdx];
+  if (!l.operadores) l.operadores = [];
+  const pos = l.operadores.indexOf(opId);
+  if (pos >= 0) l.operadores.splice(pos, 1);
+  else l.operadores.push(opId);
+
+  // Update in Supabase - need the line's UUID
+  // Re-fetch line IDs
+  const { data: lineasDB } = await db
+    .from('solicitud_lineas')
+    .select('id, orden')
+    .eq('solicitud_id', s.dbId)
+    .order('orden');
+
+  if (lineasDB && lineasDB[lineaIdx]) {
+    await db
+      .from('solicitud_lineas')
+      .update({ operadores_ids: l.operadores })
+      .eq('id', lineasDB[lineaIdx].id);
+  }
+
+  // Also update global ops list on solicitud
+  const todosOps = [...new Set(s.lineas.flatMap(ln => ln.operadores || []))];
+  s.ops = todosOps;
+
+  renderListas();
+  mostrarDetalle(s, view);
+}
+
 async function confirmarBorrar(id, codigo, view) {
   const confirma = window.confirm(
     '¿Eliminar la solicitud ' + codigo + '?\n\nEsta acción no se puede deshacer.'
