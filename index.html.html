@@ -1499,47 +1499,35 @@ function abrirForm(area) {
   fArea = area;
   document.getElementById('mTitle').textContent = area==='tapas' ? 'Nueva solicitud · Tapas' : 'Nueva solicitud · Serigrafía';
   document.getElementById('btnSave').className = `btn ${area==='tapas'?'btn-t':'btn-s'}`;
-  // Procesos ahora son por línea — no hay selector global
 
-  // fecha default +3 días
+  // Fecha default +3 días
   const d = new Date(); d.setDate(d.getDate()+3);
   document.getElementById('fFecha').value = d.toISOString().split('T')[0];
 
-  // operadores chips
-  const lista = area==='tapas' ? personal.tapas : personal.serig;
+  // Prioridad default
+  document.getElementById('fPrioSelect').value = 'normal';
+
+  // Reset form fields
+  document.getElementById('fCli').value = '';
+  document.getElementById('fNotas').value = '';
+
+  // Init líneas con 1 vacía
+  lineas = [];
+  addLinea();
+
+  // Mostrar disponibilidad en el hint
+  const listaOps = area==='tapas' ? personal.tapas : personal.serig;
   const ocupados = getOperadoresOcupados();
-  const sel = document.getElementById('opsSel');
-  sel.innerHTML = lista.map(p => {
-    const isOcupado = ocupados.has(p.id);
-    const isDisponible = p.presente && !isOcupado && p.rol !== 'supervisor';
-    const tooltip = isOcupado ? 'En proceso — ocupado' : !p.presente ? 'Ausente hoy' : '';
-    return `<div class="op-chip" id="chip_${p.id}"
-      onclick="toggleChip('${p.id}','${area}')"
-      title="${tooltip}"
-      style="${!isDisponible ? 'opacity:.35;cursor:not-allowed;pointer-events:none;' : ''}${isOcupado ? 'border-color:var(--red);' : ''}">
-      <div style="width:16px;height:16px;border-radius:50%;background:${p.color};display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:800;color:white">${p.ini}</div>
-      ${p.nombre.split(' ')[0]}
-      ${isOcupado ? '<span style="font-size:8px;color:var(--red)">●</span>' : ''}
-    </div>`;
-  }).join('');
+  const libres = listaOps.filter(p => p.presente && p.rol !== 'supervisor' && !ocupados.has(p.id)).length;
+  const enProc  = listaOps.filter(p => p.rol !== 'supervisor' && ocupados.has(p.id)).length;
+  const cntEl = document.getElementById('opsDisponiblesCount');
+  if (cntEl) cntEl.textContent = libres + ' libres · ' + enProc + ' en proceso';
 
   document.getElementById('cboxEl').className = `cbox ${area==='serig'?'cs':''}`;
-
-  // Init lineas de pedido
-  lineas = [];
-  addLinea(); // start with 1 empty line
-
-  // Show available operators count
-  const listaOps = area==='tapas' ? personal.tapas : personal.serig;
-  const ocupados2 = getOperadoresOcupados();
-  const disponibles = listaOps.filter(p => p.presente && p.rol !== 'supervisor' && !ocupados2.has(p.id));
-  const enProceso  = listaOps.filter(p => p.rol !== 'supervisor' && ocupados2.has(p.id));
-  const cntEl = document.getElementById('opsDisponiblesCount');
-  if (cntEl) cntEl.textContent = disponibles.length + ' libres · ' + enProceso.length + ' en proceso';
-
   calcular();
   document.getElementById('overlay').classList.add('open');
 }
+
 
 function toggleChip(id, area) {
   const p = [...personal.tapas,...personal.serig].find(x=>x.id===id);
@@ -1553,8 +1541,8 @@ function toggleChip(id, area) {
 }
 
 function getSelectedOps() {
-  return [...document.getElementById('opsSel').querySelectorAll('.sel-op,.sel-op-s')]
-    .map(c=>c.id.replace('chip_',''));
+  // Operadores ahora se asignan por línea — retorna todos los únicos
+  return [...new Set(lineas.flatMap(l => l.operadores || []))];
 }
 
 function getSelectedProcs() {
