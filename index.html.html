@@ -643,12 +643,17 @@ function renderLineas() {
             oninput="onSkuInput(${i},this.value)"
             onblur="setTimeout(()=>hideDrop(${i}),150)"
             autocomplete="off">
-          <div id="lDrop_${i}" style="display:none;position:absolute;top:100%;left:0;width:380px;background:white;border:1.5px solid var(--teal-l);border-radius:7px;box-shadow:var(--shadow-lg);z-index:500;max-height:200px;overflow-y:auto"></div>
+          <div id="lDrop_${i}" style="display:none;position:fixed;background:white;border:1.5px solid var(--teal-l);border-radius:7px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;max-height:260px;overflow-y:auto;min-width:420px"></div>
         </div>
-        <input class="fi" id="lDesc_${i}" value="${l.desc}"
-          placeholder="Descripción..."
-          style="padding:5px 7px;font-size:11px;width:100%"
-          oninput="lineas[${i}].desc=this.value">
+        <div style="position:relative;width:100%">
+          <input class="fi" id="lDesc_${i}" value="${l.desc}"
+            placeholder="Descripción... (escribe para buscar)"
+            style="padding:5px 7px;font-size:11px;width:100%"
+            oninput="onDescInput(${i},this.value)"
+            onblur="setTimeout(()=>hideDescDrop(${i}),150)"
+            autocomplete="off">
+          <div id="lDescDrop_${i}" style="display:none;position:fixed;background:white;border:1.5px solid var(--teal-l);border-radius:7px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;max-height:260px;overflow-y:auto;min-width:420px"></div>
+        </div>
         <input class="fi" id="lCant_${i}" value="${l.cant||''}"
           type="number" placeholder="0"
           style="padding:5px 7px;font-size:12px;font-family:var(--mono);font-weight:700;text-align:right;width:100%"
@@ -680,12 +685,20 @@ function onSkuInput(idx, val) {
   if (!results.length) { drop.style.display='none'; return; }
   drop.innerHTML = results.map(r => `
     <div onclick="selectSKU(${idx},'${r.sku}','${r.descripcion.replace(/'/g,"\'")}',${r.existencia})"
-      style="padding:7px 10px;cursor:pointer;font-size:11px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px"
+      style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;align-items:center"
       onmouseover="this.style.background='var(--teal-xl)'" onmouseout="this.style.background='white'">
-      <span><strong style="font-family:var(--mono)">${r.sku}</strong> — ${r.descripcion}</span>
-      <span style="color:var(--gray);white-space:nowrap">${r.existencia.toLocaleString()} und</span>
+      <span><strong style="font-family:var(--mono);color:var(--teal)">${r.sku}</strong> <span style="color:var(--mid)">— ${r.descripcion}</span></span>
+      <span style="color:${r.existencia>0?'var(--green)':'var(--gray-l)'};white-space:nowrap;font-family:var(--mono);font-size:11px">${r.existencia>0?r.existencia.toLocaleString()+' und':'sin stock'}</span>
     </div>
   `).join('');
+  // Position dropdown relative to input using getBoundingClientRect
+  const inputEl = document.getElementById('lSku_'+idx);
+  if (inputEl) {
+    const rect = inputEl.getBoundingClientRect();
+    drop.style.top  = (rect.bottom + 4) + 'px';
+    drop.style.left = rect.left + 'px';
+    drop.style.width = Math.max(420, rect.width) + 'px';
+  }
   drop.style.display = 'block';
 }
 
@@ -703,6 +716,47 @@ function selectSKU(idx, sku, desc, existencia) {
 function hideDrop(idx) {
   const d = document.getElementById('lDrop_'+idx);
   if (d) d.style.display = 'none';
+}
+
+function hideDescDrop(idx) {
+  const d = document.getElementById('lDescDrop_'+idx);
+  if (d) d.style.display = 'none';
+}
+
+function onDescInput(idx, val) {
+  lineas[idx].desc = val;
+  const drop = document.getElementById('lDescDrop_'+idx);
+  if (!drop) return;
+  if (val.length < 2) { drop.style.display='none'; return; }
+  const results = buscarSKU(val); // reuse same search (searches description too)
+  if (!results.length) { drop.style.display='none'; return; }
+  drop.innerHTML = results.map(r => `
+    <div onclick="selectSKUFromDesc(${idx},'${r.sku}','${r.descripcion.replace(/'/g,"\'")}',${r.existencia})"
+      style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;align-items:center"
+      onmouseover="this.style.background='var(--teal-xl)'" onmouseout="this.style.background='white'">
+      <span><span style="color:var(--mid)">${r.descripcion}</span></span>
+      <span style="color:var(--teal);white-space:nowrap;font-family:var(--mono);font-size:10px">${r.sku}</span>
+    </div>
+  `).join('');
+  const inputEl = document.getElementById('lDesc_'+idx);
+  if (inputEl) {
+    const rect = inputEl.getBoundingClientRect();
+    drop.style.top  = (rect.bottom + 4) + 'px';
+    drop.style.left = rect.left + 'px';
+    drop.style.width = Math.max(420, rect.width) + 'px';
+  }
+  drop.style.display = 'block';
+}
+
+function selectSKUFromDesc(idx, sku, desc, existencia) {
+  lineas[idx] = { ...lineas[idx], sku, desc, existencia };
+  const skuEl  = document.getElementById('lSku_'+idx);
+  const descEl = document.getElementById('lDesc_'+idx);
+  if (skuEl)  skuEl.value  = sku;
+  if (descEl) descEl.value = desc;
+  hideDescDrop(idx);
+  renderLineas();
+  calcular();
 }
 
 function updateTotals() {
@@ -913,9 +967,7 @@ let personal = {
     { id:'T7',  nombre:'Carlos Ascuc',     ini:'CA', color:'#5B4A1A', proc:'Armado',      presente:true,  turno:'AM',   rol:'operador' },
     { id:'T8',  nombre:'Selvin Rivera',    ini:'SR', color:'#5B1A1A', proc:'Banda',       presente:true,  turno:'AM',   rol:'operador' },
     { id:'T9',  nombre:'Daniel Ochoa',     ini:'DO', color:'#1A5B3A', proc:'Liner',       presente:true,  turno:'AM',   rol:'operador' },
-    { id:'T10', nombre:'Operador 1',       ini:'O1', color:'#888780', proc:'—',           presente:false, turno:'AM',   rol:'operador' },
-    { id:'T11', nombre:'Operador 2',       ini:'O2', color:'#888780', proc:'—',           presente:false, turno:'AM',   rol:'operador' },
-    { id:'T12', nombre:'Operador 3',       ini:'O3', color:'#888780', proc:'—',           presente:false, turno:'AM',   rol:'operador' },
+
   ],
   serig: [
     { id:'S0',  nombre:'Luis Cordova',       ini:'LC', color:'#0D4035', proc:'Supervisor',  presente:true,  turno:'AM',   rol:'supervisor' },
@@ -1518,3 +1570,4 @@ setInterval(tick, 30000);
 })();
 </script>
 </body>
+</html>
