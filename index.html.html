@@ -1222,15 +1222,45 @@ function mostrarDetalle(s, view) {
         ${s.estado==='proceso'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista','${view}')">✓ Lista</button>`:''}
         ${s.estado==='lista'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada','${view}')">📦 Entregar</button>`:''}
         ${ePill(s.estado)} ${pPill(s.prio)}
-        <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #f5c0c0;margin-left:4px" onclick="confirmarBorrar('${s.id}','${s.id_display||s.id}','${view}')">🗑 Borrar</button>
+                <button class="btn btn-xs" style="background:var(--blue-l);color:var(--blue);border:1px solid #b8d4f0;margin-left:4px" onclick="editarSolicitud('${s.id}','${view}')">✏ Editar</button>
+<button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #f5c0c0;margin-left:4px" onclick="confirmarBorrar('${s.id}','${s.id_display||s.id}','${view}')">🗑 Borrar</button>
       </div>
     </div>
     <div class="det-scroll">
 
       <div class="tbox ${isT?'tt':'ts'}">
-        <div class="tbox-lbl">Tiempo estimado de entrega</div>
-        <div class="tbox-val ${isT?'tc':'sc2'}">${horas.toFixed(1)} horas</div>
-        <div class="tbox-sub">${turnos} turno${turnos>1?'s':''} de ${CFG.turno_h}h · ${nOps} operador${nOps>1?'es':''} · ${cap.toLocaleString()} und/hora · Entrega estimada: <strong>${fEst}</strong></div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div>
+            <div class="tbox-lbl">Entrega estimada</div>
+            <div class="tbox-val ${isT?'tc':'sc2'}" style="font-size:30px">${fEst}</div>
+          </div>
+          ${s.fecha_lim ? `<div style="text-align:right">
+            <div class="tbox-lbl">Fecha solicitada por Ventas</div>
+            <div style="font-size:20px;font-weight:800;color:var(--mid);font-family:var(--mono)">${s.fecha_lim}</div>
+          </div>` : ''}
+        </div>
+        <div style="margin:6px 0">
+          ${(()=>{
+            if(!s.fecha_lim) return '';
+            const estD = new Date(); estD.setDate(estD.getDate()+turnos);
+            const limD = new Date(s.fecha_lim);
+            const diff = Math.round((limD-estD)/86400000);
+            if(diff>=0) return '<span style="font-size:12px;font-weight:700;color:var(--green);background:var(--green-l);padding:2px 8px;border-radius:6px">✓ '+(diff===0?'Justo a tiempo':diff+' día'+(diff>1?'s':'')+' antes del límite')+'</span>';
+            return '<span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-l);padding:2px 8px;border-radius:6px">⚠ Se pasa '+Math.abs(diff)+' día'+(Math.abs(diff)>1?'s':'')+' del límite</span>';
+          })()}
+        </div>
+        <div class="tbox-sub">⏱ ${horas.toFixed(1)}h · ${turnos} turno${turnos>1?'s':''} · ${nOps} operador${nOps>1?'es':''} · ${cap.toLocaleString()} und/h</div>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,0.07);font-size:11px;color:var(--gray)">
+          💡 ${(()=>{
+            if(!s.fecha_lim) return 'Asigna fecha límite para recibir recomendación.';
+            const diasDisp = Math.max(1,Math.ceil((new Date(s.fecha_lim)-new Date())/86400000));
+            const opsNec = Math.ceil(s.cant/(CFG.cap_und_h*diasDisp*CFG.turno_h));
+            const maxOps = isT?personal.tapas.filter(p=>p.presente&&p.rol!=='supervisor').length:personal.serig.filter(p=>p.presente&&p.rol!=='supervisor').length;
+            if(opsNec<=Math.max(nOps,1)) return 'Con '+Math.max(nOps,1)+' operador'+(Math.max(nOps,1)>1?'es':'')+' se cumple el plazo.';
+            if(opsNec>maxOps) return 'Necesitas '+opsNec+' op. pero solo hay '+maxOps+' disponibles. Considera turno de vela.';
+            return 'Recomendado: asignar <strong>'+opsNec+' operadores</strong> para cumplir la fecha.';
+          })()}
+        </div>
       </div>
 
       <div class="dc">
@@ -1387,6 +1417,88 @@ async function reasignarOp(solId, lineaIdx, opId, view) {
 
   renderListas();
   mostrarDetalle(s, view);
+}
+
+async function editarSolicitud(id, view) {
+  const s = solicitudes.find(x => x.id === id);
+  if (!s) return;
+
+  fArea = s.area;
+  document.getElementById('mTitle').textContent = 'Editar solicitud · ' + (s.id_display||s.id);
+  document.getElementById('btnSave').className = 'btn ' + (s.area==='tapas'?'btn-t':'btn-s');
+  document.getElementById('btnSave').textContent = 'Guardar cambios';
+
+  document.getElementById('fCli').value = s.cliente || '';
+  document.getElementById('fArea').value = s.area_sol || 'Ventas';
+  document.getElementById('fPrioSelect').value = s.prio || 'normal';
+  if (s.fecha_lim) document.getElementById('fFecha').value = s.fecha_lim;
+
+  lineas = (s.lineas || []).map(l => ({
+    sku: l.sku||'', desc: l.desc||'', cant: l.cant||0,
+    procs: l.procs||[], operadores: l.operadores||[], existencia: l.existencia
+  }));
+  if (!lineas.length) addLinea();
+  renderLineas();
+
+  document.getElementById('cboxEl').className = 'cbox ' + (s.area==='serig'?'cs':'');
+  calcular();
+  document.getElementById('btnSave').onclick = () => guardarEdicion(id, view);
+  document.getElementById('overlay').classList.add('open');
+}
+
+async function guardarEdicion(id, view) {
+  const s = solicitudes.find(x => x.id === id);
+  if (!s) return;
+
+  const cli     = document.getElementById('fCli').value;
+  const areaSol = document.getElementById('fArea').value;
+  const fecha   = document.getElementById('fFecha').value;
+  const prio    = document.getElementById('fPrioSelect').value;
+  const notas   = document.getElementById('fNotas').value.trim();
+  const lineasV = lineas.filter(l => l.cant > 0);
+
+  if (!cli) { alert('Selecciona un cliente.'); return; }
+  if (!lineasV.length) { alert('Agrega al menos una línea.'); return; }
+
+  const btn = document.getElementById('btnSave');
+  btn.textContent = 'Guardando...'; btn.disabled = true;
+
+  try {
+    await db.from('solicitudes').update({
+      cliente_nombre: cli, area_solicitante: areaSol,
+      fecha_limite: fecha||null, prioridad: prio, notas: notas||null
+    }).eq('id', s.dbId);
+
+    await db.from('solicitud_lineas').delete().eq('solicitud_id', s.dbId);
+    await db.from('solicitud_lineas').insert(
+      lineasV.map((l,i) => ({
+        solicitud_id: s.dbId, orden: i+1,
+        sku: l.sku||null, descripcion: l.desc||'Sin descripción',
+        cantidad: l.cant, existencia_snap: l.existencia||0,
+        procesos: l.procs||[], operadores_ids: l.operadores||[]
+      }))
+    );
+
+    cerrarForm();
+    btn.textContent = 'Guardar solicitud';
+    btn.disabled = false;
+    btn.onclick = guardar;
+
+    await cargarSolicitudes();
+
+    const toast = document.createElement('div');
+    toast.textContent = '✓ Solicitud actualizada';
+    toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--blue);color:white;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.2)';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+
+    const updated = solicitudes.find(x => x.id === id);
+    if (updated) mostrarDetalle(updated, view);
+
+  } catch(e) {
+    alert('Error: ' + e.message);
+    btn.textContent = 'Guardar cambios'; btn.disabled = false;
+  }
 }
 
 async function confirmarBorrar(id, codigo, view) {
