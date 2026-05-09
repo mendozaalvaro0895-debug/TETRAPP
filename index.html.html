@@ -1159,6 +1159,29 @@ function buildList(cid, list, view) {
 }
 
 // ══ DETAIL ════════════════════════════════════════════════
+function toggleOpDrop(id) {
+  const d = document.getElementById(id);
+  if (d) d.style.display = d.style.display === 'none' ? 'flex' : 'none';
+}
+
+function buildOpChips(l, li, s, view, isT) {
+  const ocupados = getOperadoresOcupados();
+  const lista = isT ? personal.tapas : personal.serig;
+  return lista
+    .filter(p => p.rol !== 'supervisor' && p.presente)
+    .map(p => {
+      const sel = (l.operadores||[]).includes(p.id);
+      const busy = !sel && ocupados.has(p.id);
+      const avatar = '<span style="width:11px;height:11px;border-radius:50%;background:'+p.color+';display:inline-flex;align-items:center;justify-content:center;font-size:6px;font-weight:800;color:white;margin-right:3px;vertical-align:middle">'+p.ini+'</span>';
+      const name = p.nombre.split(' ')[0];
+      if (busy) {
+        return '<span class="op-chip" style="opacity:.3;pointer-events:none;font-size:10px;padding:2px 6px" title="En proceso">'+avatar+name+'</span>';
+      }
+      const onclick = 'reasignarOp(\'' + s.id + '\''+',' + li + ','+'\'' + p.id + '\''+','+'\'' + view + '\''+ ')';
+      return '<span class="op-chip '+(sel?'sel-op':'')+'" style="font-size:10px;padding:2px 6px;cursor:pointer" onclick="'+onclick+'">'+avatar+name+'</span>';
+    }).join('');
+}
+
 function mostrarDetalle(s, view) {
   selId[view] = s.id;
   renderListas();
@@ -1221,7 +1244,15 @@ function mostrarDetalle(s, view) {
                   <div style="padding:8px;font-size:11px;color:var(--mid);background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${l.desc||'—'}</div>
                   <div style="padding:8px;font-size:12px;font-weight:800;font-family:var(--mono);text-align:right;color:var(--dark);background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${(l.cant||0).toLocaleString()}</div>
                   <div style="padding:8px;font-size:11px;font-family:var(--mono);text-align:right;font-weight:700;color:${(l.existencia||0)>=(l.cant||0)?'var(--green)':'var(--amber)'};background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${l.existencia!==undefined?l.existencia.toLocaleString():'—'}</div>
-                  <div style="padding:8px;font-size:11px;color:var(--mid);background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${(l.operadores&&l.operadores.length)?l.operadores.map(oid=>opObj(oid)?.nombre.split(' ')[0]||oid).join(', '):'<span style="color:var(--gray-l)">Sin asignar</span>'}</div>
+                  <div style="padding:6px 8px;background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">
+                    <div style="display:flex;align-items:center;gap:4px;cursor:pointer" onclick="toggleOpDrop('opd_${li}_${s.id.substring(0,8)}')">
+                      <span style="font-size:11px;color:var(--mid);flex:1">${(l.operadores&&l.operadores.length)?l.operadores.map(oid=>opObj(oid)?.nombre.split(' ')[0]||oid).join(', '):'<em style="font-size:10px;color:var(--gray-l)">Sin asignar</em>'}</span>
+                      <span style="font-size:9px;color:var(--teal)">▼</span>
+                    </div>
+                    <div id="opd_${li}_${s.id.substring(0,8)}" style="display:none;flex-wrap:wrap;gap:3px;margin-top:5px;padding-top:5px;border-top:1px dashed var(--border)">
+                      ${buildOpChips(l, li, s, view, isT)}
+                    </div>
+                  </div>
                 `).join('')}
               </div>
             </div>
@@ -1301,36 +1332,6 @@ function mostrarDetalle(s, view) {
         </div>
       </div>
 
-      <div class="dc">
-        <div class="dc-h">Reasignar operadores por línea
-          <span style="font-weight:400;text-transform:none;font-size:10px;color:var(--gray);margin-left:6px">Toca para asignar / quitar</span>
-        </div>
-        <div class="dc-b" style="display:flex;flex-direction:column;gap:8px">
-          ${(s.lineas||[]).map((ln,li) => {
-            const listaR = isT ? personal.tapas : personal.serig;
-            const ocupR = getOperadoresOcupados();
-            const chips = listaR.filter(p=>p.rol!=='supervisor'&&p.presente).map(p=>{
-              const selR = (ln.operadores||[]).includes(p.id);
-              const busyR = !selR && ocupR.has(p.id);
-              return '<div class="op-chip '+(selR?'sel-op':'')+'" '+
-                'onclick="'+(busyR?'':('reasignarOp(\''+s.id+'\','+li+',\''+p.id+'\',\''+view+'\''+')'))+'" '+
-                'title="'+(busyR?'En proceso en otra orden':selR?'Quitar':'Asignar')+'" '+
-                'style="font-size:10px;padding:3px 8px;'+(busyR?'opacity:.3;cursor:not-allowed;pointer-events:none;':'cursor:pointer;')+'">' +
-                '<div style="width:14px;height:14px;border-radius:50%;background:'+p.color+';display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:800;color:white">'+p.ini+'</div>' +
-                p.nombre.split(' ')[0] +
-                (busyR?'<span style="font-size:7px;color:var(--red)">●</span>':'') +
-                '</div>';
-            }).join('');
-            return '<div style="background:var(--bg);border-radius:8px;padding:10px 12px">' +
-              '<div style="font-size:11px;font-weight:700;color:var(--dark);margin-bottom:5px">' +
-              'Línea '+(li+1)+': <span style="font-family:var(--mono);color:var(--teal)">'+(ln.sku||'—')+'</span> · '+(ln.desc||'—')+' · <strong>'+(ln.cant||0).toLocaleString()+' und</strong>' +
-              '</div>' +
-              '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">'+chips+'</div>' +
-              '<div style="font-size:10px;color:var(--gray)">Asignados: <strong style="color:var(--teal)">' +
-              ((ln.operadores&&ln.operadores.length)?ln.operadores.map(oid=>opObj(oid)?.nombre.split(' ')[0]||oid).join(', '):'Ninguno') +
-              '</strong></div></div>';
-          }).join('')}
-        </div>
       </div>
 
       <div class="dc">
