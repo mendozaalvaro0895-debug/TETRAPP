@@ -1159,46 +1159,6 @@ function buildList(cid, list, view) {
 }
 
 // ══ DETAIL ════════════════════════════════════════════════
-function renderLineaRow(l, li, s, view, isT) {
-  const bg = li%2===0 ? 'white' : 'var(--bg)';
-  const bt = li>0 ? ';border-top:1px solid var(--bg2)' : '';
-  const ocupados = getOperadoresOcupados();
-  const listaOps = isT ? personal.tapas : personal.serig;
-  const dropId = 'drop_' + li + '_' + s.id.substring(0,8);
-  const opsStr = (l.operadores&&l.operadores.length)
-    ? l.operadores.map(oid => opObj(oid)?.nombre.split(' ')[0]||oid).join(', ')
-    : '<em style="color:var(--gray-l);font-size:10px">Sin asignar</em>';
-  
-  const chips = listaOps
-    .filter(p => p.rol !== 'supervisor' && p.presente)
-    .map(p => {
-      const sel = (l.operadores||[]).includes(p.id);
-      const busy = !sel && ocupados.has(p.id);
-      const avatar = '<span style="width:12px;height:12px;border-radius:50%;background:'+p.color+';display:inline-flex;align-items:center;justify-content:center;font-size:6px;font-weight:800;color:white;margin-right:3px;vertical-align:middle">'+p.ini+'</span>';
-      if (busy) {
-        return '<span class="op-chip" style="opacity:.3;pointer-events:none;font-size:10px;padding:2px 7px">'+avatar+p.nombre.split(' ')[0]+'</span>';
-      }
-      return '<span class="op-chip '+(sel?'sel-op':'')+'' data-sol="'+s.id+'" data-li="'+li+'" data-op="'+p.id+'" data-view="'+view+'" style="font-size:10px;padding:2px 7px;cursor:pointer" onclick="reasignarOp(this.dataset.sol,this.dataset.li,this.dataset.op,this.dataset.view)">'+avatar+p.nombre.split(' ')[0]+'</span>';
-    }).join('');
-
-  const existColor = (l.existencia||0) >= (l.cant||0) ? 'var(--green)' : 'var(--amber)';
-  const existVal = l.existencia !== undefined ? l.existencia.toLocaleString() : '—';
-
-  return '<div style="display:grid;grid-template-columns:85px 1fr 80px 72px 1fr;background:'+bg+bt+'">'
-    + '<div style="padding:8px;font-family:var(--mono);font-size:11px;color:var(--teal);font-weight:700">'+(l.sku||'—')+'</div>'
-    + '<div style="padding:8px;font-size:11px;color:var(--mid)">'+(l.desc||'—')+'</div>'
-    + '<div style="padding:8px;font-size:12px;font-weight:800;font-family:var(--mono);text-align:right;color:var(--dark)">'+(l.cant||0).toLocaleString()+'</div>'
-    + '<div style="padding:8px;font-size:11px;font-family:var(--mono);text-align:right;font-weight:700;color:'+existColor+'">'+existVal+'</div>'
-    + '<div style="padding:6px 8px">'
-    +   '<div data-drop="'+dropId+'" onclick="var d=document.getElementById(this.dataset.drop);d.style.display=d.style.display===\'none\'?\'flex\':\'none\'" style="cursor:pointer;display:flex;align-items:center;gap:4px">'
-    +     '<span style="font-size:11px;color:var(--mid);flex:1">'+opsStr+'</span>'
-    +     '<span style="font-size:9px;color:var(--teal);white-space:nowrap">▼</span>'
-    +   '</div>'
-    +   '<div id="'+dropId+'" style="display:none;flex-wrap:wrap;gap:4px;margin-top:5px;padding-top:5px;border-top:1px dashed var(--border)">'+chips+'</div>'
-    + '</div>'
-    + '</div>';
-}
-
 function mostrarDetalle(s, view) {
   selId[view] = s.id;
   renderListas();
@@ -1228,9 +1188,9 @@ function mostrarDetalle(s, view) {
         <div class="ph-sub">${s.sku} · ${s.desc}</div>
       </div>
       <div class="ph-r">
-        ${(['nueva','programada'].includes(s.estado)) ? '<button class="btn '+(isT?'btn-t':'btn-s')+' btn-xs" onclick="cambiarEstado(\''+s.id+'\',\'proceso\',\''+view+'\')">▶ Iniciar</button>' : ''}
-        ${s.estado==='proceso' ? '<button class="btn btn-g btn-xs" onclick="cambiarEstado(\''+s.id+'\',\'lista\',\''+view+'\')">✓ Lista</button>' : ''}
-        ${s.estado==='lista' ? '<button class="btn btn-g btn-xs" onclick="cambiarEstado(\''+s.id+'\',\'entregada\',\''+view+'\')">📦 Entregar</button>' : ''}
+        ${(s.estado==='nueva'||s.estado==='programada')?`<button class="btn ${isT?'btn-t':'btn-s'} btn-xs" onclick="cambiarEstado('${s.id}','proceso','${view}')">▶ Iniciar</button>`:''}
+        ${s.estado==='proceso'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista','${view}')">✓ Lista</button>`:''}
+        ${s.estado==='lista'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada','${view}')">📦 Entregar</button>`:''}
         ${ePill(s.estado)} ${pPill(s.prio)}
         <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #f5c0c0;margin-left:4px" onclick="confirmarBorrar('${s.id}','${s.id_display||s.id}','${view}')">🗑 Borrar</button>
       </div>
@@ -1246,33 +1206,72 @@ function mostrarDetalle(s, view) {
       <div class="dc">
         <div class="dc-h">Detalle de la solicitud</div>
         <div class="dc-b">
-                    <div class="ig">
+          <div class="ig">
+            <!-- Cantidad desglosada por línea -->
             <div class="ii" style="grid-column:1/-1">
-              <div class="il" style="margin-bottom:6px">Líneas del pedido · ${s.cant.toLocaleString()} und total</div>
-              <div style="border:1px solid var(--border);border-radius:7px;overflow:hidden">
-                <div style="display:grid;grid-template-columns:85px 1fr 80px 72px 1fr;background:var(--bg2);border-bottom:1px solid var(--border)">
-                  <div style="padding:5px 8px;font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px">SKU</div>
-                  <div style="padding:5px 8px;font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px">Descripción</div>
-                  <div style="padding:5px 8px;font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;text-align:right">Cant.</div>
-                  <div style="padding:5px 8px;font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;text-align:right">Bodega</div>
-                  <div style="padding:5px 8px;font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px">Operador(es) <span style="color:var(--teal);cursor:pointer;font-weight:400;text-transform:none">✏</span></div>
-                </div>
-                ${(s.lineas||[]).map((l,li) => renderLineaRow(l, li, s, view, isT)).join('')}              </div>
+              <div class="il">Cantidad total · ${s.cant.toLocaleString()} und</div>
+              <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">
+                ${(s.lineas||[]).map(l=>`
+                  <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                    <span style="font-family:var(--mono);font-size:11px;color:var(--teal);font-weight:700">${l.sku||'—'}</span>
+                    <span style="color:var(--mid)">${l.desc||'—'}</span>
+                    <span style="margin-left:auto;font-family:var(--mono);font-weight:800;color:var(--dark)">${(l.cant||0).toLocaleString()}</span>
+                    <span style="color:var(--gray-l);font-size:10px">und</span>
+                  </div>
+                `).join('')}
+              </div>
             </div>
             <div class="ii"><div class="il">Proceso(s)</div><div class="iv">${s.tipo.split('+').map(p=>PROCS[p]?.label||p).join(' + ')}</div></div>
             <div class="ii"><div class="il">Prioridad</div><div class="iv">${s.prio==='urgente'?'🔴 Urgente':s.prio==='vela'?'🌙 Vela':s.prio==='programada'?'🟡 Programada':'🟢 Normal'}</div></div>
-            <div class="ii"><div class="il">Fecha límite</div><div class="iv">📅 ${s.fecha_lim||'—'}</div></div>
-            <div class="ii"><div class="il">Entrega estimada</div>
-              <div class="iv" style="color:${(()=>{if(!s.fecha_lim)return 'var(--gray)';const e=new Date();e.setDate(e.getDate()+calcTurnos(calcHoras(s.cant,Math.max(s.ops.length,1))));return e<=new Date(s.fecha_lim)?'var(--green)':'var(--red)';})()}">🕐 ${(()=>{const t=calcTurnos(calcHoras(s.cant,Math.max(s.ops.length,1)));const e=new Date();e.setDate(e.getDate()+t);return e.toLocaleDateString('es-GT',{day:'2-digit',month:'short',year:'numeric'});})()}</div>
+            <div class="ii">
+              <div class="il">Fecha límite</div>
+              <div class="iv">📅 ${s.fecha_lim||'—'}</div>
+            </div>
+            <div class="ii">
+              <div class="il">Entrega estimada</div>
+              <div class="iv" style="color:${(()=>{
+                if(!s.fecha_lim) return 'var(--gray)';
+                const est = new Date(); est.setDate(est.getDate() + calcTurnos(calcHoras(s.cant, Math.max(s.ops.length,1))));
+                const lim = new Date(s.fecha_lim);
+                return est <= lim ? 'var(--green)' : 'var(--red)';
+              })()}">
+                🕐 ${(()=>{
+                  const t = calcTurnos(calcHoras(s.cant, Math.max(s.ops.length,1)));
+                  const est = new Date(); est.setDate(est.getDate() + t);
+                  return est.toLocaleDateString('es-GT',{day:'2-digit',month:'short',year:'numeric'});
+                })()}
+              </div>
             </div>
             <div class="ii"><div class="il">Área solicitante</div><div class="iv">${s.area_sol||'Ventas'}</div></div>
             <div class="ii"><div class="il">Ingresada</div><div class="iv mono" style="font-size:10px">${s.created}</div></div>
           </div>
-          ${s.notas ? '<div class="nota-box" style="margin-top:10px">📌 '+s.notas+'</div>' : ''}
+          ${s.notas?`<div class="nota-box" style="margin-top:10px">📌 ${s.notas}</div>`:''}
         </div>
       </div>
 
-      
+      ${s.lineas && s.lineas.length > 0 ? `
+      <div class="dc">
+        <div class="dc-h">Líneas del pedido <span style="font-weight:400;text-transform:none;font-size:10px">${s.lineas.length} producto${s.lineas.length>1?'s':''} · ${s.cant.toLocaleString()} und total</span></div>
+        <div class="dc-b" style="padding:0">
+          <table class="dt">
+            <tr><th>#</th><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Existencia</th><th>Operador</th></tr>
+            ${s.lineas.map((l,i) => `
+            <tr>
+              <td style="color:var(--gray-l)">${i+1}</td>
+              <td class="td-mono" style="font-family:var(--mono);font-size:11px">${l.sku||'—'}</td>
+              <td>${l.desc||'—'}</td>
+              <td style="text-align:right;font-weight:700;font-family:var(--mono)">${(l.cant||0).toLocaleString()}</td>
+              <td style="text-align:right;font-family:var(--mono);color:${(l.existencia||0) >= (l.cant||0) ? 'var(--green)' : 'var(--amber)'}">${l.existencia !== undefined ? l.existencia.toLocaleString() : '—'}</td>
+              <td style="font-size:11px;color:var(--mid)">${(l.operadores&&l.operadores.length) ? l.operadores.map(oid=>opObj(oid)?.nombre.split(' ')[0]||oid).join(', ') : '<span style="color:var(--gray-l)">Sin asignar</span>'}</td>
+            </tr>`).join('')}
+            <tr style="background:var(--bg)">
+              <td colspan="3" style="font-weight:700;font-size:11px">TOTAL</td>
+              <td style="text-align:right;font-weight:800;font-family:var(--mono)">${s.cant.toLocaleString()}</td>
+              <td></td>
+            </tr>
+          </table>
+        </div>
+      </div>` : ''}
 
       <div class="dc">
         <div class="dc-h">Desglose de producción</div>
@@ -1296,10 +1295,10 @@ function mostrarDetalle(s, view) {
         <div class="dc-b" style="display:flex;flex-wrap:wrap;gap:8px">
           ${s.ops.map(oid=>{
             const op=opObj(oid);
-            return op?'<div style="display:flex;align-items:center;gap:7px;background:var(--bg);padding:7px 10px;border-radius:8px;border:1px solid var(--border)">
+            return op?`<div style="display:flex;align-items:center;gap:7px;background:var(--bg);padding:7px 10px;border-radius:8px;border:1px solid var(--border)">
               <div style="width:28px;height:28px;border-radius:50%;background:${op.color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white">${op.ini}</div>
               <div><div style="font-size:12px;font-weight:700">${op.nombre}</div><div style="font-size:10px;color:var(--gray)">${op.proc} · ${op.turno}</div></div>
-            </div>':'';
+            </div>`:'';
           }).join('')}
         </div>
       </div>
@@ -1322,12 +1321,46 @@ function mostrarDetalle(s, view) {
         <div class="dc-h">Flujo de la solicitud</div>
         <div class="dc-b">
           <div class="tl">
-            ${etapas.map(e => '<div class="tl-i"><div class="tl-dot '+(e.done?'done':e.active?'active':'')+'">'+( e.done?'✓':e.active?'▶':'·')+'</div><div class="tl-b"><div class="tl-t">'+e.t+'</div><div class="tl-s">'+e.s+'</div>'+(e.tm?'<div class="tl-tm">'+e.tm+'</div>':'')+'</div></div>').join('')}
+            ${etapas.map(e=>`
+            <div class="tl-i">
+              <div class="tl-dot ${e.done?'done':e.active?'active':''}">${e.done?'✓':e.active?'▶':'·'}</div>
+              <div class="tl-b"><div class="tl-t">${e.t}</div><div class="tl-s">${e.s}</div>${e.tm?`<div class="tl-tm">${e.tm}</div>`:''}</div>
+            </div>`).join('')}
           </div>
         </div>
       </div>
 
-      
+      <div class="dc">
+        <div class="dc-h">Reasignar operadores por línea
+          <span style="font-weight:400;text-transform:none;font-size:10px;color:var(--gray);margin-left:6px">Toca para asignar / quitar</span>
+        </div>
+        <div class="dc-b" style="display:flex;flex-direction:column;gap:8px">
+          ${(s.lineas||[]).map((ln,li) => {
+            const listaR = isT ? personal.tapas : personal.serig;
+            const ocupR = getOperadoresOcupados();
+            const chips = listaR.filter(p=>p.rol!=='supervisor'&&p.presente).map(p=>{
+              const selR = (ln.operadores||[]).includes(p.id);
+              const busyR = !selR && ocupR.has(p.id);
+              return '<div class="op-chip '+(selR?'sel-op':'')+'" '+
+                'onclick="'+(busyR?'':('reasignarOp(\''+s.id+'\','+li+',\''+p.id+'\',\''+view+'\''+')'))+'" '+
+                'title="'+(busyR?'En proceso en otra orden':selR?'Quitar':'Asignar')+'" '+
+                'style="font-size:10px;padding:3px 8px;'+(busyR?'opacity:.3;cursor:not-allowed;pointer-events:none;':'cursor:pointer;')+'">' +
+                '<div style="width:14px;height:14px;border-radius:50%;background:'+p.color+';display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:800;color:white">'+p.ini+'</div>' +
+                p.nombre.split(' ')[0] +
+                (busyR?'<span style="font-size:7px;color:var(--red)">●</span>':'') +
+                '</div>';
+            }).join('');
+            return '<div style="background:var(--bg);border-radius:8px;padding:10px 12px">' +
+              '<div style="font-size:11px;font-weight:700;color:var(--dark);margin-bottom:5px">' +
+              'Línea '+(li+1)+': <span style="font-family:var(--mono);color:var(--teal)">'+(ln.sku||'—')+'</span> · '+(ln.desc||'—')+' · <strong>'+(ln.cant||0).toLocaleString()+' und</strong>' +
+              '</div>' +
+              '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">'+chips+'</div>' +
+              '<div style="font-size:10px;color:var(--gray)">Asignados: <strong style="color:var(--teal)">' +
+              ((ln.operadores&&ln.operadores.length)?ln.operadores.map(oid=>opObj(oid)?.nombre.split(' ')[0]||oid).join(', '):'Ninguno') +
+              '</strong></div></div>';
+          }).join('')}
+        </div>
+      </div>
 
       <div class="dc">
         <div class="dc-h">Actualizar progreso del supervisor</div>
