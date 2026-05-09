@@ -1213,7 +1213,8 @@ function mostrarDetalle(s, view) {
         ${s.estado==='proceso'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista','${view}')">✓ Lista</button>`:''}
         ${s.estado==='lista'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada','${view}')">📦 Entregar</button>`:''}
         ${ePill(s.estado)} ${pPill(s.prio)}
-        <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #f5c0c0;margin-left:4px" onclick="confirmarBorrar('${s.id}','${s.id_display||s.id}','${view}')">🗑 Borrar</button>
+                <button class="btn btn-xs" style="background:var(--blue-l);color:var(--blue);border:1px solid #b8d4f0;margin-left:4px" onclick="editarSolicitud(\'${s.id}\',\'${view}\')">✏ Editar</button>
+<button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #f5c0c0;margin-left:4px" onclick="confirmarBorrar('${s.id}','${s.id_display||s.id}','${view}')">🗑 Borrar</button>
       </div>
     </div>
     <div class="det-scroll">
@@ -1405,6 +1406,118 @@ async function reasignarOp(solId, lineaIdx, opId, view) {
 
   renderListas();
   mostrarDetalle(s, view);
+}
+
+async function editarSolicitud(id, view) {
+  const s = solicitudes.find(x => x.id === id);
+  if (!s) return;
+
+  // Open form with area
+  fArea = s.area;
+  document.getElementById('mTitle').textContent = 'Editar solicitud · ' + s.id;
+  document.getElementById('btnSave').className = 'btn ' + (s.area==='tapas'?'btn-t':'btn-s');
+  document.getElementById('btnSave').textContent = 'Guardar cambios';
+
+  // Prefill fields
+  document.getElementById('fCli').value = s.cliente || '';
+  document.getElementById('fArea').value = s.area_sol || 'Ventas';
+  document.getElementById('fPrioSelect').value = s.prio || 'normal';
+  if (s.fecha_lim) document.getElementById('fFecha').value = s.fecha_lim;
+
+  // Prefill lineas
+  lineas = (s.lineas || []).map(l => ({
+    sku: l.sku || '',
+    desc: l.desc || '',
+    cant: l.cant || 0,
+    procs: l.procs || [],
+    operadores: l.operadores || [],
+    existencia: l.existencia
+  }));
+  if (lineas.length === 0) addLinea();
+  renderLineas();
+
+  // Store editing ID so guardar() updates instead of inserts
+  window._editingId = id;
+  window._editingView = view;
+
+  // Override btnSave to update
+  document.getElementById('btnSave').onclick = () => guardarEdicion(id, view);
+
+  document.getElementById('cboxEl').className = 'cbox ' + (s.area==='serig'?'cs':'');
+  calcular();
+  document.getElementById('overlay').classList.add('open');
+}
+
+async function guardarEdicion(id, view) {
+  const s = solicitudes.find(x => x.id === id);
+  if (!s) return;
+
+  const cli      = document.getElementById('fCli').value;
+  const areaSol  = document.getElementById('fArea').value;
+  const fecha    = document.getElementById('fFecha').value;
+  const prio     = document.getElementById('fPrioSelect').value;
+  const notas    = document.getElementById('fNotas').value.trim();
+  const lineasV  = lineas.filter(l => l.cant > 0);
+
+  if (!cli) { alert('Selecciona un cliente.'); return; }
+  if (!lineasV.length) { alert('Agrega al menos una línea con cantidad.'); return; }
+
+  const cant = lineasV.reduce((t,l) => t + l.cant, 0);
+  const todosProcs = [...new Set(lineasV.flatMap(l => l.procs||[]))];
+  const tipo = todosProcs.join('+') || s.tipo;
+
+  const btn = document.getElementById('btnSave');
+  btn.textContent = 'Guardando...'; btn.disabled = true;
+
+  try {
+    // Update solicitud
+    await db.from('solicitudes').update({
+      cliente_nombre: cli,
+      area_solicitante: areaSol,
+      fecha_limite: fecha || null,
+      prioridad: prio,
+      notas: notas || null,
+    }).eq('id', s.dbId);
+
+    // Delete old lineas and re-insert
+    await db.from('solicitud_lineas').delete().eq('solicitud_id', s.dbId);
+    if (lineasV.length > 0) {
+      await db.from('solicitud_lineas').insert(
+        lineasV.map((l,i) => ({
+          solicitud_id: s.dbId,
+          orden: i+1,
+          sku: l.sku || null,
+          descripcion: l.desc || 'Sin descripción',
+          cantidad: l.cant,
+          existencia_snap: l.existencia || 0,
+          procesos: l.procs || [],
+          operadores_ids: l.operadores || [],
+        }))
+      );
+    }
+
+    // Reset button
+    cerrarForm();
+    document.getElementById('btnSave').textContent = 'Guardar solicitud';
+    document.getElementById('btnSave').disabled = false;
+    document.getElementById('btnSave').onclick = guardar;
+
+    await cargarSolicitudes();
+
+    const toast = document.createElement('div');
+    toast.textContent = '✓ Solicitud actualizada correctamente';
+    toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--blue);color:white;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+
+    // Re-show detail
+    const updated = solicitudes.find(x => x.id === id);
+    if (updated) mostrarDetalle(updated, view);
+
+  } catch(e) {
+    alert('Error al actualizar: ' + e.message);
+    btn.textContent = 'Guardar cambios'; btn.disabled = false;
+  }
 }
 
 async function confirmarBorrar(id, codigo, view) {
