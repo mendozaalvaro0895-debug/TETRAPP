@@ -1220,8 +1220,16 @@ function mostrarDetalle(s, view) {
     <div class="det-scroll">
 
       <div class="tbox ${isT?'tt':'ts'}">
-        <div class="tbox-lbl">Entrega estimada</div>
-        <div class="tbox-val ${isT?'tc':'sc2'}" style="font-size:32px">${fEst}</div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div>
+            <div class="tbox-lbl">Entrega estimada</div>
+            <div class="tbox-val ${isT?'tc':'sc2'}" style="font-size:32px">${fEst}</div>
+          </div>
+          ${s.fecha_lim ? `<div style="text-align:right">
+            <div class="tbox-lbl">Fecha solicitada por Ventas</div>
+            <div style="font-size:20px;font-weight:800;color:var(--mid);font-family:var(--mono)">${s.fecha_lim}</div>
+          </div>` : ''}
+        </div>
         <div style="display:flex;align-items:center;gap:6px;margin:4px 0">
           ${(()=>{
             if(!s.fecha_lim) return '';
