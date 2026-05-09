@@ -1219,9 +1219,36 @@ function mostrarDetalle(s, view) {
     <div class="det-scroll">
 
       <div class="tbox ${isT?'tt':'ts'}">
-        <div class="tbox-lbl">Tiempo estimado de entrega</div>
-        <div class="tbox-val ${isT?'tc':'sc2'}">${horas.toFixed(1)} horas</div>
-        <div class="tbox-sub">${turnos} turno${turnos>1?'s':''} de ${CFG.turno_h}h · ${nOps} operador${nOps>1?'es':''} · ${cap.toLocaleString()} und/hora · Entrega estimada: <strong>${fEst}</strong></div>
+        <div class="tbox-lbl">Entrega estimada</div>
+        <div class="tbox-val ${isT?'tc':'sc2'}" style="font-size:32px">${fEst}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin:4px 0">
+          ${(()=>{
+            if(!s.fecha_lim) return '';
+            const estD = new Date(); estD.setDate(estD.getDate()+turnos);
+            const limD = new Date(s.fecha_lim);
+            const diff = Math.round((limD-estD)/86400000);
+            if(diff >= 0) return '<span style="font-size:12px;font-weight:700;color:var(--green);background:var(--green-l);padding:2px 8px;border-radius:6px">✓ '+( diff===0?'Justo a tiempo':diff+' día'+(diff>1?'s':'')+' antes del límite')+'</span>';
+            return '<span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-l);padding:2px 8px;border-radius:6px">⚠ Se pasa '+Math.abs(diff)+' día'+(Math.abs(diff)>1?'s':'')+' del límite ('+s.fecha_lim+')</span>';
+          })()}
+        </div>
+        <div class="tbox-sub" style="margin-top:4px">
+          ⏱ ${horas.toFixed(1)} horas · ${turnos} turno${turnos>1?'s':''} de ${CFG.turno_h}h · ${cap.toLocaleString()} und/hora
+        </div>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,0.07);font-size:11px;color:var(--gray)">
+          💡 ${(()=>{
+            const opsActuales = Math.max(nOps,1);
+            const horasActuales = horas;
+            if(!s.fecha_lim) return 'Asigna una fecha límite para recibir recomendaciones.';
+            const diasDisp = Math.max(1, Math.ceil((new Date(s.fecha_lim)-new Date())/86400000));
+            const horasDisp = diasDisp * CFG.turno_h;
+            const opsNec = Math.ceil(s.cant / (CFG.cap_und_h * horasDisp));
+            const maxOps = isT ? personal.tapas.filter(p=>p.presente&&p.rol!=='supervisor').length
+                                : personal.serig.filter(p=>p.presente&&p.rol!=='supervisor').length;
+            if(opsNec <= opsActuales) return 'Con '+opsActuales+' operador'+(opsActuales>1?'es':'')+' se cumple el plazo.';
+            if(opsNec > maxOps) return 'Se necesitarían '+opsNec+' operadores pero solo hay '+maxOps+' disponibles. Considera extender el plazo o hacer vela.';
+            return 'Recomendado: asignar <strong>'+opsNec+' operadores</strong> para cumplir la fecha límite.';
+          })()}
+        </div>
       </div>
 
       <div class="dc">
