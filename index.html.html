@@ -1207,17 +1207,21 @@ function mostrarDetalle(s, view) {
         <div class="dc-h">Detalle de la solicitud</div>
         <div class="dc-b">
           <div class="ig">
-            <!-- Cantidad desglosada por línea -->
+            <!-- LÍNEAS INTEGRADAS: SKU + Desc + Cantidad + Bodega + Operador -->
             <div class="ii" style="grid-column:1/-1">
-              <div class="il">Cantidad total · ${s.cant.toLocaleString()} und</div>
-              <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">
-                ${(s.lineas||[]).map(l=>`
-                  <div style="display:flex;align-items:center;gap:8px;font-size:12px">
-                    <span style="font-family:var(--mono);font-size:11px;color:var(--teal);font-weight:700">${l.sku||'—'}</span>
-                    <span style="color:var(--mid)">${l.desc||'—'}</span>
-                    <span style="margin-left:auto;font-family:var(--mono);font-weight:800;color:var(--dark)">${(l.cant||0).toLocaleString()}</span>
-                    <span style="color:var(--gray-l);font-size:10px">und</span>
-                  </div>
+              <div class="il" style="margin-bottom:6px">Líneas del pedido · ${s.cant.toLocaleString()} und total</div>
+              <div style="display:grid;grid-template-columns:90px 1fr 90px 80px 1fr;gap:0;border:1px solid var(--border);border-radius:7px;overflow:hidden">
+                <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:5px 8px;background:var(--bg2);border-bottom:1px solid var(--border)">SKU</div>
+                <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:5px 8px;background:var(--bg2);border-bottom:1px solid var(--border)">Descripción</div>
+                <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:5px 8px;background:var(--bg2);border-bottom:1px solid var(--border);text-align:right">Cantidad</div>
+                <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:5px 8px;background:var(--bg2);border-bottom:1px solid var(--border);text-align:right">Bodega</div>
+                <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:5px 8px;background:var(--bg2);border-bottom:1px solid var(--border)">Operador(es)</div>
+                ${(s.lineas||[]).map((l,li)=>`
+                  <div style="padding:8px;font-family:var(--mono);font-size:11px;color:var(--teal);font-weight:700;background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${l.sku||'—'}</div>
+                  <div style="padding:8px;font-size:11px;color:var(--mid);background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${l.desc||'—'}</div>
+                  <div style="padding:8px;font-size:12px;font-weight:800;font-family:var(--mono);text-align:right;color:var(--dark);background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${(l.cant||0).toLocaleString()}</div>
+                  <div style="padding:8px;font-size:11px;font-family:var(--mono);text-align:right;font-weight:700;color:${(l.existencia||0)>=(l.cant||0)?'var(--green)':'var(--amber)'};background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${l.existencia!==undefined?l.existencia.toLocaleString():'—'}</div>
+                  <div style="padding:8px;font-size:11px;color:var(--mid);background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${(l.operadores&&l.operadores.length)?l.operadores.map(oid=>opObj(oid)?.nombre.split(' ')[0]||oid).join(', '):'<span style="color:var(--gray-l)">Sin asignar</span>'}</div>
                 `).join('')}
               </div>
             </div>
@@ -1229,18 +1233,7 @@ function mostrarDetalle(s, view) {
             </div>
             <div class="ii">
               <div class="il">Entrega estimada</div>
-              <div class="iv" style="color:${(()=>{
-                if(!s.fecha_lim) return 'var(--gray)';
-                const est = new Date(); est.setDate(est.getDate() + calcTurnos(calcHoras(s.cant, Math.max(s.ops.length,1))));
-                const lim = new Date(s.fecha_lim);
-                return est <= lim ? 'var(--green)' : 'var(--red)';
-              })()}">
-                🕐 ${(()=>{
-                  const t = calcTurnos(calcHoras(s.cant, Math.max(s.ops.length,1)));
-                  const est = new Date(); est.setDate(est.getDate() + t);
-                  return est.toLocaleDateString('es-GT',{day:'2-digit',month:'short',year:'numeric'});
-                })()}
-              </div>
+              <div class="iv" style="color:${(()=>{if(!s.fecha_lim)return 'var(--gray)';const est=new Date();est.setDate(est.getDate()+calcTurnos(calcHoras(s.cant,Math.max(s.ops.length,1))));return est<=new Date(s.fecha_lim)?'var(--green)':'var(--red)';})()}">🕐 ${(()=>{const t=calcTurnos(calcHoras(s.cant,Math.max(s.ops.length,1)));const est=new Date();est.setDate(est.getDate()+t);return est.toLocaleDateString('es-GT',{day:'2-digit',month:'short',year:'numeric'});})()}</div>
             </div>
             <div class="ii"><div class="il">Área solicitante</div><div class="iv">${s.area_sol||'Ventas'}</div></div>
             <div class="ii"><div class="il">Ingresada</div><div class="iv mono" style="font-size:10px">${s.created}</div></div>
@@ -1249,29 +1242,7 @@ function mostrarDetalle(s, view) {
         </div>
       </div>
 
-      ${s.lineas && s.lineas.length > 0 ? `
-      <div class="dc">
-        <div class="dc-h">Líneas del pedido <span style="font-weight:400;text-transform:none;font-size:10px">${s.lineas.length} producto${s.lineas.length>1?'s':''} · ${s.cant.toLocaleString()} und total</span></div>
-        <div class="dc-b" style="padding:0">
-          <table class="dt">
-            <tr><th>#</th><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Existencia</th><th>Operador</th></tr>
-            ${s.lineas.map((l,i) => `
-            <tr>
-              <td style="color:var(--gray-l)">${i+1}</td>
-              <td class="td-mono" style="font-family:var(--mono);font-size:11px">${l.sku||'—'}</td>
-              <td>${l.desc||'—'}</td>
-              <td style="text-align:right;font-weight:700;font-family:var(--mono)">${(l.cant||0).toLocaleString()}</td>
-              <td style="text-align:right;font-family:var(--mono);color:${(l.existencia||0) >= (l.cant||0) ? 'var(--green)' : 'var(--amber)'}">${l.existencia !== undefined ? l.existencia.toLocaleString() : '—'}</td>
-              <td style="font-size:11px;color:var(--mid)">${(l.operadores&&l.operadores.length) ? l.operadores.map(oid=>opObj(oid)?.nombre.split(' ')[0]||oid).join(', ') : '<span style="color:var(--gray-l)">Sin asignar</span>'}</td>
-            </tr>`).join('')}
-            <tr style="background:var(--bg)">
-              <td colspan="3" style="font-weight:700;font-size:11px">TOTAL</td>
-              <td style="text-align:right;font-weight:800;font-family:var(--mono)">${s.cant.toLocaleString()}</td>
-              <td></td>
-            </tr>
-          </table>
-        </div>
-      </div>` : ''}
+
 
       <div class="dc">
         <div class="dc-h">Desglose de producción</div>
