@@ -1069,8 +1069,9 @@ function opObj(id) { return [...personal.tapas,...personal.serig].find(p=>p.id==
 // ══ STATUS PILLS ══════════════════════════════════════════
 const ESTADOS = {
   nueva:{css:'p-nueva',lbl:'Nueva'}, programada:{css:'p-prog',lbl:'Programada'},
-  proceso:{css:'p-proc',lbl:'En proceso'}, lista:{css:'p-lista',lbl:'Lista'},
-  entregada:{css:'p-ent',lbl:'Entregada'}
+  proceso:{css:'p-proc',lbl:'En proceso'}, pausada:{css:'p-vela',lbl:'⏸ Pausada'}, lista:{css:'p-lista',lbl:'Lista'},
+  entregada:{css:'p-ent',lbl:'Entregada'},
+  pausada:{css:'p-urg',lbl:'⏸ Pausada'}
 };
 const PRIOS = {
   urgente:{css:'p-urg urg-b',lbl:'Urgente'}, vela:{css:'p-vela',lbl:'Vela'},
@@ -1223,6 +1224,8 @@ function mostrarDetalle(s, view) {
         ${s.estado==='lista'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada','${view}')">📦 Entregar</button>`:''}
         ${ePill(s.estado)} ${pPill(s.prio)}
                 <button class="btn btn-xs" style="background:var(--blue-l);color:var(--blue);border:1px solid #b8d4f0;margin-left:4px" onclick="editarSolicitud('${s.id}','${view}')">✏ Editar</button>
+        ${s.estado==='proceso'?'<button class="btn btn-xs" style="background:#FFF3CC;color:#7A5200;border:1px solid #FFD980;margin-left:4px" onclick="pausarSolicitud(\''+s.id+'\',\''+view+'\')">⏸ Pausar</button>':''}
+        ${s.estado==='pausada'?'<button class="btn '+(isT?'btn-t':'btn-s')+' btn-xs" style="margin-left:4px" onclick="cambiarEstado(\''+s.id+'\',\'proceso\',\''+view+'\')">▶ Reanudar</button>':''}
 <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #f5c0c0;margin-left:4px" onclick="confirmarBorrar('${s.id}','${s.id_display||s.id}','${view}')">🗑 Borrar</button>
       </div>
     </div>
@@ -1501,6 +1504,20 @@ async function guardarEdicion(id, view) {
   }
 }
 
+async function pausarSolicitud(id, view) {
+  const s = solicitudes.find(x => x.id === id);
+  if (!s) return;
+  const sldr = document.getElementById('sldr_'+id);
+  const prog = sldr ? parseInt(sldr.value) : (s.prog||0);
+  if (!confirm('Pausar la orden ' + (s.id_display||s.id) + '\nProgreso: ' + prog + '%\n\nLos operadores quedarán disponibles para reasignación.')) return;
+  if (s.dbId) await actualizarEnSupabase(s.dbId, { estado:'pausada', progreso_pct:prog });
+  s.estado='pausada'; s.prog=prog;
+  renderListas(); mostrarDetalle(s, view);
+  const t=document.createElement('div'); t.textContent='⏸ Orden pausada — operadores disponibles';
+  t.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--amber);color:white;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap';
+  document.body.appendChild(t); setTimeout(()=>t.remove(),4000);
+}
+
 async function confirmarBorrar(id, codigo, view) {
   const confirma = window.confirm(
     '¿Eliminar la solicitud ' + codigo + '?\n\nEsta acción no se puede deshacer.'
@@ -1550,14 +1567,304 @@ async function borrarSolicitud(id, view) {
 }
 
 async function cambiarEstado(id, nuevo, view) {
-  const s = solicitudes.find(x=>x.id===id);
+  const s = solicitudes.find(x => x.id === id);
   if (!s) return;
-  const prog = ['lista','entregada'].includes(nuevo) ? 100 : s.prog;
-  if (s.dbId) {
-    await actualizarEnSupabase(s.dbId, { estado: nuevo, progreso_pct: prog });
+
+  if (nuevo === 'proceso') {
+    const asignados = [...new Set((s.lineas||[]).flatMap(l => l.operadores||[]))];
+    if (!asignados.length) {
+      showSatAlert(s, view, 'Ningún operador asignado a esta orden. Asigna al menos uno antes de iniciar.');
+      return;
+    }
+    const ocupados = getOperadoresOcupados();
+    const libres = asignados.filter(id => !ocupados.has(id));
+    if (!libres.length) {
+      const area = s.area==='tapas' ? personal.tapas : personal.serig;
+      const libresArea = area.filter(p=>p.rol!=='supervisor'&&p.presente&&!ocupados.has(p.id)).length;
+      showSatAlert(s, view, 'Todos los operadores asignados están en otra orden. ' + (libresArea>0 ? libresArea+' operadores libres en el área sin asignar a esta tarea.':'El área está al 100% de capacidad.'));
+      return;
+    }
   }
+
+  const prog = ['lista','entregada'].includes(nuevo) ? 100 : s.prog;
+  if (s.dbId) await actualizarEnSupabase(s.dbId, { estado: nuevo, progreso_pct: prog });
   s.estado = nuevo; s.prog = prog;
   renderListas(); mostrarDetalle(s, view);
+}
+
+function showSatAlert(s, view, msg) {
+  document.getElementById('satOv')?.remove();
+  const d = document.createElement('div');
+  d.id = 'satOv';
+  d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px';
+  const sid = s.id; const vw = view;
+  d.innerHTML = '<div style="background:white;border-radius:14px;width:100%;max-width:460px;box-shadow:0 8px 40px rgba(0,0,0,.25);overflow:hidden">'
+    +'<div style="background:var(--red);padding:16px 20px;display:flex;align-items:center;gap:10px"><span style="font-size:20px">⚠️</span><div style="color:white;font-weight:800;font-size:15px">No se puede iniciar</div></div>'
+    +'<div style="padding:18px 20px"><p style="font-size:13px;color:var(--mid);margin-bottom:14px">'+msg+'</p>'
+    +'<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">'
+    +'<button onclick="satAct(\'forzar\',\''+sid+'\',\''+vw+'\')" style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--amber);background:var(--amber-l);color:var(--amber);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;text-align:left">⏳ Iniciar de todas formas — comenzará cuando operadores queden libres</button>'
+    +'<button onclick="satAct(\'urgente\',\''+sid+'\',\''+vw+'\')" style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--teal);background:var(--teal-xl);color:var(--teal);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;text-align:left">⚡ Marcar Urgente — priorizar y reasignar desde otra orden</button>'
+    +'</div><button onclick="document.getElementById(\'satOv\').remove()" style="width:100%;padding:9px;border-radius:8px;border:1.5px solid var(--border);background:white;font-family:var(--font);font-size:12px;cursor:pointer;color:var(--gray)">Cancelar</button>'
+    +'</div></div>';
+  document.body.appendChild(d);
+}
+
+async function satAct(accion, solId, view) {
+  document.getElementById('satOv')?.remove();
+  const s = solicitudes.find(x => x.id === solId);
+  if (!s) return;
+  if (accion === 'forzar') {
+    if (s.dbId) await actualizarEnSupabase(s.dbId, { estado:'proceso', progreso_pct:s.prog });
+    s.estado = 'proceso'; renderListas(); mostrarDetalle(s, view);
+    const t=document.createElement('div'); t.textContent='⏳ Orden iniciada — operadores comenzarán al quedar libres';
+    t.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--amber);color:white;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap';
+    document.body.appendChild(t); setTimeout(()=>t.remove(),4000);
+  } else {
+    if (s.dbId) await actualizarEnSupabase(s.dbId, { prioridad:'urgente' });
+    s.prio='urgente'; renderListas(); mostrarDetalle(s, view);
+    const t=document.createElement('div'); t.textContent='⚡ Urgente — reasigna operadores usando ▼ en otra orden';
+    t.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--teal);color:white;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap';
+    document.body.appendChild(t); setTimeout(()=>t.remove(),5000);
+  }
+}
+
+function mostrarAlertaSaturacion(s, view, tipo) {
+  document.getElementById('alertaSat')?.remove();
+  const opsAsignados = [...new Set((s.lineas||[]).flatMap(l=>l.operadores||[]))];
+  const horasMin = opsAsignados.length
+    ? Math.min(...opsAsignados.map(id=>getHorasRestantes(id)).filter(h=>h>0))
+    : 0;
+
+  const titulo = tipo==='sin_ops' ? '⚠ Sin operadores asignados' : '🔴 Área saturada';
+  const msg = tipo==='sin_ops'
+    ? 'Asigna al menos un operador antes de iniciar esta orden.'
+    : 'Todos los operadores están en proceso. El primero queda libre en ~<strong>'+horasMin+'h</strong>.';
+
+  const el = document.createElement('div');
+  el.id = 'alertaSat';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
+  el.innerHTML = `<div style="background:white;border-radius:14px;max-width:460px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.3);overflow:hidden">
+    <div style="background:var(--red);padding:16px 20px"><div style="font-size:16px;font-weight:800;color:white">${titulo}</div></div>
+    <div style="padding:18px 20px">
+      <p style="font-size:13px;color:var(--mid);margin-bottom:16px">${msg}</p>
+      ${tipo!=='sin_ops'?`
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+        <button onclick="accionPriorizar('${s.id}','${view}')" style="padding:12px;background:var(--teal-xl);border:1.5px solid var(--teal-l);border-radius:8px;cursor:pointer;text-align:left;font-family:var(--font)">
+          <div style="font-size:13px;font-weight:700;color:var(--teal)">1. Priorizar esta entrega</div>
+          <div style="font-size:11px;color:var(--gray);margin-top:2px">Marcar como URGENTE. Se inicia cuando los operadores queden libres.</div>
+        </button>
+        <button onclick="accionEntregaParcial('${s.id}','${view}')" style="padding:12px;background:var(--blue-l);border:1.5px solid #b8d4f0;border-radius:8px;cursor:pointer;text-align:left;font-family:var(--font)">
+          <div style="font-size:13px;font-weight:700;color:var(--blue)">2. Entrega parcial · Pausar una orden</div>
+          <div style="font-size:11px;color:var(--gray);margin-top:2px">Pausa una orden activa para liberar operadores ahora.</div>
+        </button>
+      </div>`:``}
+      <button onclick="document.getElementById('alertaSat').remove()" style="width:100%;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;color:var(--gray);font-family:var(--font)">
+        ${tipo==='sin_ops'?'Entendido · Asignar operadores primero':'Cancelar'}
+      </button>
+    </div>
+  </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', e=>{ if(e.target===el) el.remove(); });
+}
+
+async function accionPriorizar(id, view) {
+  document.getElementById('alertaSat')?.remove();
+  const s = solicitudes.find(x=>x.id===id);
+  if (!s) return;
+  s.prio = 'urgente';
+  if (s.dbId) await actualizarEnSupabase(s.dbId, { prioridad: 'urgente' });
+  renderListas(); mostrarDetalle(s, view);
+  const t = document.createElement('div');
+  t.textContent = '🔴 Marcada URGENTE · Se iniciará cuando los operadores queden libres';
+  t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--red);color:white;padding:12px 20px;border-radius:10px;font-size:12px;font-weight:700;z-index:9999;white-space:nowrap';
+  document.body.appendChild(t); setTimeout(()=>t.remove(),4000);
+}
+
+async function accionEntregaParcial(id, view) {
+  document.getElementById('alertaSat')?.remove();
+  const activas = solicitudes.filter(s2=>s2.estado==='proceso'&&s2.id!==id);
+  if (!activas.length) { alert('No hay órdenes activas que pausar.'); return; }
+
+  const el = document.createElement('div');
+  el.id = 'alertaParcial';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px';
+  el.innerHTML = `<div style="background:white;border-radius:14px;max-width:460px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.3);overflow:hidden">
+    <div style="background:var(--blue);padding:16px 20px"><div style="font-size:16px;font-weight:800;color:white">Selecciona la orden a pausar</div>
+    <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:2px">Sus operadores quedarán libres para la nueva orden</div></div>
+    <div style="padding:14px;display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto">
+      ${activas.map(s2=>`<button onclick="pausarOrden('${s2.id}','${id}','${view}')" style="padding:10px 14px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;cursor:pointer;text-align:left;font-family:var(--font)">
+        <div style="font-size:12px;font-weight:700;color:var(--dark)">${s2.cliente} · ${(s2.cant||0).toLocaleString()} und</div>
+        <div style="font-size:10px;color:var(--gray);margin-top:2px">Progreso: ${s2.prog||0}% · ${(s2.ops||[]).map(id2=>opObj(id2)?.nombre.split(' ')[0]||id2).join(', ')}</div>
+      </button>`).join('')}
+    </div>
+    <div style="padding:12px 14px;border-top:1px solid var(--border)">
+      <button onclick="document.getElementById('alertaParcial').remove()" style="font-size:12px;color:var(--gray);background:none;border:none;cursor:pointer">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(el);
+}
+
+async function pausarOrden(pausarId, iniciarId, view) {
+  document.getElementById('alertaParcial')?.remove();
+  const sPausa = solicitudes.find(x=>x.id===pausarId);
+  const sInicia = solicitudes.find(x=>x.id===iniciarId);
+  if (!sPausa||!sInicia) return;
+
+  sPausa.estado = 'nueva';
+  if (sPausa.dbId) await actualizarEnSupabase(sPausa.dbId, { estado: 'nueva' });
+  sInicia.estado = 'proceso';
+  if (sInicia.dbId) await actualizarEnSupabase(sInicia.dbId, { estado: 'proceso' });
+
+  await cargarSolicitudes(); renderListas(); mostrarDetalle(sInicia, view);
+  const t = document.createElement('div');
+  t.textContent = '⏸ Orden pausada · ▶ Nueva orden iniciada';
+  t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--blue);color:white;padding:12px 20px;border-radius:10px;font-size:12px;font-weight:700;z-index:9999;white-space:nowrap';
+  document.body.appendChild(t); setTimeout(()=>t.remove(),4000);
+}
+
+function validarCapacidad(s) {
+  const isT = s.area === 'tapas';
+  const todosOps = [...new Set((s.lineas||[]).flatMap(l=>l.operadores||[]).concat(s.ops||[]))];
+  const ocupados = getOperadoresOcupados();
+  const lista = isT ? personal.tapas : personal.serig;
+  const presentes = lista.filter(p=>p.rol!=='supervisor'&&p.presente);
+
+  if (todosOps.length === 0)
+    return { bloqueado:true, tipo:'sin_operadores',
+      msg:'Sin operadores asignados. Asigna al menos uno antes de iniciar.' };
+
+  const libres = todosOps.filter(id=>!ocupados.has(id));
+  const ocupadosAsig = todosOps.filter(id=>ocupados.has(id));
+  if (libres.length===0 && ocupadosAsig.length>0) {
+    const maxH = Math.max(...ocupadosAsig.map(id=>getHorasRestantes(id)));
+    const nombres = ocupadosAsig.map(id=>opObj(id)?.nombre.split(' ')[0]||id).join(', ');
+    return { bloqueado:false, advertencia:true, tipo:'saturacion', maxEspera:maxH,
+      msg:'SATURACION: Todos los operadores asignados estan ocupados.\n\n'+nombres+'\nEspera estimada: ~'+maxH+'h' };
+  }
+
+  const capsUsada = solicitudes
+    .filter(x=>x.id!==s.id&&x.area===s.area&&x.estado==='proceso')
+    .reduce((t,x)=>{
+      const ops=[...new Set((x.lineas||[]).flatMap(l=>l.operadores||[]).concat(x.ops||[]))];
+      return t+ops.length*CFG.cap_und_h;
+    },0);
+  const capTotal = presentes.length * CFG.cap_und_h;
+  const capsNueva = todosOps.length * CFG.cap_und_h;
+  if (capsUsada+capsNueva>capTotal)
+    return { bloqueado:false, advertencia:true, tipo:'sobre_capacidad',
+      msg:'AREA SATURADA: La capacidad disponible ('+( capTotal-capsUsada).toLocaleString()+' und/h libre) se supera con esta orden.' };
+
+  return { bloqueado:false, advertencia:false };
+}
+
+function mostrarAlertaSaturacion(alerta, s, view) {
+  const ex = document.getElementById('alertaSat'); if(ex) ex.remove();
+  const isT = s.area==='tapas';
+  const div = document.createElement('div');
+  div.id = 'alertaSat';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px';
+  div.innerHTML = `<div style="background:white;border-radius:14px;max-width:460px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.3);overflow:hidden">
+    <div style="background:var(--red);color:white;padding:14px 20px">
+      <div style="font-size:15px;font-weight:800">⚠ Capacidad saturada · ${isT?'Tapas':'Serigrafía'}</div>
+      <div style="font-size:11px;opacity:.8;margin-top:2px">${alerta.msg}</div>
+    </div>
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:4px">¿Qué deseas hacer?</div>
+      <button onclick="document.getElementById('alertaSat').remove();_forzarEstado('${s.id}','proceso','${view}')"
+        style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--amber);background:var(--amber-l);color:var(--amber);font-size:12px;font-weight:700;cursor:pointer;text-align:left">
+        ▶ Iniciar de todos modos · Operadores programados al terminar orden actual
+      </button>
+      <button onclick="mostrarPriorizacion('${s.id}','${view}');document.getElementById('alertaSat').remove()"
+        style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--teal);background:var(--teal-xl);color:var(--teal);font-size:12px;font-weight:700;cursor:pointer;text-align:left">
+        🔃 Priorizar · Pausar otra orden para iniciar esta
+      </button>
+      <button onclick="mostrarEntregaParcial('${s.id}','${view}');document.getElementById('alertaSat').remove()"
+        style="padding:10px 14px;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-l);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;text-align:left">
+        📦 Entrega parcial · Liberar operadores de otra orden
+      </button>
+      <button onclick="document.getElementById('alertaSat').remove()"
+        style="padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--gray);font-size:11px;cursor:pointer">
+        Cancelar
+      </button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+async function _forzarEstado(id, nuevo, view) {
+  const s = solicitudes.find(x=>x.id===id);
+  if(!s) return;
+  if(s.dbId) await actualizarEnSupabase(s.dbId,{estado:nuevo,progreso_pct:s.prog});
+  s.estado=nuevo; renderListas(); mostrarDetalle(s,view);
+}
+
+function mostrarPriorizacion(solId, view) {
+  const enProceso = solicitudes.filter(s=>s.estado==='proceso');
+  const ex=document.getElementById('alertaPrio'); if(ex) ex.remove();
+  const div=document.createElement('div'); div.id='alertaPrio';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px';
+  const rows=enProceso.map(s=>{
+    const ops=[...new Set((s.lineas||[]).flatMap(l=>l.operadores||[]).concat(s.ops||[]))];
+    const nombres=ops.map(id=>opObj(id)?.nombre.split(' ')[0]||id).join(', ')||'Sin asignar';
+    return '<div style="padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:6px" '+
+      'onclick="pausarYIniciar(''+s.id+'',''+solId+'',''+view+'');document.getElementById('alertaPrio').remove()">'+
+      '<div style="flex:1"><div style="font-size:12px;font-weight:700">'+s.cliente+'</div>'+
+      '<div style="font-size:10px;color:var(--gray)">'+s.cant.toLocaleString()+' und · '+s.prog+'% · '+nombres+'</div></div>'+
+      '<span style="font-size:11px;font-weight:700;color:var(--amber);background:var(--amber-l);padding:3px 8px;border-radius:6px;white-space:nowrap">⏸ Pausar</span></div>';
+  }).join('');
+  div.innerHTML='<div style="background:white;border-radius:14px;max-width:480px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.3);overflow:hidden">'+
+    '<div style="background:var(--teal);color:white;padding:14px 20px;display:flex;justify-content:space-between;align-items:center">'+
+    '<div style="font-size:14px;font-weight:800">🔃 Priorizar entregas</div>'+
+    '<button onclick="document.getElementById('alertaPrio').remove()" style="background:none;border:none;color:white;font-size:18px;cursor:pointer">✕</button></div>'+
+    '<div style="padding:16px 20px"><div style="font-size:12px;color:var(--gray);margin-bottom:12px">Selecciona una orden para pausarla y liberar sus operadores.</div>'+
+    (rows||'<div style="color:var(--gray);font-size:12px">No hay órdenes en proceso.</div>')+
+    '</div></div>';
+  document.body.appendChild(div);
+}
+
+async function pausarYIniciar(idPausar, idIniciar, view) {
+  const sp=solicitudes.find(x=>x.id===idPausar);
+  if(sp){sp.estado='pausada';if(sp.dbId)await actualizarEnSupabase(sp.dbId,{estado:'pausada'});}
+  await _forzarEstado(idIniciar,'proceso',view);
+  const t=document.createElement('div');
+  t.textContent='⏸ Orden pausada · ▶ Nueva orden iniciada';
+  t.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--teal);color:white;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap';
+  document.body.appendChild(t); setTimeout(()=>t.remove(),3500);
+}
+
+function mostrarEntregaParcial(solId, view) {
+  const enProceso=solicitudes.filter(s=>s.estado==='proceso');
+  const ex=document.getElementById('alertaParcial'); if(ex) ex.remove();
+  const div=document.createElement('div'); div.id='alertaParcial';
+  div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px';
+  const rows=enProceso.map(s=>{
+    const comp=Math.round(s.cant*(s.prog||0)/100);
+    return '<div style="padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;margin-bottom:6px" '+
+      'onclick="entregaParcial(''+s.id+'',''+solId+'',''+view+'');document.getElementById('alertaParcial').remove()">'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'+
+      '<div style="font-size:12px;font-weight:700">'+s.cliente+'</div>'+
+      '<span style="font-size:11px;font-weight:700;color:var(--blue);background:var(--blue-l);padding:2px 8px;border-radius:6px">📦 Entrega parcial</span></div>'+
+      '<div style="font-size:10px;color:var(--gray)">'+comp.toLocaleString()+' de '+s.cant.toLocaleString()+' und ('+s.prog+'%)</div>'+
+      '<div style="margin-top:5px;background:var(--bg2);border-radius:3px;height:4px"><div style="width:'+s.prog+'%;height:100%;background:var(--teal);border-radius:3px"></div></div></div>';
+  }).join('');
+  div.innerHTML='<div style="background:white;border-radius:14px;max-width:480px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.3);overflow:hidden">'+
+    '<div style="background:var(--blue);color:white;padding:14px 20px;display:flex;justify-content:space-between;align-items:center">'+
+    '<div style="font-size:14px;font-weight:800">📦 Entrega parcial</div>'+
+    '<button onclick="document.getElementById('alertaParcial').remove()" style="background:none;border:none;color:white;font-size:18px;cursor:pointer">✕</button></div>'+
+    '<div style="padding:16px 20px"><div style="font-size:12px;color:var(--gray);margin-bottom:12px">Marca una orden como lista con las unidades completadas hasta ahora.</div>'+
+    (rows||'<div style="color:var(--gray);font-size:12px">No hay órdenes en proceso.</div>')+
+    '</div></div>';
+  document.body.appendChild(div);
+}
+
+async function entregaParcial(idParcial, idIniciar, view) {
+  const sp=solicitudes.find(x=>x.id===idParcial);
+  if(sp){sp.estado='lista';if(sp.dbId)await actualizarEnSupabase(sp.dbId,{estado:'lista',progreso_pct:sp.prog});}
+  await _forzarEstado(idIniciar,'proceso',view);
+  const t=document.createElement('div');
+  t.textContent='📦 Entrega parcial registrada · ▶ Nueva orden iniciada';
+  t.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--blue);color:white;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap';
+  document.body.appendChild(t); setTimeout(()=>t.remove(),3500);
 }
 
 async function actualizarProg(id, view) {
