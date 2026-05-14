@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TETRAPLASTIC — Tapas & Serigrafía</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="shared/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="shared/data.js"></script>
+<script src="shared/inventario.js"></script>
+<script src="shared/supabase.js"></script>
+<script src="shared/helpers.js"></script>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">TETRA<span>PLASTIC</span></div>
+  <div class="topbar-sep"></div>
+  <div class="topbar-sub">Tapas & Serigrafía · Control de Solicitudes</div>
+  <div class="clock" id="clk"></div>
+  <div class="user-pill">
+    <div class="uavatar">AM</div>
+    <div class="uname">Álvaro Mendoza</div>
+  </div>
+</div>
+
+<div class="app">
+
+<!-- SIDENAV -->
+<div class="sidenav">
+  <div class="sn-btn active" title="Solicitudes">📋</div>
+  <div class="sn-btn" title="Dashboard" onclick="switchTab('dash',null,this)">📊</div>
+  <div class="sn-btn" title="Personal" onclick="switchTab('personal',null,this)">👥</div>
+  <div class="sn-div"></div>
+  <div style="flex:1"></div>
+  <div class="sn-btn" title="Alertas" style="position:relative">🔔<div class="sn-badge"></div></div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active" id="tab-tapas" onclick="switchTab('tapas',this)">
+      <div class="tdot" style="background:var(--teal)"></div>
+      Tapas
+      <span class="tbadge tb-teal" id="cnt-tapas">0</span>
+    </div>
+    <div class="tab t-serig" id="tab-serig" onclick="switchTab('serig',this)">
+      <div class="tdot" style="background:var(--serig-m)"></div>
+      Serigrafía
+      <span class="tbadge tb-serig" id="cnt-serig">0</span>
+    </div>
+    <div class="tab" id="tab-todas" onclick="switchTab('todas',this)">
+      Todas
+      <span class="tbadge" style="background:var(--bg2);color:var(--gray)" id="cnt-todas">0</span>
+    </div>
+    <div class="tab t-dash" id="tab-dash" onclick="switchTab('dash',this)">📊 Dashboard</div>
+    <div class="tab t-personal" id="tab-personal" onclick="switchTab('personal',this)">👥 Personal</div>
+    <div class="tabs-r">
+      <button class="btn btn-t btn-sm" onclick="abrirForm('tapas')">+ Tapas</button>
+      <button class="btn btn-s btn-sm" onclick="abrirForm('serig')">+ Serigrafía</button>
+    </div>
+  </div>
+
+  <!-- VIEWS -->
+  <div class="views">
+
+    <!-- TAPAS -->
+    <div class="view active" id="view-tapas">
+      <div class="kpi-strip">
+        <div class="kpi"><div class="kpi-l">En proceso</div><div class="kpi-v" style="color:var(--teal)" id="kt-proc">0</div><div class="kpi-s">solicitudes activas</div></div>
+        <div class="kpi"><div class="kpi-l">Pendientes</div><div class="kpi-v" style="color:var(--amber)" id="kt-pend">0</div><div class="kpi-s">sin iniciar</div></div>
+        <div class="kpi"><div class="kpi-l">Cap. disponible</div><div class="kpi-v" style="color:var(--green)" id="kt-cap">—</div><div class="kpi-s">und/hora hoy</div></div>
+        <div class="kpi"><div class="kpi-l">Operadores AM</div><div class="kpi-v" id="kt-ops">—</div><div class="kpi-s">presentes hoy</div></div>
+        <div class="kpi"><div class="kpi-l">Turno</div><div class="kpi-v" id="kt-turno">12 h</div><div class="kpi-s">Regular</div></div>
+      </div>
+      <div class="split">
+        <div class="pane-l">
+          <div class="ph">
+            <div><div class="ph-title">Solicitudes · Tapas</div><div class="ph-sub">Haz clic para ver detalle completo</div></div>
+            <div class="ph-r">
+              <select class="fi" style="font-size:11px;padding:4px 7px;height:26px" id="filtroTapas" onchange="renderListas()">
+                <option value="">Todas</option>
+                <option value="nueva">Nuevas</option>
+    
+                <option value="proceso">En proceso</option>
+                <option value="lista">Listas</option>
+              </select>
+            </div>
+          </div>
+          <div class="sol-list" id="listTapas"></div>
+        </div>
+        <div class="pane-r">
+          <div id="detTapas" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+            <div class="det-empty"><div class="det-empty-ico">📋</div><div class="det-empty-txt">Selecciona una solicitud</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SERIG -->
+    <div class="view" id="view-serig">
+      <div class="kpi-strip">
+        <div class="kpi"><div class="kpi-l">En proceso</div><div class="kpi-v" style="color:var(--serig-m)" id="ks-proc">0</div><div class="kpi-s">activas</div></div>
+        <div class="kpi"><div class="kpi-l">Pendientes</div><div class="kpi-v" style="color:var(--amber)" id="ks-pend">0</div><div class="kpi-s">sin iniciar</div></div>
+        <div class="kpi"><div class="kpi-l">Máquinas activas</div><div class="kpi-v" id="ks-maq">—</div><div class="kpi-s">impresoras</div></div>
+        <div class="kpi"><div class="kpi-l">Operadores</div><div class="kpi-v" id="ks-ops">—</div><div class="kpi-s">presentes hoy</div></div>
+        <div class="kpi"><div class="kpi-l">Turno</div><div class="kpi-v">12 h</div><div class="kpi-s">Regular</div></div>
+      </div>
+      <div class="split">
+        <div class="pane-l">
+          <div class="ph"><div><div class="ph-title">Solicitudes · Serigrafía</div><div class="ph-sub">Haz clic para ver detalle</div></div></div>
+          <div class="sol-list" id="listSerig"></div>
+        </div>
+        <div class="pane-r">
+          <div id="detSerig" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+            <div class="det-empty"><div class="det-empty-ico">🎨</div><div class="det-empty-txt">Selecciona una solicitud de serigrafía</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TODAS -->
+    <div class="view" id="view-todas">
+      <div class="split">
+        <div class="pane-l">
+          <div class="ph"><div><div class="ph-title">Todas las solicitudes</div><div class="ph-sub">Tapas + Serigrafía</div></div></div>
+          <div class="sol-list" id="listTodas"></div>
+        </div>
+        <div class="pane-r">
+          <div id="detTodas" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+            <div class="det-empty"><div class="det-empty-ico">📋</div><div class="det-empty-txt">Selecciona una solicitud</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="view" id="view-dash">
+      <div class="dash" id="dashGrid"></div>
+    </div>
+
+    <!-- PERSONAL -->
+    <div class="view" id="view-personal">
+      <div class="ph">
+        <div><div class="ph-title">Personal · Tapas & Serigrafía</div><div class="ph-sub">Asistencia y asignación del día</div></div>
+        <div class="ph-r">
+          <button class="btn btn-g btn-sm" onclick="alert('Exportar registro del día — conectar a Supabase')">⬇ Exportar</button>
+          <button class="btn btn-t btn-sm" onclick="alert('Registrar asistencia manual')">+ Asistencia</button>
+        </div>
+      </div>
+      <div id="personalGrid" style="flex:1;overflow-y:auto"></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- FORM MODAL -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="mh">
+      <div class="mh-title" id="mTitle">Nueva solicitud</div>
+      <button class="m-close" onclick="cerrarForm()">✕</button>
+    </div>
+    <div class="mb">
+
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Cliente</div>
+          <select class="fs" id="fCli">
+            <option value="">— Selecciona cliente —</option>
+            <option>A. CORP UNIVERSAL</option>
+            <option>AMERICAN NATURAL</option>
+            <option>ANCORA (HN)</option>
+            <option>BELLEZA S.A.</option>
+            <option>CALLE DE LA PLAZA</option>
+            <option>CAVE LULU (HN)</option>
+            <option>CHAMER (HN)</option>
+            <option>CLEMENTE VELASQUEZ ROCA</option>
+            <option>DAROSA (HN)</option>
+            <option>DISUFIX</option>
+            <option>DISTRIBUIDORA DEL CARIBE</option>
+            <option>ERICK DAVID CASTRO VELIZ</option>
+            <option>ETIFLEX</option>
+            <option>FARMAYA</option>
+            <option>FLUSHING</option>
+            <option>HUGO FERNANDO DURAN</option>
+            <option>INCOGUA</option>
+            <option>INTERCORP</option>
+            <option>JOSE IBAÑEZ</option>
+            <option>JULIA ALVARADO</option>
+            <option>NATUFARMA</option>
+            <option>PETROPLASTIC</option>
+            <option>ROMO S.A.</option>
+            <option>SCENTIA</option>
+            <option>SHALOM</option>
+            <option>SINERGIA</option>
+            <option>TECNIPLAST</option>
+            <option>VESA</option>
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fl">Área solicitante</div>
+          <select class="fs" id="fArea">
+            <option value="Ventas">Ventas</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Proceso ahora es por línea de pedido — sin selector global -->
+      <input type="hidden" id="fTipo" value="armado">
+      <input type="hidden" id="procSel">
+
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Fecha límite de entrega</div>
+          <input class="fi" id="fFecha" type="date" oninput="calcular();this.style.borderColor=''">
+        </div>
+        <div class="fg">
+          <div class="fl">Prioridad</div>
+          <select class="fs" id="fPrioSelect">
+            <option value="normal">🟢 Normal</option>
+            <option value="urgente">🔴 Urgente</option>
+            <option value="programada">🟡 Programada</option>
+            <option value="vela">🌙 Vela</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- LÍNEAS DE PEDIDO -->
+      <div class="fg full">
+        <div class="fl" style="margin-bottom:6px">
+          Líneas de pedido
+          <span style="color:var(--gray);font-weight:400;text-transform:none">(agrega hasta 5 productos del mismo cliente)</span>
+        </div>
+        <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;overflow:hidden">
+          <!-- Header -->
+          <div style="display:grid;grid-template-columns:110px 1fr 90px 80px 28px;gap:6px;padding:7px 10px;background:var(--bg2);border-bottom:1px solid var(--border)">
+            <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px">Código SKU</div>
+            <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px">Descripción del producto</div>
+            <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;text-align:right">Cantidad</div>
+            <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;text-align:right">Bodega</div>
+            <div></div>
+          </div>
+          <div style="padding:4px 10px;background:var(--bg2);border-bottom:1px solid var(--border)">
+            <span style="font-size:9px;color:var(--gray-l)">Proceso(s) se seleccionan por cada línea · Verde = stock suficiente · Ámbar = stock insuficiente</span>
+          </div>
+          <!-- 5 líneas -->
+          <div id="lineasPedido">
+          </div>
+          <div style="padding:6px 10px;border-top:1px solid var(--border)">
+            <button type="button" class="btn btn-g btn-xs" onclick="addLinea()" id="btnAddLinea">+ Agregar línea</button>
+          </div>
+        </div>
+        <!-- Total -->
+        <div style="display:flex;justify-content:flex-end;gap:16px;margin-top:6px;font-size:12px;color:var(--gray)">
+          <span>Total unidades: <strong id="totalUnid" style="color:var(--dark);font-family:var(--mono)">0</strong></span>
+          <span>Líneas: <strong id="totalLineas" style="color:var(--dark);font-family:var(--mono)">0</strong></span>
+        </div>
+      </div>
+
+      <!-- Operadores asignados por línea de pedido (arriba) — sin selector global -->
+      <div style="font-size:10px;color:var(--gray);padding:2px 0 4px">
+        💡 Asigna el operador directamente en cada línea de pedido.
+      </div>
+
+      <!-- CÁLCULO AUTOMÁTICO -->
+      <div class="cbox" id="cboxEl">
+        <div class="c-lbl">⏱ Cálculo automático · Capacidad: 1,200 und/hora/op · Turno: 12h · Inventario: 28 Mar 2026</div>
+        <div class="c-grid">
+          <div class="c-item"><div class="c-val" id="cHoras">—</div><div class="c-lbl2">Horas</div></div>
+          <div class="c-item"><div class="c-val" id="cTurnos">—</div><div class="c-lbl2">Turnos</div></div>
+          <div class="c-item"><div class="c-val" id="cCap">—</div><div class="c-lbl2">Und/hora</div></div>
+          <div class="c-item"><div class="c-val" id="cFecha">—</div><div class="c-lbl2">Entrega est.</div></div>
+        </div>
+        <div class="c-note" id="cNote"></div>
+        <div id="cAlerta" style="display:none;font-size:11px;font-weight:700;margin-top:6px;padding:5px 8px;border-radius:6px;background:rgba(0,0,0,0.04)"></div>
+      </div>
+
+      <div class="fg full">
+        <div class="fl">Notas / instrucciones especiales</div>
+        <textarea class="fta" id="fNotas" placeholder="Color especial, archivo de arte, referencia del cliente, instrucciones de empaque..."></textarea>
+      </div>
+
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cerrarForm()">Cancelar</button>
+      <button class="btn btn-t" id="btnSave" onclick="guardar()">Guardar solicitud</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ CONFIGURACIÓN REAL ════════════════════════════════════
+// ══ BASE DE INVENTARIO (se cargará desde Excel) ═══════════
+// Estructura: { sku, descripcion, existencia }
+// Reemplazar con datos reales del Excel compartido
+// INVENTARIO — Solo tapas facturables · 382 SKUs · 175 con existencia
+// Fuente: INVENTARIO_28MAR2026.xlsx + listado facturable Tetraplastic
+// Para actualizar: subir nuevo Excel y reemplazar este bloque
+const INV_FECHA = '28 Mar 2026';
+
+
+// Búsqueda en inventario
+function buscarSKU(query) {
+  const q = query.toLowerCase();
+  return INVENTARIO.filter(i =>
+    i.sku.includes(q) || i.descripcion.toLowerCase().includes(q)
+  ).slice(0, 30);
+}
+
+// ══ LÍNEAS DE PEDIDO ══════════════════════════════════════
+const MAX_LINEAS = 5;
+let lineas = [];
+
+function addLinea() {
+  if (lineas.length >= MAX_LINEAS) return;
+  const idx = lineas.length;
+  lineas.push({ sku:'', desc:'', cant:0, procs:[], existencia:undefined, operadores:[] });
+  renderLineas();
+  // focus the new SKU input
+  setTimeout(() => {
+    const inp = document.getElementById('lSku_'+idx);
+    if (inp) inp.focus();
+  }, 50);
+}
+
+function removeLinea(idx) {
+  lineas.splice(idx, 1);
+  renderLineas();
+  calcular();
+}
+
+const ALL_PROCS_TAPAS = [
+  {val:'armado',lbl:'Armado'},{val:'banda',lbl:'Banda'},
+  {val:'liner',lbl:'Liner'},{val:'impresion',lbl:'Impresión'},
+  {val:'encajado',lbl:'Encajado'}
+];
+const ALL_PROCS_SERIG = [
+  {val:'serigrafia',lbl:'Serigrafía'},{val:'tampografia',lbl:'Tampografía'},
+  {val:'impresion',lbl:'Impresión'},{val:'encajado',lbl:'Encajado'}
+];
+
+function getProcList() {
+  return fArea === 'tapas' ? ALL_PROCS_TAPAS : ALL_PROCS_SERIG;
+}
+
+function toggleLineaOp(lineaIdx, opId) {
+  if (!lineas[lineaIdx].operadores) lineas[lineaIdx].operadores = [];
+  const arr = lineas[lineaIdx].operadores;
+  const pos = arr.indexOf(opId);
+  if (pos >= 0) arr.splice(pos, 1);
+  else arr.push(opId);
+  // Update chip visuals without full re-render
+  const chips = document.querySelectorAll(`[id^="lOpChip_${lineaIdx}_"]`);
+  chips.forEach(c => {
+    const cId = c.id.replace(`lOpChip_${lineaIdx}_`, '');
+    if (arr.includes(cId)) {
+      c.classList.add('sel-op');
+    } else {
+      c.classList.remove('sel-op', 'sel-op-tapas', 'sel-op-serig');
+    }
+  });
+  calcular();
+}
+
+function toggleLineaProc(lineaIdx, procVal) {
+  if (!lineas[lineaIdx].procs) lineas[lineaIdx].procs = [];
+  const arr = lineas[lineaIdx].procs;
+  const pos = arr.indexOf(procVal);
+  if (pos >= 0) arr.splice(pos, 1);
+  else arr.push(procVal);
+  // re-render just this row's chips
+  const chips = document.querySelectorAll(`#lineaRow_${lineaIdx} .lp-chip`);
+  chips.forEach(c => {
+    const v = c.dataset.proc;
+    if (arr.includes(v)) c.classList.add('sel-proc');
+    else c.classList.remove('sel-proc');
+  });
+  calcular();
+}
+
+function renderLineas() {
+  const cont = document.getElementById('lineasPedido');
+  const btn = document.getElementById('btnAddLinea');
+  if (!cont) return;
+  const procs = getProcList();
+
+  cont.innerHTML = lineas.map((l, i) => {
+    const lProcs = l.procs || [];
+    const procChips = procs.map(p =>
+      `<div class="op-chip lp-chip ${lProcs.includes(p.val)?'sel-proc':''}"
+        data-proc="${p.val}"
+        onclick="toggleLineaProc(${i},'${p.val}')"
+        style="font-size:10px;padding:3px 8px;margin:0">${p.lbl}</div>`
+    ).join('');
+
+    const exist = l.existencia;
+    const existStr = exist !== undefined ? exist.toLocaleString() : '—';
+    const existColor = (exist !== undefined && l.cant > 0)
+      ? (exist >= l.cant ? 'var(--green)' : 'var(--amber)')
+      : 'var(--gray)';
+
+    return `
+    <div style="border-bottom:1px solid var(--border);padding:8px 10px" id="lineaRow_${i}">
+      <!-- Fila 1: SKU + Desc + Cant + Exist + Remove -->
+      <div style="display:grid;grid-template-columns:110px 1fr 90px 80px 28px;gap:6px;align-items:center;margin-bottom:5px">
+        <div style="position:relative">
+          <input class="fi" id="lSku_${i}" value="${l.sku}"
+            placeholder="SKU..."
+            style="padding:5px 7px;font-size:11px;font-family:var(--mono);width:100%"
+            oninput="onSkuInput(${i},this.value)"
+            onblur="setTimeout(()=>hideDrop(${i}),150)"
+            autocomplete="off">
+          <div id="lDrop_${i}" style="display:none;position:fixed;background:white;border:1.5px solid var(--teal-l);border-radius:7px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;max-height:320px;overflow-y:scroll;min-width:440px;overscroll-behavior:contain"></div>
+        </div>
+        <div style="position:relative;width:100%">
+          <input class="fi" id="lDesc_${i}" value="${l.desc}"
+            placeholder="Descripción... (escribe para buscar)"
+            style="padding:5px 7px;font-size:11px;width:100%"
+            oninput="onDescInput(${i},this.value)"
+            onblur="setTimeout(()=>hideDescDrop(${i}),150)"
+            autocomplete="off">
+          <div id="lDescDrop_${i}" style="display:none;position:fixed;background:white;border:1.5px solid var(--teal-l);border-radius:7px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;max-height:320px;overflow-y:scroll;min-width:440px;overscroll-behavior:contain"></div>
+        </div>
+        <input class="fi" id="lCant_${i}" value="${l.cant||''}"
+          type="number" placeholder="0"
+          style="padding:5px 7px;font-size:12px;font-family:var(--mono);font-weight:700;text-align:right;width:100%"
+          oninput="lineas[${i}].cant=parseInt(this.value)||0;updateTotals();calcular()">
+        <div style="font-size:11px;font-family:var(--mono);color:${existColor};text-align:right;padding:0 4px;font-weight:700">
+          ${existStr}
+        </div>
+        <button type="button" onclick="removeLinea(${i})"
+          style="width:22px;height:22px;border-radius:5px;border:none;background:var(--red-l);color:var(--red);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0">✕</button>
+      </div>
+      <!-- Fila 2: Proceso(s) para esta línea -->
+      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+        <span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Proceso:</span>
+        ${procChips}
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:4px">
+          <span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Operador:</span>
+<div style="display:flex;flex-wrap:wrap;gap:4px" id="lOpChips_${i}">
+            ${(()=>{
+              const ocupBusy = getOperadoresOcupados();
+              return (fArea==='tapas'?personal.tapas:personal.serig)
+              .filter(p=>p.rol!=='supervisor' && p.presente)
+              .map(p=>{
+                const sel = (l.operadores||[]).includes(p.id);
+                const busy = !sel && ocupBusy.has(p.id);
+                return `<div class="op-chip ${sel?'sel-op':''}"
+                  id="lOpChip_${i}_${p.id}"
+                  onclick="${busy?'':('toggleLineaOp('+i+',\''+p.id+'\')') }"
+                  title="${busy?'En proceso en otra orden':''}"
+                  style="font-size:10px;padding:3px 8px;${busy?'opacity:.3;cursor:not-allowed;pointer-events:none;border-color:var(--red)':''}">
+                  <div style="width:14px;height:14px;border-radius:50%;background:${p.color};display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:800;color:white">${p.ini}</div>
+                  ${p.nombre.split(' ')[0]}
+                  ${busy?'<span style="font-size:7px;color:var(--red)">●</span>':''}
+                </div>`;
+              }).join('');
+            })()}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  if (btn) btn.style.display = lineas.length >= MAX_LINEAS ? 'none' : 'inline-flex';
+  updateTotals();
+}
+
+function onSkuInput(idx, val) {
+  lineas[idx].sku = val;
+  const drop = document.getElementById('lDrop_'+idx);
+  if (!drop) return;
+  if (val.length < 2) { drop.style.display='none'; return; }
+  const results = buscarSKU(val);
+  if (!results.length) { drop.style.display='none'; return; }
+  drop.innerHTML = results.map(r => `
+    <div onclick="selectSKU(${idx},'${r.sku}','${r.descripcion.replace(/'/g,"\'")}',${r.existencia})"
+      style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;align-items:center"
+      onmouseover="this.style.background='var(--teal-xl)'" onmouseout="this.style.background='white'">
+      <span><strong style="font-family:var(--mono);color:var(--teal)">${r.sku}</strong> <span style="color:var(--mid)">— ${r.descripcion}</span></span>
+      <span style="color:${r.existencia>0?'var(--green)':'var(--gray-l)'};white-space:nowrap;font-family:var(--mono);font-size:11px">${r.existencia>0?r.existencia.toLocaleString()+' und':'sin stock'}</span>
+    </div>
+  `).join('');
+  // Position dropdown relative to input using getBoundingClientRect
+  const inputEl = document.getElementById('lSku_'+idx);
+  if (inputEl) {
+    const rect = inputEl.getBoundingClientRect();
+    drop.style.top  = (rect.bottom + 4) + 'px';
+    drop.style.left = rect.left + 'px';
+    drop.style.width = Math.max(420, rect.width) + 'px';
+  }
+  drop.style.display = 'block';
+}
+
+function selectSKU(idx, sku, desc, existencia) {
+  lineas[idx] = { ...lineas[idx], sku, desc, existencia };
+  const skuEl  = document.getElementById('lSku_'+idx);
+  const descEl = document.getElementById('lDesc_'+idx);
+  if (skuEl)  skuEl.value  = sku;
+  if (descEl) descEl.value = desc;
+  hideDrop(idx);
+  renderLineas();
+  calcular();
+}
+
+function hideDrop(idx) {
+  const d = document.getElementById('lDrop_'+idx);
+  if (d) d.style.display = 'none';
+}
+
+function hideDescDrop(idx) {
+  const d = document.getElementById('lDescDrop_'+idx);
+  if (d) d.style.display = 'none';
+}
+
+// Retorna IDs de operadores ocupados (en solicitudes con estado 'proceso')
+function getOperadoresOcupados() {
+  const ocupados = new Set();
+  solicitudes
+    .filter(s => s.estado === 'proceso')
+    .forEach(s => {
+      // Check both global ops and per-line operadores
+      (s.ops || []).forEach(op => ocupados.add(op));
+      (s.lineas || []).forEach(l => (l.operadores || []).forEach(op => ocupados.add(op)));
+    });
+  return ocupados;
+}
+
+function onDescInput(idx, val) {
+  lineas[idx].desc = val;
+  const drop = document.getElementById('lDescDrop_'+idx);
+  if (!drop) return;
+  if (val.length < 2) { drop.style.display='none'; return; }
+  const results = buscarSKU(val); // reuse same search (searches description too)
+  if (!results.length) { drop.style.display='none'; return; }
+  drop.innerHTML = results.map(r => `
+    <div onclick="selectSKUFromDesc(${idx},'${r.sku}','${r.descripcion.replace(/'/g,"\'")}',${r.existencia})"
+      style="padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;align-items:center"
+      onmouseover="this.style.background='var(--teal-xl)'" onmouseout="this.style.background='white'">
+      <span><span style="color:var(--mid)">${r.descripcion}</span></span>
+      <span style="color:var(--teal);white-space:nowrap;font-family:var(--mono);font-size:10px">${r.sku}</span>
+    </div>
+  `).join('');
+  const inputEl = document.getElementById('lDesc_'+idx);
+  if (inputEl) {
+    const rect = inputEl.getBoundingClientRect();
+    drop.style.top  = (rect.bottom + 4) + 'px';
+    drop.style.left = rect.left + 'px';
+    drop.style.width = Math.max(420, rect.width) + 'px';
+  }
+  drop.style.display = 'block';
+}
+
+function selectSKUFromDesc(idx, sku, desc, existencia) {
+  lineas[idx] = { ...lineas[idx], sku, desc, existencia };
+  const skuEl  = document.getElementById('lSku_'+idx);
+  const descEl = document.getElementById('lDesc_'+idx);
+  if (skuEl)  skuEl.value  = sku;
+  if (descEl) descEl.value = desc;
+  hideDescDrop(idx);
+  renderLineas();
+  calcular();
+}
+
+function updateTotals() {
+  const total = lineas.reduce((s,l) => s + (l.cant||0), 0);
+  const el = document.getElementById('totalUnid');
+  const el2 = document.getElementById('totalLineas');
+  if (el)  el.textContent  = total.toLocaleString();
+  if (el2) el2.textContent = lineas.filter(l=>l.cant>0).length;
+}
+
+
+
+// ══ SUPABASE ══════════════════════════════════════════════
+// ── Generar código de solicitud ──────────────────────────
+async function generarCodigo(area) {
+  const prefix = area === 'tapas' ? 'T' : 'S';
+  const { count } = await db
+    .from('solicitudes')
+    .select('*', { count: 'exact', head: true })
+    .eq('area', area);
+  const n = (count || 0) + 1;
+  return prefix + '-' + String(n).padStart(3, '0');
+}
+
+// ── Cargar solicitudes desde Supabase ───────────────────
+async function cargarSolicitudes() {
+  const { data, error } = await db
+    .from('solicitud_lineas')
+    .select('solicitud_id, sku, descripcion, cantidad, existencia_snap, procesos, operadores_ids, orden');
+
+  if (error) { console.error('Error cargando líneas:', error); return; }
+
+  // Agrupar líneas por solicitud_id
+  const lineasPorSol = {};
+  (data || []).forEach(l => {
+    if (!lineasPorSol[l.solicitud_id]) lineasPorSol[l.solicitud_id] = [];
+    lineasPorSol[l.solicitud_id].push(l);
+  });
+
+  const { data: ops } = await db
+    .from('solicitud_operadores')
+    .select('solicitud_id, personal(codigo)');
+  const opsPorSol = {};
+  (ops || []).forEach(o => {
+    if (!opsPorSol[o.solicitud_id]) opsPorSol[o.solicitud_id] = [];
+    if (o.personal) opsPorSol[o.solicitud_id].push(o.personal.codigo);
+  });
+
+  const { data: sols, error: err2 } = await db
+    .from('solicitudes')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (err2) { console.error('Error cargando solicitudes:', err2); return; }
+
+  solicitudes = (sols || []).map(s => ({
+    id:         s.id,
+    dbId:       s.id,
+    id_display: s.codigo,
+    area:       s.area,
+    cliente:    s.cliente_nombre,
+    area_sol:   s.area_solicitante,
+    sku:        (lineasPorSol[s.id]?.[0]?.sku) || '—',
+    desc:       lineasPorSol[s.id]?.length === 1
+                  ? (lineasPorSol[s.id][0].descripcion || '—')
+                  : (lineasPorSol[s.id]?.[0]?.descripcion || '—') +
+                    (lineasPorSol[s.id]?.length > 1 ? ` (+${lineasPorSol[s.id].length-1} más)` : ''),
+    lineas:     (lineasPorSol[s.id] || []).map(l => ({
+                  sku: l.sku, desc: l.descripcion,
+                  cant: l.cantidad, existencia: l.existencia_snap,
+                  procs: l.procesos || [],
+                  operadores: l.operadores_ids || []
+                })),
+    tipo:       ((lineasPorSol[s.id] || []).flatMap(l => l.procesos || [])).join('+') || 'armado',
+    cant:       (lineasPorSol[s.id] || []).reduce((s,l) => s + (l.cantidad||0), 0),
+    fecha_lim:  s.fecha_limite || '',
+    prio:       s.prioridad,
+    estado:     s.estado,
+    prog:       s.progreso_pct || 0,
+    ops:        opsPorSol[s.id] || [],
+    notas:      s.notas || '',
+    created:    new Date(s.created_at).toLocaleDateString('es-GT', {day:'2-digit',month:'2-digit'}) +
+                ' ' + new Date(s.created_at).toLocaleTimeString('es-GT', {hour:'2-digit',minute:'2-digit'})
+  }));
+
+  renderListas();
+}
+
+// ── Guardar solicitud en Supabase ────────────────────────
+async function guardarEnSupabase(datos) {
+  const btnSave = document.getElementById('btnSave');
+  const orig = btnSave.textContent;
+  btnSave.textContent = 'Guardando...';
+  btnSave.disabled = true;
+
+  try {
+    const codigo = await generarCodigo(datos.area);
+
+    // 1. Insertar solicitud
+    const { data: sol, error: err1 } = await db
+      .from('solicitudes')
+      .insert({
+        codigo,
+        area:             datos.area,
+        cliente_nombre:   datos.cliente,
+        area_solicitante: datos.area_sol,
+        fecha_limite:     datos.fecha_lim || null,
+        prioridad:        datos.prio,
+        estado:           'nueva',
+        progreso_pct:     0,
+        notas:            datos.notas || null,
+      })
+      .select()
+      .single();
+
+    if (err1) throw err1;
+    const solId = sol.id;
+
+    // 2. Insertar líneas
+    if (datos.lineas.length > 0) {
+      const lineasInsert = datos.lineas.map((l, i) => ({
+        solicitud_id:    solId,
+        orden:           i + 1,
+        sku:             l.sku || null,
+        descripcion:     l.desc || 'Sin descripción',
+        cantidad:        l.cant || 0,
+        existencia_snap: l.existencia || 0,
+        procesos:        l.procs || [],
+        operadores_ids: l.operadores || [],
+      }));
+      const { error: err2 } = await db.from('solicitud_lineas').insert(lineasInsert);
+      if (err2) throw err2;
+    }
+
+    // 3. Insertar operadores si los hay
+    if (datos.ops && datos.ops.length > 0) {
+      // Resolver códigos a UUIDs
+      const { data: pers } = await db
+        .from('personal')
+        .select('id, codigo')
+        .in('codigo', datos.ops);
+      if (pers && pers.length > 0) {
+        const opsInsert = pers.map(p => ({ solicitud_id: solId, personal_id: p.id }));
+        await db.from('solicitud_operadores').insert(opsInsert);
+      }
+    }
+
+    return { ok: true, codigo };
+
+  } catch(e) {
+    console.error('Error guardando:', e);
+    return { ok: false, error: e.message };
+  } finally {
+    btnSave.textContent = orig;
+    btnSave.disabled = false;
+  }
+}
+
+// ── Actualizar estado/progreso en Supabase ───────────────
+async function actualizarEnSupabase(dbId, cambios) {
+  const { error } = await db
+    .from('solicitudes')
+    .update(cambios)
+    .eq('id', dbId);
+  if (error) console.error('Error actualizando:', error);
+  return !error;
+}
+
+// ── Cargar inventario desde Supabase ─────────────────────
+async function cargarInventarioDB() {
+  const { data, error } = await db
+    .from('inventario')
+    .select('sku, descripcion, existencia')
+    .eq('facturable', true)
+    .eq('activo', true)
+    .order('descripcion');
+  if (!error && data && data.length > 0) {
+    INVENTARIO = data.map(i => ({
+      sku: i.sku,
+      descripcion: i.descripcion,
+      existencia: i.existencia || 0,
+      facturable: true
+    }));
+    console.log('Inventario cargado desde Supabase:', INVENTARIO.length, 'SKUs');
+  }
+}
+
+// ══ PERSONAL ══════════════════════════════════════════════
+
+
+// ══ SOLICITUDES ═══════════════════════════════════════════
+let solicitudes = [
+  { id:'SOL-001', area:'tapas', cliente:'Distribuidora Central', sku:'11254', desc:'Tapa Domo Naranja', tipo:'armado', cant:10000, fecha_lim:'2025-05-12', prio:'urgente', estado:'proceso', prog:62, ops:['T1','T2'], notas:'Urgente para exportación', created:'2025-05-07 07:30' },
+  { id:'SOL-002', area:'tapas', cliente:'Plásticos del Norte', sku:'11255', desc:'Tapa Domo Blanca', tipo:'banda', cant:6000, fecha_lim:'2025-05-14', prio:'normal', estado:'nueva', prog:0, ops:['T3'], notas:'', created:'2025-05-07 08:15' },
+  { id:'SOL-003', area:'tapas', cliente:'Envases Guate S.A.', sku:'44100', desc:'Tapa Twist con Liner', tipo:'liner', cant:5000, fecha_lim:'2025-05-13', prio:'normal', estado:'proceso', prog:40, ops:['T5'], notas:'', created:'2025-05-07 08:45' },
+  { id:'SOL-004', area:'tapas', cliente:'Supermercados Rey', sku:'33001', desc:'Tapa Domo Banda Roja', tipo:'banda', cant:8000, fecha_lim:'2025-05-16', prio:'programada', estado:'programada', prog:0, ops:['T3','T4'], notas:'Pendiente confirmación de material', created:'2025-05-07 09:00' },
+  { id:'SOL-005', area:'serig', cliente:'Laboratorios Pharma', sku:'32568', desc:'Tapa Domo D1 Serigrafía', tipo:'serigrafia', cant:5000, fecha_lim:'2025-05-13', prio:'urgente', estado:'proceso', prog:30, ops:['S1'], notas:'Arte pendiente aprobación', created:'2025-05-07 07:00' },
+  { id:'SOL-006', area:'serig', cliente:'Cosméticos CATA', sku:'54778', desc:'Tapa Domo Naranja D2', tipo:'serigrafia', cant:8000, fecha_lim:'2025-05-17', prio:'normal', estado:'programada', prog:0, ops:['S1','S2'], notas:'2 colores pantone especial', created:'2025-05-07 09:30' },
+  { id:'SOL-007', area:'serig', cliente:'Grupo Industrial', sku:'33002', desc:'Tapa Twist Tampografía', tipo:'tampografia', cant:2000, fecha_lim:'2025-05-15', prio:'normal', estado:'nueva', prog:0, ops:['S3'], notas:'', created:'2025-05-07 10:00' },
+];
+
+let selId = {};
+
+// ══ HELPERS ═══════════════════════════════════════════════
+function calcHoras(cant, nOps) {
+  return cant / (CFG.cap_und_h * Math.max(nOps,1));
+}
+function calcTurnos(horas) { return Math.ceil(horas / CFG.turno_h); }
+function fechaEst(turnos) {
+  const d = new Date(); d.setDate(d.getDate() + turnos);
+  return d.toLocaleDateString('es-GT',{day:'2-digit',month:'short'});
+}
+function opName(id) {
+  const all = [...personal.tapas, ...personal.serig];
+  return all.find(p=>p.id===id)?.nombre.split(' ')[0] || id;
+}
+function opObj(id) { return [...personal.tapas,...personal.serig].find(p=>p.id===id); }
+
+// ══ STATUS PILLS ══════════════════════════════════════════
+const ESTADOS = {
+  nueva:{css:'p-nueva',lbl:'Nueva'}, programada:{css:'p-prog',lbl:'Programada'},
+  proceso:{css:'p-proc',lbl:'En proceso'}, lista:{css:'p-lista',lbl:'Lista'},
+  entregada:{css:'p-ent',lbl:'Entregada'}
+};
+const PRIOS = {
+  urgente:{css:'p-urg urg-b',lbl:'Urgente'}, vela:{css:'p-vela',lbl:'Vela'},
+};
+function pill(tipo, txt) { return `<span class="pill ${tipo}">${txt}</span>`; }
+function ePill(e) { const x=ESTADOS[e]||{css:'p-nueva',lbl:e}; return pill(x.css, x.lbl); }
+function pPill(p) { const x=PRIOS[p]; return x ? pill(x.css, x.lbl) : ''; }
+
+// ══ RENDER LISTS ══════════════════════════════════════════
+function renderListas() {
+  const ft = document.getElementById('filtroTapas')?.value || '';
+  const tapas = solicitudes.filter(s=>s.area==='tapas' && (!ft || s.estado===ft));
+  const serig  = solicitudes.filter(s=>s.area==='serig');
+  const todas  = solicitudes;
+
+  document.getElementById('cnt-tapas').textContent = solicitudes.filter(s=>s.area==='tapas').length;
+  document.getElementById('cnt-serig').textContent = serig.length;
+  document.getElementById('cnt-todas').textContent = todas.length;
+
+  // KPIs tapas
+  const tp = solicitudes.filter(s=>s.area==='tapas');
+  document.getElementById('kt-proc').textContent = tp.filter(s=>s.estado==='proceso').length;
+  document.getElementById('kt-pend').textContent = tp.filter(s=>['nueva','programada'].includes(s.estado)).length;
+  const opsPresT = personal.tapas.filter(p=>p.presente && p.turno==='AM').length;
+  const _ocup = getOperadoresOcupados();
+  const opsTLibres2 = personal.tapas.filter(p=>p.presente && p.rol!=='supervisor' && !_ocup.has(p.id)).length;
+  const opsTProc2   = personal.tapas.filter(p=>p.rol!=='supervisor' && _ocup.has(p.id)).length;
+  document.getElementById('kt-ops').textContent = opsTLibres2 + ' libres / ' + opsTProc2 + ' proceso';
+  document.getElementById('kt-cap').textContent = (opsTLibres2 * CFG.cap_und_h).toLocaleString();
+
+  // KPIs serig
+  document.getElementById('ks-proc').textContent = serig.filter(s=>s.estado==='proceso').length;
+  document.getElementById('ks-pend').textContent = serig.filter(s=>['nueva','programada'].includes(s.estado)).length;
+  const opsPresS = personal.serig.filter(p=>p.presente && p.turno==='AM').length;
+  const ocupadosS = getOperadoresOcupados();
+  const opsSLibres = personal.serig.filter(p=>p.presente && p.turno==='AM' && p.rol!=='supervisor' && !ocupadosS.has(p.id)).length;
+  const opsSProc   = personal.serig.filter(p=>p.presente && p.turno==='AM' && p.rol!=='supervisor' && ocupadosS.has(p.id)).length;
+  document.getElementById('ks-ops').textContent = opsSLibres + ' libres / ' + opsSProc + ' en proceso';
+  document.getElementById('ks-maq').textContent = opsPresS + '/3';
+
+  buildList('listTapas', tapas, 'tapas');
+  buildList('listSerig', serig, 'serig');
+  buildList('listTodas', todas, 'todas');
+
+  renderDash();
+  renderPersonal();
+}
+
+function buildList(cid, list, view) {
+  const el = document.getElementById(cid);
+  el.innerHTML = '';
+  if (!list.length) {
+    el.innerHTML = '<div style="padding:30px;text-align:center;color:var(--gray-l);font-size:12px">Sin solicitudes</div>';
+    return;
+  }
+  list.forEach(s => {
+    const isT = s.area==='tapas';
+    const ops = s.ops.map(opName).join(', ');
+    const horas = calcHoras(s.cant, s.ops.length);
+    const div = document.createElement('div');
+    div.className = `sc ${isT?'at':'as'} ${selId[view]===s.id?(isT?'sel':'sel-s'):''}`;
+    div.onclick = () => mostrarDetalle(s, view);
+    div.innerHTML = `
+      <div class="sc-top">
+        <div>
+          <div class="sc-id">${s.id} · ${s.created.split(' ')[1]}</div>
+          <div class="sc-cli">${s.cliente}</div>
+          <div class="sc-desc">${s.sku} — ${s.desc}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">
+          ${ePill(s.estado)}
+          ${pPill(s.prio)}
+        </div>
+      </div>
+      <div class="sc-meta">
+        <span class="sc-qty">${s.cant.toLocaleString()} und</span>
+        <span class="pill" style="background:var(--bg2);color:var(--gray)">${s.tipo.split('+').map(p=>PROCS[p]?.label||p).join(' + ')}</span>
+        <span class="sc-date">🗓 ${s.fecha_lim}</span>
+        <span class="sc-date">⏱ ${horas.toFixed(1)}h</span>
+        ${ops ? `<span class="sc-date">👤 ${ops}</span>` : ''}
+      </div>
+      ${s.prog>0?`<div class="pr-row"><div class="pr-wrap"><div class="pr-bar ${isT?'pb-t':'pb-s'}" style="width:${s.prog}%"></div></div><div class="pr-pct">${s.prog}%</div></div>`:''}
+    `;
+    el.appendChild(div);
+  });
+}
+
+// ══ DETAIL ════════════════════════════════════════════════
+function mostrarDetalle(s, view) {
+  selId[view] = s.id;
+  renderListas();
+
+  const isT = s.area==='tapas';
+  const nOps = s.ops.length;
+  const horas = calcHoras(s.cant, nOps);
+  const turnos = calcTurnos(horas);
+  const cap = CFG.cap_und_h * nOps;
+  const opsNombres = s.ops.map(opName).join(', ');
+  const fEst = fechaEst(turnos);
+
+  const cid = view==='serig'?'detSerig':view==='todas'?'detTodas':'detTapas';
+  const det = document.getElementById(cid);
+
+  const etapas = [
+    { t:'Solicitud recibida de Ventas', s:`Cliente: ${s.cliente} · ${s.area_sol||'Ventas'}`, tm:s.created, done:true },
+    { t:'En proceso', s:`${s.tipo.split('+').map(p=>PROCS[p]?.label||p).join(' + ')} · ${nOps} op. · ${cap.toLocaleString()} und/h`, tm:s.estado==='proceso'?'Turno AM en curso':'', done:['lista','entregada'].includes(s.estado), active:s.estado==='proceso'||s.estado==='nueva' },
+    { t:'Lista · Revisión de calidad', s:`${s.cant.toLocaleString()} unidades completadas`, tm:s.estado==='lista'?s.fecha_lim:'', done:s.estado==='entregada', active:s.estado==='lista' },
+    { t:'Entregada a Bodega', s:'Registro SKU PT · cierre de talonario', tm:'', done:s.estado==='entregada', active:false },
+  ];
+
+  det.innerHTML = `
+    <div class="ph" style="flex-shrink:0;border-bottom:1px solid var(--border);background:var(--card)">
+      <div>
+        <div class="ph-title">${s.id} — ${s.cliente}</div>
+        <div class="ph-sub">${s.sku} · ${s.desc}</div>
+      </div>
+      <div class="ph-r">
+        ${(s.estado==='nueva'||s.estado==='programada')?`<button class="btn ${isT?'btn-t':'btn-s'} btn-xs" onclick="cambiarEstado('${s.id}','proceso','${view}')">▶ Iniciar</button>`:''}
+        ${s.estado==='proceso'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista','${view}')">✓ Lista</button>`:''}
+        ${s.estado==='lista'?`<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada','${view}')">📦 Entregar</button>`:''}
+        ${ePill(s.estado)} ${pPill(s.prio)}
+        <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #f5c0c0;margin-left:4px" onclick="confirmarBorrar('${s.id}','${s.id_display||s.id}','${view}')">🗑 Borrar</button>
+      </div>
+    </div>
+    <div class="det-scroll">
+
+      <div class="tbox ${isT?'tt':'ts'}">
+        <div class="tbox-lbl">Tiempo estimado de entrega</div>
+        <div class="tbox-val ${isT?'tc':'sc2'}">${horas.toFixed(1)} horas</div>
+        <div class="tbox-sub">${turnos} turno${turnos>1?'s':''} de ${CFG.turno_h}h · ${nOps} operador${nOps>1?'es':''} · ${cap.toLocaleString()} und/hora · Entrega estimada: <strong>${fEst}</strong></div>
+      </div>
+
+      <div class="dc">
+        <div class="dc-h">Detalle de la solicitud</div>
+        <div class="dc-b">
+          <div class="ig">
+            <!-- LÍNEAS INTEGRADAS: SKU + Desc + Cantidad + Bodega + Operador -->
+            <div class="ii" style="grid-column:1/-1">
+              <div class="il" style="margin-bottom:6px">Líneas del pedido · ${s.cant.toLocaleString()} und total</div>
+              <div style="display:grid;grid-template-columns:90px 1fr 90px 80px 1fr;gap:0;border:1px solid var(--border);border-radius:7px;overflow:hidden">
+                <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:5px 8px;background:var(--bg2);border-bottom:1px solid var(--border)">SKU</div>
+                <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:5px 8px;background:var(--bg2);border-bottom:1px solid var(--border)">Descripción</div>
+                <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:5px 8px;background:var(--bg2);border-bottom:1px solid var(--border);text-align:right">Cantidad</div>
+                <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:5px 8px;background:var(--bg2);border-bottom:1px solid var(--border);text-align:right">Bodega</div>
+                <div style="font-size:9px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:5px 8px;background:var(--bg2);border-bottom:1px solid var(--border)">Operador(es)</div>
+                ${(s.lineas||[]).map((l,li)=>`
+                  <div style="padding:8px;font-family:var(--mono);font-size:11px;color:var(--teal);font-weight:700;background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${l.sku||'—'}</div>
+                  <div style="padding:8px;font-size:11px;color:var(--mid);background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${l.desc||'—'}</div>
+                  <div style="padding:8px;font-size:12px;font-weight:800;font-family:var(--mono);text-align:right;color:var(--dark);background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${(l.cant||0).toLocaleString()}</div>
+                  <div style="padding:8px;font-size:11px;font-family:var(--mono);text-align:right;font-weight:700;color:${(l.existencia||0)>=(l.cant||0)?'var(--green)':'var(--amber)'};background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${l.existencia!==undefined?l.existencia.toLocaleString():'—'}</div>
+                  <div style="padding:8px;font-size:11px;color:var(--mid);background:${li%2===0?'white':'var(--bg)'}${li>0?';border-top:1px solid var(--bg2)':''}">${(l.operadores&&l.operadores.length)?l.operadores.map(oid=>opObj(oid)?.nombre.split(' ')[0]||oid).join(', '):'<span style="color:var(--gray-l)">Sin asignar</span>'}</div>
+                `).join('')}
+              </div>
+            </div>
+            <div class="ii"><div class="il">Proceso(s)</div><div class="iv">${s.tipo.split('+').map(p=>PROCS[p]?.label||p).join(' + ')}</div></div>
+            <div class="ii"><div class="il">Prioridad</div><div class="iv">${s.prio==='urgente'?'🔴 Urgente':s.prio==='vela'?'🌙 Vela':s.prio==='programada'?'🟡 Programada':'🟢 Normal'}</div></div>
+            <div class="ii">
+              <div class="il">Fecha límite</div>
+              <div class="iv">📅 ${s.fecha_lim||'—'}</div>
+            </div>
+            <div class="ii">
+              <div class="il">Entrega estimada</div>
+              <div class="iv" style="color:${(()=>{if(!s.fecha_lim)return 'var(--gray)';const est=new Date();est.setDate(est.getDate()+calcTurnos(calcHoras(s.cant,Math.max(s.ops.length,1))));return est<=new Date(s.fecha_lim)?'var(--green)':'var(--red)';})()}">🕐 ${(()=>{const t=calcTurnos(calcHoras(s.cant,Math.max(s.ops.length,1)));const est=new Date();est.setDate(est.getDate()+t);return est.toLocaleDateString('es-GT',{day:'2-digit',month:'short',year:'numeric'});})()}</div>
+            </div>
+            <div class="ii"><div class="il">Área solicitante</div><div class="iv">${s.area_sol||'Ventas'}</div></div>
+            <div class="ii"><div class="il">Ingresada</div><div class="iv mono" style="font-size:10px">${s.created}</div></div>
+          </div>
+          ${s.notas?`<div class="nota-box" style="margin-top:10px">📌 ${s.notas}</div>`:''}
+        </div>
+      </div>
+
+
+
+      <div class="dc">
+        <div class="dc-h">Desglose de producción</div>
+        <div class="dc-b" style="padding:0">
+          <table class="dt">
+            <tr><th>Concepto</th><th>Valor</th></tr>
+            <tr><td>Proceso(s)</td><td><strong>${s.tipo.split('+').map(p=>PROCS[p]?.label||p).join(' + ')}</strong></td></tr>
+            <tr><td>Capacidad base</td><td><strong>${CFG.cap_und_h.toLocaleString()} und/hora/operador</strong></td></tr>
+            <tr><td>Operadores asignados</td><td><strong>${nOps} (${opsNombres})</strong></td></tr>
+            <tr><td>Capacidad efectiva</td><td><strong>${cap.toLocaleString()} und/hora</strong></td></tr>
+            <tr><td>Unidades solicitadas</td><td><strong>${s.cant.toLocaleString()}</strong></td></tr>
+            <tr><td>Horas requeridas</td><td><strong>${horas.toFixed(2)} h</strong></td></tr>
+            <tr><td>Turnos de ${CFG.turno_h}h necesarios</td><td><strong>${turnos}</strong></td></tr>
+            <tr><td>Fecha estimada de entrega</td><td><strong>${fEst}</strong></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="dc">
+        <div class="dc-h">Operadores asignados</div>
+        <div class="dc-b" style="display:flex;flex-wrap:wrap;gap:8px">
+          ${s.ops.map(oid=>{
+            const op=opObj(oid);
+            return op?`<div style="display:flex;align-items:center;gap:7px;background:var(--bg);padding:7px 10px;border-radius:8px;border:1px solid var(--border)">
+              <div style="width:28px;height:28px;border-radius:50%;background:${op.color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white">${op.ini}</div>
+              <div><div style="font-size:12px;font-weight:700">${op.nombre}</div><div style="font-size:10px;color:var(--gray)">${op.proc} · ${op.turno}</div></div>
+            </div>`:'';
+          }).join('')}
+        </div>
+      </div>
+
+      ${s.prog>0?`
+      <div class="dc">
+        <div class="dc-h">Progreso actual <span class="pr-pct" style="font-size:13px">${s.prog}%</span></div>
+        <div class="dc-b">
+          <div class="pr-wrap" style="height:8px;border-radius:5px">
+            <div class="pr-bar ${isT?'pb-t':'pb-s'}" style="width:${s.prog}%;height:8px;border-radius:5px"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:var(--gray)">
+            <span>${Math.round(s.cant*s.prog/100).toLocaleString()} und completadas</span>
+            <span>${Math.round(s.cant*(100-s.prog)/100).toLocaleString()} und pendientes</span>
+          </div>
+        </div>
+      </div>`:''}
+
+      <div class="dc">
+        <div class="dc-h">Flujo de la solicitud</div>
+        <div class="dc-b">
+          <div class="tl">
+            ${etapas.map(e=>`
+            <div class="tl-i">
+              <div class="tl-dot ${e.done?'done':e.active?'active':''}">${e.done?'✓':e.active?'▶':'·'}</div>
+              <div class="tl-b"><div class="tl-t">${e.t}</div><div class="tl-s">${e.s}</div>${e.tm?`<div class="tl-tm">${e.tm}</div>`:''}</div>
+            </div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="dc">
+        <div class="dc-h">Reasignar operadores por línea
+          <span style="font-weight:400;text-transform:none;font-size:10px;color:var(--gray);margin-left:6px">Toca para asignar / quitar</span>
+        </div>
+        <div class="dc-b" style="display:flex;flex-direction:column;gap:8px">
+          ${(s.lineas||[]).map((ln,li) => {
+            const listaR = isT ? personal.tapas : personal.serig;
+            const ocupR = getOperadoresOcupados();
+            const chips = listaR.filter(p=>p.rol!=='supervisor'&&p.presente).map(p=>{
+              const selR = (ln.operadores||[]).includes(p.id);
+              const busyR = !selR && ocupR.has(p.id);
+              return '<div class="op-chip '+(selR?'sel-op':'')+'" '+
+                'onclick="'+(busyR?'':('reasignarOp(\''+s.id+'\','+li+',\''+p.id+'\',\''+view+'\''+')'))+'" '+
+                'title="'+(busyR?'En proceso en otra orden':selR?'Quitar':'Asignar')+'" '+
+                'style="font-size:10px;padding:3px 8px;'+(busyR?'opacity:.3;cursor:not-allowed;pointer-events:none;':'cursor:pointer;')+'">' +
+                '<div style="width:14px;height:14px;border-radius:50%;background:'+p.color+';display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:800;color:white">'+p.ini+'</div>' +
+                p.nombre.split(' ')[0] +
+                (busyR?'<span style="font-size:7px;color:var(--red)">●</span>':'') +
+                '</div>';
+            }).join('');
+            return '<div style="background:var(--bg);border-radius:8px;padding:10px 12px">' +
+              '<div style="font-size:11px;font-weight:700;color:var(--dark);margin-bottom:5px">' +
+              'Línea '+(li+1)+': <span style="font-family:var(--mono);color:var(--teal)">'+(ln.sku||'—')+'</span> · '+(ln.desc||'—')+' · <strong>'+(ln.cant||0).toLocaleString()+' und</strong>' +
+              '</div>' +
+              '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">'+chips+'</div>' +
+              '<div style="font-size:10px;color:var(--gray)">Asignados: <strong style="color:var(--teal)">' +
+              ((ln.operadores&&ln.operadores.length)?ln.operadores.map(oid=>opObj(oid)?.nombre.split(' ')[0]||oid).join(', '):'Ninguno') +
+              '</strong></div></div>';
+          }).join('')}
+        </div>
+      </div>
+
+      <div class="dc">
+        <div class="dc-h">Actualizar progreso del supervisor</div>
+        <div class="dc-b">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="range" id="sldr_${s.id}" min="0" max="100" value="${s.prog}" style="flex:1"
+              oninput="document.getElementById('sldrV_${s.id}').textContent=this.value+'%'">
+            <span id="sldrV_${s.id}" style="font-family:var(--mono);font-size:14px;font-weight:800;min-width:42px">${s.prog}%</span>
+            <button class="btn btn-g btn-sm" onclick="actualizarProg('${s.id}','${view}')">Guardar</button>
+          </div>
+          <div style="font-size:10px;color:var(--gray);margin-top:4px">Registra aquí el reporte del supervisor. El sistema calcula unidades completadas automáticamente.</div>
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+// ══ ACCIONES ══════════════════════════════════════════════
+async function reasignarOp(solId, lineaIdx, opId, view) {
+  const s = solicitudes.find(x => x.id === solId);
+  if (!s || !s.lineas[lineaIdx]) return;
+  const l = s.lineas[lineaIdx];
+  if (!l.operadores) l.operadores = [];
+  const pos = l.operadores.indexOf(opId);
+  if (pos >= 0) l.operadores.splice(pos, 1);
+  else l.operadores.push(opId);
+
+  // Update in Supabase - need the line's UUID
+  // Re-fetch line IDs
+  const { data: lineasDB } = await db
+    .from('solicitud_lineas')
+    .select('id, orden')
+    .eq('solicitud_id', s.dbId)
+    .order('orden');
+
+  if (lineasDB && lineasDB[lineaIdx]) {
+    await db
+      .from('solicitud_lineas')
+      .update({ operadores_ids: l.operadores })
+      .eq('id', lineasDB[lineaIdx].id);
+  }
+
+  // Also update global ops list on solicitud
+  const todosOps = [...new Set(s.lineas.flatMap(ln => ln.operadores || []))];
+  s.ops = todosOps;
+
+  renderListas();
+  mostrarDetalle(s, view);
+}
+
+async function confirmarBorrar(id, codigo, view) {
+  const confirma = window.confirm(
+    '¿Eliminar la solicitud ' + codigo + '?\n\nEsta acción no se puede deshacer.'
+  );
+  if (!confirma) return;
+  await borrarSolicitud(id, view);
+}
+
+async function borrarSolicitud(id, view) {
+  // Buscar dbId real
+  const s = solicitudes.find(x => x.id === id);
+  const dbId = s?.dbId || id;
+
+  try {
+    // Borrar en cascada desde Supabase
+    await db.from('solicitud_operadores').delete().eq('solicitud_id', dbId);
+    await db.from('solicitud_historial').delete().eq('solicitud_id', dbId);
+    await db.from('solicitud_lineas').delete().eq('solicitud_id', dbId);
+    const { error } = await db.from('solicitudes').delete().eq('id', dbId);
+
+    if (error) throw error;
+
+    // Limpiar del estado local
+    solicitudes = solicitudes.filter(x => x.id !== id);
+
+    // Limpiar detalle
+    const detId = view==='serig'?'detSerig':view==='todas'?'detTodas':'detTapas';
+    const det = document.getElementById(detId);
+    if (det) det.innerHTML = `
+      <div class="det-empty">
+        <div class="det-empty-ico">🗑️</div>
+        <div class="det-empty-txt">Solicitud eliminada</div>
+      </div>`;
+
+    renderListas();
+
+    // Toast confirmación
+    const toast = document.createElement('div');
+    toast.textContent = '🗑 Solicitud eliminada correctamente';
+    toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--red);color:white;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+
+  } catch(e) {
+    alert('Error al eliminar: ' + e.message);
+  }
+}
+
+async function cambiarEstado(id, nuevo, view) {
+  const s = solicitudes.find(x=>x.id===id);
+  if (!s) return;
+  const prog = ['lista','entregada'].includes(nuevo) ? 100 : s.prog;
+  if (s.dbId) {
+    await actualizarEnSupabase(s.dbId, { estado: nuevo, progreso_pct: prog });
+  }
+  s.estado = nuevo; s.prog = prog;
+  renderListas(); mostrarDetalle(s, view);
+}
+
+async function actualizarProg(id, view) {
+  const s = solicitudes.find(x=>x.id===id);
+  const sl = document.getElementById('sldr_'+id);
+  if (!s || !sl) return;
+  const prog = parseInt(sl.value);
+  const nuevoEstado = prog === 100 ? 'lista' : s.estado;
+  if (s.dbId) {
+    await actualizarEnSupabase(s.dbId, { progreso_pct: prog, estado: nuevoEstado });
+  }
+  s.prog = prog; s.estado = nuevoEstado;
+  renderListas(); mostrarDetalle(s, view);
+}
+
+// ══ DASHBOARD ═════════════════════════════════════════════
+function renderDash() {
+  const g = document.getElementById('dashGrid');
+  const tp = solicitudes.filter(s=>s.area==='tapas');
+  const sg = solicitudes.filter(s=>s.area==='serig');
+  const opsT = personal.tapas.filter(p=>p.presente&&p.turno==='AM').length;
+  const opsS = personal.serig.filter(p=>p.presente&&p.turno==='AM').length;
+
+  const estados = ['nueva','programada','proceso','lista'];
+  const estLbl  = ['Nuevas','Programadas','En proceso','Listas'];
+  const estCol  = ['var(--teal)','#7A5200','var(--blue)','var(--green)'];
+
+  g.innerHTML = `
+    <div class="dash-card">
+      <div class="dash-h">Estado de solicitudes <span style="font-size:10px;color:var(--gray)">Tapas + Serigrafía</span></div>
+      <div class="dash-b">
+        ${estados.map((e,i)=>{
+          const n = solicitudes.filter(s=>s.estado===e).length;
+          const pct = solicitudes.length ? Math.round(n/solicitudes.length*100) : 0;
+          return `<div class="cap-row"><div class="cap-name" style="color:${estCol[i]};font-size:11px">${estLbl[i]}</div><div class="cap-p"><div class="pr-wrap"><div class="pr-bar" style="width:${pct}%;background:${estCol[i]}"></div></div></div><div class="cap-v">${n}</div></div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="dash-card">
+      <div class="dash-h">Capacidad real hoy</div>
+      <div class="dash-b">
+        <div class="cap-row"><div class="cap-name">Tapas AM</div><div class="cap-p"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:${Math.min(100,opsT/personal.tapas.length*100)}%"></div></div></div><div class="cap-v">${(opsT*CFG.cap_und_h).toLocaleString()} und/h</div></div>
+        <div class="cap-row"><div class="cap-name">Serigrafía</div><div class="cap-p"><div class="pr-wrap"><div class="pr-bar pb-s" style="width:${Math.min(100,opsS/personal.serig.length*100)}%"></div></div></div><div class="cap-v">${(opsS*CFG.cap_und_h).toLocaleString()} und/h</div></div>
+        <div class="cap-row"><div class="cap-name">Turno</div><div class="cap-p"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:100%"></div></div></div><div class="cap-v">${CFG.turno_h} h</div></div>
+        <div style="font-size:10px;color:var(--gray);margin-top:4px">
+          Base: ${CFG.cap_und_h.toLocaleString()} und/hora/op · 
+          Tapas: ${personal.tapas.filter(p=>p.presente&&p.rol!=='supervisor'&&!getOperadoresOcupados().has(p.id)).length} libres · 
+          Serigrafía: ${personal.serig.filter(p=>p.presente&&p.rol!=='supervisor'&&!getOperadoresOcupados().has(p.id)).length} libres
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-card">
+      <div class="dash-h">Tapas · Carga vs capacidad</div>
+      <div class="dash-b">
+        ${tp.filter(s=>['nueva','programada','proceso'].includes(s.estado)).map(s=>{
+          const h = calcHoras(s.cant, s.ops.length);
+          return `<div class="cap-row">
+            <div class="cap-name" style="font-size:10px">${s.id}</div>
+            <div class="cap-p"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:${s.prog}%"></div></div></div>
+            <div class="cap-v">${h.toFixed(1)}h · ${s.prog}%</div>
+          </div>`;
+        }).join('') || '<div style="font-size:12px;color:var(--gray)">Sin solicitudes activas</div>'}
+      </div>
+    </div>
+
+    <div class="dash-card">
+      <div class="dash-h">Serigrafía · Carga vs capacidad</div>
+      <div class="dash-b">
+        ${sg.filter(s=>['nueva','programada','proceso'].includes(s.estado)).map(s=>{
+          const h = calcHoras(s.cant, s.ops.length);
+          return `<div class="cap-row">
+            <div class="cap-name" style="font-size:10px">${s.id}</div>
+            <div class="cap-p"><div class="pr-wrap"><div class="pr-bar pb-s" style="width:${s.prog}%"></div></div></div>
+            <div class="cap-v">${h.toFixed(1)}h · ${s.prog}%</div>
+          </div>`;
+        }).join('') || '<div style="font-size:12px;color:var(--gray)">Sin solicitudes activas</div>'}
+      </div>
+    </div>
+  `;
+}
+
+// ══ PERSONAL ══════════════════════════════════════════════
+function renderPersonal() {
+  const g = document.getElementById('personalGrid');
+  const todas = [
+    { area:'Tapas', lista: personal.tapas },
+    { area:'Serigrafía', lista: personal.serig },
+  ];
+  g.innerHTML = todas.map(({area,lista})=>`
+    <div style="padding:12px 16px 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--gray)">${area} — ${lista.filter(p=>p.presente).length}/${lista.length} presentes</div>
+    <div class="pg">
+      ${lista.map(p=>`
+      <div class="op-card" style="opacity:${p.presente?1:.5}">
+        <div class="op-top">
+          <div class="op-avatar" style="background:${p.color}">${p.ini}</div>
+          <div>
+            <div class="op-name">${p.nombre}</div>
+            <div class="op-proc">${p.proc} · ${p.turno}</div>
+          </div>
+          <div style="margin-left:auto">
+            <div class="pill ${p.presente?'p-lista':'p-urg'}">${p.presente?'Presente':'Ausente'}</div>
+          </div>
+        </div>
+        <div class="op-stats">
+          <span class="op-stat-l">Turno</span>
+          <span class="op-stat-v ${p.turno==='VELA'?'sc2':''}">${p.turno}</span>
+        </div>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-g btn-xs" onclick="togglePresente('${p.id}','${area==='Tapas'?'tapas':'serig'}')">
+            ${p.presente?'Marcar ausente':'Marcar presente'}
+          </button>
+        </div>
+      </div>`).join('')}
+    </div>
+  `).join('');
+}
+
+function togglePresente(id, area) {
+  const lista = personal[area];
+  const p = lista.find(x=>x.id===id);
+  if(p) p.presente = !p.presente;
+  renderListas();
+}
+
+// ══ FORM ══════════════════════════════════════════════════
+let fArea = 'tapas';
+
+function abrirForm(area) {
+  fArea = area;
+  document.getElementById('mTitle').textContent = area==='tapas' ? 'Nueva solicitud · Tapas' : 'Nueva solicitud · Serigrafía';
+  document.getElementById('btnSave').className = `btn ${area==='tapas'?'btn-t':'btn-s'}`;
+
+  // Fecha default +3 días
+  const d = new Date(); d.setDate(d.getDate()+3);
+  document.getElementById('fFecha').value = d.toISOString().split('T')[0];
+
+  // Prioridad default
+  document.getElementById('fPrioSelect').value = 'normal';
+
+  // Reset form fields
+  document.getElementById('fCli').value = '';
+  document.getElementById('fNotas').value = '';
+
+  // Init líneas con 1 vacía
+  lineas = [];
+  addLinea();
+
+  // Mostrar disponibilidad en el hint
+  const listaOps = area==='tapas' ? personal.tapas : personal.serig;
+  const ocupados = getOperadoresOcupados();
+  const libres = listaOps.filter(p => p.presente && p.rol !== 'supervisor' && !ocupados.has(p.id)).length;
+  const enProc  = listaOps.filter(p => p.rol !== 'supervisor' && ocupados.has(p.id)).length;
+  const cntEl = document.getElementById('opsDisponiblesCount');
+  if (cntEl) cntEl.textContent = libres + ' libres · ' + enProc + ' en proceso';
+
+  document.getElementById('cboxEl').className = `cbox ${area==='serig'?'cs':''}`;
+  calcular();
+  document.getElementById('overlay').classList.add('open');
+}
+
+
+function toggleChip(id, area) {
+  const p = [...personal.tapas,...personal.serig].find(x=>x.id===id);
+  if(!p?.presente) return;
+  const chip = document.getElementById('chip_'+id);
+  const isSel = chip.classList.contains('sel-op') || chip.classList.contains('sel-op-s');
+  const cls = area==='tapas'?'sel-op':'sel-op-s';
+  if(isSel){ chip.classList.remove('sel-op','sel-op-s'); }
+  else { chip.classList.add(cls); }
+  calcular();
+}
+
+function getSelectedOps() {
+  // Operadores ahora se asignan por línea — retorna todos los únicos
+  return [...new Set(lineas.flatMap(l => l.operadores || []))];
+}
+
+function getSelectedProcs() {
+  return [...document.querySelectorAll('#procSel .sel-proc')].map(c=>c.dataset.proc);
+}
+
+function toggleProc(el) {
+  el.classList.toggle('sel-proc');
+  // update hidden input with first selected proc for backward compat
+  const procs = getSelectedProcs();
+  document.getElementById('fTipo').value = procs[0] || 'armado';
+  calcular();
+}
+
+function calcular() {
+  const cant = lineas.reduce((s,l) => s + (l.cant||0), 0);
+  // Calcular factor de procesos combinados desde lineas
+  const todosProcsCalc = [...new Set(lineas.filter(l=>l.cant>0).flatMap(l=>l.procs||[]))];
+  const ops = getSelectedOps();
+  const nOps = Math.max(ops.length, 1);
+  const procFactor = 1 + (Math.max(todosProcsCalc.length,1) - 1) * 0.15;
+
+  if(!cant){
+    ['cHoras','cTurnos','cCap','cFecha'].forEach(id=>document.getElementById(id).textContent='—');
+    return;
+  }
+
+  const cap = CFG.cap_und_h * nOps;
+  const h = calcHoras(cant, nOps) * procFactor;
+  const t = calcTurnos(h);
+  const procNames = todosProcsCalc.length
+    ? todosProcsCalc.map(p=>PROCS[p]?.label||p).join(' + ')
+    : 'Sin proceso asignado';
+
+  document.getElementById('cHoras').textContent = h.toFixed(1)+'h';
+  document.getElementById('cTurnos').textContent = t+(t>1?' turnos':' turno');
+  document.getElementById('cCap').textContent = cap.toLocaleString();
+
+  // Fecha estimada con color según si cumple el límite
+  const fechaLimStr = document.getElementById('fFecha').value;
+  const fechaEstDate = new Date(); fechaEstDate.setDate(fechaEstDate.getDate() + t);
+  const fechaLimDate = fechaLimStr ? new Date(fechaLimStr) : null;
+  const enTiempo = !fechaLimDate || fechaEstDate <= fechaLimDate;
+  const fechaEl = document.getElementById('cFecha');
+  fechaEl.textContent = fechaEst(t);
+  fechaEl.style.color = enTiempo ? 'var(--green)' : 'var(--red)';
+  // También mostrar la diferencia en días
+  if (fechaLimDate) {
+    const diffDias = Math.round((fechaLimDate - fechaEstDate) / (1000*60*60*24));
+    const diffTxt = diffDias === 0 ? ' (justo)' : diffDias > 0 ? ` (+${diffDias}d)` : ` (${diffDias}d tarde)`;
+    fechaEl.textContent = fechaEst(t) + diffTxt;
+  }
+
+  document.getElementById('cNote').textContent =
+    `${procNames} · ${nOps} operador${nOps>1?'es':''} · ${CFG.cap_und_h.toLocaleString()} und/h · Turno ${CFG.turno_h}h${procs.length>1?' · +'+Math.round((procFactor-1)*100)+'% por procesos combinados':''}`;
+
+  const cvals = document.querySelectorAll('.c-val');
+  cvals.forEach(v=>v.className=`c-val${fArea==='serig'?' cs2':''}`);
+}
+
+function cerrarForm() { document.getElementById('overlay').classList.remove('open'); }
+function cerrarFormFuera(e){ /* deshabilitado — cerrar solo con X */ }
+
+async function guardar() {
+  const cli    = document.getElementById('fCli').value;
+  const areaSol= document.getElementById('fArea').value;
+  const fecha  = document.getElementById('fFecha').value;
+  const prio   = document.getElementById('fPrioSelect').value;
+  const ops    = getSelectedOps();
+  const notas  = document.getElementById('fNotas').value.trim();
+  const lineasValidas = lineas.filter(l => l.cant > 0);
+
+  if (!cli)              { alert('Selecciona un cliente.'); return; }
+  if (!lineasValidas.length) { alert('Agrega al menos una línea con cantidad.'); return; }
+
+  // Procesos únicos de todas las líneas
+  const todosProcs = [...new Set(lineasValidas.flatMap(l => l.procs || []))];
+  const tipo = todosProcs.join('+') || 'armado';
+  const cant = lineasValidas.reduce((s, l) => s + l.cant, 0);
+
+  const btnSave = document.getElementById('btnSave');
+  btnSave.textContent = 'Guardando...';
+  btnSave.disabled = true;
+
+  const result = await guardarEnSupabase({
+    area: fArea, cliente: cli, area_sol: areaSol,
+    lineas: lineasValidas, tipo, cant,
+    fecha_lim: fecha, prio, ops, notas
+  });
+
+  btnSave.textContent = 'Guardar solicitud';
+  btnSave.disabled = false;
+
+  if (result.ok) {
+    cerrarForm();
+    await cargarSolicitudes();
+    const view = fArea === 'tapas' ? 'tapas' : 'serig';
+    switchTab(view, document.getElementById('tab-' + view));
+    if (solicitudes.length > 0) mostrarDetalle(solicitudes[0], view);
+    const toast = document.createElement('div');
+    toast.textContent = '✓ ' + result.codigo + ' guardada correctamente';
+    toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1A6B5B;color:white;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.25);white-space:nowrap';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3500);
+  } else {
+    alert('Error al guardar:\n' + (result.error || 'Error desconocido'));
+  }
+
+} // end guardar
+
+// ══ NAVEGACIÓN ════════════════════════════════════════════
+function switchTab(view, tabEl, snBtn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.sn-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const vEl = document.getElementById('view-' + view);
+  if (vEl) vEl.classList.add('active');
+  if (tabEl) {
+    tabEl.classList.add('active');
+  } else {
+    const tEl = document.getElementById('tab-' + view);
+    if (tEl) tEl.classList.add('active');
+  }
+  if (snBtn) snBtn.classList.add('active');
+}
+
+// ══ RELOJ ══════════════════════════════════════════════════
+function tick() {
+  const n = new Date();
+  const el = document.getElementById('clk');
+  if (!el) return;
+  el.textContent =
+    n.toLocaleDateString('es-GT',{weekday:'short',day:'2-digit',month:'short'}) +
+    ' · ' +
+    n.toLocaleTimeString('es-GT',{hour:'2-digit',minute:'2-digit'});
+}
+tick();
+setInterval(tick, 30000);
+
+// ══ INIT ══════════════════════════════════════════════════
+function fixPanelHeights() {
+  const paneRList = document.querySelectorAll('.pane-r, .pane-l');
+  paneRList.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    el.style.height = rect.height + 'px';
+  });
+}
+
+(async () => {
+  await cargarInventarioDB();
+  await cargarSolicitudes();
+  setTimeout(fixPanelHeights, 100);
+})();
+window.addEventListener('resize', fixPanelHeights);
+</script>
+</body>
+</html>
