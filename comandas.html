@@ -14,40 +14,41 @@
 /* ── Layout base ─────────────────────────────────────── */
 body { background:var(--bg); color:var(--ink); min-height:100vh; }
 
-.topbar { background:var(--ink); padding:10px 20px; display:flex; align-items:center; justify-content:space-between; color:#fff; }
-.logo { font-family:var(--display); font-size:16px; font-weight:900; }
+.topbar { background:#0C0C0B; padding:10px 20px; display:flex; align-items:center; justify-content:space-between; color:#fff; border-bottom:2px solid var(--teal); }
+.logo { font-family:var(--display); font-size:16px; font-weight:900; color:#fff; }
 .logo span { color:#7ECEC0 }
+.logo-sub { font-family:var(--font); font-size:13px; font-weight:400; color:rgba(255,255,255,.7); margin-left:8px; }
 .topbar-right { display:flex; align-items:center; gap:12px; }
-.back-btn { background:rgba(255,255,255,.1); border:none; color:#fff; padding:6px 14px; border-radius:8px; font-size:12px; cursor:pointer; font-family:var(--font); }
-.back-btn:hover { background:rgba(255,255,255,.2); }
+.back-btn { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2); color:#fff; padding:6px 14px; border-radius:8px; font-size:12px; cursor:pointer; font-family:var(--font); font-weight:600; }
+.back-btn:hover { background:rgba(255,255,255,.25); }
 
 /* ── Dos columnas ─────────────────────────────────────── */
 .main-layout { display:grid; grid-template-columns:420px 1fr; height:calc(100vh - 44px); overflow:hidden; }
 
 /* ── Panel izquierdo: listado ─────────────────────────── */
-.left-panel { border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; background:var(--card); }
-.left-header { padding:16px; border-bottom:1px solid var(--border); }
-.left-title { font-family:var(--display); font-size:18px; font-weight:700; margin-bottom:10px; }
+.left-panel { border-right:2px solid var(--border); display:flex; flex-direction:column; overflow:hidden; background:#FAFAF8; }
+.left-header { padding:16px; border-bottom:2px solid var(--border); background:#fff; }
+.left-title { font-family:var(--display); font-size:18px; font-weight:700; margin-bottom:10px; color:#0C0C0B; }
 .left-controls { display:flex; gap:8px; }
 .btn-new { background:var(--teal); color:#fff; border:none; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:var(--font); flex:1; }
 .btn-new:hover { background:#0D4035; }
 .search-box { flex:1; border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:13px; font-family:var(--font); background:var(--bg); }
 .date-filter { border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:12px; font-family:var(--font); background:var(--bg); }
 
-.kpi-strip { display:flex; gap:0; border-bottom:1px solid var(--border); }
-.kpi-box { flex:1; padding:10px 14px; text-align:center; border-right:1px solid var(--border); }
+.kpi-strip { display:flex; gap:0; border-bottom:2px solid var(--border); background:#0C0C0B; }
+.kpi-box { flex:1; padding:10px 14px; text-align:center; border-right:1px solid rgba(255,255,255,.1); }
 .kpi-box:last-child { border-right:none; }
-.kpi-v { font-family:var(--mono); font-size:20px; font-weight:700; color:var(--teal); }
-.kpi-l { font-size:10px; color:var(--gray); margin-top:2px; }
+.kpi-v { font-family:var(--mono); font-size:20px; font-weight:700; color:#7ECEC0; }
+.kpi-l { font-size:10px; color:rgba(255,255,255,.5); margin-top:2px; letter-spacing:.5px; text-transform:uppercase; }
 
 .cmd-list { overflow-y:auto; flex:1; }
 .cmd-item { padding:14px 16px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s; display:flex; gap:12px; align-items:flex-start; }
-.cmd-item:hover { background:var(--bg); }
+.cmd-item:hover { background:#F0FAF8; }
 .cmd-item.active { background:var(--teal-xl); border-left:3px solid var(--teal); }
-.cmd-avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; flex-shrink:0; }
+.cmd-avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; flex-shrink:0; box-shadow:0 2px 6px rgba(0,0,0,.15); }
 .cmd-info { flex:1; min-width:0; }
-.cmd-name { font-weight:600; font-size:13px; margin-bottom:2px; }
-.cmd-meta { font-size:11px; color:var(--gray); display:flex; gap:8px; flex-wrap:wrap; }
+.cmd-name { font-weight:700; font-size:14px; margin-bottom:2px; color:#0C0C0B; }
+.cmd-meta { font-size:11px; color:#5A5A58; display:flex; gap:8px; flex-wrap:wrap; }
 .cmd-procs { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
 .proc-chip { font-size:10px; padding:2px 7px; border-radius:10px; background:var(--teal-xl); color:var(--teal); font-weight:600; }
 .proc-chip.banda { background:#FFF3D6; color:var(--gold); }
@@ -72,7 +73,7 @@ body { background:var(--bg); color:var(--ink); min-height:100vh; }
 .form-panel.visible { display:block; }
 
 .form-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
-.form-title { font-family:var(--display); font-size:22px; font-weight:700; }
+.form-title { font-family:var(--display); font-size:22px; font-weight:700; color:#0C0C0B; }
 .form-actions { display:flex; gap:8px; }
 .btn { padding:8px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:var(--font); border:none; }
 .btn-primary { background:var(--teal); color:#fff; }
@@ -82,14 +83,14 @@ body { background:var(--bg); color:var(--ink); min-height:100vh; }
 .btn-sec { background:var(--bg); color:var(--ink); border:1px solid var(--border); }
 
 /* Form sections */
-.section-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:16px; }
-.section-label { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--gray); margin-bottom:12px; }
+.section-card { background:#fff; border:1.5px solid #D8D6D0; border-radius:12px; padding:18px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+.section-label { font-size:11px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; color:#1A6B5B; margin-bottom:12px; border-bottom:2px solid var(--teal-l); padding-bottom:8px; }
 .field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
 .field-row.thirds { grid-template-columns:1fr 1fr 1fr; }
 .field-row.full { grid-template-columns:1fr; }
 .field { display:flex; flex-direction:column; gap:4px; }
-.field label { font-size:11px; font-weight:600; color:var(--gray); }
-.field select, .field input { border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; font-family:var(--font); background:var(--bg); color:var(--ink); }
+.field label { font-size:11px; font-weight:700; color:#3A3A38; letter-spacing:.3px; }
+.field select, .field input { border:1.5px solid #C8C6C0; border-radius:8px; padding:8px 10px; font-size:13px; font-family:var(--font); background:#fff; color:#0C0C0B; }
 .field select:focus, .field input:focus { outline:none; border-color:var(--teal); }
 
 /* Tareas dentro de la comanda */
@@ -101,8 +102,8 @@ body { background:var(--bg); color:var(--ink); min-height:100vh; }
 .btn-rm-tarea:hover { color:var(--red); }
 
 /* Cierre de comanda */
-.cierre-card { background:var(--teal-xl); border:1px solid var(--teal-l); border-radius:12px; padding:18px; margin-bottom:16px; }
-.cierre-label { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--teal); margin-bottom:12px; }
+.cierre-card { background:#E8F5F2; border:2px solid #1A6B5B; border-radius:12px; padding:18px; margin-bottom:16px; }
+.cierre-label { font-size:11px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; color:#0D4035; margin-bottom:12px; }
 
 /* Totales summary */
 .total-bar { background:var(--ink); color:#fff; border-radius:10px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
@@ -142,7 +143,11 @@ body { background:var(--bg); color:var(--ink); min-height:100vh; }
 <body>
 
 <div class="topbar">
-  <div class="logo">TETRA<span>PLASTIC</span> · <span style="font-family:var(--font);font-size:13px;font-weight:400;color:rgba(255,255,255,.6)">Comandas de Trabajo · Tapas</span></div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="logo">TETRA<span>PLASTIC</span></div>
+    <div style="width:1px;height:20px;background:rgba(255,255,255,.2)"></div>
+    <div class="logo-sub">📋 Comandas de Trabajo · Tapas</div>
+  </div>
   <div class="topbar-right">
     <button class="back-btn" onclick="location.href='tapas.html'">← Tapas</button>
     <button class="back-btn" onclick="location.href='index.html'">🏠 Inicio</button>
@@ -241,9 +246,10 @@ body { background:var(--bg); color:var(--ink); min-height:100vh; }
             <label>Total unidades completadas (PT)</label>
             <input type="number" id="fTotalUnidades" placeholder="0" min="0">
           </div>
-          <div class="field">
-            <label>Descripción producto terminado</label>
-            <input type="text" id="fDescPT" placeholder="Ej. Tapa Press Top Negro/Verde">
+          <div class="field" style="position:relative">
+            <label>Descripción / SKU producto terminado</label>
+            <input type="text" id="fDescPT" placeholder="Escribe SKU o descripción..." autocomplete="off" oninput="buscarSKUCierre(this.value)" onblur="setTimeout(()=>cerrarDropPT(),200)">
+            <div id="dropPT" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--teal);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:999;max-height:200px;overflow-y:auto;margin-top:2px"></div>
           </div>
         </div>
         <div class="field-row full">
@@ -742,6 +748,43 @@ function mostrarPanel(cual) {
 function cancelarForm() {
   if (comandaActual) verComanda(comandaActual.id);
   else mostrarPanel('welcome');
+}
+
+// ── Autocomplete SKU en cierre ─────────────────────────
+function buscarSKUCierre(query) {
+  const drop = document.getElementById('dropPT');
+  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
+
+  const inv = (typeof getInventario === 'function' && getInventario()) || (typeof INVENTARIO !== 'undefined' ? INVENTARIO : []);
+  const q = query.toLowerCase();
+  const results = inv
+    .filter(i => ((i.sku||i.codigo||'')+' '+(i.descripcion||i.desc||'')).toLowerCase().includes(q))
+    .slice(0, 8);
+
+  if (!results.length) { drop.style.display = 'none'; return; }
+
+  drop.innerHTML = results.map(i => {
+    const sku = i.sku || i.codigo || '';
+    const desc = i.descripcion || i.desc || '';
+    const exist = i.existencia !== undefined ? i.existencia : '';
+    return `<div onclick="seleccionarSKUPT('${sku}', '${desc.replace(/'/g,"\'")}', ${exist})"
+      style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #F0EDE8;font-size:12px"
+      onmouseover="this.style.background='#EBF7F4'" onmouseout="this.style.background=''">
+      <div style="font-family:var(--mono);font-weight:700;color:var(--teal)">${sku}</div>
+      <div style="color:#3A3A38;margin-top:2px">${desc}</div>
+      ${exist !== '' ? `<div style="color:var(--gray);font-size:10px">Existencia: ${exist} und</div>` : ''}
+    </div>`;
+  }).join('');
+  drop.style.display = 'block';
+}
+
+function seleccionarSKUPT(sku, desc, exist) {
+  document.getElementById('fDescPT').value = sku + ' — ' + desc;
+  cerrarDropPT();
+}
+
+function cerrarDropPT() {
+  document.getElementById('dropPT').style.display = 'none';
 }
 </script>
 </body>
