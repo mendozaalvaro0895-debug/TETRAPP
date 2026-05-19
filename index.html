@@ -14,6 +14,8 @@
   --tapas-m: #1A6B5B;
   --serig-m: #5A2D9E;
   --gold: #B07D2A;
+  --red: #B83232;
+  --amber: #B87200;
   --bg: #F7F6F2;
   --card: #FFFFFF;
   --border: #E0DED8;
@@ -63,6 +65,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .area-arrow{position:absolute;top:24px;right:24px;color:var(--gray-l);font-size:20px}
 .area-card:hover .area-arrow{color:var(--teal);transform:translateX(4px);transition:all .2s}
 
+/* KPI Extra Strip */
+.kpi-extra{max-width:1100px;margin:0 auto 24px;padding:0 24px;display:flex;gap:8px;flex-wrap:wrap}
+.kpi-badge{background:var(--card);border:1px solid var(--border);border-radius:40px;padding:6px 14px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.kpi-badge.warning{background:#FEF3C7;border-color:#FDE68A;color:#92400E}
+.kpi-badge.critical{background:#FEE2E2;border-color:#FECACA;color:var(--red)}
+
 .footer-info{padding:32px 24px 48px;max-width:1100px;margin:0 auto;text-align:center;color:var(--gray);font-size:12px}
 .footer-info code{font-family:var(--mono);background:var(--card);padding:2px 6px;border-radius:4px;font-size:11px;border:1px solid var(--border)}
 </style>
@@ -81,6 +89,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   <div class="hero-tag">Sistema Digital de Operaciones</div>
   <h1 class="hero-title">Selecciona un área para trabajar</h1>
   <p class="hero-sub">Cada área tiene su propio módulo. Los datos viven en una base compartida, así que todo está sincronizado en tiempo real entre módulos.</p>
+</div>
+
+<!-- KPIs dinámicos en tiempo real -->
+<div class="kpi-extra" id="kpiExtra">
+  <div class="kpi-badge">📊 <span id="totalActivas">—</span> solicitudes activas</div>
+  <div class="kpi-badge">⏱ <span id="horasTotales">—</span> horas de producción</div>
+  <div class="kpi-badge warning" id="urgentesBadge">🔴 0 urgentes</div>
+  <div class="kpi-badge" id="fugasBadge">📉 Fugas: —</div>
 </div>
 
 <div class="areas-grid">
@@ -158,28 +174,68 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 <!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="shared/supabase.js"></script>
+<script src="shared/helpers.js"></script>
 
 <script>
-// Cargar conteos de solicitudes activas
-(async () => {
+// Función para cargar KPIs en tiempo real
+async function cargarKPIs() {
   try {
-    const { data: tapas } = await db.from('solicitudes').select('estado').eq('area','tapas');
-    const { data: serig } = await db.from('solicitudes').select('estado').eq('area','serig');
-
+    // Cargar todas las solicitudes desde Supabase
+    const { data: tapas } = await db.from('solicitudes').select('estado, prioridad, area').eq('area', 'tapas');
+    const { data: serig } = await db.from('solicitudes').select('estado, prioridad, area').eq('area', 'serig');
+    
+    const todas = [...(tapas || []), ...(serig || [])];
+    
+    // Calcular KPIs
+    const activas = todas.filter(s => s.estado === 'proceso').length;
+    const urgentes = todas.filter(s => s.prioridad === 'urgente' && s.estado !== 'entregada').length;
+    
+    document.getElementById('totalActivas').textContent = activas;
+    document.getElementById('urgentesBadge').innerHTML = urgentes > 0 ? `🔴 ${urgentes} urgentes` : `🟢 0 urgentes`;
+    document.getElementById('urgentesBadge').className = urgentes > 0 ? 'kpi-badge critical' : 'kpi-badge';
+    
+    // Horas totales estimadas (cálculo simple)
+    const horasEst = todas.filter(s => s.estado !== 'entregada').length * 8; // estimación
+    document.getElementById('horasTotales').textContent = horasEst;
+    
+    // Tapas KPIs
     if (tapas) {
-      document.getElementById('tapas-activas').textContent = tapas.filter(s=>s.estado==='proceso').length;
-      document.getElementById('tapas-pendientes').textContent = tapas.filter(s=>['nueva','programada'].includes(s.estado)).length;
+      document.getElementById('tapas-activas').textContent = tapas.filter(s => s.estado === 'proceso').length;
+      document.getElementById('tapas-pendientes').textContent = tapas.filter(s => ['nueva', 'programada'].includes(s.estado)).length;
     }
+    
+    // Serigrafía KPIs
     if (serig) {
-      document.getElementById('serig-activas').textContent = serig.filter(s=>s.estado==='proceso').length;
-      document.getElementById('serig-pendientes').textContent = serig.filter(s=>['nueva','programada'].includes(s.estado)).length;
+      document.getElementById('serig-activas').textContent = serig.filter(s => s.estado === 'proceso').length;
+      document.getElementById('serig-pendientes').textContent = serig.filter(s => ['nueva', 'programada'].includes(s.estado)).length;
     }
+    
+    // Intentar cargar fugas (si existe la tabla)
+    try {
+      const { data: fugasData } = await db.from('movimientos_materiales').select('tipo, cantidad');
+      if (fugasData && fugasData.length > 0) {
+        const salidas = fugasData.filter(f => f.tipo === 'salida_bodega').reduce((s, f) => s + (f.cantidad || 0), 0);
+        const entradas = fugasData.filter(f => f.tipo === 'entrada_pt').reduce((s, f) => s + (f.cantidad || 0), 0);
+        const perdidas = fugasData.filter(f => f.tipo === 'perdida').reduce((s, f) => s + (f.cantidad || 0), 0);
+        const fugaTotal = salidas - entradas - perdidas;
+        document.getElementById('fugasBadge').innerHTML = `📉 Fugas: ${fugaTotal.toLocaleString()} und`;
+        if (fugaTotal > 5000) document.getElementById('fugasBadge').classList.add('warning');
+      }
+    } catch(e) {
+      // Tabla no existe aún
+      document.getElementById('fugasBadge').innerHTML = `📉 Fugas: -- (configurar)`;
+    }
+    
   } catch(e) {
     console.error('Error cargando KPIs:', e);
   }
-
+  
   document.getElementById('last-update').textContent = new Date().toLocaleString('es-GT');
-})();
+}
+
+// Cargar al inicio y cada 30 segundos
+cargarKPIs();
+setInterval(cargarKPIs, 30000);
 </script>
 
 </body>
