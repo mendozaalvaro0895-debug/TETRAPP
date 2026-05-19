@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TETRAPLASTIC — Comandas de Trabajo · Tapas</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css">
+<script src="shared/supabase.js"></script>
+<script src="shared/data.js"></script>
+<script src="shared/helpers.js"></script>
+<style>
+/* ── Layout base ─────────────────────────────────────── */
+body { background:var(--bg); color:var(--ink); min-height:100vh; }
+
+.topbar { background:var(--ink); padding:10px 20px; display:flex; align-items:center; justify-content:space-between; color:#fff; }
+.logo { font-family:var(--display); font-size:16px; font-weight:900; }
+.logo span { color:#7ECEC0 }
+.topbar-right { display:flex; align-items:center; gap:12px; }
+.back-btn { background:rgba(255,255,255,.1); border:none; color:#fff; padding:6px 14px; border-radius:8px; font-size:12px; cursor:pointer; font-family:var(--font); }
+.back-btn:hover { background:rgba(255,255,255,.2); }
+
+/* ── Dos columnas ─────────────────────────────────────── */
+.main-layout { display:grid; grid-template-columns:420px 1fr; height:calc(100vh - 44px); overflow:hidden; }
+
+/* ── Panel izquierdo: listado ─────────────────────────── */
+.left-panel { border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; background:var(--card); }
+.left-header { padding:16px; border-bottom:1px solid var(--border); }
+.left-title { font-family:var(--display); font-size:18px; font-weight:700; margin-bottom:10px; }
+.left-controls { display:flex; gap:8px; }
+.btn-new { background:var(--teal); color:#fff; border:none; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:var(--font); flex:1; }
+.btn-new:hover { background:#0D4035; }
+.search-box { flex:1; border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:13px; font-family:var(--font); background:var(--bg); }
+.date-filter { border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:12px; font-family:var(--font); background:var(--bg); }
+
+.kpi-strip { display:flex; gap:0; border-bottom:1px solid var(--border); }
+.kpi-box { flex:1; padding:10px 14px; text-align:center; border-right:1px solid var(--border); }
+.kpi-box:last-child { border-right:none; }
+.kpi-v { font-family:var(--mono); font-size:20px; font-weight:700; color:var(--teal); }
+.kpi-l { font-size:10px; color:var(--gray); margin-top:2px; }
+
+.cmd-list { overflow-y:auto; flex:1; }
+.cmd-item { padding:14px 16px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s; display:flex; gap:12px; align-items:flex-start; }
+.cmd-item:hover { background:var(--bg); }
+.cmd-item.active { background:var(--teal-xl); border-left:3px solid var(--teal); }
+.cmd-avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; flex-shrink:0; }
+.cmd-info { flex:1; min-width:0; }
+.cmd-name { font-weight:600; font-size:13px; margin-bottom:2px; }
+.cmd-meta { font-size:11px; color:var(--gray); display:flex; gap:8px; flex-wrap:wrap; }
+.cmd-procs { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
+.proc-chip { font-size:10px; padding:2px 7px; border-radius:10px; background:var(--teal-xl); color:var(--teal); font-weight:600; }
+.proc-chip.banda { background:#FFF3D6; color:var(--gold); }
+.proc-chip.liner { background:#E0E7FF; color:#4338CA; }
+.proc-chip.impresion { background:#FCE7F3; color:#9D174D; }
+.proc-chip.encajado { background:#DCFCE7; color:#166534; }
+.proc-chip.otro { background:#F3F4F6; color:var(--gray); }
+.cmd-total { font-family:var(--mono); font-size:14px; font-weight:700; color:var(--ink); white-space:nowrap; }
+.empty-state { padding:48px 24px; text-align:center; color:var(--gray); }
+.empty-state .ico { font-size:40px; margin-bottom:12px; }
+
+/* ── Panel derecho: detalle / formulario ──────────────── */
+.right-panel { display:flex; flex-direction:column; overflow:hidden; }
+
+/* Welcome state */
+.welcome-state { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--gray); gap:12px; }
+.welcome-state .ico { font-size:56px; }
+.welcome-state h3 { font-family:var(--display); font-size:22px; color:var(--ink); }
+
+/* Form panel */
+.form-panel { flex:1; overflow-y:auto; padding:24px; display:none; }
+.form-panel.visible { display:block; }
+
+.form-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.form-title { font-family:var(--display); font-size:22px; font-weight:700; }
+.form-actions { display:flex; gap:8px; }
+.btn { padding:8px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:var(--font); border:none; }
+.btn-primary { background:var(--teal); color:#fff; }
+.btn-primary:hover { background:#0D4035; }
+.btn-danger { background:#FEE2E2; color:var(--red); }
+.btn-danger:hover { background:#FECACA; }
+.btn-sec { background:var(--bg); color:var(--ink); border:1px solid var(--border); }
+
+/* Form sections */
+.section-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:16px; }
+.section-label { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--gray); margin-bottom:12px; }
+.field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+.field-row.thirds { grid-template-columns:1fr 1fr 1fr; }
+.field-row.full { grid-template-columns:1fr; }
+.field { display:flex; flex-direction:column; gap:4px; }
+.field label { font-size:11px; font-weight:600; color:var(--gray); }
+.field select, .field input { border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; font-family:var(--font); background:var(--bg); color:var(--ink); }
+.field select:focus, .field input:focus { outline:none; border-color:var(--teal); }
+
+/* Tareas dentro de la comanda */
+.tareas-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.btn-add-tarea { background:var(--teal-xl); color:var(--teal); border:1px solid var(--teal-l); border-radius:8px; padding:6px 14px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font); }
+.tarea-card { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:10px; position:relative; }
+.tarea-num { font-family:var(--mono); font-size:10px; color:var(--gray); margin-bottom:8px; font-weight:700; letter-spacing:1px; }
+.btn-rm-tarea { position:absolute; top:10px; right:10px; background:none; border:none; color:var(--gray); cursor:pointer; font-size:16px; line-height:1; }
+.btn-rm-tarea:hover { color:var(--red); }
+
+/* Cierre de comanda */
+.cierre-card { background:var(--teal-xl); border:1px solid var(--teal-l); border-radius:12px; padding:18px; margin-bottom:16px; }
+.cierre-label { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--teal); margin-bottom:12px; }
+
+/* Totales summary */
+.total-bar { background:var(--ink); color:#fff; border-radius:10px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.total-bar-val { font-family:var(--mono); font-size:22px; font-weight:700; color:#7ECEC0; }
+.total-bar-lbl { font-size:12px; color:rgba(255,255,255,.5); margin-top:2px; }
+
+/* Detail view */
+.detail-panel { flex:1; overflow-y:auto; padding:24px; display:none; }
+.detail-panel.visible { display:block; }
+.detail-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; }
+.detail-operario { display:flex; gap:14px; align-items:center; }
+.detail-avatar { width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; color:#fff; }
+.detail-name { font-family:var(--display); font-size:22px; font-weight:700; }
+.detail-date { font-size:13px; color:var(--gray); margin-top:2px; }
+.tarea-detail { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:10px; }
+.tarea-detail-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.tarea-proc-badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; background:var(--teal-xl); color:var(--teal); }
+.tarea-detail-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.td-cell { }
+.td-cell .lbl { font-size:10px; color:var(--gray); margin-bottom:2px; font-weight:600; }
+.td-cell .val { font-size:13px; font-weight:600; }
+.td-cell .val.big { font-family:var(--mono); font-size:18px; color:var(--teal); }
+.mat-row { display:flex; justify-content:space-between; font-size:12px; padding:4px 0; border-bottom:1px solid var(--border); }
+.mat-row:last-child { border-bottom:none; }
+.devolucion-tag { display:inline-block; background:#FEF3C7; color:#92400E; font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; margin-top:4px; }
+.firma-row { display:flex; align-items:center; gap:8px; margin-top:12px; padding:10px 14px; background:var(--teal-xl); border-radius:8px; font-size:12px; color:var(--teal); font-weight:600; }
+
+/* Responsive */
+@media(max-width:768px) {
+  .main-layout { grid-template-columns:1fr; }
+  .left-panel { height:40vh; }
+  .field-row { grid-template-columns:1fr; }
+  .field-row.thirds { grid-template-columns:1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">TETRA<span>PLASTIC</span> · <span style="font-family:var(--font);font-size:13px;font-weight:400;color:rgba(255,255,255,.6)">Comandas de Trabajo · Tapas</span></div>
+  <div class="topbar-right">
+    <button class="back-btn" onclick="location.href='tapas.html'">← Tapas</button>
+    <button class="back-btn" onclick="location.href='index.html'">🏠 Inicio</button>
+  </div>
+</div>
+
+<div class="main-layout">
+
+  <!-- ── PANEL IZQUIERDO ──────────────────────────────── -->
+  <div class="left-panel">
+    <div class="left-header">
+      <div class="left-title">📋 Comandas del día</div>
+      <div class="left-controls">
+        <input type="date" class="date-filter" id="filtroFecha" onchange="cargarComandas()">
+        <button class="btn-new" onclick="nuevaComanda()">+ Nueva comanda</button>
+      </div>
+      <div style="margin-top:8px">
+        <input type="text" class="search-box" id="busqueda" placeholder="Buscar operario..." oninput="filtrarLista()" style="width:100%">
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <div class="kpi-box"><div class="kpi-v" id="kTotalComandas">0</div><div class="kpi-l">Comandas</div></div>
+      <div class="kpi-box"><div class="kpi-v" id="kTotalUnidades">0</div><div class="kpi-l">Unidades PT</div></div>
+      <div class="kpi-box"><div class="kpi-v" id="kPromedioOp">0</div><div class="kpi-l">Promedio/op</div></div>
+    </div>
+
+    <div class="cmd-list" id="cmdList">
+      <div class="empty-state"><div class="ico">📋</div><p>Selecciona una fecha<br>para ver las comandas</p></div>
+    </div>
+  </div>
+
+  <!-- ── PANEL DERECHO ────────────────────────────────── -->
+  <div class="right-panel">
+
+    <!-- Welcome state -->
+    <div class="welcome-state" id="welcomeState">
+      <div class="ico">📝</div>
+      <h3>Comandas de trabajo</h3>
+      <p>Selecciona una comanda para ver el detalle<br>o crea una nueva para registrar el trabajo del día.</p>
+    </div>
+
+    <!-- Formulario nueva/editar comanda -->
+    <div class="form-panel" id="formPanel">
+      <div class="form-header">
+        <div class="form-title" id="formTitle">Nueva comanda</div>
+        <div class="form-actions">
+          <button class="btn btn-sec" onclick="cancelarForm()">Cancelar</button>
+          <button class="btn btn-primary" onclick="guardarComanda()">💾 Guardar comanda</button>
+        </div>
+      </div>
+
+      <!-- Encabezado de comanda -->
+      <div class="section-card">
+        <div class="section-label">📋 Encabezado de comanda</div>
+        <div class="field-row">
+          <div class="field">
+            <label>Correlativo</label>
+            <input type="text" id="fCorrelativo" placeholder="Ej. CMD-001" >
+          </div>
+          <div class="field">
+            <label>Fecha</label>
+            <input type="date" id="fFecha">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Operario *</label>
+            <select id="fOperario">
+              <option value="">— Selecciona operario —</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Supervisor</label>
+            <select id="fSupervisor">
+              <option value="">— Selecciona supervisor —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tareas del día -->
+      <div class="section-card">
+        <div class="tareas-header">
+          <div class="section-label" style="margin-bottom:0">🔧 Tareas del día</div>
+          <button class="btn-add-tarea" onclick="agregarTarea()">+ Agregar tarea</button>
+        </div>
+        <div id="tareasContainer"></div>
+      </div>
+
+      <!-- Cierre de comanda -->
+      <div class="cierre-card">
+        <div class="cierre-label">✅ Cierre de comanda</div>
+        <div class="field-row">
+          <div class="field">
+            <label>Total unidades completadas (PT)</label>
+            <input type="number" id="fTotalUnidades" placeholder="0" min="0">
+          </div>
+          <div class="field">
+            <label>Descripción producto terminado</label>
+            <input type="text" id="fDescPT" placeholder="Ej. Tapa Press Top Negro/Verde">
+          </div>
+        </div>
+        <div class="field-row full">
+          <div class="field">
+            <label>Material devuelto a bodega (descripción y cantidad)</label>
+            <input type="text" id="fDevolucion" placeholder="Ej. 500 bases negras, 200 contratapas verdes">
+          </div>
+        </div>
+        <div class="field-row full">
+          <div class="field">
+            <label>Observaciones del supervisor</label>
+            <input type="text" id="fObservaciones" placeholder="Notas adicionales...">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Firma supervisor</label>
+            <select id="fFirmaSup">
+              <option value="">— Selecciona —</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Hora de cierre</label>
+            <input type="time" id="fHoraCierre">
+          </div>
+        </div>
+      </div>
+
+      <div class="total-bar">
+        <div><div class="total-bar-lbl">Total unidades PT registradas</div></div>
+        <div class="total-bar-val" id="totalBarVal">0 und</div>
+      </div>
+
+    </div>
+
+    <!-- Vista de detalle -->
+    <div class="detail-panel" id="detailPanel">
+      <div id="detailContent"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Estado global ──────────────────────────────────────
+let comandas = [];
+let comandaActual = null;
+let modoEdicion = false;
+let tareaCount = 0;
+
+const PROCESOS_TAPAS = [
+  { id:'armado',    lbl:'Armado',    cls:'armado'    },
+  { id:'banda',     lbl:'Banda',     cls:'banda'     },
+  { id:'liner',     lbl:'Liner',     cls:'liner'     },
+  { id:'impresion', lbl:'Impresión', cls:'impresion' },
+  { id:'encajado',  lbl:'Encajado',  cls:'encajado'  },
+  { id:'flameado',  lbl:'Flameado',  cls:'otro'      },
+  { id:'otro',      lbl:'Otra tarea',cls:'otro'      },
+];
+
+// ── Init ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  // Fecha de hoy por defecto
+  const hoy = new Date().toISOString().split('T')[0];
+  document.getElementById('filtroFecha').value = hoy;
+  document.getElementById('fFecha').value = hoy;
+  document.getElementById('fHoraCierre').value = new Date().toTimeString().slice(0,5);
+
+  // Poblar operarios y supervisores
+  poblarPersonal();
+  await cargarComandas();
+});
+
+function poblarPersonal() {
+  const ops = personal?.tapas || [];
+  const selOp = document.getElementById('fOperario');
+  const selSup = document.getElementById('fSupervisor');
+  const selFirma = document.getElementById('fFirmaSup');
+
+  ops.forEach(p => {
+    const opt = `<option value="${p.id}">${p.nombre}</option>`;
+    selOp.insertAdjacentHTML('beforeend', opt);
+    if (p.rol === 'supervisor') {
+      selSup.insertAdjacentHTML('beforeend', opt);
+      selFirma.insertAdjacentHTML('beforeend', opt);
+    }
+  });
+
+  // Todos pueden aparecer como supervisor en cierre
+  ops.forEach(p => {
+    if (p.rol !== 'supervisor') {
+      const opt = `<option value="${p.id}">${p.nombre}</option>`;
+      selSup.insertAdjacentHTML('beforeend', opt);
+      selFirma.insertAdjacentHTML('beforeend', opt);
+    }
+  });
+}
+
+// ── Cargar comandas del día ────────────────────────────
+async function cargarComandas() {
+  const fecha = document.getElementById('filtroFecha').value;
+  if (!fecha) return;
+
+  const { data, error } = await db
+    .from('comandas')
+    .select('*, comanda_tareas(*)')
+    .eq('fecha', fecha)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error cargando comandas:', error);
+    // Si la tabla no existe aún, mostrar mensaje amigable
+    document.getElementById('cmdList').innerHTML = `
+      <div class="empty-state">
+        <div class="ico">⚠️</div>
+        <p>Ejecuta el SQL de comandas<br>en Supabase primero.</p>
+      </div>`;
+    return;
+  }
+
+  comandas = data || [];
+  renderLista();
+  actualizarKPIs();
+}
+
+// ── Render lista ───────────────────────────────────────
+function renderLista() {
+  const busq = document.getElementById('busqueda').value.toLowerCase();
+  const lista = document.getElementById('cmdList');
+
+  let filtradas = comandas;
+  if (busq) {
+    filtradas = comandas.filter(c =>
+      (c.operario_nombre || '').toLowerCase().includes(busq)
+    );
+  }
+
+  if (!filtradas.length) {
+    lista.innerHTML = `<div class="empty-state"><div class="ico">📋</div><p>No hay comandas registradas<br>para esta fecha.</p></div>`;
+    return;
+  }
+
+  lista.innerHTML = filtradas.map(c => {
+    const op = opObj(c.operario_id) || {};
+    const color = op.color || '#6B6B6A';
+    const ini = op.ini || '??';
+    const procs = (c.comanda_tareas || []).map(t => t.proceso).filter(Boolean);
+    const procsUnicos = [...new Set(procs)];
+    const totalUnd = c.total_unidades || 0;
+
+    return `
+    <div class="cmd-item ${comandaActual?.id === c.id ? 'active' : ''}" onclick="verComanda('${c.id}')">
+      <div class="cmd-avatar" style="background:${color}">${ini}</div>
+      <div class="cmd-info">
+        <div class="cmd-name">${c.operario_nombre || '—'}</div>
+        <div class="cmd-meta">
+          <span>${c.correlativo || '—'}</span>
+          <span>${(c.comanda_tareas || []).length} tareas</span>
+          <span>Sup: ${c.supervisor_nombre || '—'}</span>
+        </div>
+        <div class="cmd-procs">
+          ${procsUnicos.map(p => {
+            const pr = PROCESOS_TAPAS.find(x => x.id === p);
+            return `<span class="proc-chip ${pr?.cls || 'otro'}">${pr?.lbl || p}</span>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="cmd-total">${totalUnd.toLocaleString()}<div style="font-size:10px;color:var(--gray);font-weight:400">unidades</div></div>
+    </div>`;
+  }).join('');
+}
+
+function filtrarLista() { renderLista(); }
+
+// ── KPIs ───────────────────────────────────────────────
+function actualizarKPIs() {
+  const total = comandas.length;
+  const totalUnd = comandas.reduce((s, c) => s + (c.total_unidades || 0), 0);
+  const prom = total > 0 ? Math.round(totalUnd / total) : 0;
+  document.getElementById('kTotalComandas').textContent = total;
+  document.getElementById('kTotalUnidades').textContent = totalUnd.toLocaleString();
+  document.getElementById('kPromedioOp').textContent = prom.toLocaleString();
+}
+
+// ── Nueva comanda ──────────────────────────────────────
+function nuevaComanda() {
+  modoEdicion = false;
+  comandaActual = null;
+  tareaCount = 0;
+  document.getElementById('formTitle').textContent = 'Nueva comanda';
+  document.getElementById('fCorrelativo').value = 'CMD-' + String(comandas.length + 1).padStart(3,'0');
+  document.getElementById('fFecha').value = document.getElementById('filtroFecha').value;
+  document.getElementById('fOperario').value = '';
+  document.getElementById('fSupervisor').value = '';
+  document.getElementById('fTotalUnidades').value = '';
+  document.getElementById('fDescPT').value = '';
+  document.getElementById('fDevolucion').value = '';
+  document.getElementById('fObservaciones').value = '';
+  document.getElementById('fHoraCierre').value = new Date().toTimeString().slice(0,5);
+  document.getElementById('tareasContainer').innerHTML = '';
+  document.getElementById('totalBarVal').textContent = '0 und';
+
+  mostrarPanel('form');
+  agregarTarea(); // Iniciar con una tarea
+}
+
+// ── Agregar tarea ──────────────────────────────────────
+function agregarTarea(datos = {}) {
+  tareaCount++;
+  const n = tareaCount;
+  const cont = document.getElementById('tareasContainer');
+
+  const procsOpts = PROCESOS_TAPAS.map(p =>
+    `<option value="${p.id}" ${datos.proceso === p.id ? 'selected' : ''}>${p.lbl}</option>`
+  ).join('');
+
+  cont.insertAdjacentHTML('beforeend', `
+    <div class="tarea-card" id="tarea_${n}">
+      <div class="tarea-num">TAREA #${n}</div>
+      <button class="btn-rm-tarea" onclick="removerTarea(${n})">✕</button>
+      <div class="field-row thirds">
+        <div class="field">
+          <label>Proceso</label>
+          <select id="t${n}_proc">${procsOpts}</select>
+        </div>
+        <div class="field">
+          <label>Hora inicio</label>
+          <input type="time" id="t${n}_inicio" value="${datos.hora_inicio || ''}">
+        </div>
+        <div class="field">
+          <label>Tiempo estimado (h)</label>
+          <input type="number" id="t${n}_horas" value="${datos.horas_estimadas || ''}" min="0.5" max="12" step="0.5" placeholder="Ej. 3.5">
+        </div>
+      </div>
+      <div class="field-row full">
+        <div class="field">
+          <label>Material asignado (bases, contratapas, etc.)</label>
+          <input type="text" id="t${n}_material" value="${datos.material_asignado || ''}" placeholder="Ej. 5,000 bases negras + 5,000 contratapas verdes">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Unidades completadas en esta tarea</label>
+          <input type="number" id="t${n}_unidades" value="${datos.unidades_completadas || ''}" min="0" oninput="recalcularTotal()">
+        </div>
+        <div class="field">
+          <label>Observación de tarea</label>
+          <input type="text" id="t${n}_obs" value="${datos.observaciones || ''}" placeholder="Opcional">
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function removerTarea(n) {
+  document.getElementById(`tarea_${n}`)?.remove();
+  recalcularTotal();
+}
+
+function recalcularTotal() {
+  let total = 0;
+  document.querySelectorAll('[id^="t"][id$="_unidades"]').forEach(inp => {
+    total += parseInt(inp.value || 0);
+  });
+  document.getElementById('totalBarVal').textContent = total.toLocaleString() + ' und';
+  document.getElementById('fTotalUnidades').value = total;
+}
+
+// ── Guardar comanda ────────────────────────────────────
+async function guardarComanda() {
+  const operarioId = document.getElementById('fOperario').value;
+  const fecha = document.getElementById('fFecha').value;
+
+  if (!operarioId || !fecha) {
+    showToast('Completa operario y fecha', 'var(--red)');
+    return;
+  }
+
+  const op = opObj(operarioId) || {};
+  const supId = document.getElementById('fSupervisor').value;
+  const supOp = opObj(supId) || {};
+
+  // Recopilar tareas
+  const tareas = [];
+  document.querySelectorAll('.tarea-card').forEach(card => {
+    const n = card.id.replace('tarea_', '');
+    tareas.push({
+      proceso: document.getElementById(`t${n}_proc`)?.value,
+      hora_inicio: document.getElementById(`t${n}_inicio`)?.value,
+      horas_estimadas: parseFloat(document.getElementById(`t${n}_horas`)?.value) || 0,
+      material_asignado: document.getElementById(`t${n}_material`)?.value,
+      unidades_completadas: parseInt(document.getElementById(`t${n}_unidades`)?.value) || 0,
+      observaciones: document.getElementById(`t${n}_obs`)?.value,
+    });
+  });
+
+  const totalUnd = tareas.reduce((s, t) => s + t.unidades_completadas, 0);
+  const firmaSup = document.getElementById('fFirmaSup').value;
+  const firmaOp = opObj(firmaSup) || {};
+
+  const cabecera = {
+    correlativo: document.getElementById('fCorrelativo').value,
+    fecha: fecha,
+    operario_id: operarioId,
+    operario_nombre: op.nombre || '',
+    supervisor_id: supId,
+    supervisor_nombre: supOp.nombre || '',
+    total_unidades: parseInt(document.getElementById('fTotalUnidades').value) || totalUnd,
+    desc_producto_terminado: document.getElementById('fDescPT').value,
+    material_devuelto: document.getElementById('fDevolucion').value,
+    observaciones: document.getElementById('fObservaciones').value,
+    firma_supervisor_id: firmaSup,
+    firma_supervisor_nombre: firmaOp.nombre || '',
+    hora_cierre: document.getElementById('fHoraCierre').value,
+  };
+
+  try {
+    let cmdId;
+
+    if (modoEdicion && comandaActual) {
+      // UPDATE
+      const { error } = await db.from('comandas').update(cabecera).eq('id', comandaActual.id);
+      if (error) throw error;
+      cmdId = comandaActual.id;
+      // Borrar tareas anteriores y reinsertar
+      await db.from('comanda_tareas').delete().eq('comanda_id', cmdId);
+    } else {
+      // INSERT
+      const { data, error } = await db.from('comandas').insert(cabecera).select();
+      if (error) throw error;
+      cmdId = data[0].id;
+    }
+
+    // Insertar tareas
+    if (tareas.length > 0) {
+      const tareasData = tareas.map((t, i) => ({ ...t, comanda_id: cmdId, orden: i + 1 }));
+      const { error: errT } = await db.from('comanda_tareas').insert(tareasData);
+      if (errT) throw errT;
+    }
+
+    showToast('✅ Comanda guardada');
+    await cargarComandas();
+    // Buscar y mostrar la comanda recién guardada
+    const nueva = comandas.find(c => c.id === cmdId);
+    if (nueva) verComanda(cmdId);
+    else mostrarPanel('welcome');
+
+  } catch(e) {
+    console.error(e);
+    showToast('Error al guardar: ' + e.message, 'var(--red)');
+  }
+}
+
+// ── Ver detalle de comanda ─────────────────────────────
+function verComanda(id) {
+  const c = comandas.find(x => x.id === id);
+  if (!c) return;
+  comandaActual = c;
+
+  // Actualizar active en lista
+  document.querySelectorAll('.cmd-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.cmd-item').forEach(el => {
+    if (el.onclick?.toString().includes(id)) el.classList.add('active');
+  });
+
+  const op = opObj(c.operario_id) || {};
+  const color = op.color || '#6B6B6A';
+  const tareas = c.comanda_tareas || [];
+  const totalUnd = c.total_unidades || 0;
+
+  const tareasHtml = tareas.map((t, i) => {
+    const pr = PROCESOS_TAPAS.find(p => p.id === t.proceso);
+    return `
+    <div class="tarea-detail">
+      <div class="tarea-detail-head">
+        <span class="proc-chip ${pr?.cls || 'otro'}" style="font-size:12px;padding:4px 12px">${pr?.lbl || t.proceso}</span>
+        <span style="font-size:11px;color:var(--gray)">Tarea ${i+1}</span>
+      </div>
+      <div class="tarea-detail-grid">
+        <div class="td-cell">
+          <div class="lbl">Hora inicio</div>
+          <div class="val">${t.hora_inicio || '—'}</div>
+        </div>
+        <div class="td-cell">
+          <div class="lbl">Tiempo estimado</div>
+          <div class="val">${t.horas_estimadas ? t.horas_estimadas + 'h' : '—'}</div>
+        </div>
+        <div class="td-cell">
+          <div class="lbl">Unidades completadas</div>
+          <div class="val big">${(t.unidades_completadas || 0).toLocaleString()}</div>
+        </div>
+      </div>
+      ${t.material_asignado ? `
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div class="lbl" style="font-size:10px;color:var(--gray);margin-bottom:4px">MATERIAL ASIGNADO</div>
+        <div style="font-size:12px">${t.material_asignado}</div>
+      </div>` : ''}
+      ${t.observaciones ? `<div style="font-size:11px;color:var(--gray);margin-top:6px">📝 ${t.observaciones}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-header">
+      <div class="detail-operario">
+        <div class="detail-avatar" style="background:${color}">${op.ini || '??'}</div>
+        <div>
+          <div class="detail-name">${c.operario_nombre}</div>
+          <div class="detail-date">📅 ${fmtFecha(c.fecha + 'T12:00:00')} · Correlativo: ${c.correlativo || '—'}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sec" onclick="editarComanda('${c.id}')">✏️ Editar</button>
+        <button class="btn btn-danger" onclick="borrarComanda('${c.id}')">🗑 Borrar</button>
+      </div>
+    </div>
+
+    <div class="total-bar" style="margin-bottom:16px">
+      <div>
+        <div class="total-bar-lbl">Total unidades PT · ${c.desc_producto_terminado || 'sin descripción'}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">Supervisor: ${c.supervisor_nombre || '—'}</div>
+      </div>
+      <div class="total-bar-val">${totalUnd.toLocaleString()} und</div>
+    </div>
+
+    <div class="section-card" style="margin-bottom:12px">
+      <div class="section-label">🔧 Tareas realizadas</div>
+      ${tareasHtml || '<p style="color:var(--gray);font-size:13px">Sin tareas registradas</p>'}
+    </div>
+
+    ${c.material_devuelto ? `
+    <div class="section-card" style="margin-bottom:12px">
+      <div class="section-label">📦 Material devuelto a bodega</div>
+      <div class="devolucion-tag">Devolución</div>
+      <p style="font-size:13px;margin-top:8px">${c.material_devuelto}</p>
+    </div>` : ''}
+
+    ${c.observaciones ? `
+    <div class="section-card" style="margin-bottom:12px">
+      <div class="section-label">📝 Observaciones</div>
+      <p style="font-size:13px">${c.observaciones}</p>
+    </div>` : ''}
+
+    <div class="firma-row">
+      ✍️ Firmado por: <strong>${c.firma_supervisor_nombre || c.supervisor_nombre || '—'}</strong>
+      · Cierre: <strong>${c.hora_cierre || '—'}</strong>
+    </div>
+  `;
+
+  mostrarPanel('detail');
+}
+
+// ── Editar comanda ─────────────────────────────────────
+function editarComanda(id) {
+  const c = comandas.find(x => x.id === id);
+  if (!c) return;
+  modoEdicion = true;
+  comandaActual = c;
+  tareaCount = 0;
+
+  document.getElementById('formTitle').textContent = 'Editar comanda';
+  document.getElementById('fCorrelativo').value = c.correlativo || '';
+  document.getElementById('fFecha').value = c.fecha || '';
+  document.getElementById('fOperario').value = c.operario_id || '';
+  document.getElementById('fSupervisor').value = c.supervisor_id || '';
+  document.getElementById('fTotalUnidades').value = c.total_unidades || '';
+  document.getElementById('fDescPT').value = c.desc_producto_terminado || '';
+  document.getElementById('fDevolucion').value = c.material_devuelto || '';
+  document.getElementById('fObservaciones').value = c.observaciones || '';
+  document.getElementById('fFirmaSup').value = c.firma_supervisor_id || '';
+  document.getElementById('fHoraCierre').value = c.hora_cierre || '';
+  document.getElementById('tareasContainer').innerHTML = '';
+
+  (c.comanda_tareas || []).forEach(t => agregarTarea(t));
+  recalcularTotal();
+  mostrarPanel('form');
+}
+
+// ── Borrar comanda ─────────────────────────────────────
+async function borrarComanda(id) {
+  if (!confirm('¿Borrar esta comanda? Esta acción no se puede deshacer.')) return;
+  await db.from('comanda_tareas').delete().eq('comanda_id', id);
+  await db.from('comandas').delete().eq('id', id);
+  showToast('Comanda eliminada');
+  comandaActual = null;
+  await cargarComandas();
+  mostrarPanel('welcome');
+}
+
+// ── Mostrar panel ──────────────────────────────────────
+function mostrarPanel(cual) {
+  document.getElementById('welcomeState').style.display = cual === 'welcome' ? 'flex' : 'none';
+  document.getElementById('formPanel').classList.toggle('visible', cual === 'form');
+  document.getElementById('detailPanel').classList.toggle('visible', cual === 'detail');
+}
+
+function cancelarForm() {
+  if (comandaActual) verComanda(comandaActual.id);
+  else mostrarPanel('welcome');
+}
+</script>
+</body>
+</html>
