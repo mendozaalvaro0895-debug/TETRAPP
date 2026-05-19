@@ -7,9 +7,14 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared/styles.css">
-<script src="shared/supabase.js"></script>
 <script src="shared/data.js"></script>
-<script src="shared/helpers.js"></script>
+<script src="shared/inventario.js"></script>
+<script>
+// Conexión Supabase directa - sin depender de supabase.js
+const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
+const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+</script>
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-height:100vh; }
@@ -301,6 +306,12 @@ let comandas = [];
 let comandaActual = null;
 let editandoId = null;
 let acTargetRow = null;
+
+// Helpers inline (no depende de helpers.js)
+function opObj(id) {
+  const all = [...(typeof personal !== 'undefined' ? (personal.tapas||[]).concat(personal.serig||[]) : [])];
+  return all.find(p => p.id === id) || null;
+}
 
 const PROCS = [
   'Armado','Banda','Liner','Impresión','Encajado','Flameado','Otra tarea'
