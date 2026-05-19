@@ -241,17 +241,8 @@ body { background:var(--bg); color:var(--ink); min-height:100vh; }
       <!-- Cierre de comanda -->
       <div class="cierre-card">
         <div class="cierre-label">✅ Cierre de comanda</div>
-        <div class="field-row">
-          <div class="field">
-            <label>Total unidades completadas (PT)</label>
-            <input type="number" id="fTotalUnidades" placeholder="0" min="0">
-          </div>
-          <div class="field" style="position:relative">
-            <label>Descripción / SKU producto terminado</label>
-            <input type="text" id="fDescPT" placeholder="Escribe SKU o descripción..." autocomplete="off" oninput="buscarSKUCierre(this.value)" onblur="setTimeout(()=>cerrarDropPT(),200)">
-            <div id="dropPT" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--teal);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:999;max-height:200px;overflow-y:auto;margin-top:2px"></div>
-          </div>
-        </div>
+        <input type="hidden" id="fTotalUnidades" value="0">
+        <input type="hidden" id="fDescPT" value="">
         <div class="field-row full">
           <div class="field">
             <label>Material devuelto a bodega (descripción y cantidad)</label>
@@ -466,6 +457,17 @@ function agregarTarea(datos = {}) {
     `<option value="${p.id}" ${datos.proceso === p.id ? 'selected' : ''}>${p.lbl}</option>`
   ).join('');
 
+  // Parsear líneas si vienen de edición
+  let lineasIniciales = [];
+  if (datos.material_asignado) {
+    try { lineasIniciales = JSON.parse(datos.material_asignado); } catch(e) {
+      lineasIniciales = [{ desc: datos.material_asignado, und: datos.unidades_completadas || 0 }];
+    }
+  }
+  if (!lineasIniciales.length) lineasIniciales = [{ desc: '', und: 0 }];
+
+  const lineasHtml = lineasIniciales.map((l, i) => buildLineaTarea(n, i+1, l.desc, l.und)).join('');
+
   cont.insertAdjacentHTML('beforeend', `
     <div class="tarea-card" id="tarea_${n}">
       <div class="tarea-num">TAREA #${n}</div>
@@ -484,17 +486,21 @@ function agregarTarea(datos = {}) {
           <input type="number" id="t${n}_horas" value="${datos.horas_estimadas || ''}" min="0.5" max="12" step="0.5" placeholder="Ej. 3.5">
         </div>
       </div>
-      <div class="field-row full">
-        <div class="field">
-          <label>Material asignado (bases, contratapas, etc.)</label>
-          <input type="text" id="t${n}_material" value="${datos.material_asignado || ''}" placeholder="Ej. 5,000 bases negras + 5,000 contratapas verdes">
+
+      <!-- Líneas de tarea asignada -->
+      <div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <label style="font-size:11px;font-weight:700;color:#3A3A38">TAREA ASIGNADA</label>
+          <button type="button" class="btn-add-tarea" style="padding:4px 10px;font-size:11px" onclick="agregarLineaTarea(${n})">+ Línea</button>
+        </div>
+        <div id="t${n}_lineas">${lineasHtml}</div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+          <span style="font-size:11px;color:var(--gray)">Total tarea:</span>
+          <span id="t${n}_subtotal" style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--teal)">0 und</span>
         </div>
       </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Unidades completadas en esta tarea</label>
-          <input type="number" id="t${n}_unidades" value="${datos.unidades_completadas || ''}" min="0" oninput="recalcularTotal()">
-        </div>
+
+      <div class="field-row full" style="margin-top:8px">
         <div class="field">
           <label>Observación de tarea</label>
           <input type="text" id="t${n}_obs" value="${datos.observaciones || ''}" placeholder="Opcional">
@@ -502,6 +508,7 @@ function agregarTarea(datos = {}) {
       </div>
     </div>
   `);
+  actualizarSubtotal(n);
 }
 
 function removerTarea(n) {
@@ -509,10 +516,64 @@ function removerTarea(n) {
   recalcularTotal();
 }
 
+// ── Líneas dentro de cada tarea ────────────────────────
+let lineaCount = {};
+
+function agregarLineaTarea(nt, descVal = '', cantVal = 0) {
+  if (!lineaCount[nt]) lineaCount[nt] = 0;
+  lineaCount[nt]++;
+  const nl = lineaCount[nt];
+  const cont = document.getElementById(`t${nt}_lineas`);
+  if (!cont) return;
+
+  cont.insertAdjacentHTML('beforeend', `
+    <div id="tl_${nt}_${nl}" style="display:grid;grid-template-columns:1fr 110px 32px;gap:6px;align-items:center">
+      <input type="text" 
+        placeholder="Ej. Press Top 28 negra" 
+        value="${descVal}"
+        style="border:1.5px solid #C8C6C0;border-radius:6px;padding:6px 9px;font-size:12px;font-family:var(--font);color:#0C0C0B;background:#fff"
+        id="tl_${nt}_${nl}_desc">
+      <input type="number" 
+        placeholder="0 und" 
+        value="${cantVal || ''}"
+        min="0"
+        style="border:1.5px solid #C8C6C0;border-radius:6px;padding:6px 9px;font-size:12px;font-family:var(--font);color:#0C0C0B;background:#fff;text-align:right"
+        id="tl_${nt}_${nl}_cant"
+        oninput="recalcularTarea(${nt})">
+      <button onclick="removerLineaTarea(${nt}, ${nl})" 
+        style="background:#FEE2E2;border:none;border-radius:6px;color:#B83232;cursor:pointer;font-size:14px;width:32px;height:32px;display:flex;align-items:center;justify-content:center">
+        ✕
+      </button>
+    </div>
+  `);
+  if (cantVal) recalcularTarea(nt);
+}
+
+function removerLineaTarea(nt, nl) {
+  document.getElementById(`tl_${nt}_${nl}`)?.remove();
+  recalcularTarea(nt);
+}
+
+function recalcularTarea(nt) {
+  let total = 0;
+  const cont = document.getElementById(`t${nt}_lineas`);
+  if (!cont) return;
+  cont.querySelectorAll('[id$="_cant"]').forEach(inp => {
+    total += parseInt(inp.value || 0);
+  });
+  const el = document.getElementById(`t${nt}_total`);
+  if (el) el.textContent = total.toLocaleString() + ' und';
+  recalcularTotal();
+}
+
 function recalcularTotal() {
   let total = 0;
-  document.querySelectorAll('[id^="t"][id$="_unidades"]').forEach(inp => {
-    total += parseInt(inp.value || 0);
+  // Sumar totales de cada tarea (desde los campos de cantidad de líneas)
+  document.querySelectorAll('.tarea-card').forEach(card => {
+    const nt = card.id.replace('tarea_', '');
+    card.querySelectorAll('[id$="_cant"]').forEach(inp => {
+      total += parseInt(inp.value || 0);
+    });
   });
   document.getElementById('totalBarVal').textContent = total.toLocaleString() + ' und';
   document.getElementById('fTotalUnidades').value = total;
@@ -532,16 +593,28 @@ async function guardarComanda() {
   const supId = document.getElementById('fSupervisor').value;
   const supOp = opObj(supId) || {};
 
-  // Recopilar tareas
+  // Recopilar tareas con sus líneas
   const tareas = [];
   document.querySelectorAll('.tarea-card').forEach(card => {
     const n = card.id.replace('tarea_', '');
+    // Recopilar líneas de materiales
+    const lineas = [];
+    const contLineas = document.getElementById(`t${n}_lineas`);
+    if (contLineas) {
+      contLineas.querySelectorAll('[id$="_cant"]').forEach(inp => {
+        const nl = inp.id.split('_')[2];
+        const desc = document.getElementById(`tl_${n}_${nl}_desc`)?.value || '';
+        const cant = parseInt(inp.value || 0);
+        if (desc || cant) lineas.push({ desc, cant });
+      });
+    }
+    const totalTarea = lineas.reduce((s, l) => s + l.cant, 0);
     tareas.push({
       proceso: document.getElementById(`t${n}_proc`)?.value,
       hora_inicio: document.getElementById(`t${n}_inicio`)?.value,
       horas_estimadas: parseFloat(document.getElementById(`t${n}_horas`)?.value) || 0,
-      material_asignado: document.getElementById(`t${n}_material`)?.value,
-      unidades_completadas: parseInt(document.getElementById(`t${n}_unidades`)?.value) || 0,
+      material_asignado: JSON.stringify(lineas),
+      unidades_completadas: totalTarea,
       observaciones: document.getElementById(`t${n}_obs`)?.value,
     });
   });
