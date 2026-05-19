@@ -331,11 +331,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function poblarOperarios() {
   const sel = document.getElementById('fOperario');
-  sel.innerHTML = '<option value="">— Selecciona operario —</option>';
-  (personal?.tapas || []).forEach(p => {
-    sel.insertAdjacentHTML('beforeend',
-      `<option value="${p.id}">${p.nombre}</option>`);
-  });
+  if (!sel) return;
+  
+  const ops = (typeof personal !== 'undefined' && personal?.tapas) ? personal.tapas : [];
+  
+  if (!ops.length) {
+    // Fallback manual con los operarios conocidos
+    const fallback = [
+      {id:'T0', nombre:'Heidy'},
+      {id:'T1', nombre:'Yenifer Lopez'},
+      {id:'T2', nombre:'Mishel Arriaza'},
+      {id:'T3', nombre:'Ana Chun'},
+      {id:'T4', nombre:'Violeta Bartolome'},
+      {id:'T5', nombre:'Elsa Tul'},
+      {id:'T6', nombre:'Noemi Alvarez'},
+      {id:'T7', nombre:'Carlos Ascuc'},
+      {id:'T8', nombre:'Selvin Rivera'},
+      {id:'T9', nombre:'Daniel Ochoa'},
+    ];
+    sel.innerHTML = '<option value="">— Selecciona operario —</option>';
+    fallback.forEach(p => {
+      sel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.nombre}</option>`);
+    });
+  } else {
+    sel.innerHTML = '<option value="">— Selecciona operario —</option>';
+    ops.forEach(p => {
+      sel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.nombre}</option>`);
+    });
+  }
 }
 
 // ════════════════════════════════════════════════════════
@@ -524,19 +547,32 @@ function nuevaComanda() {
   comandaActual = null;
   rowCount = 0;
 
-  document.getElementById('formTitle').textContent = 'Nueva comanda';
-  document.getElementById('fCorr').value = 'CMD-' + String(comandas.length + 1).padStart(3,'0');
-  document.getElementById('fFecha').value = document.getElementById('filtroFecha').value;
-  document.getElementById('fHoraInicio').value = '06:00';
-  document.getElementById('fHoraCierre').value = new Date().toTimeString().slice(0,5);
-  document.getElementById('fOperario').value = '';
-  document.getElementById('fDevolucion').value = '';
-  document.getElementById('fObs').value = '';
-  document.getElementById('tareasBody').innerHTML = '';
-  document.getElementById('totalVal').textContent = '0 und';
+  // Repoblar operarios por si acaso no se cargaron al inicio
+  poblarOperarios();
 
-  addTareaRow(); // empezar con 1 fila vacía
+  const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+  
+  setVal('formTitle', ''); // es textContent, no value
+  const ft = document.getElementById('formTitle');
+  if (ft) ft.textContent = 'Nueva comanda';
+
+  setVal('fCorr', 'CMD-' + String(comandas.length + 1).padStart(3,'0'));
+  setVal('fFecha', document.getElementById('filtroFecha')?.value || '');
+  setVal('fHoraInicio', '06:00');
+  setVal('fHoraCierre', new Date().toTimeString().slice(0,5));
+  setVal('fOperario', '');
+  setVal('fDevolucion', '');
+  setVal('fObs', '');
+
+  const tbody = document.getElementById('tareasBody');
+  if (tbody) tbody.innerHTML = '';
+
+  const totalEl = document.getElementById('totalVal');
+  if (totalEl) totalEl.textContent = '0 und';
+
+  addTareaRow();
   showPanel('form');
+  console.log('✓ nueva comanda abierta');
 }
 
 // ════════════════════════════════════════════════════════
@@ -754,9 +790,12 @@ async function borrarComanda(id) {
 // UTILIDADES UI
 // ════════════════════════════════════════════════════════
 function showPanel(cual) {
-  document.getElementById('stWelcome').style.display = cual === 'welcome' ? 'flex' : 'none';
-  document.getElementById('stForm').classList.toggle('vis', cual === 'form');
-  document.getElementById('stDetail').classList.toggle('vis', cual === 'detail');
+  const welcome = document.getElementById('stWelcome');
+  const form = document.getElementById('stForm');
+  const detail = document.getElementById('stDetail');
+  if (welcome) welcome.style.display = cual === 'welcome' ? 'flex' : 'none';
+  if (form) { form.classList.toggle('vis', cual === 'form'); }
+  if (detail) { detail.classList.toggle('vis', cual === 'detail'); }
 }
 
 function cancelar() {
