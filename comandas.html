@@ -269,19 +269,31 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
       <!-- BLOQUE 3: CIERRE -->
       <div class="sec cierre">
         <div class="sec-label">✅ Cierre · Firma del supervisor</div>
-        <div class="grid-2">
-          <div class="field">
-            <label>Material devuelto a bodega</label>
-            <input type="text" id="fDevolucion" placeholder="Ej. 200 bases negras sin usar">
+        <div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <label style="font-size:11px;font-weight:700;color:#3A3A38">📦 MATERIAL DEVUELTO A BODEGA</label>
+            <button type="button" class="btn-add-row" style="width:auto;padding:5px 12px;margin-top:0;font-size:11px" onclick="addDevolucionRow()">+ Línea</button>
           </div>
+          <table class="tareas-table">
+            <thead>
+              <tr>
+                <th>Material / SKU</th>
+                <th style="width:90px">Cantidad</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="devolucionBody"></tbody>
+          </table>
+        </div>
+        <div class="grid-2">
           <div class="field">
             <label>Hora de cierre</label>
             <input type="time" id="fHoraCierre">
           </div>
-        </div>
-        <div class="field">
-          <label>Observaciones</label>
-          <input type="text" id="fObs" placeholder="Notas del día...">
+          <div class="field">
+            <label>Observaciones</label>
+            <input type="text" id="fObs" placeholder="Notas del día...">
+          </div>
         </div>
       </div>
 
@@ -524,6 +536,69 @@ function removeRow(n) {
   recalcTotal();
 }
 
+// ── Líneas de material devuelto ───────────────────────────
+let devCount = 0;
+
+function addDevolucionRow(datos = {}) {
+  devCount++;
+  const n = devCount;
+  const tbody = document.getElementById('devolucionBody');
+  if (!tbody) return;
+  tbody.insertAdjacentHTML('beforeend', `
+    <tr class="tarea-row" id="dev_${n}">
+      <td>
+        <div class="ac-wrap">
+          <input type="text" id="dev_${n}_mat" value="${datos.desc||''}"
+            placeholder="SKU o descripción del material..." autocomplete="off"
+            oninput="buscarSKUDev(${n}, this.value)"
+            data-sku="${datos.sku||''}">
+          <div class="ac-drop" id="dev_${n}_drop"></div>
+        </div>
+      </td>
+      <td><input type="number" id="dev_${n}_cant" value="${datos.cantidad||''}" min="0" placeholder="0"></td>
+      <td><button class="btn-rm-row" onclick="removeDevRow(${n})">✕</button></td>
+    </tr>
+  `);
+}
+
+function removeDevRow(n) {
+  document.getElementById(`dev_${n}`)?.remove();
+}
+
+function buscarSKUDev(n, query) {
+  const drop = document.getElementById(`dev_${n}_drop`);
+  if (!drop) return;
+  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
+
+  const inv = (typeof getInventario === 'function' && getInventario())
+    || (typeof INVENTARIO !== 'undefined' ? INVENTARIO : []);
+  const q = query.toLowerCase();
+  const results = inv
+    .filter(i => ((i.sku||'')+' '+(i.descripcion||i.desc||'')).toLowerCase().includes(q))
+    .slice(0, 7);
+
+  if (!results.length) { drop.style.display = 'none'; return; }
+
+  drop.innerHTML = results.map(i => {
+    const sku = i.sku || '';
+    const desc = i.descripcion || i.desc || '';
+    const exist = i.existencia !== undefined ? i.existencia : '';
+    return `<div class="ac-item" onclick="seleccionarDev(${n},'${sku}','${desc.replace(/'/g,"\\'")}')">
+      <div class="ac-sku">${sku}</div>
+      <div class="ac-desc">${desc}</div>
+      ${exist !== '' ? `<div class="ac-exist">Existencia: ${exist.toLocaleString()} und</div>` : ''}
+    </div>`;
+  }).join('');
+  drop.style.display = 'block';
+}
+
+function seleccionarDev(n, sku, desc) {
+  const inp = document.getElementById(`dev_${n}_mat`);
+  if (inp) { inp.value = sku + ' — ' + desc; inp.dataset.sku = sku; }
+  const drop = document.getElementById(`dev_${n}_drop`);
+  if (drop) drop.style.display = 'none';
+}
+
 function actualizarClaseEstado(n) {
   const sel = document.getElementById(`row_${n}_est`);
   if (!sel) return;
@@ -608,11 +683,15 @@ function nuevaComanda() {
   setVal('fHoraInicio', '06:00');
   setVal('fHoraCierre', new Date().toTimeString().slice(0,5));
   setVal('fOperario', '');
-  setVal('fDevolucion', '');
   setVal('fObs', '');
 
   const tbody = document.getElementById('tareasBody');
   if (tbody) tbody.innerHTML = '';
+
+  const devBody = document.getElementById('devolucionBody');
+  if (devBody) devBody.innerHTML = '';
+  devCount = 0;
+  addDevolucionRow();
 
   const totalEl = document.getElementById('totalVal');
   if (totalEl) totalEl.textContent = '0 und';
@@ -625,6 +704,18 @@ function nuevaComanda() {
 // ════════════════════════════════════════════════════════
 // GUARDAR
 // ════════════════════════════════════════════════════════
+function recopilarDevolucion() {
+  const lineas = [];
+  document.querySelectorAll('[id^="dev_"][id$="_mat"]').forEach(inp => {
+    const n = inp.id.replace('dev_','').replace('_mat','');
+    const cant = document.getElementById(`dev_${n}_cant`)?.value;
+    if (inp.value || cant) {
+      lineas.push({ sku: inp.dataset.sku || '', desc: inp.value, cantidad: parseInt(cant || 0) });
+    }
+  });
+  return JSON.stringify(lineas);
+}
+
 async function guardar() {
   const operarioId = document.getElementById('fOperario').value;
   const fecha = document.getElementById('fFecha').value;
@@ -662,7 +753,7 @@ async function guardar() {
     hora_inicio: document.getElementById('fHoraInicio').value,
     hora_cierre: document.getElementById('fHoraCierre').value,
     total_unidades: totalPT,
-    material_devuelto: document.getElementById('fDevolucion').value,
+    material_devuelto: recopilarDevolucion(),
     observaciones: document.getElementById('fObs').value,
   };
 
@@ -770,11 +861,7 @@ function verComanda(id) {
       ${tareasHtml}
     </div>
 
-    ${c.material_devuelto ? `
-    <div class="sec" style="margin-bottom:12px">
-      <div class="sec-label">📦 Material devuelto a bodega</div>
-      <p style="font-size:13px">${c.material_devuelto}</p>
-    </div>` : ''}
+    ${renderDevolucionDetalle(c.material_devuelto)}
 
     ${c.observaciones ? `
     <div class="sec" style="margin-bottom:12px">
@@ -793,6 +880,31 @@ function verComanda(id) {
 // ════════════════════════════════════════════════════════
 // EDITAR / BORRAR
 // ════════════════════════════════════════════════════════
+function renderDevolucionDetalle(matDevuelto) {
+  if (!matDevuelto) return '';
+  let lineas = [];
+  try { lineas = JSON.parse(matDevuelto); } catch(e) {
+    // formato viejo (texto plano)
+    return `<div class="sec" style="margin-bottom:12px">
+      <div class="sec-label">📦 Material devuelto a bodega</div>
+      <p style="font-size:13px">${matDevuelto}</p>
+    </div>`;
+  }
+  if (!lineas.length) return '';
+  return `<div class="sec" style="margin-bottom:12px">
+    <div class="sec-label">📦 Material devuelto a bodega</div>
+    <table class="det-table">
+      <thead><tr><th>Material</th><th>Cantidad</th></tr></thead>
+      <tbody>
+        ${lineas.map(l => `<tr>
+          <td style="font-size:12px">${l.desc || '—'}</td>
+          <td style="font-family:'DM Mono',monospace;font-weight:700">${(l.cantidad||0).toLocaleString()}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
 function editarComanda(id) {
   const c = comandas.find(x => x.id === id);
   if (!c) return;
@@ -805,9 +917,22 @@ function editarComanda(id) {
   document.getElementById('fHoraInicio').value = c.hora_inicio || '06:00';
   document.getElementById('fHoraCierre').value = c.hora_cierre || '';
   document.getElementById('fOperario').value = c.operario_id || '';
-  document.getElementById('fDevolucion').value = c.material_devuelto || '';
   document.getElementById('fObs').value = c.observaciones || '';
   document.getElementById('tareasBody').innerHTML = '';
+
+  // Cargar líneas de devolución
+  const devBody = document.getElementById('devolucionBody');
+  if (devBody) devBody.innerHTML = '';
+  devCount = 0;
+  let devLineas = [];
+  try { devLineas = JSON.parse(c.material_devuelto || '[]'); } catch(e) {
+    if (c.material_devuelto) devLineas = [{ desc: c.material_devuelto, cantidad: 0, sku: '' }];
+  }
+  if (devLineas.length) {
+    devLineas.forEach(d => addDevolucionRow(d));
+  } else {
+    addDevolucionRow();
+  }
 
   (c.comanda_tareas || []).forEach(t => {
     addTareaRow({
