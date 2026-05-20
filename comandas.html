@@ -171,7 +171,7 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
       <div class="col-left-title">📋 Comandas del día</div>
       <div class="fecha-row">
         <input type="date" class="fecha-input" id="filtroFecha" onchange="cargarComandas()">
-        <button class="btn-nueva" onclick="nuevaComanda()">+ Nueva</button>
+        <button class="btn-nueva" type="button" id="btnNuevaComanda">+ Nueva</button>
       </div>
       <input type="text" class="buscar" id="busqueda" placeholder="Buscar operario..." oninput="renderLista()">
     </div>
@@ -313,7 +313,7 @@ function opObj(id) {
   return all.find(p => p.id === id) || null;
 }
 
-const PROCS = [
+const PROCS_LIST = [
   'Armado','Banda','Liner','Impresión','Encajado','Flameado','Otra tarea'
 ];
 
@@ -323,16 +323,46 @@ const ESTADOS_TAREA = ['Asignada','En proceso','Terminada'];
 // INIT
 // ════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
-  const hoy = new Date().toISOString().split('T')[0];
-  document.getElementById('filtroFecha').value = hoy;
-  document.getElementById('fFecha').value = hoy;
-  document.getElementById('fHoraInicio').value = '06:00';
-  document.getElementById('fHoraCierre').value = new Date().toTimeString().slice(0,5);
+  console.log('🚀 Init comandas.html');
+  
+  try {
+    const hoy = new Date().toISOString().split('T')[0];
+    const filtro = document.getElementById('filtroFecha');
+    if (filtro) filtro.value = hoy;
+    const fFecha = document.getElementById('fFecha');
+    if (fFecha) fFecha.value = hoy;
+    const fHI = document.getElementById('fHoraInicio');
+    if (fHI) fHI.value = '06:00';
+    const fHC = document.getElementById('fHoraCierre');
+    if (fHC) fHC.value = new Date().toTimeString().slice(0,5);
 
-  poblarOperarios();
-  await cargarComandas();
+    poblarOperarios();
+    console.log('✓ Operarios poblados');
 
-  // Cerrar autocomplete al hacer click fuera
+    // Conectar el botón de nueva comanda
+    const btnNueva = document.getElementById('btnNuevaComanda');
+    if (btnNueva) {
+      btnNueva.addEventListener('click', function(e) {
+        console.log('🖱 Click en botón Nueva');
+        e.preventDefault();
+        try {
+          nuevaComanda();
+        } catch(err) {
+          console.error('Error en nuevaComanda:', err);
+          alert('Error al abrir nueva comanda: ' + err.message);
+        }
+      });
+      console.log('✓ Botón Nueva conectado');
+    } else {
+      console.error('✗ Botón Nueva no encontrado');
+    }
+
+    await cargarComandas();
+    console.log('✓ Comandas cargadas');
+  } catch(e) {
+    console.error('Error en init:', e);
+  }
+
   document.addEventListener('click', e => {
     if (!e.target.closest('.ac-wrap') && !e.target.closest('#acDrop')) {
       cerrarAC();
@@ -376,8 +406,9 @@ function poblarOperarios() {
 // CARGAR Y RENDERIZAR LISTA
 // ════════════════════════════════════════════════════════
 async function cargarComandas() {
-  const fecha = document.getElementById('filtroFecha').value;
+  const fecha = document.getElementById('filtroFecha')?.value;
   if (!fecha) return;
+  console.log('📥 Cargando comandas para', fecha);
 
   try {
     const { data, error } = await db
@@ -386,15 +417,20 @@ async function cargarComandas() {
       .eq('fecha', fecha)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    comandas = data || [];
+    if (error) {
+      console.error('Error Supabase:', error);
+      comandas = [];
+    } else {
+      comandas = data || [];
+      console.log('✓ Comandas cargadas:', comandas.length);
+    }
   } catch(e) {
-    console.error(e);
+    console.error('Exception:', e);
     comandas = [];
   }
 
-  renderLista();
-  actualizarKPIs();
+  try { renderLista(); } catch(e) { console.error('renderLista error:', e); }
+  try { actualizarKPIs(); } catch(e) { console.error('actualizarKPIs error:', e); }
 }
 
 function renderLista() {
@@ -448,7 +484,7 @@ let rowCount = 0;
 function addTareaRow(datos = {}) {
   rowCount++;
   const n = rowCount;
-  const procsOpts = PROCS.map(p =>
+  const procsOpts = PROCS_LIST.map(p =>
     `<option value="${p}" ${datos.proceso===p?'selected':''}>${p}</option>`
   ).join('');
 
