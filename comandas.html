@@ -114,6 +114,9 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
 .estado-sel.proceso  { border-color:#1A3B8B; background:#DBEAFE; color:#1A3B8B; }
 .estado-sel.terminada{ border-color:#166534; background:#DCFCE7; color:#166534; }
 
+.modo-btn { flex:1; border:1.5px solid #C8C6C0; background:#fff; color:#6B6B6A; border-radius:8px; padding:6px 8px; font-size:11px; font-weight:700; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .15s; }
+.modo-btn.active { background:#1A6B5B; border-color:#1A6B5B; color:#fff; }
+.modo-btn:hover:not(.active) { border-color:#1A6B5B; color:#1A6B5B; }
 .btn-add-row { background:#EBF7F4; border:1.5px dashed #1A6B5B; color:#1A6B5B; border-radius:8px; padding:7px 14px; font-size:12px; font-weight:700; cursor:pointer; margin-top:10px; font-family:'DM Sans',sans-serif; width:100%; }
 .btn-add-row:hover { background:#C8EDE7; }
 .btn-rm-row { background:none; border:none; color:#C8C6C0; cursor:pointer; font-size:18px; line-height:1; padding:0 4px; }
@@ -170,12 +173,33 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
   <!-- ══ COLUMNA IZQUIERDA ══════════════════════════════ -->
   <div class="col-left">
     <div class="col-left-head">
-      <div class="col-left-title">📋 Comandas del día</div>
-      <div class="fecha-row">
+      <div class="col-left-title">📋 Comandas</div>
+
+      <!-- Modo de búsqueda -->
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="modo-btn active" id="modoFecha" onclick="setModo('fecha')">📅 Por fecha</button>
+        <button class="modo-btn" id="modoOperario" onclick="setModo('operario')">👤 Por operario</button>
+      </div>
+
+      <!-- Filtro fecha -->
+      <div id="filtroFechaWrap" class="fecha-row">
         <input type="date" class="fecha-input" id="filtroFecha" onchange="cargarComandas()">
         <button class="btn-nueva" type="button" id="btnNuevaComanda">+ Nueva</button>
       </div>
-      <input type="text" class="buscar" id="busqueda" placeholder="Buscar operario..." oninput="renderLista()">
+
+      <!-- Filtro operario -->
+      <div id="filtroOperarioWrap" style="display:none;margin-bottom:8px">
+        <select class="buscar" id="filtroOperarioSel" onchange="cargarPorOperario()" style="width:100%;background:#F7F6F2">
+          <option value="">— Selecciona operario —</option>
+        </select>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <input type="date" class="fecha-input" id="filtroDesde" placeholder="Desde" style="flex:1">
+          <input type="date" class="fecha-input" id="filtroHasta" placeholder="Hasta" style="flex:1">
+          <button class="btn-nueva" style="flex:0;padding:0 12px" onclick="cargarPorOperario()">🔍</button>
+        </div>
+      </div>
+
+      <input type="text" class="buscar" id="busqueda" placeholder="Buscar..." oninput="renderLista()">
     </div>
 
     <div class="kpi-strip">
@@ -341,6 +365,69 @@ const ESTADOS_TAREA = ['Asignada','En proceso','Terminada'];
 // ════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════
+// ── Modo de filtrado ──────────────────────────────────────
+let modoActual = 'fecha';
+
+function setModo(modo) {
+  modoActual = modo;
+  document.getElementById('modoFecha').classList.toggle('active', modo === 'fecha');
+  document.getElementById('modoOperario').classList.toggle('active', modo === 'operario');
+  document.getElementById('filtroFechaWrap').style.display = modo === 'fecha' ? 'flex' : 'none';
+  document.getElementById('filtroOperarioWrap').style.display = modo === 'operario' ? 'block' : 'none';
+  if (modo === 'operario') {
+    poblarSelectorOperarios();
+    cargarPorOperario();
+  } else {
+    cargarComandas();
+  }
+}
+
+function poblarSelectorOperarios() {
+  const sel = document.getElementById('filtroOperarioSel');
+  if (sel.options.length > 1) return; // ya poblado
+  const ops = (typeof personal !== 'undefined' && personal?.tapas) ? personal.tapas : [
+    {id:'T0',nombre:'Heidy'},{id:'T1',nombre:'Yenifer Lopez'},{id:'T2',nombre:'Mishel Arriaza'},
+    {id:'T3',nombre:'Ana Chun'},{id:'T4',nombre:'Violeta Bartolome'},{id:'T5',nombre:'Elsa Tul'},
+    {id:'T6',nombre:'Noemi Alvarez'},{id:'T7',nombre:'Carlos Ascuc'},{id:'T8',nombre:'Selvin Rivera'},
+    {id:'T9',nombre:'Daniel Ochoa'}
+  ];
+  ops.forEach(p => sel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.nombre}</option>`));
+}
+
+async function cargarPorOperario() {
+  const opId = document.getElementById('filtroOperarioSel')?.value;
+  let desde = document.getElementById('filtroDesde')?.value;
+  let hasta = document.getElementById('filtroHasta')?.value;
+
+  // Default: último mes si no hay fechas
+  if (!desde) {
+    const d = new Date(); d.setDate(1);
+    desde = d.toISOString().split('T')[0];
+  }
+  if (!hasta) {
+    hasta = new Date().toISOString().split('T')[0];
+  }
+
+  try {
+    let query = db.from('comandas')
+      .select('*, comanda_tareas(*)')
+      .gte('fecha', desde)
+      .lte('fecha', hasta)
+      .order('fecha', { ascending: false });
+
+    if (opId) query = query.eq('operario_id', opId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    comandas = data || [];
+  } catch(e) {
+    console.error('Error cargando por operario:', e);
+    comandas = [];
+  }
+  renderLista();
+  actualizarKPIs();
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🚀 Init comandas.html');
   
@@ -460,7 +547,8 @@ function renderLista() {
   if (busq) items = items.filter(c => (c.operario_nombre||'').toLowerCase().includes(busq));
 
   if (!items.length) {
-    lista.innerHTML = `<div class="empty">No hay comandas para esta fecha.</div>`;
+    const msg = modoActual === 'operario' ? 'Sin comandas para este operario en el período.' : 'No hay comandas para esta fecha.';
+    lista.innerHTML = `<div class="empty">${msg}</div>`;
     return;
   }
 
@@ -476,7 +564,9 @@ function renderLista() {
       <div class="cmd-av" style="background:${color}">${ini}</div>
       <div style="flex:1;min-width:0">
         <div class="cmd-name">${c.operario_nombre||'—'}</div>
-        <div class="cmd-meta">${c.correlativo||'—'} · ${tareas.length} tareas · Sup: ${c.supervisor_nombre||'—'}</div>
+        <div class="cmd-meta">
+          ${modoActual === 'operario' ? `📅 ${c.fecha||'—'} · ` : ''}${c.correlativo||'—'} · ${tareas.length} tareas · Sup: ${c.supervisor_nombre||'—'}
+        </div>
       </div>
       <div class="cmd-und">${totalUnd.toLocaleString()}<small>und PT</small></div>
     </div>`;
