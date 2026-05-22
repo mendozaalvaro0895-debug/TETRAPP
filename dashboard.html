@@ -5,484 +5,431 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TETRAPLASTIC — Dashboard Ejecutivo</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --ink: #0C0C0B;
-  --teal: #1A6B5B;
-  --teal-l: #C8EDE7;
-  --teal-xl: #EBF7F4;
-  --serig-m: #5A2D9E;
-  --serig-l: #E8DFFF;
-  --gold: #B07D2A;
-  --gold-l: #FFF3D6;
-  --red: #B83232;
-  --red-l: #FDECEA;
-  --green: #1A7A3A;
-  --green-l: #D4F0DE;
-  --blue: #1A3A6B;
-  --blue-l: #DBEAFE;
-  --amber: #B87200;
-  --amber-l: #FFF0CC;
-  --bg: #F7F6F2;
-  --card: #FFFFFF;
-  --border: #E0DED8;
-  --gray: #6B6B6A;
-  --gray-l: #A8A6A0;
-  --font: 'DM Sans', sans-serif;
-  --display: 'Playfair Display', serif;
-  --mono: 'DM Mono', monospace;
+  --ink:#0C0C0B; --teal:#1A6B5B; --teal-l:#C8EDE7; --teal-xl:#EBF7F4;
+  --gold:#B07D2A; --red:#B83232; --bg:#F7F6F2; --card:#fff;
+  --border:#E0DED8; --gray:#6B6B6A; --gray-l:#A8A6A0;
+  --font:'DM Sans',sans-serif; --display:'Playfair Display',serif;
+  --mono:'DM Mono',monospace;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh}
 
-.topbar{background:var(--ink);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;color:#fff}
-.logo{font-family:var(--display);font-size:18px;font-weight:900;letter-spacing:.5px}
+/* TOPBAR */
+.topbar{background:var(--ink);padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--teal)}
+.logo{font-family:var(--display);font-size:16px;font-weight:900;color:#fff}
 .logo span{color:#7ECEC0}
-.user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:5px 12px;border-radius:20px;font-size:12px}
-.user-av{width:24px;height:24px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.nav-btns{display:flex;gap:8px}
+.nav-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;font-family:var(--font)}
+.nav-btn:hover{background:rgba(255,255,255,.22)}
+.nav-btn.active{background:var(--teal);border-color:var(--teal)}
 
-.back-link{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:30px;padding:6px 14px;font-size:12px;text-decoration:none;color:var(--ink);margin:16px 24px 0;transition:all .2s}
-.back-link:hover{background:var(--teal-xl);border-color:var(--teal)}
+/* LAYOUT */
+.page{max-width:1280px;margin:0 auto;padding:24px}
+.page-title{font-family:var(--display);font-size:28px;font-weight:700;margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--gray);margin-bottom:24px}
 
-.dashboard{padding:20px 24px 40px;max-width:1400px;margin:0 auto}
+/* PERIOD SELECTOR */
+.period-bar{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.period-label{font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px}
+.period-btn{background:var(--card);border:1.5px solid var(--border);color:var(--gray);padding:7px 16px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s}
+.period-btn.active{background:var(--teal);border-color:var(--teal);color:#fff}
+.period-btn:hover:not(.active){background:var(--teal-xl);border-color:var(--teal-l);color:var(--teal)}
+.period-date{font-family:var(--mono);font-size:11px;color:var(--gray-l);margin-left:4px}
 
-/* KPI CARDS */
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
-.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;transition:all .2s}
-.kpi-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.08)}
-.kpi-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray);margin-bottom:8px}
-.kpi-value{font-size:32px;font-weight:800;font-family:var(--mono);color:var(--ink);line-height:1}
-.kpi-sub{font-size:11px;color:var(--gray-l);margin-top:6px}
-.kpi-trend{display:inline-flex;align-items:center;gap:3px;font-size:10px;margin-left:8px}
-.trend-up{color:var(--green)}.trend-down{color:var(--red)}
+/* KPI STRIP SUPERIOR */
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.kpi-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.kpi-card.highlight{background:var(--ink);border-color:var(--ink)}
+.kpi-icon{font-size:20px;margin-bottom:8px}
+.kpi-val{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--ink);line-height:1}
+.kpi-card.highlight .kpi-val{color:#7ECEC0}
+.kpi-lbl{font-size:11px;color:var(--gray);margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.kpi-card.highlight .kpi-lbl{color:rgba(255,255,255,.4)}
+.kpi-sub{font-size:10px;color:var(--gray-l);margin-top:2px}
+.kpi-card.highlight .kpi-sub{color:rgba(255,255,255,.25)}
 
-/* CHARTS SECTION */
-.charts-section{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:20px;margin-bottom:24px}
-.chart-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
-.chart-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.chart-header h3{font-size:14px;font-weight:700}
-.chart-header span{font-size:10px;color:var(--gray);font-family:var(--mono)}
-.chart-body{padding:16px;height:280px;position:relative}
+/* SECTION */
+.sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.sec-title{font-family:var(--display);font-size:20px;font-weight:700}
+.sec-tag{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--teal);background:var(--teal-xl);padding:4px 10px;border-radius:20px}
 
-/* TABLE SECTION */
-.table-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:24px}
-.table-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.table-header h3{font-size:14px;font-weight:700}
-.table-wrapper{overflow-x:auto}
-.data-table{width:100%;border-collapse:collapse}
-.data-table th{text-align:left;padding:12px 16px;background:var(--bg);font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px}
-.data-table td{padding:10px 16px;font-size:12px;border-bottom:1px solid var(--border)}
-.data-table tr:hover td{background:var(--teal-xl)}
-.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
-.badge-high{background:var(--red-l);color:var(--red)}
-.badge-medium{background:var(--amber-l);color:var(--amber)}
-.badge-low{background:var(--green-l);color:var(--green)}
-.badge-warning{background:#FEF3C7;color:#92400E}
+/* GRID 2 COLUMNAS */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:24px}
 
-/* FUGA BAR */
-.fuga-bar-container{background:var(--bg2);border-radius:8px;height:8px;overflow:hidden;margin-top:6px}
-.fuga-bar{height:100%;border-radius:8px;transition:width .5s ease}
+/* CARD BASE */
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
 
-.refresh-info{text-align:center;padding:16px;color:var(--gray);font-size:11px;border-top:1px solid var(--border);margin-top:16px}
-.btn-refresh{background:var(--teal);color:white;border:none;padding:6px 12px;border-radius:20px;font-size:11px;cursor:pointer;margin-left:12px}
+/* RANKING */
+.ranking-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.ranking-row:last-child{border-bottom:none}
+.rank-pos{width:24px;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--gray-l);text-align:center;flex-shrink:0}
+.rank-medal{font-size:16px;width:24px;text-align:center;flex-shrink:0}
+.rank-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.rank-info{flex:1;min-width:0}
+.rank-name{font-size:13px;font-weight:600;color:var(--ink)}
+.rank-cmds{font-size:10px;color:var(--gray)}
+.rank-bar-wrap{flex:1;background:var(--bg);border-radius:4px;height:6px;overflow:hidden}
+.rank-bar{height:6px;border-radius:4px;background:var(--teal);transition:width .6s ease}
+.rank-und{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--teal);white-space:nowrap;min-width:80px;text-align:right}
+
+/* PROCESOS */
+.proc-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.proc-row:last-child{border-bottom:none}
+.proc-chip{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;min-width:90px;text-align:center}
+.proc-chip.armado{background:var(--teal-xl);color:var(--teal)}
+.proc-chip.banda{background:#FFF3D6;color:var(--gold)}
+.proc-chip.liner{background:#E0E7FF;color:#4338CA}
+.proc-chip.impresion{background:#FCE7F3;color:#9D174D}
+.proc-chip.encajado{background:#DCFCE7;color:#166534}
+.proc-chip.otro{background:var(--bg);color:var(--gray)}
+.proc-bar-wrap{flex:1;background:var(--bg);border-radius:4px;height:6px;overflow:hidden}
+.proc-bar{height:6px;border-radius:4px;transition:width .6s ease}
+.proc-und{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;min-width:70px;text-align:right}
+.proc-tareas{font-size:10px;color:var(--gray-l);white-space:nowrap;min-width:55px;text-align:right}
+
+/* LOADING */
+.loading{text-align:center;padding:40px;color:var(--gray)}
+.spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--teal-l);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px;color:var(--gray);font-size:13px}
+
+/* HISTORIAL TABLE */
+.hist-table{width:100%;border-collapse:collapse}
+.hist-table th{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--gray);padding:8px 10px;border-bottom:2px solid var(--border);text-align:left}
+.hist-table td{padding:10px;border-bottom:1px solid var(--border);font-size:12px}
+.hist-table tr:last-child td{border-bottom:none}
+.hist-table tr:hover td{background:var(--bg)}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px}
+.b-term{background:#DCFCE7;color:#166534}
+.b-proc{background:#DBEAFE;color:#1A3B8B}
+.b-asig{background:#FFF3D6;color:#7A4800}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div class="logo">TETRA<span>PLASTIC</span> · Dashboard Ejecutivo</div>
-  <div class="user-pill">
-    <div class="user-av">AM</div>
-    Alvaro Mendoza
+  <div style="display:flex;align-items:center;gap:14px">
+    <div class="logo">TETRA<span>PLASTIC</span></div>
+    <div style="width:1px;height:18px;background:rgba(255,255,255,.2)"></div>
+    <span style="font-size:12px;color:rgba(255,255,255,.6)">📊 Dashboard Ejecutivo</span>
+  </div>
+  <div class="nav-btns">
+    <a href="tapas.html" class="nav-btn">🏷 Tapas</a>
+    <a href="serigrafia.html" class="nav-btn">🎨 Serigrafía</a>
+    <a href="comandas.html" class="nav-btn">📋 Comandas</a>
+    <a href="index.html" class="nav-btn">🏠 Inicio</a>
   </div>
 </div>
 
-<a href="index.html" class="back-link">← Volver al inicio</a>
+<div class="page">
 
-<div class="dashboard">
-  
-  <!-- KPI Grid -->
-  <div class="kpi-grid" id="kpiGrid">
-    <div class="kpi-card"><div class="kpi-title">📊 Solicitudes activas</div><div class="kpi-value" id="kpiActivas">—</div><div class="kpi-sub">en producción actualmente</div></div>
-    <div class="kpi-card"><div class="kpi-title">⚠️ Urgentes</div><div class="kpi-value" id="kpiUrgentes" style="color:var(--red)">—</div><div class="kpi-sub">requieren atención inmediata</div></div>
-    <div class="kpi-card"><div class="kpi-title">📦 Unidades perdidas (hoy)</div><div class="kpi-value" id="kpiPerdidasHoy">—</div><div class="kpi-sub">por calidad, merma o defectos</div></div>
-    <div class="kpi-card"><div class="kpi-title">💰 Valor de fugas (hoy)</div><div class="kpi-value" id="kpiValorFugas">—</div><div class="kpi-sub">estimado en quetzales</div></div>
-    <div class="kpi-card"><div class="kpi-title">⏸ Paros hoy</div><div class="kpi-value" id="kpiParosHoy">—</div><div class="kpi-sub">minutos totales</div></div>
-    <div class="kpi-card"><div class="kpi-title">👥 Operadores libres</div><div class="kpi-value" id="kpiOpsLibres">—</div><div class="kpi-sub">disponibles para asignar</div></div>
-  </div>
-
-  <!-- Charts -->
-  <div class="charts-section">
-    <div class="chart-card">
-      <div class="chart-header"><h3>📉 Fugas por proceso (últimos 7 días)</h3><span>unidades perdidas</span></div>
-      <div class="chart-body"><canvas id="chartFugasProceso"></canvas></div>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+    <div>
+      <div class="page-title">Productividad · Tapas</div>
+      <div class="page-sub" id="pageSubLabel">Cargando datos...</div>
     </div>
-    <div class="chart-card">
-      <div class="chart-header"><h3>📊 Estado de solicitudes</h3><span>distribución actual</span></div>
-      <div class="chart-body"><canvas id="chartEstado"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-header"><h3>🏭 Producción por área</h3><span>unidades completadas (últimos 7 días)</span></div>
-      <div class="chart-body"><canvas id="chartProduccion"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-header"><h3>⏸ Top motivos de paro</h3><span>minutos perdidos</span></div>
-      <div class="chart-body"><canvas id="chartParos"></canvas></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="period-label">Período:</span>
+      <button class="period-btn active" data-p="hoy" onclick="setPeriod('hoy')">Hoy</button>
+      <button class="period-btn" data-p="semana" onclick="setPeriod('semana')">Esta semana</button>
+      <button class="period-btn" data-p="mes" onclick="setPeriod('mes')">Este mes</button>
+      <span class="period-date" id="periodDateLabel"></span>
     </div>
   </div>
 
-  <!-- Tabla de solicitudes con mayor fuga -->
-  <div class="table-card">
-    <div class="table-header">
-      <h3>🔍 Solicitudes con mayor índice de fuga</h3>
-      <span style="font-size:10px;color:var(--gray)">(salidas - entradas - pérdidas)</span>
-    </div>
-    <div class="table-wrapper">
-      <table class="data-table" id="tablaFugas">
-        <thead>
-          <tr><th>Solicitud</th><th>Cliente</th><th>Salidas</th><th>Entradas PT</th><th>Pérdidas</th><th>Fuga neta</th><th>% Fuga</th><th></th></tr>
-        </thead>
-        <tbody id="tablaFugasBody">
-          <tr><td colspan="8" style="text-align:center">Cargando...</td></tr>
-        </tbody>
-      </table>
-    </div>
+  <!-- KPI STRIP -->
+  <div class="kpi-strip" id="kpiStrip">
+    <div class="kpi-card loading"><div class="spinner"></div></div>
+    <div class="kpi-card loading"><div class="spinner"></div></div>
+    <div class="kpi-card loading"><div class="spinner"></div></div>
+    <div class="kpi-card loading"><div class="spinner"></div></div>
   </div>
 
-  <!-- Tabla de paros recientes -->
-  <div class="table-card">
-    <div class="table-header">
-      <h3>⏸ Últimos paros registrados</h3>
-      <button class="btn-refresh" onclick="cargarDatos()">⟳ Actualizar</button>
+  <!-- RANKING + PROCESOS -->
+  <div class="grid-2">
+
+    <!-- Ranking operarios -->
+    <div class="card">
+      <div class="sec-header">
+        <div class="sec-title">🏆 Ranking · Unidades PT</div>
+        <div class="sec-tag">por operario</div>
+      </div>
+      <div id="rankingContent"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
     </div>
-    <div class="table-wrapper">
-      <table class="data-table">
-        <thead><tr><th>Fecha</th><th>Máquina</th><th>Motivo</th><th>Duración</th><th>Observaciones</th></tr></thead>
-        <tbody id="tablaParosBody">
-          <tr><td colspan="5" style="text-align:center">Cargando...</td></tr>
-        </tbody>
-      </table>
+
+    <!-- Procesos -->
+    <div class="card">
+      <div class="sec-header">
+        <div class="sec-title">🔧 Procesos del período</div>
+        <div class="sec-tag">distribución</div>
+      </div>
+      <div id="procesosContent"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
     </div>
+
   </div>
 
-  <div class="refresh-info">
-    📡 Datos en tiempo real · Última actualización: <span id="lastUpdate">—</span>
+  <!-- HISTORIAL DE COMANDAS -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="sec-header">
+      <div class="sec-title">📋 Historial de comandas</div>
+      <div class="sec-tag" id="histCount">—</div>
+    </div>
+    <div id="historialContent"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
   </div>
-</div>
 
-<script src="shared/supabase.js"></script>
-<script src="shared/helpers.js"></script>
+</div><!-- /page -->
 
 <script>
-// ════════════════════════════════════════════════════════════
-// DASHBOARD EJECUTIVO - TETRAPLASTIC
-// ════════════════════════════════════════════════════════════
+// ══ SUPABASE ═══════════════════════════════════════════
+const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
+const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-let charts = {};
+// Colores de operarios Tapas
+const OP_COLORS = {
+  T0:'#0D4035',T1:'#1A6B5B',T2:'#2E86AB',T3:'#A23B72',T4:'#F18F01',
+  T5:'#C73E1D',T6:'#3B1F2B',T7:'#44BBA4',T8:'#E94F37',T9:'#393E41'
+};
 
-// Precio estimado por unidad (para cálculo de valor de fugas)
-const PRECIO_POR_UNIDAD = 0.85; // Q0.85 por tapa (ajustar según real)
+const PROC_COLORS = {
+  'Armado':'#1A6B5B','Banda':'#B07D2A','Liner':'#4338CA',
+  'Impresión':'#9D174D','Encajado':'#166534','Flameado':'#0369A1','Otra tarea':'#6B6B6A'
+};
 
+let periodo = 'hoy';
+
+// ══ INIT ════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => cargarDatos());
+
+function setPeriod(p) {
+  periodo = p;
+  document.querySelectorAll('.period-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.p === p);
+  });
+  cargarDatos();
+}
+
+function getFechas(p) {
+  const hoy = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+
+  if (p === 'hoy') {
+    const f = fmt(hoy);
+    return { desde:f, hasta:f, label:'Hoy · ' + hoy.toLocaleDateString('es-GT',{weekday:'long',day:'2-digit',month:'long'}) };
+  }
+  if (p === 'semana') {
+    const lunes = new Date(hoy);
+    lunes.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
+    return { desde:fmt(lunes), hasta:fmt(hoy), label:`Semana ${fmt(lunes)} al ${fmt(hoy)}` };
+  }
+  const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  return { desde:fmt(inicio), hasta:fmt(hoy), label:hoy.toLocaleDateString('es-GT',{month:'long',year:'numeric'}) };
+}
+
+// ══ CARGA PRINCIPAL ══════════════════════════════════════
 async function cargarDatos() {
+  const { desde, hasta, label } = getFechas(periodo);
+  document.getElementById('pageSubLabel').textContent = label;
+  document.getElementById('periodDateLabel').textContent = desde === hasta ? desde : `${desde} → ${hasta}`;
+
   try {
-    // 1. Cargar solicitudes
-    const { data: solicitudes, error: err1 } = await db
-      .from('solicitudes')
-      .select('*, solicitud_lineas(*)')
-      .order('created_at', { ascending: false });
-    
-    if (err1) throw err1;
-    
-    // 2. Cargar movimientos de materiales (fugas)
-    const hoy = new Date().toISOString().split('T')[0];
-    const hace7Dias = new Date();
-    hace7Dias.setDate(hace7Dias.getDate() - 7);
-    const fecha7Dias = hace7Dias.toISOString().split('T')[0];
-    
-    const { data: movimientos, error: err2 } = await db
-      .from('movimientos_materiales')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (err2 && !err2.message.includes('does not exist')) {
-      console.warn('Tabla movimientos_materiales no existe aún');
-    }
-    
-    // 3. Cargar paros
-    const { data: paros, error: err3 } = await db
-      .from('paros_maquina')
-      .select('*')
-      .gte('created_at', fecha7Dias)
-      .order('created_at', { ascending: false });
-    
-    if (err3 && !err3.message.includes('does not exist')) {
-      console.warn('Tabla paros_maquina no existe aún');
-    }
-    
-    // Calcular KPIs
-    const solicitudesList = solicitudes || [];
-    const activas = solicitudesList.filter(s => s.estado === 'proceso').length;
-    const urgentes = solicitudesList.filter(s => s.prioridad === 'urgente' && s.estado !== 'entregada').length;
-    
-    // Fugas de hoy
-    const movsHoy = (movimientos || []).filter(m => m.created_at?.startsWith(hoy));
-    const perdidasHoy = movsHoy.filter(m => m.tipo === 'perdida').reduce((s, m) => s + (m.cantidad || 0), 0);
-    const valorFugasHoy = perdidasHoy * PRECIO_POR_UNIDAD;
-    
-    // Paros de hoy
-    const parosHoy = (paros || []).filter(p => p.created_at?.startsWith(hoy));
-    const minutosParosHoy = parosHoy.reduce((s, p) => s + (p.duracion_minutos || 0), 0);
-    
-    // Operadores libres
-    let opsLibres = 0;
-    if (window.personal) {
-      const todosOps = [...(personal.tapas || []), ...(personal.serig || [])];
-      opsLibres = todosOps.filter(p => p.rol !== 'supervisor' && p.presente).length;
-    }
-    
-    // Actualizar KPIs
-    document.getElementById('kpiActivas').textContent = activas;
-    document.getElementById('kpiUrgentes').textContent = urgentes;
-    document.getElementById('kpiPerdidasHoy').textContent = perdidasHoy.toLocaleString();
-    document.getElementById('kpiValorFugas').textContent = 'Q ' + valorFugasHoy.toFixed(2);
-    document.getElementById('kpiParosHoy').textContent = minutosParosHoy + ' min';
-    document.getElementById('kpiOpsLibres').textContent = opsLibres;
-    
-    // Tabla de fugas por solicitud
-    renderTablaFugas(solicitudesList, movimientos || []);
-    
-    // Tabla de paros recientes
-    renderTablaParos(paros || []);
-    
-    // Gráficos
-    renderCharts(solicitudesList, movimientos || [], paros || []);
-    
-    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('es-GT');
-    
+    const { data, error } = await db
+      .from('comandas')
+      .select('id, fecha, operario_id, operario_nombre, supervisor_nombre, total_unidades, hora_inicio, hora_cierre, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
+      .gte('fecha', desde)
+      .lte('fecha', hasta)
+      .order('fecha', { ascending: false });
+
+    if (error) throw error;
+    const cmds = data || [];
+
+    renderKPIs(cmds);
+    renderRanking(cmds);
+    renderProcesos(cmds);
+    renderHistorial(cmds);
+
   } catch(e) {
-    console.error('Error cargando datos:', e);
-    document.getElementById('tablaFugasBody').innerHTML = '<tr><td colspan="8" style="text-align:center">❌ Error cargando datos</td></tr>';
+    console.error('Error:', e);
+    document.getElementById('pageSubLabel').textContent = 'Error al cargar datos. Verifica la conexión.';
   }
 }
 
-function renderTablaFugas(solicitudes, movimientos) {
-  const tbody = document.getElementById('tablaFugasBody');
-  if (!tbody) return;
-  
-  // Calcular fugas por solicitud
-  const fugasPorSol = {};
-  movimientos.forEach(m => {
-    if (!m.solicitud_id) return;
-    if (!fugasPorSol[m.solicitud_id]) {
-      fugasPorSol[m.solicitud_id] = { salidas: 0, entradas: 0, perdidas: 0 };
+// ══ KPIs ════════════════════════════════════════════════
+function renderKPIs(cmds) {
+  const totalUnd = cmds.reduce((s,c) => s + (c.total_unidades||0), 0);
+  const totalCmds = cmds.length;
+  const opSet = new Set(cmds.map(c => c.operario_id));
+  const prom = opSet.size > 0 ? Math.round(totalUnd / opSet.size) : 0;
+
+  // Calcular unidades por proceso Terminada
+  const tareasTerminadas = cmds.flatMap(c => (c.comanda_tareas||[]).filter(t => t.estado === 'Terminada'));
+  const totalTareas = cmds.flatMap(c => c.comanda_tareas||[]).length;
+
+  document.getElementById('kpiStrip').innerHTML = `
+    <div class="kpi-card highlight">
+      <div class="kpi-icon">📦</div>
+      <div class="kpi-val">${totalUnd.toLocaleString()}</div>
+      <div class="kpi-lbl">Unidades PT</div>
+      <div class="kpi-sub">Tareas terminadas</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">📋</div>
+      <div class="kpi-val">${totalCmds}</div>
+      <div class="kpi-lbl">Comandas</div>
+      <div class="kpi-sub">${opSet.size} operarios activos</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">👤</div>
+      <div class="kpi-val">${prom.toLocaleString()}</div>
+      <div class="kpi-lbl">Promedio/operario</div>
+      <div class="kpi-sub">unidades PT</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">🔧</div>
+      <div class="kpi-val">${totalTareas}</div>
+      <div class="kpi-lbl">Tareas registradas</div>
+      <div class="kpi-sub">${tareasTerminadas.length} terminadas</div>
+    </div>
+  `;
+}
+
+// ══ RANKING ═════════════════════════════════════════════
+function renderRanking(cmds) {
+  const porOp = {};
+  cmds.forEach(c => {
+    if (!porOp[c.operario_id]) {
+      porOp[c.operario_id] = { nombre: c.operario_nombre || c.operario_id, und: 0, cmds: 0 };
     }
-    if (m.tipo === 'salida_bodega') fugasPorSol[m.solicitud_id].salidas += (m.cantidad || 0);
-    if (m.tipo === 'entrada_pt') fugasPorSol[m.solicitud_id].entradas += (m.cantidad || 0);
-    if (m.tipo === 'perdida') fugasPorSol[m.solicitud_id].perdidas += (m.cantidad || 0);
+    porOp[c.operario_id].und += (c.total_unidades || 0);
+    porOp[c.operario_id].cmds++;
   });
-  
-  const solicitudesConFuga = solicitudes.map(s => {
-    const f = fugasPorSol[s.id] || { salidas: 0, entradas: 0, perdidas: 0 };
-    const fugaNeta = f.salidas - f.entradas - f.perdidas;
-    const porcentajeFuga = f.salidas > 0 ? (fugaNeta / f.salidas) * 100 : 0;
-    return {
-      ...s,
-      salidas: f.salidas,
-      entradas: f.entradas,
-      perdidas: f.perdidas,
-      fugaNeta,
-      porcentajeFuga
-    };
-  }).filter(s => s.salidas > 0 || s.perdidas > 0)
-    .sort((a, b) => b.porcentajeFuga - a.porcentajeFuga)
-    .slice(0, 10);
-  
-  if (solicitudesConFuga.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center">📭 No hay datos de fugas aún</td></tr>';
+
+  const ranking = Object.entries(porOp)
+    .map(([id, d]) => ({ id, ...d }))
+    .sort((a, b) => b.und - a.und);
+
+  if (!ranking.length) {
+    document.getElementById('rankingContent').innerHTML = '<div class="empty">Sin datos en este período.</div>';
     return;
   }
-  
-  tbody.innerHTML = solicitudesConFuga.map(s => {
-    let badgeClass = 'badge-low';
-    if (s.porcentajeFuga > 20) badgeClass = 'badge-high';
-    else if (s.porcentajeFuga > 5) badgeClass = 'badge-medium';
-    
+
+  const maxUnd = ranking[0].und || 1;
+  const medals = ['🥇','🥈','🥉'];
+
+  document.getElementById('rankingContent').innerHTML = ranking.map((op, i) => {
+    const pct = Math.round((op.und / maxUnd) * 100);
+    const color = OP_COLORS[op.id] || '#6B6B6A';
+    const ini = op.nombre?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() || '??';
     return `
-      <tr>
-        <td style="font-family:var(--mono);font-size:11px">${s.codigo || s.id.slice(0,8)}</td>
-        <td>${s.cliente_nombre || '—'}</td>
-        <td style="text-align:right">${s.salidas.toLocaleString()}</td>
-        <td style="text-align:right">${s.entradas.toLocaleString()}</td>
-        <td style="text-align:right;color:var(--red)">${s.perdidas.toLocaleString()}</td>
-        <td style="text-align:right;font-weight:700;color:${s.fugaNeta > 0 ? 'var(--red)' : 'var(--green)'}">${s.fugaNeta.toLocaleString()}</td>
-        <td style="text-align:right">
-          <span class="badge ${badgeClass}">${s.porcentajeFuga.toFixed(1)}%</span>
-        </td>
-        <td>
-          <div class="fuga-bar-container" style="width:80px">
-            <div class="fuga-bar" style="width:${Math.min(s.porcentajeFuga, 100)}%;background:${s.porcentajeFuga > 20 ? 'var(--red)' : s.porcentajeFuga > 5 ? 'var(--amber)' : 'var(--green)'}"></div>
-          </div>
-        </td>
-      </tr>
-    `;
+    <div class="ranking-row">
+      <div class="rank-medal">${medals[i] || ''}</div>
+      <div class="rank-avatar" style="background:${color}">${ini}</div>
+      <div class="rank-info">
+        <div class="rank-name">${op.nombre?.split(' ')[0] || '—'} ${op.nombre?.split(' ')[1] || ''}</div>
+        <div class="rank-cmds">${op.cmds} comanda${op.cmds !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="rank-bar-wrap">
+        <div class="rank-bar" style="width:${pct}%"></div>
+      </div>
+      <div class="rank-und">${op.und.toLocaleString()} und</div>
+    </div>`;
   }).join('');
 }
 
-function renderTablaParos(paros) {
-  const tbody = document.getElementById('tablaParosBody');
-  if (!tbody) return;
-  
-  if (paros.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">⏸ No hay paros registrados en los últimos 7 días</td></tr>';
+// ══ PROCESOS ════════════════════════════════════════════
+function renderProcesos(cmds) {
+  const porProc = {};
+  cmds.forEach(c => {
+    (c.comanda_tareas || []).forEach(t => {
+      const p = t.proceso || 'Otra tarea';
+      if (!porProc[p]) porProc[p] = { und: 0, tareas: 0, terminadas: 0 };
+      porProc[p].und += (t.unidades_completadas || 0);
+      porProc[p].tareas++;
+      if (t.estado === 'Terminada') porProc[p].terminadas++;
+    });
+  });
+
+  const procList = Object.entries(porProc).sort((a, b) => b[1].und - a[1].und);
+
+  if (!procList.length) {
+    document.getElementById('procesosContent').innerHTML = '<div class="empty">Sin tareas en este período.</div>';
     return;
   }
-  
-  tbody.innerHTML = paros.slice(0, 15).map(p => {
-    const fecha = new Date(p.created_at).toLocaleString('es-GT');
-    const motivoMap = {
-      'mantenimiento': '🔧 Mantenimiento',
-      'falta_material': '📦 Falta material',
-      'cambio_molde': '🔄 Cambio de molde',
-      'operador_ausente': '👤 Operador ausente',
-      'energia': '⚡ Problema eléctrico',
-      'calidad': '🔍 Problema de calidad',
-      'pantalla': '🖨 Problema de pantalla',
-      'tinta': '🎨 Falta de tinta',
-      'otro': '📌 Otro'
-    };
+
+  const maxUnd = procList[0][1].und || 1;
+
+  document.getElementById('procesosContent').innerHTML = procList.map(([proc, d]) => {
+    const pct = Math.round((d.und / maxUnd) * 100);
+    const color = PROC_COLORS[proc] || '#6B6B6A';
+    const cls = proc.toLowerCase().replace(/[^a-z]/g,'').slice(0,8);
     return `
-      <tr>
-        <td style="font-size:11px">${fecha}</td>
-        <td>${p.maquina_id || '—'}</td>
-        <td><span class="badge badge-medium">${motivoMap[p.motivo] || p.motivo}</span></td>
-        <td style="text-align:right;font-family:var(--mono)">${p.duracion_minutos} min</td>
-        <td style="font-size:11px;color:var(--gray)">${p.observaciones || '—'}</td>
-      </tr>
-    `;
+    <div class="proc-row">
+      <div class="proc-chip ${cls}" style="background:${color}20;color:${color}">${proc}</div>
+      <div class="proc-bar-wrap">
+        <div class="proc-bar" style="width:${pct}%;background:${color}"></div>
+      </div>
+      <div class="proc-und">${d.und.toLocaleString()} und</div>
+      <div class="proc-tareas">${d.tareas} tareas</div>
+    </div>`;
   }).join('');
 }
 
-function renderCharts(solicitudes, movimientos, paros) {
-  // Gráfico 1: Estado de solicitudes
-  const estados = ['nueva', 'programada', 'proceso', 'lista', 'entregada'];
-  const estadosLabels = ['Nuevas', 'Programadas', 'En proceso', 'Listas', 'Entregadas'];
-  const estadosColors = ['var(--teal)', '#7A5200', 'var(--blue)', 'var(--green)', 'var(--gray)'];
-  const estadosCounts = estados.map(e => solicitudes.filter(s => s.estado === e).length);
-  
-  if (charts.estado) charts.estado.destroy();
-  const ctxEstado = document.getElementById('chartEstado')?.getContext('2d');
-  if (ctxEstado) {
-    charts.estado = new Chart(ctxEstado, {
-      type: 'doughnut',
-      data: { labels: estadosLabels, datasets: [{ data: estadosCounts, backgroundColor: estadosColors, borderWidth: 0 }] },
-      options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
-    });
-  }
-  
-  // Gráfico 2: Fugas por proceso (últimos 7 días)
-  const procesosMap = {
-    'cavidad_defectuosa': 'Cavidad defectuosa',
-    'rechazo_calidad': 'Rechazo calidad',
-    'merma_operacion': 'Merma operación',
-    'defecto_serigrafia': 'Defecto serigrafía',
-    'error_tampografia': 'Error tampografía',
-    'muestra_lab': 'Muestra lab',
-    'robo': 'Robo',
-    'otro': 'Otro'
-  };
-  
-  const perdidasPorMotivo = {};
-  (movimientos || []).filter(m => m.tipo === 'perdida').forEach(m => {
-    const motivo = m.motivo_perdida || 'otro';
-    perdidasPorMotivo[motivo] = (perdidasPorMotivo[motivo] || 0) + (m.cantidad || 0);
-  });
-  
-  const motivosLabels = Object.keys(perdidasPorMotivo).map(m => procesosMap[m] || m);
-  const motivosData = Object.values(perdidasPorMotivo);
-  
-  if (charts.fugas) charts.fugas.destroy();
-  const ctxFugas = document.getElementById('chartFugasProceso')?.getContext('2d');
-  if (ctxFugas && motivosLabels.length > 0) {
-    charts.fugas = new Chart(ctxFugas, {
-      type: 'bar',
-      data: { labels: motivosLabels, datasets: [{ label: 'Unidades perdidas', data: motivosData, backgroundColor: 'var(--red)', borderRadius: 6 }] },
-      options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } } }
-    });
-  } else if (ctxFugas) {
-    charts.fugas = new Chart(ctxFugas, {
-      type: 'bar',
-      data: { labels: ['Sin datos'], datasets: [{ data: [0], backgroundColor: 'var(--gray)' }] },
-      options: { responsive: true }
-    });
-  }
-  
-  // Gráfico 3: Producción por área (estimada desde solicitudes entregadas últimas 7 días)
-  const hoyDate = new Date();
-  const hace7DiasDate = new Date();
-  hace7DiasDate.setDate(hoyDate.getDate() - 7);
-  
-  const entregadasRecientes = solicitudes.filter(s => {
-    if (s.estado !== 'entregada') return false;
-    const fecha = new Date(s.updated_at || s.created_at);
-    return fecha >= hace7DiasDate;
-  });
-  
-  const tapasProducidas = entregadasRecientes.filter(s => s.area === 'tapas').reduce((sum, s) => {
-    const cant = s.solicitud_lineas?.reduce((acc, l) => acc + (l.cantidad || 0), 0) || 0;
-    return sum + cant;
-  }, 0);
-  
-  const serigProducidas = entregadasRecientes.filter(s => s.area === 'serig').reduce((sum, s) => {
-    const cant = s.solicitud_lineas?.reduce((acc, l) => acc + (l.cantidad || 0), 0) || 0;
-    return sum + cant;
-  }, 0);
-  
-  if (charts.produccion) charts.produccion.destroy();
-  const ctxProd = document.getElementById('chartProduccion')?.getContext('2d');
-  if (ctxProd) {
-    charts.produccion = new Chart(ctxProd, {
-      type: 'bar',
-      data: { labels: ['Tapas', 'Serigrafía'], datasets: [{ label: 'Unidades producidas (últimos 7 días)', data: [tapasProducidas, serigProducidas], backgroundColor: ['var(--teal)', 'var(--serig-m)'], borderRadius: 6 }] },
-      options: { responsive: true, maintainAspectRatio: true }
-    });
-  }
-  
-  // Gráfico 4: Top motivos de paro
-  const parosPorMotivo = {};
-  (paros || []).forEach(p => {
-    const motivo = p.motivo || 'otro';
-    parosPorMotivo[motivo] = (parosPorMotivo[motivo] || 0) + (p.duracion_minutos || 0);
-  });
-  
-  const topMotivos = Object.entries(parosPorMotivo).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const motivoLabels = topMotivos.map(m => {
-    const map = { 'mantenimiento': 'Mantenimiento', 'falta_material': 'Falta material', 'cambio_molde': 'Cambio molde', 'operador_ausente': 'Op. ausente', 'energia': 'Energía', 'calidad': 'Calidad', 'pantalla': 'Pantalla', 'tinta': 'Tinta' };
-    return map[m[0]] || m[0];
-  });
-  const motivoData = topMotivos.map(m => m[1]);
-  
-  if (charts.paros) charts.paros.destroy();
-  const ctxParos = document.getElementById('chartParos')?.getContext('2d');
-  if (ctxParos && motivoLabels.length > 0) {
-    charts.paros = new Chart(ctxParos, {
-      type: 'bar',
-      data: { labels: motivoLabels, datasets: [{ label: 'Minutos perdidos', data: motivoData, backgroundColor: 'var(--amber)', borderRadius: 6 }] },
-      options: { responsive: true, maintainAspectRatio: true, indexAxis: 'y' }
-    });
-  } else if (ctxParos) {
-    charts.paros = new Chart(ctxParos, {
-      type: 'bar',
-      data: { labels: ['Sin datos'], datasets: [{ data: [0], backgroundColor: 'var(--gray)' }] },
-      options: { responsive: true }
-    });
-  }
-}
+// ══ HISTORIAL ═══════════════════════════════════════════
+function renderHistorial(cmds) {
+  document.getElementById('histCount').textContent = `${cmds.length} comandas`;
 
-// Auto-refresh cada 60 segundos
-cargarDatos();
-setInterval(cargarDatos, 60000);
+  if (!cmds.length) {
+    document.getElementById('historialContent').innerHTML = '<div class="empty">No hay comandas en este período.</div>';
+    return;
+  }
+
+  document.getElementById('historialContent').innerHTML = `
+    <div style="overflow-x:auto">
+    <table class="hist-table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Correlativo</th>
+          <th>Operario</th>
+          <th>Supervisor</th>
+          <th>Tareas</th>
+          <th>Inicio</th>
+          <th>Cierre</th>
+          <th style="text-align:right">Unidades PT</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${cmds.map(c => {
+          const tareas = c.comanda_tareas || [];
+          const term = tareas.filter(t => t.estado === 'Terminada').length;
+          const enProc = tareas.filter(t => t.estado === 'En proceso').length;
+          const badgeCls = term === tareas.length && tareas.length > 0 ? 'b-term' : enProc > 0 ? 'b-proc' : 'b-asig';
+          const badgeTxt = term === tareas.length && tareas.length > 0 ? 'Completa' : enProc > 0 ? 'En proceso' : 'Asignada';
+          return `<tr>
+            <td style="font-family:var(--mono);font-size:11px">${c.fecha||'—'}</td>
+            <td style="font-weight:600">${c.correlativo||'—'}</td>
+            <td>${c.operario_nombre||'—'}</td>
+            <td style="color:var(--gray)">${c.supervisor_nombre||'—'}</td>
+            <td>
+              <span class="badge ${badgeCls}">${badgeTxt}</span>
+              <span style="font-size:10px;color:var(--gray-l);margin-left:4px">${tareas.length} tarea${tareas.length!==1?'s':''}</span>
+            </td>
+            <td style="font-family:var(--mono);font-size:11px">${c.hora_inicio||'—'}</td>
+            <td style="font-family:var(--mono);font-size:11px">${c.hora_cierre||'—'}</td>
+            <td style="font-family:var(--mono);font-weight:700;color:var(--teal);text-align:right">${(c.total_unidades||0).toLocaleString()}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>`;
+}
 </script>
 
 </body>
