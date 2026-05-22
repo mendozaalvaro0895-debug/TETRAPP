@@ -21,6 +21,7 @@
     <div class="uavatar">AM</div>
     <div class="uname">Álvaro Mendoza</div>
   </div>
+  <a href="index.html" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;margin-left:8px">🏠 Inicio</a>
 </div>
 
 <div class="app">
@@ -906,6 +907,151 @@ async function cargarKPIComandas() {
 
 // ══ INICIO ══════════════════════════════════════════════════
 init();
+</script>
+
+<!-- PANEL PRODUCTIVIDAD COLAPSABLE -->
+<div id="prodPanel" style="position:fixed;bottom:0;left:0;right:0;background:#0C0C0B;border-top:2px solid #1A6B5B;z-index:9999;transition:height .3s cubic-bezier(.4,0,.2,1);height:44px;overflow:hidden;box-shadow:0 -4px 20px rgba(0,0,0,.35)">
+
+  <div onclick="toggleProd()" style="display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:44px;cursor:pointer;user-select:none">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:13px;font-weight:700;color:#7ECEC0">📊 Productividad · Tapas</span>
+      <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
+        <button class="prod-p-btn active" data-p="hoy" onclick="setProdPeriod('hoy')">Hoy</button>
+        <button class="prod-p-btn" data-p="semana" onclick="setProdPeriod('semana')">Semana</button>
+        <button class="prod-p-btn" data-p="mes" onclick="setProdPeriod('mes')">Mes</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <span style="font-size:11px;color:rgba(255,255,255,.4)" id="prodResumen">Haz clic para expandir</span>
+      <span id="prodArrow" style="color:#7ECEC0;font-size:14px;transition:transform .3s">▲</span>
+    </div>
+  </div>
+
+  <div id="prodContent" style="padding:14px 20px 16px;overflow-y:auto;max-height:310px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+
+      <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:14px">
+        <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:10px">Resumen</div>
+        <div style="font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#7ECEC0" id="pTotalUnd">—</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.3);margin-bottom:10px">unidades PT</div>
+        <div style="display:flex;gap:16px">
+          <div><div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#fff" id="pTotalCmds">—</div><div style="font-size:9px;color:rgba(255,255,255,.3)">Comandas</div></div>
+          <div><div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#fff" id="pProm">—</div><div style="font-size:9px;color:rgba(255,255,255,.3)">Prom/op</div></div>
+        </div>
+      </div>
+
+      <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:14px">
+        <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:10px">🏆 Ranking operarios</div>
+        <div id="pRanking" style="overflow-y:auto;max-height:180px"><div style="font-size:11px;color:rgba(255,255,255,.3)">Cargando...</div></div>
+      </div>
+
+      <div style="background:rgba(255,255,255,.07);border-radius:10px;padding:14px">
+        <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:10px">🔧 Procesos</div>
+        <div id="pProcesos" style="overflow-y:auto;max-height:180px"><div style="font-size:11px;color:rgba(255,255,255,.3)">Cargando...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.prod-p-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
+.prod-p-btn.active{background:#1A6B5B;border-color:#1A6B5B;color:#fff}
+.app{padding-bottom:44px}
+</style>
+
+<script>
+let _prodOpen = false;
+let _prodPeriod = 'hoy';
+
+function toggleProd() {
+  _prodOpen = !_prodOpen;
+  document.getElementById('prodPanel').style.height = _prodOpen ? '370px' : '44px';
+  document.getElementById('prodArrow').style.transform = _prodOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+  if (_prodOpen) loadProd();
+}
+
+function setProdPeriod(p) {
+  _prodPeriod = p;
+  document.querySelectorAll('.prod-p-btn').forEach(b => b.classList.toggle('active', b.dataset.p === p));
+  if (_prodOpen) loadProd();
+}
+
+function getProdFechas(p) {
+  const hoy = new Date();
+  const fmt = d => d.toISOString().split('T')[0];
+  if (p === 'hoy') return { desde: fmt(hoy), hasta: fmt(hoy) };
+  if (p === 'semana') {
+    const lun = new Date(hoy); lun.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
+    return { desde: fmt(lun), hasta: fmt(hoy) };
+  }
+  const ini = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  return { desde: fmt(ini), hasta: fmt(hoy) };
+}
+
+async function loadProd() {
+  const { desde, hasta } = getProdFechas(_prodPeriod);
+  try {
+    const { data } = await db.from('comandas')
+      .select('operario_id, operario_nombre, total_unidades, comanda_tareas(proceso, unidades_completadas, estado)')
+      .gte('fecha', desde).lte('fecha', hasta);
+
+    const cmds = data || [];
+    const totalUnd = cmds.reduce((s,c) => s+(c.total_unidades||0), 0);
+    const ops = new Set(cmds.map(c=>c.operario_id));
+    const prom = ops.size > 0 ? Math.round(totalUnd/ops.size) : 0;
+
+    document.getElementById('pTotalUnd').textContent = totalUnd.toLocaleString();
+    document.getElementById('pTotalCmds').textContent = cmds.length;
+    document.getElementById('pProm').textContent = prom.toLocaleString();
+    document.getElementById('prodResumen').textContent = totalUnd.toLocaleString() + ' und · ' + cmds.length + ' comandas';
+
+    // Ranking
+    const porOp = {};
+    cmds.forEach(c => {
+      if (!porOp[c.operario_id]) porOp[c.operario_id] = { nombre: c.operario_nombre, und: 0, cmds: 0 };
+      porOp[c.operario_id].und += (c.total_unidades||0);
+      porOp[c.operario_id].cmds++;
+    });
+    const ranking = Object.values(porOp).sort((a,b) => b.und-a.und);
+    const maxU = ranking[0]?.und || 1;
+    const medals = ['🥇','🥈','🥉'];
+    document.getElementById('pRanking').innerHTML = ranking.length
+      ? ranking.map((op,i) => `<div style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+            <span style="color:#fff;font-weight:600">${medals[i]||''} ${(op.nombre||'').split(' ')[0]}</span>
+            <span style="font-family:'DM Mono',monospace;color:#7ECEC0;font-size:10px">${op.und.toLocaleString()}</span>
+          </div>
+          <div style="background:rgba(255,255,255,.1);border-radius:4px;height:4px">
+            <div style="background:#1A6B5B;height:4px;border-radius:4px;width:${Math.round(op.und/maxU*100)}%"></div>
+          </div>
+        </div>`).join('')
+      : '<div style="font-size:11px;color:rgba(255,255,255,.3)">Sin datos.</div>';
+
+    // Procesos
+    const porProc = {};
+    cmds.forEach(c => (c.comanda_tareas||[]).forEach(t => {
+      const p = t.proceso||'Otro';
+      if (!porProc[p]) porProc[p] = { und:0, n:0 };
+      porProc[p].und += (t.unidades_completadas||0);
+      porProc[p].n++;
+    }));
+    const procs = Object.entries(porProc).sort((a,b)=>b[1].und-a[1].und);
+    const maxP = procs[0]?.[1]?.und || 1;
+    const procColors = {Armado:'#1A6B5B',Banda:'#B07D2A',Liner:'#4338CA',Impresión:'#9D174D',Encajado:'#166534',Flameado:'#0369A1'};
+    document.getElementById('pProcesos').innerHTML = procs.length
+      ? procs.map(([proc,d]) => `<div style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">
+            <span style="color:#fff;font-weight:600">${proc}</span>
+            <span style="color:rgba(255,255,255,.5)">${d.und.toLocaleString()} · ${d.n}t</span>
+          </div>
+          <div style="background:rgba(255,255,255,.1);border-radius:4px;height:4px">
+            <div style="background:${procColors[proc]||'#6B6B6A'};height:4px;border-radius:4px;width:${Math.round(d.und/maxP*100)}%"></div>
+          </div>
+        </div>`).join('')
+      : '<div style="font-size:11px;color:rgba(255,255,255,.3)">Sin tareas.</div>';
+
+  } catch(e) { console.error('loadProd:', e); }
+}
 </script>
 </body>
 </html>
