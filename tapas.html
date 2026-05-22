@@ -27,7 +27,7 @@
 
 <div class="sidenav">
   <div class="sn-btn active" title="Solicitudes">📋</div>
-  <div class="sn-btn" title="Dashboard" onclick="location.href='dashboard.html'">📊</div>
+  <div class="sn-btn" title="Dashboard" onclick="switchTab('dash')">📊</div>
   <div class="sn-btn" title="Personal" onclick="switchTab('personal')">👥</div>
   <div class="sn-div"></div>
   <div style="flex:1"></div>
@@ -46,6 +46,7 @@
     <div class="tab t-personal" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
     <div class="tabs-r">
       <button class="btn btn-t btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>
+      <a href="comandas.html" class="btn btn-g btn-sm" style="text-decoration:none">📋 Comandas</a>
       <button class="btn btn-g btn-sm" onclick="reportarParo()">⏸ Reportar Paro</button>
     </div>
   </div>
@@ -60,6 +61,16 @@
         <div class="kpi"><div class="kpi-l">Cap. disponible</div><div class="kpi-v" style="color:var(--green)" id="kt-cap">—</div><div class="kpi-s">und/hora hoy</div></div>
         <div class="kpi"><div class="kpi-l">Operadores AM</div><div class="kpi-v" id="kt-ops">—</div><div class="kpi-s">libres / proceso</div></div>
         <div class="kpi"><div class="kpi-l">Fugas hoy</div><div class="kpi-v" id="kt-fugas">0</div><div class="kpi-s">unidades perdidas</div></div>
+        <div class="kpi" style="cursor:pointer" onclick="location.href='comandas.html'">
+          <div class="kpi-l">PT hoy</div>
+          <div class="kpi-v" id="kt-cmd-und" style="color:var(--teal)">—</div>
+          <div class="kpi-s">unidades en comandas</div>
+        </div>
+        <div class="kpi" style="cursor:pointer" onclick="location.href='comandas.html'">
+          <div class="kpi-l">Comandas hoy</div>
+          <div class="kpi-v" id="kt-cmd-count" style="color:var(--teal)">—</div>
+          <div class="kpi-s">operarios registrados</div>
+        </div>
       </div>
       <div class="split">
         <div class="pane-l">
@@ -455,6 +466,7 @@ async function refreshKPIs() {
     if (fugasHoy) {
       const perdidas = fugasHoy.filter(f => f.tipo === 'perdida').reduce((s, f) => s + (f.cantidad || 0), 0);
       document.getElementById('kt-fugas').textContent = perdidas.toLocaleString();
+  cargarKPIComandas();
     }
   } catch(e) {}
   
@@ -875,6 +887,21 @@ function tick() {
   if (el) {
     el.textContent = new Date().toLocaleString('es-GT', { hour: '2-digit', minute: '2-digit' });
   }
+}
+
+// ══ KPIs COMANDAS ═══════════════════════════════════════════
+async function cargarKPIComandas() {
+  try {
+    const hoy = new Date().toISOString().split('T')[0];
+    const { data } = await db.from('comandas').select('total_unidades, operario_id').eq('fecha', hoy);
+    if (!data) return;
+    const totalUnd = data.reduce((s,c) => s + (c.total_unidades||0), 0);
+    const opCount = new Set(data.map(c => c.operario_id)).size;
+    const elUnd = document.getElementById('kt-cmd-und');
+    const elCount = document.getElementById('kt-cmd-count');
+    if (elUnd) elUnd.textContent = totalUnd.toLocaleString();
+    if (elCount) elCount.textContent = opCount;
+  } catch(e) { console.warn('KPI comandas:', e); }
 }
 
 // ══ INICIO ══════════════════════════════════════════════════
