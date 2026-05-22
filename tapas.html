@@ -881,5 +881,230 @@ function tick() {
 // ══ INICIO ══════════════════════════════════════════════════
 init();
 </script>
+
+<!-- ═══════════════════════════════════════════════════════
+     PANEL DE PRODUCTIVIDAD COLAPSABLE
+════════════════════════════════════════════════════════ -->
+<div id="prodPanel" style="
+  position:fixed; bottom:0; left:0; right:0;
+  background:#0C0C0B; border-top:2px solid #1A6B5B;
+  z-index:9999; transition:height .3s cubic-bezier(.4,0,.2,1);
+  height:44px; overflow:hidden;
+  box-shadow:0 -4px 20px rgba(0,0,0,.3);">
+
+  <!-- Handle / Toggle -->
+  <div id="prodToggle" onclick="toggleProd()" style="
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 20px; height:44px; cursor:pointer; user-select:none;">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-size:13px;font-weight:700;color:#7ECEC0">📊 Productividad · Tapas</span>
+      <div style="display:flex;gap:6px" id="prodPeriodBtns" onclick="event.stopPropagation()">
+        <button class="prod-period-btn active" data-period="hoy" onclick="setPeriod('hoy')">Hoy</button>
+        <button class="prod-period-btn" data-period="semana" onclick="setPeriod('semana')">Semana</button>
+        <button class="prod-period-btn" data-period="mes" onclick="setPeriod('mes')">Mes</button>
+      </div>
+      <span id="prodFechaLabel" style="font-size:10px;color:rgba(255,255,255,.3);font-family:'DM Mono',monospace"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <span style="font-size:11px;color:rgba(255,255,255,.4)" id="prodResumen">Cargando...</span>
+      <span id="prodArrow" style="color:#7ECEC0;font-size:16px;transition:transform .3s">▲</span>
+    </div>
+  </div>
+
+  <!-- Contenido expandido -->
+  <div id="prodContent" style="padding:16px 20px 20px;overflow-y:auto;max-height:320px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+
+      <!-- KPIs totales -->
+      <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:12px">Resumen del período</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div style="font-family:'DM Mono',monospace;font-size:26px;font-weight:700;color:#7ECEC0" id="prodTotalUnd">—</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35)">Unidades PT totales</div>
+          </div>
+          <div style="display:flex;gap:16px">
+            <div>
+              <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#fff" id="prodTotalCmds">—</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.35)">Comandas</div>
+            </div>
+            <div>
+              <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#fff" id="prodPromedio">—</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.35)">Prom/operario</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ranking de operarios -->
+      <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:10px">Ranking · Unidades PT</div>
+        <div id="prodRanking" style="display:flex;flex-direction:column;gap:6px;overflow-y:auto;max-height:200px">
+          <div style="font-size:11px;color:rgba(255,255,255,.3)">Cargando...</div>
+        </div>
+      </div>
+
+      <!-- Procesos más usados -->
+      <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:14px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:10px">Procesos del período</div>
+        <div id="prodProcesos" style="display:flex;flex-direction:column;gap:6px;overflow-y:auto;max-height:200px">
+          <div style="font-size:11px;color:rgba(255,255,255,.3)">Cargando...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<style>
+.prod-period-btn {
+  background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.15);
+  color:rgba(255,255,255,.6); padding:3px 10px; border-radius:20px;
+  font-size:10px; font-weight:700; cursor:pointer;
+  font-family:'DM Sans',sans-serif; transition:all .15s;
+}
+.prod-period-btn.active {
+  background:#1A6B5B; border-color:#1A6B5B; color:#fff;
+}
+.prod-period-btn:hover { background:rgba(255,255,255,.18); }
+.prod-period-btn.active:hover { background:#0D4035; }
+</style>
+
+<script>
+// ── PANEL DE PRODUCTIVIDAD ────────────────────────────────
+let prodAbierto = false;
+let prodPeriodo = 'hoy';
+
+function toggleProd() {
+  prodAbierto = !prodAbierto;
+  const panel = document.getElementById('prodPanel');
+  const arrow = document.getElementById('prodArrow');
+  if (prodAbierto) {
+    panel.style.height = '380px';
+    arrow.style.transform = 'rotate(180deg)';
+    cargarProductividad();
+  } else {
+    panel.style.height = '44px';
+    arrow.style.transform = 'rotate(0deg)';
+  }
+}
+
+function setPeriod(p) {
+  prodPeriodo = p;
+  document.querySelectorAll('.prod-period-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.period === p);
+  });
+  if (prodAbierto) cargarProductividad();
+}
+
+function getFechasRango(periodo) {
+  const hoy = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+
+  if (periodo === 'hoy') {
+    const f = fmt(hoy);
+    return { desde: f, hasta: f, label: 'Hoy · ' + hoy.toLocaleDateString('es-GT',{day:'2-digit',month:'short'}) };
+  }
+  if (periodo === 'semana') {
+    const lunes = new Date(hoy);
+    lunes.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7));
+    return { desde: fmt(lunes), hasta: fmt(hoy), label: 'Semana · ' + fmt(lunes) + ' – ' + fmt(hoy) };
+  }
+  if (periodo === 'mes') {
+    const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    return { desde: fmt(inicio), hasta: fmt(hoy), label: hoy.toLocaleDateString('es-GT',{month:'long',year:'numeric'}) };
+  }
+}
+
+async function cargarProductividad() {
+  const { desde, hasta, label } = getFechasRango(prodPeriodo);
+  const labelEl = document.getElementById('prodFechaLabel');
+  if (labelEl) labelEl.textContent = label;
+
+  try {
+    const { data: cmds, error } = await db
+      .from('comandas')
+      .select('operario_id, operario_nombre, total_unidades, comanda_tareas(proceso, unidades_completadas, estado)')
+      .gte('fecha', desde)
+      .lte('fecha', hasta);
+
+    if (error) throw error;
+
+    const comandasData = cmds || [];
+
+    // ── KPIs globales
+    const totalUnd = comandasData.reduce((s,c) => s + (c.total_unidades||0), 0);
+    const totalCmds = comandasData.length;
+    const opSet = new Set(comandasData.map(c => c.operario_id));
+    const prom = opSet.size > 0 ? Math.round(totalUnd / opSet.size) : 0;
+
+    document.getElementById('prodTotalUnd').textContent = totalUnd.toLocaleString();
+    document.getElementById('prodTotalCmds').textContent = totalCmds;
+    document.getElementById('prodPromedio').textContent = prom.toLocaleString();
+    document.getElementById('prodResumen').textContent =
+      `${totalUnd.toLocaleString()} und PT · ${totalCmds} comandas · ${opSet.size} operarios`;
+
+    // ── Ranking por operario
+    const porOp = {};
+    comandasData.forEach(c => {
+      if (!porOp[c.operario_id]) porOp[c.operario_id] = { nombre: c.operario_nombre||c.operario_id, und: 0, cmds: 0 };
+      porOp[c.operario_id].und += (c.total_unidades||0);
+      porOp[c.operario_id].cmds++;
+    });
+    const ranking = Object.values(porOp).sort((a,b) => b.und - a.und);
+    const maxUnd = ranking[0]?.und || 1;
+
+    document.getElementById('prodRanking').innerHTML = ranking.length
+      ? ranking.map((op, i) => {
+          const pct = Math.round((op.und / maxUnd) * 100);
+          const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+          return `<div style="margin-bottom:4px">
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+              <span style="color:#fff;font-weight:600">${medal} ${op.nombre.split(' ')[0]}</span>
+              <span style="font-family:'DM Mono',monospace;color:#7ECEC0;font-size:11px">${op.und.toLocaleString()} und</span>
+            </div>
+            <div style="background:rgba(255,255,255,.1);border-radius:4px;height:4px">
+              <div style="background:#1A6B5B;height:4px;border-radius:4px;width:${pct}%;transition:width .4s"></div>
+            </div>
+          </div>`;
+        }).join('')
+      : '<div style="font-size:11px;color:rgba(255,255,255,.3)">Sin datos en este período.</div>';
+
+    // ── Procesos más usados
+    const porProc = {};
+    comandasData.forEach(c => {
+      (c.comanda_tareas||[]).forEach(t => {
+        const p = t.proceso || 'Otro';
+        if (!porProc[p]) porProc[p] = { und: 0, tareas: 0 };
+        porProc[p].und += (t.unidades_completadas||0);
+        porProc[p].tareas++;
+      });
+    });
+    const procList = Object.entries(porProc).sort((a,b) => b[1].und - a[1].und);
+    const maxProcUnd = procList[0]?.[1]?.und || 1;
+
+    document.getElementById('prodProcesos').innerHTML = procList.length
+      ? procList.map(([proc, data]) => {
+          const pct = Math.round((data.und / maxProcUnd) * 100);
+          return `<div style="margin-bottom:4px">
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+              <span style="color:#fff;font-weight:600">${proc}</span>
+              <span style="font-family:'DM Mono',monospace;color:rgba(255,255,255,.6);font-size:10px">${data.und.toLocaleString()} und · ${data.tareas} tareas</span>
+            </div>
+            <div style="background:rgba(255,255,255,.1);border-radius:4px;height:4px">
+              <div style="background:#B07D2A;height:4px;border-radius:4px;width:${pct}%;transition:width .4s"></div>
+            </div>
+          </div>`;
+        }).join('')
+      : '<div style="font-size:11px;color:rgba(255,255,255,.3)">Sin tareas en este período.</div>';
+
+  } catch(e) {
+    console.error('Error productividad:', e);
+    document.getElementById('prodResumen').textContent = 'Error al cargar';
+  }
+}
+</script>
+
 </body>
 </html>
