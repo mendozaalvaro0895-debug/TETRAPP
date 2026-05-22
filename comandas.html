@@ -605,7 +605,7 @@ function addTareaRow(datos = {}) {
   const tbody = document.getElementById('tareasBody');
   tbody.insertAdjacentHTML('beforeend', `
     <tr class="tarea-row" id="row_${n}">
-      <td><select onchange="cambiarEstadoRow(${n})" id="row_${n}_proc">${procsOpts}</select></td>
+      <td><select onchange="cambiarEstadoRow(${n}); actualizarCapHint(${n})" id="row_${n}_proc">${procsOpts}</select></td>
       <td>
         <div class="ac-wrap">
           <input type="text" id="row_${n}_tapa" value="${datos.tapa_desc||''}"
@@ -615,9 +615,12 @@ function addTareaRow(datos = {}) {
           <div class="ac-drop" id="row_${n}_drop"></div>
         </div>
       </td>
-      <td><input type="number" id="row_${n}_cant" value="${datos.cantidad||''}" min="0" placeholder="0" oninput="recalcTotal()"></td>
       <td>
-        <select class="metodo-sel" id="row_${n}_met" onchange="actualizarMetodo(${n})">
+        <input type="number" id="row_${n}_cant" value="${datos.cantidad||''}" min="0" placeholder="0" oninput="recalcTotal()">
+        <div id="row_${n}_cap_hint" style="font-size:9px;color:#6B6B6A;margin-top:2px;text-align:right"></div>
+      </td>
+      <td>
+        <select class="metodo-sel" id="row_${n}_met" onchange="actualizarMetodo(${n}); autoCapacidad(${n})">
           <option value="manual" ${(datos.metodo||'manual')==='manual'?'selected':''}>✋ Manual</option>
           <option value="maquina_liner" ${datos.metodo==='maquina_liner'?'selected':''}>⚙ Máq. Liner PP33</option>
           <option value="maquina_armado" ${datos.metodo==='maquina_armado'?'selected':''}>⚙ Máq. Armado PP28</option>
@@ -629,7 +632,10 @@ function addTareaRow(datos = {}) {
           ${estadoOpts}
         </select>
       </td>
-      <td><button class="btn-rm-row" onclick="removeRow(${n})">✕</button></td>
+      <td style="text-align:center">
+        <div id="row_${n}_cap" style="font-size:9px;font-weight:700;color:#6B6B6A;margin-bottom:4px;white-space:nowrap">✋ 833/h</div>
+        <button class="btn-rm-row" onclick="removeRow(${n})">✕</button>
+      </td>
     </tr>
   `);
   recalcTotal();
@@ -709,16 +715,48 @@ function actualizarClaseEstado(n) {
   sel.className = 'estado-sel ' + sel.value.toLowerCase().replace(' ','');
 }
 
+// Capacidades por proceso+método (und/hora)
+// Base: promedio diario ÷ 12h turno
 const CAPACIDADES = {
-  manual: 1200,
-  maquina_liner: 2500,
-  maquina_armado: 2500
+  // Máquinas
+  maquina_liner:  2500,
+  maquina_armado: 2500,
+  // Procesos rápidos
+  flameado:   1167,  // ~14,000/día ÷ 12h
+  impresion:  1167,  // ~14,000/día ÷ 12h
+  // Procesos base manual
+  armado:     833,   // ~10,000/día ÷ 12h
+  liner:      833,
+  banda:      833,
+  encajado:   833,
+  manual:     833,   // fallback genérico
+  otro:       833,
 };
+
+// Obtener capacidad según proceso y método
+function getCapacidad(proceso, metodo) {
+  if (metodo === 'maquina_liner')  return CAPACIDADES.maquina_liner;
+  if (metodo === 'maquina_armado') return CAPACIDADES.maquina_armado;
+  const p = (proceso || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // quitar tildes
+    .replace(/[^a-z]/g, '');
+  return CAPACIDADES[p] || CAPACIDADES.manual;
+}
 
 function actualizarMetodo(n) {
   const sel = document.getElementById(`row_${n}_met`);
   if (!sel) return;
   sel.className = sel.value === 'manual' ? 'metodo-sel' : 'metodo-sel maquina';
+  actualizarCapHint(n);
+}
+
+function actualizarCapHint(n) {
+  const metSel = document.getElementById(`row_${n}_met`);
+  const procSel = document.getElementById(`row_${n}_proc`);
+  const hint = document.getElementById(`row_${n}_cap_hint`);
+  if (!hint || !metSel || !procSel) return;
+  const cap = getCapacidad(procSel.value, metSel.value);
+  hint.textContent = cap.toLocaleString() + ' und/h · ' + (cap * 12).toLocaleString() + '/turno';
 }
 
 function recalcTotal() {
@@ -850,7 +888,8 @@ async function guardar() {
     const tapaPinput = document.getElementById(`row_${n}_tapa`);
     const metodo = document.getElementById(`row_${n}_met`)?.value || 'manual';
     const cantidad = parseInt(document.getElementById(`row_${n}_cant`)?.value || 0);
-    const cap = CAPACIDADES[metodo] || 1200;
+    const proceso = document.getElementById(`row_${n}_proc`)?.value || '';
+    const cap = getCapacidad(proceso, metodo);
     tareas.push({
       proceso: document.getElementById(`row_${n}_proc`)?.value || '',
       tapa_desc: tapaPinput?.value || '',
