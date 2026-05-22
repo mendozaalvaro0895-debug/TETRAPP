@@ -275,7 +275,10 @@ function renderKPIs(cmds) {
   let heManual = 0, heMaquina = 0;
   tareasTerminadas.forEach(t => {
     const met = t.metodo || 'manual';
-    const cap = t.capacidad_hora || CAP[met] || 1200;
+    const proc = t.proceso || '';
+    const cap = t.capacidad_hora && t.capacidad_hora > 0
+      ? t.capacidad_hora
+      : getCapDash(proc, met);
     const und = t.unidades_completadas || t.cantidad || 0;
     const he = und > 0 ? und / cap : 0;
     if (MAQUINAS.includes(met)) heMaquina += he;
@@ -311,8 +314,21 @@ function renderKPIs(cmds) {
 }
 
 // ══ CAPACIDADES ═════════════════════════════════════════
-const CAP = { manual:1200, maquina_liner:2500, maquina_armado:2500 };
+const CAP = {
+  manual: 833,
+  manual_rapido: 1167,
+  maquina_liner: 2500,
+  maquina_armado: 2500
+};
 const MAQUINAS = ['maquina_liner','maquina_armado'];
+const PROCESOS_RAPIDOS = ['Flameado', 'Impresión'];
+
+function getCapDash(proceso, metodo) {
+  if (metodo === 'maquina_liner') return CAP.maquina_liner;
+  if (metodo === 'maquina_armado') return CAP.maquina_armado;
+  if (PROCESOS_RAPIDOS.includes(proceso)) return CAP.manual_rapido;
+  return CAP.manual;
+}
 
 // ══ RANKING ═════════════════════════════════════════════
 function renderRanking(cmds) {
@@ -323,7 +339,7 @@ function renderRanking(cmds) {
       porOp[c.operario_id] = {
         nombre: c.operario_nombre || c.operario_id,
         und_total: 0, und_manual: 0, und_maquina: 0,
-        he_total: 0, he_manual: 0, he_maquina: 0,
+        he_total: 0, he_manual: 0, he_maquina: 0, he_rapido: 0,
         cmds: 0, tipo: 'manual'
       };
     }
@@ -334,7 +350,10 @@ function renderRanking(cmds) {
     (c.comanda_tareas || []).filter(t => t.estado === 'Terminada').forEach(t => {
       const und = t.unidades_completadas || t.cantidad || 0;
       const met = t.metodo || 'manual';
-      const cap = t.capacidad_hora || CAP[met] || 1200;
+      const proc = t.proceso || '';
+      const cap = t.capacidad_hora && t.capacidad_hora > 0
+        ? t.capacidad_hora
+        : getCapDash(proc, met);
       const he = und > 0 ? und / cap : 0;
       if (MAQUINAS.includes(met)) {
         op.und_maquina += und;
@@ -343,6 +362,7 @@ function renderRanking(cmds) {
       } else {
         op.und_manual += und;
         op.he_manual += he;
+        if (PROCESOS_RAPIDOS.includes(t.proceso||'')) op.he_rapido += he;
       }
       op.he_total += he;
     });
@@ -374,6 +394,7 @@ function renderRanking(cmds) {
       <div class="rank-info">
         <div class="rank-name">${(op.nombre||'').split(' ')[0]} ${(op.nombre||'').split(' ')[1]||''}
           ${esMaq && tipo !== 'manual' ? '<span style="font-size:9px;background:#EBF7F4;color:#0D4035;padding:1px 5px;border-radius:8px;margin-left:4px">⚙ Máq.</span>' : ''}
+          ${!esMaq && op.he_rapido > 0 ? '<span style="font-size:9px;background:#FFF3D6;color:#7A4800;padding:1px 5px;border-radius:8px;margin-left:4px">⚡ Rápido</span>' : ''}
         </div>
         <div class="rank-cmds">${op.cmds} comanda${op.cmds!==1?'s':''} · ${he.toFixed(1)}h efectivas</div>
       </div>
