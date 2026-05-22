@@ -241,7 +241,7 @@ async function cargarDatos() {
   try {
     const { data, error } = await db
       .from('comandas')
-      .select('id, fecha, operario_id, operario_nombre, supervisor_nombre, total_unidades, hora_inicio, hora_cierre, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
+      .select('id, fecha, operario_id, operario_nombre, supervisor_nombre, total_unidades, hora_inicio, hora_cierre, comanda_tareas(proceso, cantidad, unidades_completadas, estado, metodo, capacidad_hora, horas_efectivas)')
       .gte('fecha', desde)
       .lte('fecha', hasta)
       .order('fecha', { ascending: false });
@@ -268,8 +268,19 @@ function renderKPIs(cmds) {
   const prom = opSet.size > 0 ? Math.round(totalUnd / opSet.size) : 0;
 
   // Calcular unidades por proceso Terminada
-  const tareasTerminadas = cmds.flatMap(c => (c.comanda_tareas||[]).filter(t => t.estado === 'Terminada'));
-  const totalTareas = cmds.flatMap(c => c.comanda_tareas||[]).length;
+  const todasTareas = cmds.flatMap(c => c.comanda_tareas||[]);
+  const tareasTerminadas = todasTareas.filter(t => t.estado === 'Terminada');
+
+  // Calcular horas efectivas totales
+  let heManual = 0, heMaquina = 0;
+  tareasTerminadas.forEach(t => {
+    const met = t.metodo || 'manual';
+    const cap = t.capacidad_hora || CAP[met] || 1200;
+    const und = t.unidades_completadas || t.cantidad || 0;
+    const he = und > 0 ? und / cap : 0;
+    if (MAQUINAS.includes(met)) heMaquina += he;
+    else heManual += he;
+  });
 
   document.getElementById('kpiStrip').innerHTML = `
     <div class="kpi-card highlight">
@@ -285,61 +296,130 @@ function renderKPIs(cmds) {
       <div class="kpi-sub">${opSet.size} operarios activos</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-icon">👤</div>
-      <div class="kpi-val">${prom.toLocaleString()}</div>
-      <div class="kpi-lbl">Promedio/operario</div>
-      <div class="kpi-sub">unidades PT</div>
+      <div class="kpi-icon">✋</div>
+      <div class="kpi-val">${heManual.toFixed(1)}h</div>
+      <div class="kpi-lbl">Horas ef. manual</div>
+      <div class="kpi-sub">trabajo a mano</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-icon">🔧</div>
-      <div class="kpi-val">${totalTareas}</div>
-      <div class="kpi-lbl">Tareas registradas</div>
-      <div class="kpi-sub">${tareasTerminadas.length} terminadas</div>
+      <div class="kpi-icon">⚙</div>
+      <div class="kpi-val">${heMaquina.toFixed(1)}h</div>
+      <div class="kpi-lbl">Horas ef. máquina</div>
+      <div class="kpi-sub">Liner PP33 + Armado PP28</div>
     </div>
   `;
 }
 
+// ══ CAPACIDADES ═════════════════════════════════════════
+const CAP = { manual:1200, maquina_liner:2500, maquina_armado:2500 };
+const MAQUINAS = ['maquina_liner','maquina_armado'];
+
 // ══ RANKING ═════════════════════════════════════════════
 function renderRanking(cmds) {
+  // Construir datos por operario con separación manual/máquina
   const porOp = {};
   cmds.forEach(c => {
     if (!porOp[c.operario_id]) {
-      porOp[c.operario_id] = { nombre: c.operario_nombre || c.operario_id, und: 0, cmds: 0 };
+      porOp[c.operario_id] = {
+        nombre: c.operario_nombre || c.operario_id,
+        und_total: 0, und_manual: 0, und_maquina: 0,
+        he_total: 0, he_manual: 0, he_maquina: 0,
+        cmds: 0, tipo: 'manual'
+      };
     }
-    porOp[c.operario_id].und += (c.total_unidades || 0);
-    porOp[c.operario_id].cmds++;
+    const op = porOp[c.operario_id];
+    op.und_total += (c.total_unidades || 0);
+    op.cmds++;
+
+    (c.comanda_tareas || []).filter(t => t.estado === 'Terminada').forEach(t => {
+      const und = t.unidades_completadas || t.cantidad || 0;
+      const met = t.metodo || 'manual';
+      const cap = t.capacidad_hora || CAP[met] || 1200;
+      const he = und > 0 ? und / cap : 0;
+      if (MAQUINAS.includes(met)) {
+        op.und_maquina += und;
+        op.he_maquina += he;
+        op.tipo = 'maquina';
+      } else {
+        op.und_manual += und;
+        op.he_manual += he;
+      }
+      op.he_total += he;
+    });
   });
 
-  const ranking = Object.entries(porOp)
-    .map(([id, d]) => ({ id, ...d }))
-    .sort((a, b) => b.und - a.und);
-
-  if (!ranking.length) {
+  const ops = Object.entries(porOp).map(([id, d]) => ({ id, ...d }));
+  if (!ops.length) {
     document.getElementById('rankingContent').innerHTML = '<div class="empty">Sin datos en este período.</div>';
     return;
   }
 
-  const maxUnd = ranking[0].und || 1;
+  const manual = ops.filter(o => o.tipo === 'manual' && o.he_manual > 0).sort((a,b) => b.he_manual - a.he_manual);
+  const maquina = ops.filter(o => o.und_maquina > 0).sort((a,b) => b.und_maquina - a.und_maquina);
+  const equiparado = [...ops].filter(o => o.he_total > 0).sort((a,b) => b.he_total - a.he_total);
+
   const medals = ['🥇','🥈','🥉'];
 
-  document.getElementById('rankingContent').innerHTML = ranking.map((op, i) => {
-    const pct = Math.round((op.und / maxUnd) * 100);
+  function rowHE(op, i, maxHE, tipo) {
+    const pct = Math.round((op.he_total / maxHE) * 100);
     const color = OP_COLORS[op.id] || '#6B6B6A';
-    const ini = op.nombre?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() || '??';
-    return `
-    <div class="ranking-row">
-      <div class="rank-medal">${medals[i] || ''}</div>
+    const ini = (op.nombre||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const esMaq = op.und_maquina > 0;
+    const he = tipo === 'manual' ? op.he_manual : tipo === 'maquina' ? op.he_maquina : op.he_total;
+    const maxVal = tipo === 'manual' ? (manual[0]?.he_manual||1) : tipo === 'maquina' ? (maquina[0]?.he_maquina||1) : maxHE;
+    const pctBar = Math.round((he/maxVal)*100);
+    return `<div class="ranking-row">
+      <div class="rank-medal">${medals[i]||''}</div>
       <div class="rank-avatar" style="background:${color}">${ini}</div>
       <div class="rank-info">
-        <div class="rank-name">${op.nombre?.split(' ')[0] || '—'} ${op.nombre?.split(' ')[1] || ''}</div>
-        <div class="rank-cmds">${op.cmds} comanda${op.cmds !== 1 ? 's' : ''}</div>
+        <div class="rank-name">${(op.nombre||'').split(' ')[0]} ${(op.nombre||'').split(' ')[1]||''}
+          ${esMaq && tipo !== 'manual' ? '<span style="font-size:9px;background:#EBF7F4;color:#0D4035;padding:1px 5px;border-radius:8px;margin-left:4px">⚙ Máq.</span>' : ''}
+        </div>
+        <div class="rank-cmds">${op.cmds} comanda${op.cmds!==1?'s':''} · ${he.toFixed(1)}h efectivas</div>
       </div>
-      <div class="rank-bar-wrap">
-        <div class="rank-bar" style="width:${pct}%"></div>
-      </div>
-      <div class="rank-und">${op.und.toLocaleString()} und</div>
+      <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pctBar}%"></div></div>
+      <div class="rank-und" style="font-size:11px">${he.toFixed(1)}h</div>
     </div>`;
-  }).join('');
+  }
+
+  function rowUnd(op, i) {
+    const color = OP_COLORS[op.id] || '#6B6B6A';
+    const ini = (op.nombre||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const maxV = maquina[0]?.und_maquina || 1;
+    const pct = Math.round((op.und_maquina/maxV)*100);
+    return `<div class="ranking-row">
+      <div class="rank-medal">${medals[i]||''}</div>
+      <div class="rank-avatar" style="background:${color}">${ini}</div>
+      <div class="rank-info">
+        <div class="rank-name">${(op.nombre||'').split(' ')[0]}</div>
+        <div class="rank-cmds">${op.cmds} comandas · ⚙ Máquina</div>
+      </div>
+      <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%;background:var(--gold)"></div></div>
+      <div class="rank-und">${op.und_maquina.toLocaleString()} und</div>
+    </div>`;
+  }
+
+  const maxHE = equiparado[0]?.he_total || 1;
+
+  document.getElementById('rankingContent').innerHTML = `
+    <!-- RANKING EQUIPARADO -->
+    <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--teal);text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--teal-l)">
+      ⚖ Ranking equiparado · Horas efectivas
+    </div>
+    ${equiparado.map((op,i) => rowHE(op,i,maxHE,'equiparado')).join('')}
+
+    ${manual.length ? `
+    <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--gray);text-transform:uppercase;margin:14px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)">
+      ✋ Manual · Horas efectivas
+    </div>
+    ${manual.map((op,i) => rowHE(op,i,maxHE,'manual')).join('')}` : ''}
+
+    ${maquina.length ? `
+    <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:var(--gold);text-transform:uppercase;margin:14px 0 10px;padding-bottom:6px;border-bottom:1px solid #FEF3C7">
+      ⚙ Máquinas · Unidades brutas
+    </div>
+    ${maquina.map((op,i) => rowUnd(op,i)).join('')}` : ''}
+  `;
 }
 
 // ══ PROCESOS ════════════════════════════════════════════
