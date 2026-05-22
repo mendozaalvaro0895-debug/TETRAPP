@@ -108,6 +108,8 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
 
 /* Estado chips en tabla */
 .estado-sel { border:1.5px solid #C8C6C0; border-radius:8px; padding:6px 8px; font-size:12px; font-family:'DM Sans',sans-serif; background:#fff; cursor:pointer; }
+.metodo-sel { border:1.5px solid #C8C6C0; border-radius:8px; padding:6px 8px; font-size:11px; font-family:'DM Sans',sans-serif; background:#fff; cursor:pointer; width:100%; }
+.metodo-sel.maquina { border-color:#1A6B5B; background:#EBF7F4; color:#0D4035; font-weight:700; }
 .estado-sel.asignada { border-color:#B87200; background:#FFF3D6; color:#7A4800; }
 .estado-sel.proceso  { border-color:#1A3B8B; background:#DBEAFE; color:#1A3B8B; }
 .estado-sel.terminada{ border-color:#166534; background:#DCFCE7; color:#166534; }
@@ -248,6 +250,7 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
               <th style="width:130px">Proceso</th>
               <th>Tapa asignada</th>
               <th style="width:90px">Cantidad</th>
+              <th style="width:130px">Método</th>
               <th style="width:110px">Estado</th>
               <th></th>
             </tr>
@@ -524,6 +527,13 @@ function addTareaRow(datos = {}) {
       </td>
       <td><input type="number" id="row_${n}_cant" value="${datos.cantidad||''}" min="0" placeholder="0" oninput="recalcTotal()"></td>
       <td>
+        <select class="metodo-sel" id="row_${n}_met" onchange="actualizarMetodo(${n})">
+          <option value="manual" ${(datos.metodo||'manual')==='manual'?'selected':''}>✋ Manual</option>
+          <option value="maquina_liner" ${datos.metodo==='maquina_liner'?'selected':''}>⚙ Máq. Liner PP33</option>
+          <option value="maquina_armado" ${datos.metodo==='maquina_armado'?'selected':''}>⚙ Máq. Armado PP28</option>
+        </select>
+      </td>
+      <td>
         <select class="estado-sel ${estadoClass}" id="row_${n}_est"
           onchange="actualizarClaseEstado(${n}); recalcTotal()">
           ${estadoOpts}
@@ -607,6 +617,18 @@ function actualizarClaseEstado(n) {
   const sel = document.getElementById(`row_${n}_est`);
   if (!sel) return;
   sel.className = 'estado-sel ' + sel.value.toLowerCase().replace(' ','');
+}
+
+const CAPACIDADES = {
+  manual: 1200,
+  maquina_liner: 2500,
+  maquina_armado: 2500
+};
+
+function actualizarMetodo(n) {
+  const sel = document.getElementById(`row_${n}_met`);
+  if (!sel) return;
+  sel.className = sel.value === 'manual' ? 'metodo-sel' : 'metodo-sel maquina';
 }
 
 function recalcTotal() {
@@ -736,11 +758,17 @@ async function guardar() {
   document.querySelectorAll('.tarea-row').forEach(row => {
     const n = row.id.replace('row_','');
     const tapaPinput = document.getElementById(`row_${n}_tapa`);
+    const metodo = document.getElementById(`row_${n}_met`)?.value || 'manual';
+    const cantidad = parseInt(document.getElementById(`row_${n}_cant`)?.value || 0);
+    const cap = CAPACIDADES[metodo] || 1200;
     tareas.push({
       proceso: document.getElementById(`row_${n}_proc`)?.value || '',
       tapa_desc: tapaPinput?.value || '',
       tapa_sku: tapaPinput?.dataset?.sku || '',
-      cantidad: parseInt(document.getElementById(`row_${n}_cant`)?.value || 0),
+      cantidad: cantidad,
+      metodo: metodo,
+      capacidad_hora: cap,
+      horas_efectivas: cantidad > 0 ? Math.round((cantidad / cap) * 100) / 100 : 0,
       estado: document.getElementById(`row_${n}_est`)?.value || 'Asignada',
     });
   });
@@ -782,6 +810,9 @@ async function guardar() {
         tapa_desc: t.tapa_desc,
         tapa_sku: t.tapa_sku,
         cantidad: t.cantidad,
+        metodo: t.metodo || 'manual',
+        capacidad_hora: t.capacidad_hora || 1200,
+        horas_efectivas: t.horas_efectivas || 0,
         unidades_completadas: t.estado === 'Terminada' ? t.cantidad : 0,
         estado: t.estado,
       }));
@@ -833,7 +864,10 @@ function verComanda(id) {
               <td><strong>${t.proceso||'—'}</strong></td>
               <td style="font-size:12px">${t.tapa_desc||'—'}</td>
               <td style="font-family:'DM Mono',monospace;font-weight:700">${(t.cantidad||0).toLocaleString()}</td>
-              <td><span class="status-badge sb-${(t.estado||'asignada').toLowerCase().replace(' ','')}">${t.estado||'Asignada'}</span></td>
+              <td>
+                ${t.metodo && t.metodo !== 'manual' ? `<span style="font-size:10px;background:#EBF7F4;color:#0D4035;padding:2px 6px;border-radius:10px;font-weight:700;display:block;margin-bottom:3px">⚙ Máquina</span>` : ''}
+                <span class="status-badge sb-${(t.estado||'asignada').toLowerCase().replace(' ','')}">${t.estado||'Asignada'}</span>
+              </td>
             </tr>`).join('')}
         </tbody>
       </table>`
@@ -944,6 +978,7 @@ function editarComanda(id) {
       tapa_desc: t.tapa_desc || '',
       tapa_sku: t.tapa_sku || '',
       cantidad: t.cantidad || 0,
+      metodo: t.metodo || 'manual',
       estado: t.estado || 'Asignada',
     });
   });
