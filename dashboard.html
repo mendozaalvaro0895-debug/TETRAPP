@@ -110,31 +110,25 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .b-proc{background:#DBEAFE;color:#1A3B8B}
 .b-asig{background:#FFF3D6;color:#7A4800}
 
-/* DETALLE POR PERSONA */
-.op-card { background:var(--card); border:1.5px solid var(--border); border-radius:12px; overflow:hidden; transition:box-shadow .2s; cursor:pointer; }
-.op-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.08); }
-.op-card.expanded { border-color:var(--teal); box-shadow:0 4px 20px rgba(26,107,91,.12); }
-.op-card-head { padding:14px 16px; display:flex; align-items:center; gap:12px; }
-.op-card-av { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; flex-shrink:0; }
-.op-card-info { flex:1; min-width:0; }
-.op-card-name { font-weight:700; font-size:14px; margin-bottom:2px; }
-.op-card-meta { font-size:11px; color:var(--gray); }
-.op-card-total { text-align:right; }
-.op-card-und { font-family:var(--mono); font-size:18px; font-weight:700; color:var(--teal); }
-.op-card-he { font-size:10px; color:var(--gray); margin-top:2px; }
-.op-card-body { display:none; border-top:1px solid var(--border); }
-.op-card.expanded .op-card-body { display:block; }
-.op-task-row { display:grid; grid-template-columns:auto 1fr auto auto; gap:8px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--border); font-size:12px; }
-.op-task-row:last-child { border-bottom:none; }
-.op-task-date { font-family:var(--mono); font-size:10px; color:var(--gray-l); white-space:nowrap; }
-.op-task-proc { font-weight:600; }
-.op-task-und { font-family:var(--mono); font-weight:700; color:var(--ink); text-align:right; white-space:nowrap; }
-.op-task-he { font-size:10px; color:var(--gray); text-align:right; white-space:nowrap; }
-.op-proc-badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; white-space:nowrap; }
-.op-footer { padding:10px 16px; background:var(--bg); display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
-.op-foot-kpi { text-align:center; }
-.op-foot-val { font-family:var(--mono); font-size:15px; font-weight:700; color:var(--teal); }
-.op-foot-lbl { font-size:9px; color:var(--gray); text-transform:uppercase; letter-spacing:.5px; margin-top:1px; }
+/* DETALLE POR PROCESO */
+.proc-block { border:1.5px solid var(--border); border-radius:14px; overflow:hidden; cursor:pointer; transition:all .2s; background:var(--card); }
+.proc-block:hover { box-shadow:0 4px 16px rgba(0,0,0,.08); transform:translateY(-2px); }
+.proc-block.expanded { box-shadow:0 6px 24px rgba(0,0,0,.1); transform:translateY(-2px); }
+.proc-block-head { display:flex; user-select:none; }
+.proc-block-name { font-family:var(--display); font-weight:700; }
+.proc-block-arrow { font-size:12px; transition:transform .25s; }
+.proc-block.expanded .proc-block-arrow { transform:rotate(180deg); }
+.proc-block-body { display:none; border-top:1px solid var(--border); background:var(--bg); }
+.proc-block.expanded .proc-block-body { display:block; }
+.op-rank-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); }
+.op-rank-row:last-child { border-bottom:none; }
+.op-rank-medal { font-size:16px; width:22px; text-align:center; flex-shrink:0; }
+.op-rank-av { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; flex-shrink:0; }
+.op-rank-name { flex:1; font-size:13px; font-weight:600; }
+.op-rank-bar-wrap { width:120px; background:rgba(0,0,0,.07); border-radius:4px; height:5px; }
+.op-rank-bar { height:5px; border-radius:4px; transition:width .5s ease; }
+.op-rank-und { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink); white-space:nowrap; min-width:90px; text-align:right; }
+.op-rank-he { font-size:10px; color:var(--gray); white-space:nowrap; min-width:55px; text-align:right; }
 </style>
 </head>
 <body>
@@ -176,7 +170,22 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="kpi-card loading"><div class="spinner"></div></div>
   </div>
 
-  <!-- RANKING + PROCESOS -->
+  <!-- ══ DETALLE POR PROCESO ══════════════════════════════ -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="sec-header">
+      <div class="sec-title">🔧 Detalle por proceso</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="date" id="diaEspecifico" style="border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;font-family:var(--font);background:var(--bg)" onchange="filtrarPorDia(this.value)">
+        <button onclick="limpiarDia()" style="border:1.5px solid var(--border);background:var(--bg);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">Ver período</button>
+        <div class="sec-tag" id="detalleLabel">período activo</div>
+      </div>
+    </div>
+    <div id="detalleProcGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:4px">
+      <div class="loading"><div class="spinner"></div><div>Cargando...</div></div>
+    </div>
+  </div>
+
+  <!-- ══ RANKING + PROCESOS ════════════════════════════════ -->
   <div class="grid-2">
 
     <!-- Ranking operarios -->
@@ -209,22 +218,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 
 
-  <!-- ══ DETALLE POR PERSONA ══════════════════════════════ -->
-  <div class="card" style="margin-bottom:24px">
-    <div class="sec-header">
-      <div class="sec-title">👤 Detalle por persona</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <input type="date" id="diaEspecifico" style="border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;font-family:var(--font);background:var(--bg)" onchange="filtrarPorDia(this.value)">
-        <button onclick="limpiarDia()" style="border:1.5px solid var(--border);background:var(--bg);border-radius:8px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">Ver período</button>
-        <div class="sec-tag" id="detalleLabel">período activo</div>
-      </div>
-    </div>
 
-    <!-- Grid de tarjetas por operario -->
-    <div id="detalleGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:4px">
-      <div class="loading"><div class="spinner"></div><div>Cargando...</div></div>
-    </div>
-  </div>
 
 </div><!-- /page -->
 
@@ -576,163 +570,147 @@ function renderHistorial(cmds) {
     </div>`;
 }
 
-// ══ DETALLE POR PERSONA ════════════════════════════════════
+// ══ DETALLE POR PROCESO ════════════════════════════════════
 let cmdsCacheDetalle = [];
-let diaFiltro = null;
+
+const PROC_COLORS_D = {
+  'Liner':'#4338CA','Armado':'#1A6B5B','Banda':'#B07D2A',
+  'Impresión':'#9D174D','Encajado':'#166534','Flameado':'#0369A1','Otra tarea':'#6B6B6A'
+};
+const PROC_ORDER = ['Liner','Armado','Impresión','Flameado','Encajado','Banda','Otra tarea'];
 
 async function cargarDetalle(cmds) {
   cmdsCacheDetalle = cmds;
-  diaFiltro = null;
-  renderDetalle(cmds);
+  renderDetalleProc(cmds);
 }
 
 function filtrarPorDia(fecha) {
-  diaFiltro = fecha;
   const label = document.getElementById('detalleLabel');
-  if (label) label.textContent = fecha;
+  if (label) label.textContent = fecha || 'período activo';
   const filtradas = fecha
     ? cmdsCacheDetalle.filter(c => c.fecha === fecha)
     : cmdsCacheDetalle;
-  renderDetalle(filtradas);
+  renderDetalleProc(filtradas);
 }
 
 function limpiarDia() {
-  diaFiltro = null;
   document.getElementById('diaEspecifico').value = '';
   document.getElementById('detalleLabel').textContent = 'período activo';
-  renderDetalle(cmdsCacheDetalle);
+  renderDetalleProc(cmdsCacheDetalle);
 }
 
-function renderDetalle(cmds) {
-  const grid = document.getElementById('detalleGrid');
-  if (!grid) return;
+function renderDetalleProc(cmds) {
+  const cont = document.getElementById('detalleProcGrid');
+  if (!cont) return;
 
-  // Agrupar por operario
-  const porOp = {};
+  // Agrupar por proceso → por operario
+  const porProc = {};
   cmds.forEach(c => {
-    if (!porOp[c.operario_id]) {
-      porOp[c.operario_id] = {
-        id: c.operario_id,
-        nombre: c.operario_nombre || c.operario_id,
-        tareas: [], und: 0, he: 0, cmds: 0
-      };
-    }
-    const op = porOp[c.operario_id];
-    op.cmds++;
-    op.und += (c.total_unidades || 0);
-
     (c.comanda_tareas || []).filter(t => t.estado === 'Terminada').forEach(t => {
+      const proc = t.proceso || 'Otra tarea';
       const und = t.unidades_completadas || t.cantidad || 0;
       const met = t.metodo || 'manual';
-      const proc = t.proceso || '';
       const cap = t.capacidad_hora && t.capacidad_hora > 0
         ? t.capacidad_hora : getCapDash(proc, met);
       const he = und > 0 ? und / cap : 0;
-      op.he += he;
-      op.tareas.push({
-        fecha: c.fecha,
-        proc, und, he,
-        met, cap,
-        tapa: t.tapa_desc || ''
-      });
+
+      if (!porProc[proc]) porProc[proc] = { und:0, tareas:0, ops:{} };
+      porProc[proc].und += und;
+      porProc[proc].tareas++;
+
+      const opId = c.operario_id;
+      if (!porProc[proc].ops[opId]) {
+        porProc[proc].ops[opId] = { nombre: c.operario_nombre||opId, und:0, he:0, n:0 };
+      }
+      porProc[proc].ops[opId].und += und;
+      porProc[proc].ops[opId].he += he;
+      porProc[proc].ops[opId].n++;
     });
   });
 
-  const ops = Object.values(porOp).sort((a,b) => b.und - a.und);
-
-  if (!ops.length) {
-    grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Sin datos para este período.</div>';
+  if (!Object.keys(porProc).length) {
+    cont.innerHTML = '<div class="empty">Sin datos para este período.</div>';
     return;
   }
 
-  const PROC_COLORS = {
-    'Armado':'#1A6B5B','Banda':'#B07D2A','Liner':'#4338CA',
-    'Impresión':'#9D174D','Encajado':'#166534','Flameado':'#0369A1','Otra tarea':'#6B6B6A'
-  };
+  // Ordenar procesos por volumen
+  const ordered = [...PROC_ORDER, ...Object.keys(porProc).filter(p => !PROC_ORDER.includes(p))];
+  const procsConData = ordered.filter(p => porProc[p]);
 
-  grid.innerHTML = ops.map(op => {
-    const color = OP_COLORS[op.id] || '#6B6B6A';
-    const ini = (op.nombre||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const medals = ['🥇','🥈','🥉'];
 
-    // Agrupar tareas por proceso para el resumen
-    const porProc = {};
-    op.tareas.forEach(t => {
-      if (!porProc[t.proc]) porProc[t.proc] = { und:0, he:0, n:0 };
-      porProc[t.proc].und += t.und;
-      porProc[t.proc].he += t.he;
-      porProc[t.proc].n++;
-    });
+  cont.innerHTML = procsConData.map(proc => {
+    const d = porProc[proc];
+    const color = PROC_COLORS_D[proc] || '#6B6B6A';
+    const esMaq = proc.includes('Máq') || proc.includes('maquina');
+    const esRap = PROCESOS_RAPIDOS.includes(proc);
+    const icon = esMaq ? '⚙' : esRap ? '⚡' : '✋';
 
-    // Ordenar tareas por fecha desc
-    const tareasOrdenadas = [...op.tareas].sort((a,b) => b.fecha?.localeCompare(a.fecha||''));
+    // Ranking de operarios en este proceso
+    const ranking = Object.entries(d.ops)
+      .map(([id, op]) => ({ id, ...op }))
+      .sort((a,b) => b.und - a.und);
+    const maxUnd = ranking[0]?.und || 1;
 
-    const tareasHtml = tareasOrdenadas.map(t => {
-      const c = PROC_COLORS[t.proc] || '#6B6B6A';
-      const esMaq = MAQUINAS.includes(t.met);
-      const esRap = PROCESOS_RAPIDOS.includes(t.proc);
-      const badge = esMaq ? '⚙' : esRap ? '⚡' : '✋';
-      return `<div class="op-task-row">
-        <div class="op-task-date">${t.fecha||'—'}</div>
-        <div>
-          <span class="op-proc-badge" style="background:${c}20;color:${c}">${badge} ${t.proc||'—'}</span>
-          ${t.tapa ? `<div style="font-size:10px;color:var(--gray-l);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px">${t.tapa}</div>` : ''}
+    const rankingHtml = ranking.map((op, i) => {
+      const opColor = OP_COLORS[op.id] || '#6B6B6A';
+      const ini = (op.nombre||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      const pct = Math.round((op.und / maxUnd) * 100);
+      return `<div class="op-rank-row">
+        <div class="op-rank-medal">${medals[i] || ''}</div>
+        <div class="op-rank-av" style="background:${opColor}">${ini}</div>
+        <div class="op-rank-name">${(op.nombre||'').split(' ').slice(0,2).join(' ')}</div>
+        <div class="op-rank-bar-wrap">
+          <div class="op-rank-bar" style="width:${pct}%;background:${color}"></div>
         </div>
-        <div class="op-task-und">${t.und.toLocaleString()}</div>
-        <div class="op-task-he">${t.he.toFixed(1)}h</div>
+        <div class="op-rank-und">${op.und.toLocaleString()} und</div>
+        <div class="op-rank-he">${op.he.toFixed(1)}h ef.</div>
       </div>`;
     }).join('');
 
-    // Footer con totales por proceso
-    const procResumen = Object.entries(porProc)
-      .sort((a,b)=>b[1].und-a[1].und)
-      .map(([proc,d]) => {
-        const c = PROC_COLORS[proc]||'#6B6B6A';
-        return `<span style="font-size:10px;background:${c}15;color:${c};padding:2px 8px;border-radius:10px;font-weight:700">${proc}: ${d.und.toLocaleString()}</span>`;
-      }).join(' ');
-
-    return `<div class="op-card" id="opcard_${op.id}" onclick="toggleOpCard('${op.id}')">
-      <div class="op-card-head">
-        <div class="op-card-av" style="background:${color}">${ini}</div>
-        <div class="op-card-info">
-          <div class="op-card-name">${op.nombre}</div>
-          <div class="op-card-meta">${op.cmds} comanda${op.cmds!==1?'s':''} · ${op.tareas.length} tareas</div>
+    return `<div class="proc-block" id="pb_${proc}" onclick="toggleProcBlock('${proc}')">
+      <!-- CABEZA: resumen compacto en tarjeta -->
+      <div class="proc-block-head" style="flex-direction:column;align-items:flex-start;gap:8px;padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:22px">${icon}</span>
+            <span class="proc-block-name" style="color:${color};font-size:15px">${proc.toUpperCase()}</span>
+          </div>
+          <div class="proc-block-arrow" style="color:${color}">▼</div>
         </div>
-        <div class="op-card-total">
-          <div class="op-card-und">${op.und.toLocaleString()}</div>
-          <div class="op-card-he">${op.he.toFixed(1)}h ef.</div>
+        <div style="width:100%">
+          <div style="font-family:var(--mono);font-size:26px;font-weight:700;color:${color};line-height:1">${d.und.toLocaleString()}</div>
+          <div style="font-size:10px;color:var(--gray);margin-top:3px">${d.tareas} tareas · ${ranking.length} operario${ranking.length!==1?'s':''}</div>
         </div>
-        <div style="color:var(--gray-l);margin-left:8px;font-size:16px" id="arrow_${op.id}">▼</div>
+        <!-- Mini ranking preview (top 3) -->
+        <div style="width:100%;display:flex;flex-direction:column;gap:4px">
+          ${ranking.slice(0,3).map((op,i)=>{
+            const opColor = OP_COLORS[op.id]||'#6B6B6A';
+            const ini = (op.nombre||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+            const pct = Math.round((op.und/maxUnd)*100);
+            return `<div style="display:flex;align-items:center;gap:6px;font-size:11px">
+              <span>${medals[i]||''}</span>
+              <div style="width:20px;height:20px;border-radius:50%;background:${opColor};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0">${ini}</div>
+              <span style="flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(op.nombre||'').split(' ')[0]}</span>
+              <span style="font-family:var(--mono);font-weight:700;color:${color};font-size:11px">${op.und.toLocaleString()}</span>
+            </div>`;
+          }).join('')}
+          ${ranking.length > 3 ? `<div style="font-size:10px;color:var(--gray-l);text-align:center;margin-top:2px">+ ${ranking.length-3} más · clic para ver todos</div>` : ''}
+        </div>
       </div>
-      <div class="op-card-body" id="body_${op.id}">
-        <div style="padding:10px 16px;display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--border)">
-          ${procResumen}
-        </div>
-        ${tareasHtml}
-        <div class="op-footer">
-          <div class="op-foot-kpi">
-            <div class="op-foot-val">${op.und.toLocaleString()}</div>
-            <div class="op-foot-lbl">Unidades PT</div>
-          </div>
-          <div class="op-foot-kpi">
-            <div class="op-foot-val">${op.he.toFixed(1)}h</div>
-            <div class="op-foot-lbl">Horas ef.</div>
-          </div>
-          <div class="op-foot-kpi">
-            <div class="op-foot-val">${op.tareas.length}</div>
-            <div class="op-foot-lbl">Tareas</div>
-          </div>
-        </div>
+      <!-- BODY: ranking completo al expandir -->
+      <div class="proc-block-body" id="pbb_${proc}" style="padding:14px 16px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:1px;color:${color};text-transform:uppercase;margin-bottom:10px;border-bottom:2px solid ${color}20;padding-bottom:6px">Ranking completo · ${proc}</div>
+        ${rankingHtml}
       </div>
     </div>`;
   }).join('');
 }
 
-function toggleOpCard(id) {
-  const card = document.getElementById(`opcard_${id}`);
-  const arrow = document.getElementById(`arrow_${id}`);
-  if (!card) return;
-  const expanded = card.classList.toggle('expanded');
-  if (arrow) arrow.textContent = expanded ? '▲' : '▼';
+function toggleProcBlock(proc) {
+  const block = document.getElementById(`pb_${proc}`);
+  if (!block) return;
+  block.classList.toggle('expanded');
 }
 
 </script>
