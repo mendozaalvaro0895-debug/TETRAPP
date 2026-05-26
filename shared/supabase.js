@@ -89,3 +89,74 @@ async function cargarInventarioDB() {
   // Respaldo: inventario estático de shared/inventario.js
   return (typeof INVENTARIO !== 'undefined' && Array.isArray(INVENTARIO)) ? INVENTARIO : [];
 }
+// ════════════════════════════════════════════════════════
+// MÓDULO DE TRAZABILIDAD Y BODEGA (FASE 1 - Lotes)
+// ════════════════════════════════════════════════════════
+
+/**
+ * Registra un movimiento de inventario asociado a una solicitud
+ * @param {string} solicitudId - ID de la solicitud (ej. 'T0001')
+ * @param {string} sku - Código del material
+ * @param {number} cantidad - Cantidad movida
+ * @param {string} tipo - 'salida_bodega', 'entrada_pt', 'perdida', 'devolucion'
+ * @param {string} observaciones - Notas opcionales
+ */
+async function registrarMovimientoMaterial(solicitudId, sku, cantidad, tipo, observaciones = '') {
+  try {
+    const { error } = await db.from('movimientos_materiales').insert([{
+      solicitud_id: solicitudId,
+      sku: sku,
+      cantidad: Number(cantidad),
+      tipo: tipo,
+      observaciones: observaciones,
+      usuario: 'Admin' 
+    }]);
+
+    if (error) throw error;
+    console.log(`✅ Movimiento registrado: ${tipo} de ${cantidad} unds (SKU: ${sku})`);
+    return true;
+  } catch (err) {
+    console.error('❌ Error al registrar movimiento:', err);
+    return false;
+  }
+}
+
+/**
+ * Obtiene todos los movimientos de una solicitud y calcula el balance (Fugas)
+ * @param {string} solicitudId - ID de la solicitud a consultar
+ */
+async function obtenerBalanceLote(solicitudId) {
+  try {
+    const { data, error } = await db
+      .from('movimientos_materiales')
+      .select('*')
+      .eq('solicitud_id', solicitudId);
+
+    if (error) throw error;
+
+    let totalSalidas = 0;
+    let totalDevoluciones = 0;
+    let totalProductoTerminado = 0;
+
+    data.forEach(mov => {
+      if (mov.tipo === 'salida_bodega') totalSalidas += Number(mov.cantidad);
+      if (mov.tipo === 'devolucion') totalDevoluciones += Number(mov.cantidad);
+      if (mov.tipo === 'entrada_pt') totalProductoTerminado += Number(mov.cantidad);
+    });
+
+    const fugasCalculadas = totalSalidas - (totalDevoluciones + totalProductoTerminado);
+
+    return {
+      movimientos: data,
+      resumen: {
+        salidas: totalSalidas,
+        devoluciones: totalDevoluciones,
+        productoTerminado: totalProductoTerminado,
+        fugas: fugasCalculadas
+      }
+    };
+  } catch (err) {
+    console.error('❌ Error al obtener balance del lote:', err);
+    return null;
+  }
+}
