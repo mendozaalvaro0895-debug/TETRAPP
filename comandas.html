@@ -6,15 +6,6 @@
 <title>TETRAPLASTIC — Comandas · Tapas</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="shared/styles.css">
-<script src="shared/data.js"></script>
-<script src="shared/inventario.js"></script>
-<script>
-// Conexión Supabase directa - sin depender de supabase.js
-const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
-const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
-const db = supabase.createClient(SUPA_URL, SUPA_KEY);
-</script>
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-height:100vh; }
@@ -152,6 +143,13 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
 .ac-sku { font-family:'DM Mono',monospace; font-weight:700; color:#1A6B5B; margin-bottom:2px; }
 .ac-desc { color:#3A3A38; }
 .ac-exist { color:#6B6B6A; font-size:10px; margin-top:2px; }
+
+/* Toast */
+.toast-msg { animation: fadeInUp 0.3s ease; }
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
 </style>
 </head>
 <body>
@@ -199,7 +197,7 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
         </div>
       </div>
 
-      <input type="text" class="buscar" id="busqueda" placeholder="Buscar..." oninput="renderLista()">
+      <input type="text" class="buscar" id="busqueda" placeholder="Buscar..." oninput="onSearchInput()">
     </div>
 
     <div class="kpi-strip">
@@ -343,31 +341,108 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
 
 <script>
 // ════════════════════════════════════════════════════════
+// CONEXIÓN SUPABASE
+// ════════════════════════════════════════════════════════
+const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
+const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ════════════════════════════════════════════════════════
 // ESTADO GLOBAL
 // ════════════════════════════════════════════════════════
 let comandas = [];
 let comandaActual = null;
 let editandoId = null;
-let acTargetRow = null;
+let rowCount = 0;
+let devCount = 0;
+let timeoutBusqueda = null;
+let modoActual = 'fecha';
+let operariosCache = [];
 
-// Helpers inline (no depende de helpers.js)
-function opObj(id) {
-  const all = [...(typeof personal !== 'undefined' ? (personal.tapas||[]).concat(personal.serig||[]) : [])];
-  return all.find(p => p.id === id) || null;
-}
-
-const PROCS_LIST = [
-  'Armado','Banda','Liner','Impresión','Encajado','Flameado','Otra tarea'
-];
-
+// Listas de opciones
+const PROCS_LIST = ['Armado','Banda','Liner','Impresión','Encajado','Flameado','Otra tarea'];
 const ESTADOS_TAREA = ['Asignada','En proceso','Terminada'];
 
-// ════════════════════════════════════════════════════════
-// INIT
-// ════════════════════════════════════════════════════════
-// ── Modo de filtrado ──────────────────────────────────────
-let modoActual = 'fecha';
+// Capacidades por proceso+método (und/hora)
+const CAPACIDADES = {
+  maquina_liner: 2500,
+  maquina_armado: 2500,
+  flameado: 1167,
+  impresion: 1167,
+  armado: 833,
+  liner: 833,
+  banda: 833,
+  encajado: 833,
+  manual: 833,
+  otro: 833,
+};
 
+// ════════════════════════════════════════════════════════
+// FUNCIONES DE CARGA DE DATOS
+// ════════════════════════════════════════════════════════
+
+// Cargar operarios desde Supabase
+async function cargarOperarios() {
+  try {
+    const { data, error } = await db
+      .from('personal')
+      .select('codigo, nombre, iniciales, color_hex')
+      .eq('area', 'tapas')
+      .eq('activo', true)
+      .order('nombre');
+    
+    if (error) throw error;
+    operariosCache = data || [];
+    
+    // Poblar select de operarios en formulario
+    const sel = document.getElementById('fOperario');
+    if (sel) {
+      sel.innerHTML = '<option value="">— Selecciona operario —</option>';
+      operariosCache.forEach(op => {
+        sel.insertAdjacentHTML('beforeend', `<option value="${op.codigo}">${op.nombre}</option>`);
+      });
+    }
+    
+    return operariosCache;
+  } catch(e) {
+    console.error('Error cargando operarios:', e);
+    return [];
+  }
+}
+
+// Obtener operario por ID
+function getOperarioById(id) {
+  return operariosCache.find(op => op.codigo === id) || { nombre: id, iniciales: '?', color_hex: '#6B6B6A' };
+}
+
+// Obtener inventario para autocompletado
+async function getInventario() {
+  try {
+    const { data, error } = await db
+      .from('inventario')
+      .select('sku, descripcion, existencia')
+      .eq('activo', true)
+      .limit(100);
+    
+    if (error) throw error;
+    return data || [];
+  } catch(e) {
+    console.error('Error cargando inventario:', e);
+    return [];
+  }
+}
+
+// Función helper de capacidad
+function getCapacidad(proceso, metodo) {
+  if (metodo === 'maquina_liner') return CAPACIDADES.maquina_liner;
+  if (metodo === 'maquina_armado') return CAPACIDADES.maquina_armado;
+  const p = (proceso || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, '');
+  return CAPACIDADES[p] || CAPACIDADES.manual;
+}
+
+// ════════════════════════════════════════════════════════
+// MODOS DE FILTRADO
+// ════════════════════════════════════════════════════════
 function setModo(modo) {
   modoActual = modo;
   document.getElementById('modoFecha').classList.toggle('active', modo === 'fecha');
@@ -382,16 +457,15 @@ function setModo(modo) {
   }
 }
 
-function poblarSelectorOperarios() {
+async function poblarSelectorOperarios() {
   const sel = document.getElementById('filtroOperarioSel');
-  if (sel.options.length > 1) return; // ya poblado
-  const ops = (typeof personal !== 'undefined' && personal?.tapas) ? personal.tapas : [
-    {id:'T0',nombre:'Heidy'},{id:'T1',nombre:'Yenifer Lopez'},{id:'T2',nombre:'Mishel Arriaza'},
-    {id:'T3',nombre:'Ana Chun'},{id:'T4',nombre:'Violeta Bartolome'},{id:'T5',nombre:'Elsa Tul'},
-    {id:'T6',nombre:'Noemi Alvarez'},{id:'T7',nombre:'Carlos Ascuc'},{id:'T8',nombre:'Selvin Rivera'},
-    {id:'T9',nombre:'Daniel Ochoa'}
-  ];
-  ops.forEach(p => sel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.nombre}</option>`));
+  if (!sel) return;
+  if (sel.options.length > 1) return;
+  
+  const ops = operariosCache.length ? operariosCache : await cargarOperarios();
+  ops.forEach(op => {
+    sel.insertAdjacentHTML('beforeend', `<option value="${op.codigo}">${op.nombre}</option>`);
+  });
 }
 
 async function cargarPorOperario() {
@@ -399,7 +473,6 @@ async function cargarPorOperario() {
   let desde = document.getElementById('filtroDesde')?.value;
   let hasta = document.getElementById('filtroHasta')?.value;
 
-  // Default: último mes si no hay fechas
   if (!desde) {
     const d = new Date(); d.setDate(1);
     desde = d.toISOString().split('T')[0];
@@ -423,94 +496,20 @@ async function cargarPorOperario() {
   } catch(e) {
     console.error('Error cargando por operario:', e);
     comandas = [];
+    showToast('Error al cargar comandas', '#B83232');
   }
   renderLista();
   actualizarKPIs();
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('🚀 Init comandas.html');
-  
-  try {
-    const hoy = new Date().toISOString().split('T')[0];
-    const filtro = document.getElementById('filtroFecha');
-    if (filtro) filtro.value = hoy;
-    const fFecha = document.getElementById('fFecha');
-    if (fFecha) fFecha.value = hoy;
-    const fHI = document.getElementById('fHoraInicio');
-    if (fHI) fHI.value = '06:00';
-    const fHC = document.getElementById('fHoraCierre');
-    if (fHC) fHC.value = new Date().toTimeString().slice(0,5);
-
-    poblarOperarios();
-    console.log('✓ Operarios poblados');
-
-    // Conectar el botón de nueva comanda
-    const btnNueva = document.getElementById('btnNuevaComanda');
-    if (btnNueva) {
-      btnNueva.addEventListener('click', function(e) {
-        console.log('🖱 Click en botón Nueva');
-        e.preventDefault();
-        try {
-          nuevaComanda();
-        } catch(err) {
-          console.error('Error en nuevaComanda:', err);
-          alert('Error al abrir nueva comanda: ' + err.message);
-        }
-      });
-      console.log('✓ Botón Nueva conectado');
-    } else {
-      console.error('✗ Botón Nueva no encontrado');
-    }
-
-    await cargarComandas();
-    console.log('✓ Comandas cargadas');
-  } catch(e) {
-    console.error('Error en init:', e);
-  }
-
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.ac-wrap') && !e.target.closest('#acDrop')) {
-      cerrarAC();
-    }
-  });
-});
-
-function poblarOperarios() {
-  const sel = document.getElementById('fOperario');
-  if (!sel) return;
-  
-  const ops = (typeof personal !== 'undefined' && personal?.tapas) ? personal.tapas : [];
-  
-  if (!ops.length) {
-    // Fallback manual con los operarios conocidos
-    const fallback = [
-      {id:'T0', nombre:'Heidy'},
-      {id:'T1', nombre:'Yenifer Lopez'},
-      {id:'T2', nombre:'Mishel Arriaza'},
-      {id:'T3', nombre:'Ana Chun'},
-      {id:'T4', nombre:'Violeta Bartolome'},
-      {id:'T5', nombre:'Elsa Tul'},
-      {id:'T6', nombre:'Noemi Alvarez'},
-      {id:'T7', nombre:'Carlos Ascuc'},
-      {id:'T8', nombre:'Selvin Rivera'},
-      {id:'T9', nombre:'Daniel Ochoa'},
-    ];
-    sel.innerHTML = '<option value="">— Selecciona operario —</option>';
-    fallback.forEach(p => {
-      sel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.nombre}</option>`);
-    });
-  } else {
-    sel.innerHTML = '<option value="">— Selecciona operario —</option>';
-    ops.forEach(p => {
-      sel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.nombre}</option>`);
-    });
-  }
-}
-
 // ════════════════════════════════════════════════════════
 // CARGAR Y RENDERIZAR LISTA
 // ════════════════════════════════════════════════════════
+function onSearchInput() {
+  if (timeoutBusqueda) clearTimeout(timeoutBusqueda);
+  timeoutBusqueda = setTimeout(() => renderLista(), 300);
+}
+
 async function cargarComandas() {
   const fecha = document.getElementById('filtroFecha')?.value;
   if (!fecha) return;
@@ -523,20 +522,17 @@ async function cargarComandas() {
       .eq('fecha', fecha)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error Supabase:', error);
-      comandas = [];
-    } else {
-      comandas = data || [];
-      console.log('✓ Comandas cargadas:', comandas.length);
-    }
+    if (error) throw error;
+    comandas = data || [];
+    console.log('✓ Comandas cargadas:', comandas.length);
   } catch(e) {
     console.error('Exception:', e);
     comandas = [];
+    showToast('Error al cargar comandas', '#B83232');
   }
 
-  try { renderLista(); } catch(e) { console.error('renderLista error:', e); }
-  try { actualizarKPIs(); } catch(e) { console.error('actualizarKPIs error:', e); }
+  renderLista();
+  actualizarKPIs();
 }
 
 function renderLista() {
@@ -544,7 +540,7 @@ function renderLista() {
   const lista = document.getElementById('cmdList');
 
   let items = comandas;
-  if (busq) items = items.filter(c => (c.operario_nombre||'').toLowerCase().includes(busq));
+  if (busq) items = items.filter(c => (c.operario_nombre || '').toLowerCase().includes(busq));
 
   if (!items.length) {
     const msg = modoActual === 'operario' ? 'Sin comandas para este operario en el período.' : 'No hay comandas para esta fecha.';
@@ -553,607 +549,20 @@ function renderLista() {
   }
 
   lista.innerHTML = items.map(c => {
-    const op = opObj(c.operario_id) || {};
-    const color = op.color || '#6B6B6A';
-    const ini = op.ini || '?';
+    const op = getOperarioById(c.operario_id);
+    const color = op.color_hex || '#6B6B6A';
+    const ini = op.iniciales || '?';
     const tareas = c.comanda_tareas || [];
-    const totalUnd = tareas.filter(t => t.estado === 'Terminada').reduce((s,t) => s+(t.cantidad||0), 0);
+    const totalUnd = tareas.filter(t => t.estado === 'Terminada').reduce((s, t) => s + (t.cantidad || 0), 0);
     const isActive = comandaActual?.id === c.id;
 
-    return `<div class="cmd-item ${isActive?'active':''}" onclick="verComanda('${c.id}')">
+    return `<div class="cmd-item ${isActive ? 'active' : ''}" onclick="verComanda('${c.id}')">
       <div class="cmd-av" style="background:${color}">${ini}</div>
       <div style="flex:1;min-width:0">
-        <div class="cmd-name">${c.operario_nombre||'—'}</div>
+        <div class="cmd-name">${c.operario_nombre || '—'}</div>
         <div class="cmd-meta">
-          ${modoActual === 'operario' ? `📅 ${c.fecha||'—'} · ` : ''}${c.correlativo||'—'} · ${tareas.length} tareas · Sup: ${c.supervisor_nombre||'—'}
+          ${modoActual === 'operario' ? `📅 ${c.fecha || '—'} · ` : ''}${c.correlativo || '—'} · ${tareas.length} tareas · Sup: ${c.supervisor_nombre || '—'}
         </div>
       </div>
       <div class="cmd-und">${totalUnd.toLocaleString()}<small>und PT</small></div>
-    </div>`;
-  }).join('');
-}
-
-function actualizarKPIs() {
-  const total = comandas.length;
-  const totalUnd = comandas.reduce((s,c) => {
-    const ts = c.comanda_tareas || [];
-    return s + ts.filter(t=>t.estado==='Terminada').reduce((a,t)=>a+(t.cantidad||0),0);
-  }, 0);
-  const prom = total > 0 ? Math.round(totalUnd/total) : 0;
-  document.getElementById('kCmd').textContent = total;
-  document.getElementById('kUnd').textContent = totalUnd.toLocaleString();
-  document.getElementById('kProm').textContent = prom.toLocaleString();
-}
-
-// ════════════════════════════════════════════════════════
-// FILAS DE TAREAS
-// ════════════════════════════════════════════════════════
-let rowCount = 0;
-
-function addTareaRow(datos = {}) {
-  rowCount++;
-  const n = rowCount;
-  const procsOpts = PROCS_LIST.map(p =>
-    `<option value="${p}" ${datos.proceso===p?'selected':''}>${p}</option>`
-  ).join('');
-
-  const estadoClass = (datos.estado||'Asignada').toLowerCase().replace(' ','');
-  const estadoOpts = ESTADOS_TAREA.map(e =>
-    `<option value="${e}" ${(datos.estado||'Asignada')===e?'selected':''}>${e}</option>`
-  ).join('');
-
-  const tbody = document.getElementById('tareasBody');
-  tbody.insertAdjacentHTML('beforeend', `
-    <tr class="tarea-row" id="row_${n}">
-      <td><select onchange="cambiarEstadoRow(${n}); actualizarCapHint(${n})" id="row_${n}_proc">${procsOpts}</select></td>
-      <td>
-        <div class="ac-wrap">
-          <input type="text" id="row_${n}_tapa" value="${datos.tapa_desc||''}"
-            placeholder="SKU o descripción..." autocomplete="off"
-            oninput="buscarSKURow(${n}, this.value)"
-            data-sku="${datos.tapa_sku||''}">
-          <div class="ac-drop" id="row_${n}_drop"></div>
-        </div>
-      </td>
-      <td>
-        <input type="number" id="row_${n}_cant" value="${datos.cantidad||''}" min="0" placeholder="0" oninput="recalcTotal()">
-        <div id="row_${n}_cap_hint" style="font-size:9px;color:#6B6B6A;margin-top:2px;text-align:right"></div>
-      </td>
-      <td>
-        <select class="metodo-sel" id="row_${n}_met" onchange="actualizarMetodo(${n}); autoCapacidad(${n})">
-          <option value="manual" ${(datos.metodo||'manual')==='manual'?'selected':''}>✋ Manual</option>
-          <option value="maquina_liner" ${datos.metodo==='maquina_liner'?'selected':''}>⚙ Máq. Liner PP33</option>
-          <option value="maquina_armado" ${datos.metodo==='maquina_armado'?'selected':''}>⚙ Máq. Armado PP28</option>
-        </select>
-      </td>
-      <td>
-        <select class="estado-sel ${estadoClass}" id="row_${n}_est"
-          onchange="actualizarClaseEstado(${n}); recalcTotal()">
-          ${estadoOpts}
-        </select>
-      </td>
-      <td style="text-align:center">
-        <div id="row_${n}_cap" style="font-size:9px;font-weight:700;color:#6B6B6A;margin-bottom:4px;white-space:nowrap">✋ 833/h</div>
-        <button class="btn-rm-row" onclick="removeRow(${n})">✕</button>
-      </td>
-    </tr>
-  `);
-  recalcTotal();
-}
-
-function removeRow(n) {
-  document.getElementById(`row_${n}`)?.remove();
-  recalcTotal();
-}
-
-// ── Líneas de material devuelto ───────────────────────────
-let devCount = 0;
-
-function addDevolucionRow(datos = {}) {
-  devCount++;
-  const n = devCount;
-  const tbody = document.getElementById('devolucionBody');
-  if (!tbody) return;
-  tbody.insertAdjacentHTML('beforeend', `
-    <tr class="tarea-row" id="dev_${n}">
-      <td>
-        <div class="ac-wrap">
-          <input type="text" id="dev_${n}_mat" value="${datos.desc||''}"
-            placeholder="SKU o descripción del material..." autocomplete="off"
-            oninput="buscarSKUDev(${n}, this.value)"
-            data-sku="${datos.sku||''}">
-          <div class="ac-drop" id="dev_${n}_drop"></div>
-        </div>
-      </td>
-      <td><input type="number" id="dev_${n}_cant" value="${datos.cantidad||''}" min="0" placeholder="0"></td>
-      <td><button class="btn-rm-row" onclick="removeDevRow(${n})">✕</button></td>
-    </tr>
-  `);
-}
-
-function removeDevRow(n) {
-  document.getElementById(`dev_${n}`)?.remove();
-}
-
-function buscarSKUDev(n, query) {
-  const drop = document.getElementById(`dev_${n}_drop`);
-  if (!drop) return;
-  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
-
-  const inv = (typeof getInventario === 'function' && getInventario())
-    || (typeof INVENTARIO !== 'undefined' ? INVENTARIO : []);
-  const q = query.toLowerCase();
-  const results = inv
-    .filter(i => ((i.sku||'')+' '+(i.descripcion||i.desc||'')).toLowerCase().includes(q))
-    .slice(0, 7);
-
-  if (!results.length) { drop.style.display = 'none'; return; }
-
-  drop.innerHTML = results.map(i => {
-    const sku = i.sku || '';
-    const desc = i.descripcion || i.desc || '';
-    const exist = i.existencia !== undefined ? i.existencia : '';
-    return `<div class="ac-item" onclick="seleccionarDev(${n},'${sku}','${desc.replace(/'/g,"\\'")}')">
-      <div class="ac-sku">${sku}</div>
-      <div class="ac-desc">${desc}</div>
-      ${exist !== '' ? `<div class="ac-exist">Existencia: ${exist.toLocaleString()} und</div>` : ''}
-    </div>`;
-  }).join('');
-  drop.style.display = 'block';
-}
-
-function seleccionarDev(n, sku, desc) {
-  const inp = document.getElementById(`dev_${n}_mat`);
-  if (inp) { inp.value = sku + ' — ' + desc; inp.dataset.sku = sku; }
-  const drop = document.getElementById(`dev_${n}_drop`);
-  if (drop) drop.style.display = 'none';
-}
-
-function actualizarClaseEstado(n) {
-  const sel = document.getElementById(`row_${n}_est`);
-  if (!sel) return;
-  sel.className = 'estado-sel ' + sel.value.toLowerCase().replace(' ','');
-}
-
-// Capacidades por proceso+método (und/hora)
-// Base: promedio diario ÷ 12h turno
-const CAPACIDADES = {
-  // Máquinas
-  maquina_liner:  2500,
-  maquina_armado: 2500,
-  // Procesos rápidos
-  flameado:   1167,  // ~14,000/día ÷ 12h
-  impresion:  1167,  // ~14,000/día ÷ 12h
-  // Procesos base manual
-  armado:     833,   // ~10,000/día ÷ 12h
-  liner:      833,
-  banda:      833,
-  encajado:   833,
-  manual:     833,   // fallback genérico
-  otro:       833,
-};
-
-// Obtener capacidad según proceso y método
-function getCapacidad(proceso, metodo) {
-  if (metodo === 'maquina_liner')  return CAPACIDADES.maquina_liner;
-  if (metodo === 'maquina_armado') return CAPACIDADES.maquina_armado;
-  const p = (proceso || '').toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '') // quitar tildes
-    .replace(/[^a-z]/g, '');
-  return CAPACIDADES[p] || CAPACIDADES.manual;
-}
-
-function actualizarMetodo(n) {
-  const sel = document.getElementById(`row_${n}_met`);
-  if (!sel) return;
-  sel.className = sel.value === 'manual' ? 'metodo-sel' : 'metodo-sel maquina';
-  actualizarCapHint(n);
-}
-
-function actualizarCapHint(n) {
-  const metSel = document.getElementById(`row_${n}_met`);
-  const procSel = document.getElementById(`row_${n}_proc`);
-  const hint = document.getElementById(`row_${n}_cap_hint`);
-  if (!hint || !metSel || !procSel) return;
-  const cap = getCapacidad(procSel.value, metSel.value);
-  hint.textContent = cap.toLocaleString() + ' und/h · ' + (cap * 12).toLocaleString() + '/turno';
-}
-
-function recalcTotal() {
-  let total = 0;
-  document.querySelectorAll('[id$="_est"]').forEach(sel => {
-    if (sel.value === 'Terminada') {
-      const n = sel.id.replace('row_','').replace('_est','');
-      const cant = parseInt(document.getElementById(`row_${n}_cant`)?.value || 0);
-      total += cant;
-    }
-  });
-  document.getElementById('totalVal').textContent = total.toLocaleString() + ' und';
-}
-
-// ════════════════════════════════════════════════════════
-// AUTOCOMPLETE DE TAPA
-// ════════════════════════════════════════════════════════
-function buscarSKURow(n, query) {
-  const drop = document.getElementById(`row_${n}_drop`);
-  if (!drop) return;
-  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
-
-  const inv = (typeof getInventario === 'function' && getInventario())
-    || (typeof INVENTARIO !== 'undefined' ? INVENTARIO : []);
-  const q = query.toLowerCase();
-  const results = inv
-    .filter(i => ((i.sku||'')+' '+(i.descripcion||i.desc||'')).toLowerCase().includes(q))
-    .slice(0, 7);
-
-  if (!results.length) { drop.style.display = 'none'; return; }
-
-  drop.innerHTML = results.map(i => {
-    const sku = i.sku || '';
-    const desc = i.descripcion || i.desc || '';
-    const exist = i.existencia !== undefined ? i.existencia : '';
-    return `<div class="ac-item" onclick="seleccionarTapa(${n},'${sku}','${desc.replace(/'/g,"\\'")}')">
-      <div class="ac-sku">${sku}</div>
-      <div class="ac-desc">${desc}</div>
-      ${exist !== '' ? `<div class="ac-exist">Existencia: ${exist.toLocaleString()} und</div>` : ''}
-    </div>`;
-  }).join('');
-  drop.style.display = 'block';
-}
-
-function seleccionarTapa(n, sku, desc) {
-  const inp = document.getElementById(`row_${n}_tapa`);
-  if (inp) {
-    inp.value = sku + ' — ' + desc;
-    inp.dataset.sku = sku;
-  }
-  const drop = document.getElementById(`row_${n}_drop`);
-  if (drop) drop.style.display = 'none';
-}
-
-function cerrarAC() {
-  document.querySelectorAll('.ac-drop').forEach(d => d.style.display = 'none');
-}
-
-// ════════════════════════════════════════════════════════
-// NUEVA COMANDA
-// ════════════════════════════════════════════════════════
-function nuevaComanda() {
-  editandoId = null;
-  comandaActual = null;
-  rowCount = 0;
-
-  // Repoblar operarios por si acaso no se cargaron al inicio
-  poblarOperarios();
-
-  const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
-  
-  setVal('formTitle', ''); // es textContent, no value
-  const ft = document.getElementById('formTitle');
-  if (ft) ft.textContent = 'Nueva comanda';
-
-  setVal('fCorr', 'CMD-' + String(comandas.length + 1).padStart(3,'0'));
-  setVal('fFecha', document.getElementById('filtroFecha')?.value || '');
-  setVal('fHoraInicio', '06:00');
-  setVal('fHoraCierre', new Date().toTimeString().slice(0,5));
-  setVal('fOperario', '');
-  setVal('fObs', '');
-
-  const tbody = document.getElementById('tareasBody');
-  if (tbody) tbody.innerHTML = '';
-
-  const devBody = document.getElementById('devolucionBody');
-  if (devBody) devBody.innerHTML = '';
-  devCount = 0;
-  addDevolucionRow();
-
-  const totalEl = document.getElementById('totalVal');
-  if (totalEl) totalEl.textContent = '0 und';
-
-  addTareaRow();
-  showPanel('form');
-  console.log('✓ nueva comanda abierta');
-}
-
-// ════════════════════════════════════════════════════════
-// GUARDAR
-// ════════════════════════════════════════════════════════
-function recopilarDevolucion() {
-  const lineas = [];
-  document.querySelectorAll('[id^="dev_"][id$="_mat"]').forEach(inp => {
-    const n = inp.id.replace('dev_','').replace('_mat','');
-    const cant = document.getElementById(`dev_${n}_cant`)?.value;
-    if (inp.value || cant) {
-      lineas.push({ sku: inp.dataset.sku || '', desc: inp.value, cantidad: parseInt(cant || 0) });
-    }
-  });
-  return JSON.stringify(lineas);
-}
-
-async function guardar() {
-  const operarioId = document.getElementById('fOperario').value;
-  const fecha = document.getElementById('fFecha').value;
-  if (!operarioId || !fecha) {
-    showToast('Completa operario y fecha', '#B83232');
-    return;
-  }
-
-  const op = opObj(operarioId) || {};
-  const supNombre = 'Heidy';
-
-  // Recopilar filas de tareas
-  const tareas = [];
-  document.querySelectorAll('.tarea-row').forEach(row => {
-    const n = row.id.replace('row_','');
-    const tapaPinput = document.getElementById(`row_${n}_tapa`);
-    const metodo = document.getElementById(`row_${n}_met`)?.value || 'manual';
-    const cantidad = parseInt(document.getElementById(`row_${n}_cant`)?.value || 0);
-    const proceso = document.getElementById(`row_${n}_proc`)?.value || '';
-    const cap = getCapacidad(proceso, metodo);
-    tareas.push({
-      proceso: document.getElementById(`row_${n}_proc`)?.value || '',
-      tapa_desc: tapaPinput?.value || '',
-      tapa_sku: tapaPinput?.dataset?.sku || '',
-      cantidad: cantidad,
-      metodo: metodo,
-      capacidad_hora: cap,
-      horas_efectivas: cantidad > 0 ? Math.round((cantidad / cap) * 100) / 100 : 0,
-      estado: document.getElementById(`row_${n}_est`)?.value || 'Asignada',
-    });
-  });
-
-  const totalPT = tareas.filter(t => t.estado === 'Terminada').reduce((s,t) => s + t.cantidad, 0);
-
-  const cabecera = {
-    correlativo: document.getElementById('fCorr').value,
-    fecha: fecha,
-    operario_id: operarioId,
-    operario_nombre: op.nombre || '',
-    supervisor_id: 'T0',
-    supervisor_nombre: supNombre,
-    hora_inicio: document.getElementById('fHoraInicio').value,
-    hora_cierre: document.getElementById('fHoraCierre').value,
-    total_unidades: totalPT,
-    material_devuelto: recopilarDevolucion(),
-    observaciones: document.getElementById('fObs').value,
-  };
-
-  try {
-    let cmdId;
-    if (editandoId) {
-      await db.from('comandas').update(cabecera).eq('id', editandoId);
-      cmdId = editandoId;
-      await db.from('comanda_tareas').delete().eq('comanda_id', cmdId);
-    } else {
-      const { data, error } = await db.from('comandas').insert(cabecera).select();
-      if (error) throw error;
-      cmdId = data[0].id;
-    }
-
-    if (tareas.length) {
-      const tareasData = tareas.map((t, i) => ({
-        comanda_id: cmdId,
-        orden: i + 1,
-        proceso: t.proceso,
-        material_asignado: JSON.stringify([{ sku: t.tapa_sku, desc: t.tapa_desc, und: t.cantidad }]),
-        tapa_desc: t.tapa_desc,
-        tapa_sku: t.tapa_sku,
-        cantidad: t.cantidad,
-        metodo: t.metodo || 'manual',
-        capacidad_hora: t.capacidad_hora || 1200,
-        horas_efectivas: t.horas_efectivas || 0,
-        unidades_completadas: t.estado === 'Terminada' ? t.cantidad : 0,
-        estado: t.estado,
-      }));
-      const { error: errT } = await db.from('comanda_tareas').insert(tareasData);
-      if (errT) throw errT;
-    }
-
-    showToast('✅ Comanda guardada');
-    await cargarComandas();
-    const cmd = comandas.find(c => c.id === cmdId);
-    if (cmd) verComanda(cmdId);
-    else showPanel('welcome');
-
-  } catch(e) {
-    console.error(e);
-    showToast('Error: ' + e.message, '#B83232');
-  }
-}
-
-// ════════════════════════════════════════════════════════
-// VER DETALLE
-// ════════════════════════════════════════════════════════
-function verComanda(id) {
-  const c = comandas.find(x => x.id === id);
-  if (!c) return;
-  comandaActual = c;
-
-  // highlight activo
-  document.querySelectorAll('.cmd-item').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.cmd-item').forEach(el => {
-    if (el.getAttribute('onclick')?.includes(id)) el.classList.add('active');
-  });
-
-  const op = opObj(c.operario_id) || {};
-  const color = op.color || '#6B6B6A';
-  const tareas = c.comanda_tareas || [];
-  const totalPT = tareas.filter(t => t.estado === 'Terminada').reduce((s,t) => s+(t.cantidad||0), 0);
-
-  const tareasHtml = tareas.length
-    ? `<table class="det-table">
-        <thead><tr>
-          <th>#</th><th>Proceso</th><th>Tapa asignada</th>
-          <th>Cantidad</th><th>Estado</th>
-        </tr></thead>
-        <tbody>
-          ${tareas.map((t, i) => `
-            <tr>
-              <td style="color:#6B6B6A;font-size:11px">${i+1}</td>
-              <td><strong>${t.proceso||'—'}</strong></td>
-              <td style="font-size:12px">${t.tapa_desc||'—'}</td>
-              <td style="font-family:'DM Mono',monospace;font-weight:700">${(t.cantidad||0).toLocaleString()}</td>
-              <td>
-                ${t.metodo && t.metodo !== 'manual' ? `<span style="font-size:10px;background:#EBF7F4;color:#0D4035;padding:2px 6px;border-radius:10px;font-weight:700;display:block;margin-bottom:3px">⚙ Máquina</span>` : ''}
-                <span class="status-badge sb-${(t.estado||'asignada').toLowerCase().replace(' ','')}">${t.estado||'Asignada'}</span>
-              </td>
-            </tr>`).join('')}
-        </tbody>
-      </table>`
-    : '<p style="color:#6B6B6A;font-size:13px">Sin tareas registradas.</p>';
-
-  document.getElementById('detailContent').innerHTML = `
-    <div class="det-head">
-      <div style="display:flex;gap:14px;align-items:center">
-        <div class="det-avatar" style="background:${color}">${op.ini||'?'}</div>
-        <div>
-          <div class="det-name">${c.operario_nombre||'—'}</div>
-          <div class="det-meta">📅 ${c.fecha||''} · ${c.correlativo||'—'} · Supervisor: ${c.supervisor_nombre||'—'}</div>
-          <div class="det-meta">🕐 Inicio: ${c.hora_inicio||'—'} · Cierre: ${c.hora_cierre||'—'}</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-cancel" onclick="editarComanda('${c.id}')">✏️ Editar</button>
-        <button class="btn btn-del" onclick="borrarComanda('${c.id}')">🗑</button>
-      </div>
-    </div>
-
-    <div class="total-bar" style="margin-bottom:14px">
-      <div><div class="total-bar-lbl">Total unidades PT del día (tareas Terminadas)</div></div>
-      <div class="total-bar-val">${totalPT.toLocaleString()} und</div>
-    </div>
-
-    <div class="sec" style="margin-bottom:12px">
-      <div class="sec-label">🔧 Tareas</div>
-      ${tareasHtml}
-    </div>
-
-    ${renderDevolucionDetalle(c.material_devuelto)}
-
-    ${c.observaciones ? `
-    <div class="sec" style="margin-bottom:12px">
-      <div class="sec-label">📝 Observaciones</div>
-      <p style="font-size:13px">${c.observaciones}</p>
-    </div>` : ''}
-
-    <div style="background:#EBF7F4;border:1.5px solid #1A6B5B;border-radius:10px;padding:12px 16px;font-size:12px;color:#0D4035;font-weight:600">
-      ✍️ Firmado por: <strong>${c.supervisor_nombre||'—'}</strong> · Cierre: <strong>${c.hora_cierre||'—'}</strong>
-    </div>
-  `;
-
-  showPanel('detail');
-}
-
-// ════════════════════════════════════════════════════════
-// EDITAR / BORRAR
-// ════════════════════════════════════════════════════════
-function renderDevolucionDetalle(matDevuelto) {
-  if (!matDevuelto) return '';
-  let lineas = [];
-  try { lineas = JSON.parse(matDevuelto); } catch(e) {
-    // formato viejo (texto plano)
-    return `<div class="sec" style="margin-bottom:12px">
-      <div class="sec-label">📦 Material devuelto a bodega</div>
-      <p style="font-size:13px">${matDevuelto}</p>
-    </div>`;
-  }
-  if (!lineas.length) return '';
-  return `<div class="sec" style="margin-bottom:12px">
-    <div class="sec-label">📦 Material devuelto a bodega</div>
-    <table class="det-table">
-      <thead><tr><th>Material</th><th>Cantidad</th></tr></thead>
-      <tbody>
-        ${lineas.map(l => `<tr>
-          <td style="font-size:12px">${l.desc || '—'}</td>
-          <td style="font-family:'DM Mono',monospace;font-weight:700">${(l.cantidad||0).toLocaleString()}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>
-  </div>`;
-}
-
-function editarComanda(id) {
-  const c = comandas.find(x => x.id === id);
-  if (!c) return;
-  editandoId = id;
-  rowCount = 0;
-
-  document.getElementById('formTitle').textContent = 'Editar comanda';
-  document.getElementById('fCorr').value = c.correlativo || '';
-  document.getElementById('fFecha').value = c.fecha || '';
-  document.getElementById('fHoraInicio').value = c.hora_inicio || '06:00';
-  document.getElementById('fHoraCierre').value = c.hora_cierre || '';
-  document.getElementById('fOperario').value = c.operario_id || '';
-  document.getElementById('fObs').value = c.observaciones || '';
-  document.getElementById('tareasBody').innerHTML = '';
-
-  // Cargar líneas de devolución
-  const devBody = document.getElementById('devolucionBody');
-  if (devBody) devBody.innerHTML = '';
-  devCount = 0;
-  let devLineas = [];
-  try { devLineas = JSON.parse(c.material_devuelto || '[]'); } catch(e) {
-    if (c.material_devuelto) devLineas = [{ desc: c.material_devuelto, cantidad: 0, sku: '' }];
-  }
-  if (devLineas.length) {
-    devLineas.forEach(d => addDevolucionRow(d));
-  } else {
-    addDevolucionRow();
-  }
-
-  (c.comanda_tareas || []).forEach(t => {
-    addTareaRow({
-      proceso: t.proceso,
-      tapa_desc: t.tapa_desc || '',
-      tapa_sku: t.tapa_sku || '',
-      cantidad: t.cantidad || 0,
-      metodo: t.metodo || 'manual',
-      estado: t.estado || 'Asignada',
-    });
-  });
-
-  recalcTotal();
-  showPanel('form');
-}
-
-async function borrarComanda(id) {
-  if (!confirm('¿Borrar esta comanda?')) return;
-  await db.from('comanda_tareas').delete().eq('comanda_id', id);
-  await db.from('comandas').delete().eq('id', id);
-  showToast('Comanda eliminada');
-  comandaActual = null;
-  await cargarComandas();
-  showPanel('welcome');
-}
-
-// ════════════════════════════════════════════════════════
-// UTILIDADES UI
-// ════════════════════════════════════════════════════════
-function showPanel(cual) {
-  const welcome = document.getElementById('stWelcome');
-  const form = document.getElementById('stForm');
-  const detail = document.getElementById('stDetail');
-  if (welcome) welcome.style.display = cual === 'welcome' ? 'flex' : 'none';
-  if (form) { form.classList.toggle('vis', cual === 'form'); }
-  if (detail) { detail.classList.toggle('vis', cual === 'detail'); }
-}
-
-function cancelar() {
-  if (comandaActual) verComanda(comandaActual.id);
-  else showPanel('welcome');
-}
-
-function showToast(msg, color = '#1A6B5B') {
-  const existing = document.querySelector('.toast-msg');
-  if (existing) existing.remove();
-  const t = document.createElement('div');
-  t.className = 'toast-msg';
-  t.textContent = msg;
-  t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${color};color:#fff;padding:11px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);white-space:nowrap`;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3500);
-}
-</script>
-
-</body>
-</html>
+   
