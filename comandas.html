@@ -565,4 +565,635 @@ function renderLista() {
         </div>
       </div>
       <div class="cmd-und">${totalUnd.toLocaleString()}<small>und PT</small></div>
-   
+    </div>`;
+  }).join('');
+}
+
+function actualizarKPIs() {
+  const total = comandas.length;
+  const totalUnd = comandas.reduce((s, c) => {
+    const ts = c.comanda_tareas || [];
+    return s + ts.filter(t => t.estado === 'Terminada').reduce((a, t) => a + (t.cantidad || 0), 0);
+  }, 0);
+  const prom = total > 0 ? Math.round(totalUnd / total) : 0;
+  document.getElementById('kCmd').textContent = total;
+  document.getElementById('kUnd').textContent = totalUnd.toLocaleString();
+  document.getElementById('kProm').textContent = prom.toLocaleString();
+}
+
+// ════════════════════════════════════════════════════════
+// FILAS DE TAREAS
+// ════════════════════════════════════════════════════════
+function addTareaRow(datos = {}) {
+  rowCount++;
+  const n = rowCount;
+  const procsOpts = PROCS_LIST.map(p =>
+    `<option value="${p}" ${datos.proceso === p ? 'selected' : ''}>${p}</option>`
+  ).join('');
+
+  const estadoClass = (datos.estado || 'Asignada').toLowerCase().replace(' ', '');
+  const estadoOpts = ESTADOS_TAREA.map(e =>
+    `<option value="${e}" ${(datos.estado || 'Asignada') === e ? 'selected' : ''}>${e}</option>`
+  ).join('');
+
+  const tbody = document.getElementById('tareasBody');
+  tbody.insertAdjacentHTML('beforeend', `
+    <tr class="tarea-row" id="row_${n}">
+      <td>
+        <select onchange="cambiarEstadoRow(${n}); actualizarCapHint(${n})" id="row_${n}_proc">${procsOpts}</select>
+      </td>
+      <td>
+        <div class="ac-wrap">
+          <input type="text" id="row_${n}_tapa" value="${datos.tapa_desc || ''}"
+            placeholder="SKU o descripción..." autocomplete="off"
+            oninput="buscarSKURow(${n}, this.value)"
+            data-sku="${datos.tapa_sku || ''}">
+          <div class="ac-drop" id="row_${n}_drop"></div>
+        </div>
+      </td>
+      <td>
+        <input type="number" id="row_${n}_cant" value="${datos.cantidad || ''}" min="0" placeholder="0" oninput="recalcTotal()">
+        <div id="row_${n}_cap_hint" style="font-size:9px;color:#6B6B6A;margin-top:2px;text-align:right"></div>
+      </td>
+      <td>
+        <select class="metodo-sel" id="row_${n}_met" onchange="actualizarMetodo(${n}); autoCapacidad(${n})">
+          <option value="manual" ${(datos.metodo || 'manual') === 'manual' ? 'selected' : ''}>✋ Manual</option>
+          <option value="maquina_liner" ${datos.metodo === 'maquina_liner' ? 'selected' : ''}>⚙ Máq. Liner PP33</option>
+          <option value="maquina_armado" ${datos.metodo === 'maquina_armado' ? 'selected' : ''}>⚙ Máq. Armado PP28</option>
+        </select>
+      </td>
+      <td>
+        <select class="estado-sel ${estadoClass}" id="row_${n}_est"
+          onchange="actualizarClaseEstado(${n}); recalcTotal()">
+          ${estadoOpts}
+        </select>
+      </td>
+      <td style="text-align:center">
+        <div id="row_${n}_cap" style="font-size:9px;font-weight:700;color:#6B6B6A;margin-bottom:4px;white-space:nowrap">✋ 833/h</div>
+        <button class="btn-rm-row" onclick="removeRow(${n})">✕</button>
+      </td>
+    </tr>
+  `);
+  recalcTotal();
+}
+
+function removeRow(n) {
+  document.getElementById(`row_${n}`)?.remove();
+  recalcTotal();
+}
+
+function cambiarEstadoRow(n) {
+  actualizarCapHint(n);
+}
+
+function autoCapacidad(n) {
+  const procSel = document.getElementById(`row_${n}_proc`);
+  const metSel = document.getElementById(`row_${n}_met`);
+  if (procSel && metSel) {
+    const cap = getCapacidad(procSel.value, metSel.value);
+    const capDiv = document.getElementById(`row_${n}_cap`);
+    if (capDiv) {
+      capDiv.innerHTML = `${metSel.value === 'manual' ? '✋' : '⚙'} ${cap.toLocaleString()}/h`;
+    }
+    actualizarCapHint(n);
+  }
+}
+
+function actualizarMetodo(n) {
+  const sel = document.getElementById(`row_${n}_met`);
+  if (!sel) return;
+  sel.className = sel.value === 'manual' ? 'metodo-sel' : 'metodo-sel maquina';
+  actualizarCapHint(n);
+}
+
+function actualizarCapHint(n) {
+  const metSel = document.getElementById(`row_${n}_met`);
+  const procSel = document.getElementById(`row_${n}_proc`);
+  const hint = document.getElementById(`row_${n}_cap_hint`);
+  if (!hint || !metSel || !procSel) return;
+  const cap = getCapacidad(procSel.value, metSel.value);
+  hint.textContent = cap.toLocaleString() + ' und/h · ' + (cap * 12).toLocaleString() + '/turno';
+}
+
+function actualizarClaseEstado(n) {
+  const sel = document.getElementById(`row_${n}_est`);
+  if (!sel) return;
+  sel.className = 'estado-sel ' + sel.value.toLowerCase().replace(' ', '');
+}
+
+function recalcTotal() {
+  let total = 0;
+  document.querySelectorAll('[id$="_est"]').forEach(sel => {
+    if (sel.value === 'Terminada') {
+      const n = sel.id.replace('row_', '').replace('_est', '');
+      const cant = parseInt(document.getElementById(`row_${n}_cant`)?.value || 0);
+      total += cant;
+    }
+  });
+  document.getElementById('totalVal').textContent = total.toLocaleString() + ' und';
+}
+
+// ════════════════════════════════════════════════════════
+// LÍNEAS DE DEVOLUCIÓN
+// ════════════════════════════════════════════════════════
+function addDevolucionRow(datos = {}) {
+  devCount++;
+  const n = devCount;
+  const tbody = document.getElementById('devolucionBody');
+  if (!tbody) return;
+  tbody.insertAdjacentHTML('beforeend', `
+    <tr class="tarea-row" id="dev_${n}">
+      <td>
+        <div class="ac-wrap">
+          <input type="text" id="dev_${n}_mat" value="${datos.desc || ''}"
+            placeholder="SKU o descripción del material..." autocomplete="off"
+            oninput="buscarSKUDev(${n}, this.value)"
+            data-sku="${datos.sku || ''}">
+          <div class="ac-drop" id="dev_${n}_drop"></div>
+        </div>
+      </td>
+      <td><input type="number" id="dev_${n}_cant" value="${datos.cantidad || ''}" min="0" placeholder="0"></td>
+      <td><button class="btn-rm-row" onclick="removeDevRow(${n})">✕</button></td>
+    </tr>
+  `);
+}
+
+function removeDevRow(n) {
+  document.getElementById(`dev_${n}`)?.remove();
+}
+
+// ════════════════════════════════════════════════════════
+// AUTOCOMPLETADO DE INVENTARIO
+// ════════════════════════════════════════════════════════
+let inventarioCache = [];
+
+async function buscarSKURow(n, query) {
+  const drop = document.getElementById(`row_${n}_drop`);
+  if (!drop) return;
+  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
+
+  if (inventarioCache.length === 0) {
+    inventarioCache = await getInventario();
+  }
+
+  const q = query.toLowerCase();
+  const results = inventarioCache
+    .filter(i => ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().includes(q))
+    .slice(0, 7);
+
+  if (!results.length) { drop.style.display = 'none'; return; }
+
+  drop.innerHTML = results.map(i => {
+    const sku = i.sku || '';
+    const desc = i.descripcion || '';
+    const exist = i.existencia !== undefined ? i.existencia : '';
+    return `<div class="ac-item" onclick="seleccionarTapa(${n},'${sku}','${desc.replace(/'/g, "\\'")}')">
+      <div class="ac-sku">${sku}</div>
+      <div class="ac-desc">${desc.substring(0, 60)}</div>
+      ${exist !== '' ? `<div class="ac-exist">Existencia: ${exist.toLocaleString()} und</div>` : ''}
+    </div>`;
+  }).join('');
+  drop.style.display = 'block';
+}
+
+function seleccionarTapa(n, sku, desc) {
+  const inp = document.getElementById(`row_${n}_tapa`);
+  if (inp) {
+    inp.value = sku + ' — ' + desc;
+    inp.dataset.sku = sku;
+  }
+  const drop = document.getElementById(`row_${n}_drop`);
+  if (drop) drop.style.display = 'none';
+}
+
+async function buscarSKUDev(n, query) {
+  const drop = document.getElementById(`dev_${n}_drop`);
+  if (!drop) return;
+  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
+
+  if (inventarioCache.length === 0) {
+    inventarioCache = await getInventario();
+  }
+
+  const q = query.toLowerCase();
+  const results = inventarioCache
+    .filter(i => ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().includes(q))
+    .slice(0, 7);
+
+  if (!results.length) { drop.style.display = 'none'; return; }
+
+  drop.innerHTML = results.map(i => {
+    const sku = i.sku || '';
+    const desc = i.descripcion || '';
+    const exist = i.existencia !== undefined ? i.existencia : '';
+    return `<div class="ac-item" onclick="seleccionarDev(${n},'${sku}','${desc.replace(/'/g, "\\'")}')">
+      <div class="ac-sku">${sku}</div>
+      <div class="ac-desc">${desc.substring(0, 60)}</div>
+      ${exist !== '' ? `<div class="ac-exist">Existencia: ${exist.toLocaleString()} und</div>` : ''}
+    </div>`;
+  }).join('');
+  drop.style.display = 'block';
+}
+
+function seleccionarDev(n, sku, desc) {
+  const inp = document.getElementById(`dev_${n}_mat`);
+  if (inp) { inp.value = sku + ' — ' + desc; inp.dataset.sku = sku; }
+  const drop = document.getElementById(`dev_${n}_drop`);
+  if (drop) drop.style.display = 'none';
+}
+
+function cerrarAC() {
+  document.querySelectorAll('.ac-drop').forEach(d => d.style.display = 'none');
+}
+
+// ════════════════════════════════════════════════════════
+// NUEVA COMANDA
+// ════════════════════════════════════════════════════════
+function nuevaComanda() {
+  editandoId = null;
+  comandaActual = null;
+  rowCount = 0;
+  devCount = 0;
+
+  const ft = document.getElementById('formTitle');
+  if (ft) ft.textContent = 'Nueva comanda';
+
+  document.getElementById('fCorr').value = 'CMD-' + String(comandas.length + 1).padStart(3, '0');
+  document.getElementById('fFecha').value = document.getElementById('filtroFecha')?.value || new Date().toISOString().split('T')[0];
+  document.getElementById('fHoraInicio').value = '06:00';
+  document.getElementById('fHoraCierre').value = new Date().toTimeString().slice(0, 5);
+  document.getElementById('fOperario').value = '';
+  document.getElementById('fObs').value = '';
+
+  const tbody = document.getElementById('tareasBody');
+  if (tbody) tbody.innerHTML = '';
+
+  const devBody = document.getElementById('devolucionBody');
+  if (devBody) devBody.innerHTML = '';
+  addDevolucionRow();
+
+  const totalEl = document.getElementById('totalVal');
+  if (totalEl) totalEl.textContent = '0 und';
+
+  addTareaRow();
+  showPanel('form');
+  console.log('✓ nueva comanda abierta');
+}
+
+// ════════════════════════════════════════════════════════
+// GUARDAR
+// ════════════════════════════════════════════════════════
+function recopilarDevolucion() {
+  const lineas = [];
+  document.querySelectorAll('[id^="dev_"][id$="_mat"]').forEach(inp => {
+    const n = inp.id.replace('dev_', '').replace('_mat', '');
+    const cant = document.getElementById(`dev_${n}_cant`)?.value;
+    if (inp.value || (cant && parseInt(cant) > 0)) {
+      lineas.push({ sku: inp.dataset.sku || '', desc: inp.value, cantidad: parseInt(cant || 0) });
+    }
+  });
+  return JSON.stringify(lineas);
+}
+
+async function guardar() {
+  const operarioId = document.getElementById('fOperario').value;
+  const fecha = document.getElementById('fFecha').value;
+  
+  if (!operarioId || !fecha) {
+    showToast('❌ Completa operario y fecha', '#B83232');
+    return;
+  }
+
+  // Recopilar filas de tareas
+  const tareas = [];
+  document.querySelectorAll('.tarea-row').forEach(row => {
+    const n = row.id.replace('row_', '');
+    const tapaInput = document.getElementById(`row_${n}_tapa`);
+    const metodo = document.getElementById(`row_${n}_met`)?.value || 'manual';
+    const cantidad = parseInt(document.getElementById(`row_${n}_cant`)?.value || 0);
+    const proceso = document.getElementById(`row_${n}_proc`)?.value || '';
+    const estado = document.getElementById(`row_${n}_est`)?.value || 'Asignada';
+    const cap = getCapacidad(proceso, metodo);
+    
+    if (cantidad > 0 || proceso) {
+      tareas.push({
+        proceso: proceso,
+        tapa_desc: tapaInput?.value || '',
+        tapa_sku: tapaInput?.dataset?.sku || '',
+        cantidad: cantidad,
+        metodo: metodo,
+        capacidad_hora: cap,
+        horas_efectivas: cantidad > 0 ? Math.round((cantidad / cap) * 100) / 100 : 0,
+        estado: estado,
+        unidades_completadas: estado === 'Terminada' ? cantidad : 0
+      });
+    }
+  });
+
+  // Validar que haya al menos una tarea
+  if (tareas.length === 0) {
+    showToast('❌ Agrega al menos una tarea', '#B83232');
+    return;
+  }
+
+  const op = getOperarioById(operarioId);
+  const totalPT = tareas.filter(t => t.estado === 'Terminada').reduce((s, t) => s + t.cantidad, 0);
+
+  const cabecera = {
+    correlativo: document.getElementById('fCorr').value,
+    fecha: fecha,
+    operario_id: operarioId,
+    operario_nombre: op.nombre || '',
+    supervisor_id: 'T0',
+    supervisor_nombre: 'Heidy',
+    hora_inicio: document.getElementById('fHoraInicio').value,
+    hora_cierre: document.getElementById('fHoraCierre').value,
+    total_unidades: totalPT,
+    material_devuelto: recopilarDevolucion(),
+    observaciones: document.getElementById('fObs').value,
+  };
+
+  try {
+    let cmdId;
+    if (editandoId) {
+      await db.from('comandas').update(cabecera).eq('id', editandoId);
+      cmdId = editandoId;
+      await db.from('comanda_tareas').delete().eq('comanda_id', cmdId);
+    } else {
+      const { data, error } = await db.from('comandas').insert(cabecera).select();
+      if (error) throw error;
+      cmdId = data[0].id;
+    }
+
+    if (tareas.length) {
+      const tareasData = tareas.map((t, i) => ({
+        comanda_id: cmdId,
+        orden: i + 1,
+        proceso: t.proceso,
+        tapa_desc: t.tapa_desc,
+        tapa_sku: t.tapa_sku,
+        cantidad: t.cantidad,
+        metodo: t.metodo || 'manual',
+        capacidad_hora: t.capacidad_hora || 833,
+        horas_efectivas: t.horas_efectivas || 0,
+        unidades_completadas: t.unidades_completadas || 0,
+        estado: t.estado,
+      }));
+      const { error: errT } = await db.from('comanda_tareas').insert(tareasData);
+      if (errT) throw errT;
+    }
+
+    showToast('✅ Comanda guardada correctamente');
+    await cargarComandas();
+    const cmd = comandas.find(c => c.id === cmdId);
+    if (cmd) verComanda(cmdId);
+    else showPanel('welcome');
+
+  } catch (e) {
+    console.error('Error al guardar:', e);
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// VER DETALLE
+// ════════════════════════════════════════════════════════
+function verComanda(id) {
+  const c = comandas.find(x => x.id === id);
+  if (!c) return;
+  comandaActual = c;
+
+  document.querySelectorAll('.cmd-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.cmd-item').forEach(el => {
+    if (el.getAttribute('onclick')?.includes(id)) el.classList.add('active');
+  });
+
+  const op = getOperarioById(c.operario_id);
+  const color = op.color_hex || '#6B6B6A';
+  const tareas = c.comanda_tareas || [];
+  const totalPT = tareas.filter(t => t.estado === 'Terminada').reduce((s, t) => s + (t.cantidad || 0), 0);
+
+  const tareasHtml = tareas.length
+    ? `<table class="det-table">
+        <thead>
+          <tr><th>#</th><th>Proceso</th><th>Tapa asignada</th><th>Cantidad</th><th>Método</th><th>Estado</th></tr>
+        </thead>
+        <tbody>
+          ${tareas.map((t, i) => `
+            <tr>
+              <td style="color:#6B6B6A;font-size:11px">${i + 1}</td>
+              <td><strong>${t.proceso || '—'}</strong></td>
+              <td style="font-size:12px">${t.tapa_desc || '—'}</td>
+              <td style="font-family:'DM Mono',monospace;font-weight:700">${(t.cantidad || 0).toLocaleString()}</td>
+              <td>${t.metodo === 'manual' ? '✋ Manual' : t.metodo === 'maquina_liner' ? '⚙ Máquina Liner' : '⚙ Máquina Armado'}</td>
+              <td><span class="status-badge sb-${(t.estado || 'asignada').toLowerCase().replace(' ', '')}">${t.estado || 'Asignada'}</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`
+    : '<p style="color:#6B6B6A;font-size:13px">Sin tareas registradas.</p>';
+
+  document.getElementById('detailContent').innerHTML = `
+    <div class="det-head">
+      <div style="display:flex;gap:14px;align-items:center">
+        <div class="det-avatar" style="background:${color}">${op.iniciales || '?'}</div>
+        <div>
+          <div class="det-name">${c.operario_nombre || '—'}</div>
+          <div class="det-meta">📅 ${c.fecha || ''} · ${c.correlativo || '—'} · Supervisor: ${c.supervisor_nombre || '—'}</div>
+          <div class="det-meta">🕐 Inicio: ${c.hora_inicio || '—'} · Cierre: ${c.hora_cierre || '—'}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-cancel" onclick="editarComanda('${c.id}')">✏️ Editar</button>
+        <button class="btn btn-del" onclick="borrarComanda('${c.id}')">🗑 Eliminar</button>
+      </div>
+    </div>
+
+    <div class="total-bar" style="margin-bottom:14px">
+      <div><div class="total-bar-lbl">Total unidades PT del día (tareas Terminadas)</div></div>
+      <div class="total-bar-val">${totalPT.toLocaleString()} und</div>
+    </div>
+
+    <div class="sec" style="margin-bottom:12px">
+      <div class="sec-label">🔧 Tareas</div>
+      ${tareasHtml}
+    </div>
+
+    ${renderDevolucionDetalle(c.material_devuelto)}
+
+    ${c.observaciones ? `
+    <div class="sec" style="margin-bottom:12px">
+      <div class="sec-label">📝 Observaciones</div>
+      <p style="font-size:13px">${c.observaciones}</p>
+    </div>` : ''}
+
+    <div style="background:#EBF7F4;border:1.5px solid #1A6B5B;border-radius:10px;padding:12px 16px;font-size:12px;color:#0D4035;font-weight:600">
+      ✍️ Firmado por: <strong>${c.supervisor_nombre || '—'}</strong> · Cierre: <strong>${c.hora_cierre || '—'}</strong>
+    </div>
+  `;
+
+  showPanel('detail');
+}
+
+function renderDevolucionDetalle(matDevuelto) {
+  if (!matDevuelto) return '';
+  let lineas = [];
+  try { lineas = JSON.parse(matDevuelto); } catch (e) {
+    return `<div class="sec" style="margin-bottom:12px">
+      <div class="sec-label">📦 Material devuelto a bodega</div>
+      <p style="font-size:13px">${matDevuelto}</p>
+    </div>`;
+  }
+  if (!lineas.length) return '';
+  return `<div class="sec" style="margin-bottom:12px">
+    <div class="sec-label">📦 Material devuelto a bodega</div>
+    <table class="det-table">
+      <thead><tr><th>Material</th><th>Cantidad</th></tr></thead>
+      <tbody>
+        ${lineas.map(l => `
+          <tr>
+            <td style="font-size:12px">${l.desc || '—'}</td>
+            <td style="font-family:'DM Mono',monospace;font-weight:700">${(l.cantidad || 0).toLocaleString()}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+// EDITAR / BORRAR
+// ════════════════════════════════════════════════════════
+function editarComanda(id) {
+  const c = comandas.find(x => x.id === id);
+  if (!c) return;
+  editandoId = id;
+  rowCount = 0;
+  devCount = 0;
+
+  document.getElementById('formTitle').textContent = 'Editar comanda';
+  document.getElementById('fCorr').value = c.correlativo || '';
+  document.getElementById('fFecha').value = c.fecha || '';
+  document.getElementById('fHoraInicio').value = c.hora_inicio || '06:00';
+  document.getElementById('fHoraCierre').value = c.hora_cierre || '';
+  document.getElementById('fOperario').value = c.operario_id || '';
+  document.getElementById('fObs').value = c.observaciones || '';
+  document.getElementById('tareasBody').innerHTML = '';
+
+  const devBody = document.getElementById('devolucionBody');
+  if (devBody) devBody.innerHTML = '';
+  let devLineas = [];
+  try { devLineas = JSON.parse(c.material_devuelto || '[]'); } catch (e) {
+    if (c.material_devuelto) devLineas = [{ desc: c.material_devuelto, cantidad: 0, sku: '' }];
+  }
+  if (devLineas.length) {
+    devLineas.forEach(d => addDevolucionRow(d));
+  } else {
+    addDevolucionRow();
+  }
+
+  (c.comanda_tareas || []).forEach(t => {
+    addTareaRow({
+      proceso: t.proceso,
+      tapa_desc: t.tapa_desc || '',
+      tapa_sku: t.tapa_sku || '',
+      cantidad: t.cantidad || 0,
+      metodo: t.metodo || 'manual',
+      estado: t.estado || 'Asignada',
+    });
+  });
+
+  recalcTotal();
+  showPanel('form');
+}
+
+async function borrarComanda(id) {
+  if (!confirm('¿Borrar esta comanda? Esta acción no se puede deshacer.')) return;
+  try {
+    await db.from('comanda_tareas').delete().eq('comanda_id', id);
+    await db.from('comandas').delete().eq('id', id);
+    showToast('🗑 Comanda eliminada');
+    comandaActual = null;
+    await cargarComandas();
+    showPanel('welcome');
+  } catch (e) {
+    showToast('❌ Error al eliminar: ' + e.message, '#B83232');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// UTILIDADES UI
+// ════════════════════════════════════════════════════════
+function showPanel(cual) {
+  const welcome = document.getElementById('stWelcome');
+  const form = document.getElementById('stForm');
+  const detail = document.getElementById('stDetail');
+  if (welcome) welcome.style.display = cual === 'welcome' ? 'flex' : 'none';
+  if (form) form.classList.toggle('vis', cual === 'form');
+  if (detail) detail.classList.toggle('vis', cual === 'detail');
+}
+
+function cancelar() {
+  if (comandaActual) verComanda(comandaActual.id);
+  else showPanel('welcome');
+}
+
+function showToast(msg, color = '#1A6B5B') {
+  const existing = document.querySelector('.toast-msg');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'toast-msg';
+  t.textContent = msg;
+  t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${color};color:#fff;padding:11px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);white-space:nowrap`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// ════════════════════════════════════════════════════════
+// INICIALIZACIÓN
+// ════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('🚀 Init comandas.html');
+  
+  try {
+    // Cargar operarios primero
+    await cargarOperarios();
+    console.log('✓ Operarios cargados:', operariosCache.length);
+    
+    const hoy = new Date().toISOString().split('T')[0];
+    const filtro = document.getElementById('filtroFecha');
+    if (filtro) filtro.value = hoy;
+    const fFecha = document.getElementById('fFecha');
+    if (fFecha) fFecha.value = hoy;
+    const fHI = document.getElementById('fHoraInicio');
+    if (fHI) fHI.value = '06:00';
+    const fHC = document.getElementById('fHoraCierre');
+    if (fHC) fHC.value = new Date().toTimeString().slice(0, 5);
+
+    // Conectar botón de nueva comanda
+    const btnNueva = document.getElementById('btnNuevaComanda');
+    if (btnNueva) {
+      btnNueva.addEventListener('click', (e) => {
+        e.preventDefault();
+        nuevaComanda();
+      });
+    }
+
+    await cargarComandas();
+    console.log('✓ Comandas cargadas');
+  } catch (e) {
+    console.error('Error en init:', e);
+    showToast('Error al iniciar: ' + e.message, '#B83232');
+  }
+
+  // Cerrar autocomplete al hacer clic fuera
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.ac-wrap') && !e.target.closest('.ac-drop')) {
+      cerrarAC();
+    }
+  });
+});
+</script>
+
+</body>
+</html>
