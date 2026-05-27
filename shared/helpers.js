@@ -1,107 +1,165 @@
 // ════════════════════════════════════════════════════════
-// HELPERS COMPARTIDOS · TETRAPLASTIC
-// VERSIÓN 2.1 · LIMPIO (sin duplicar datos de data.js)
+// TETRAPLASTIC - FUNCIONES COMPARTIDAS
 // ════════════════════════════════════════════════════════
-// IMPORTANTE: este archivo depende de que data.js se cargue antes
-// porque usa CFG, ESTADOS y personal definidos allí.
 
-// ── Cálculo de horas y turnos ──────────────────────────────
-function calcHoras(cant, nOps) {
-  if (!cant || !nOps) return 0;
-  return cant / (CFG.cap_und_h * nOps);
+// Funciones de UI
+function ePill(estado) {
+  const clases = {
+    'nueva': 'pill-pendiente',
+    'programada': 'pill-programada',
+    'proceso': 'pill-proceso',
+    'lista': 'pill-lista',
+    'entregada': 'pill-entregada'
+  };
+  const textos = {
+    'nueva': '🟡 Nueva',
+    'programada': '📅 Programada',
+    'proceso': '🟢 En proceso',
+    'lista': '✅ Lista',
+    'entregada': '📦 Entregada'
+  };
+  return `<span class="pill ${clases[estado] || 'pill-pendiente'}">${textos[estado] || estado}</span>`;
 }
 
-function calcTurnos(h) {
-  return Math.ceil(h / CFG.turno_h);
+function pPill(prioridad) {
+  const clases = {
+    'normal': 'pill-normal',
+    'urgente': 'pill-urgente',
+    'programada': 'pill-programada',
+    'vela': 'pill-vela'
+  };
+  const textos = {
+    'normal': '🟢 Normal',
+    'urgente': '🔴 Urgente',
+    'programada': '📅 Programada',
+    'vela': '🌙 Vela'
+  };
+  return `<span class="pill ${clases[prioridad] || 'pill-normal'}">${textos[prioridad] || prioridad}</span>`;
+}
+
+function calcHoras(cantidad, opsCount = 1) {
+  const velocidadBase = 1200; // und/hora por operador
+  return cantidad / (velocidadBase * opsCount);
 }
 
 function fechaEst(turnos) {
-  const d = new Date();
-  d.setDate(d.getDate() + turnos);
-  return d.toLocaleDateString('es-GT', { day: '2-digit', month: 'short' });
+  const fecha = new Date();
+  fecha.setDate(fecha.getDate() + turnos);
+  return fecha.toLocaleDateString('es-GT');
 }
 
-// ── Operadores ocupados (los que están en órdenes activas) ─
-function getOperadoresOcupados(solicitudesGlobal) {
-  const ocupados = new Set();
-  (solicitudesGlobal || []).filter(s => s.estado === 'proceso').forEach(s => {
-    (s.lineas || []).forEach(l => {
-      (l.operadores || []).forEach(opId => ocupados.add(opId));
-    });
-  });
-  return ocupados;
-}
-
-// ── Horas restantes de un operador en sus órdenes ──────────
-function getHorasRestantes(opId, solicitudesGlobal) {
-  let totalH = 0;
-  (solicitudesGlobal || []).filter(s => s.estado === 'proceso').forEach(s => {
-    const asignado = (s.lineas || []).some(l => (l.operadores || []).includes(opId));
-    if (asignado) {
-      const h = calcHoras(s.cant, Math.max(s.ops.length, 1));
-      totalH += h * (1 - (s.prog || 0) / 100);
+async function generarCodigo(area) {
+  const prefix = area === 'tapas' ? 'T' : 'S';
+  try {
+    const { data, error } = await db
+      .from('solicitudes')
+      .select('codigo')
+      .eq('area', area)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    if (error) throw error;
+    
+    let lastNum = 0;
+    if (data && data.length > 0 && data[0].codigo) {
+      const match = data[0].codigo.match(/\d+$/);
+      if (match) lastNum = parseInt(match[0]);
     }
-  });
-  return Math.round(totalH * 10) / 10;
+    const newNum = lastNum + 1;
+    return `${prefix}-${String(newNum).padStart(3, '0')}`;
+  } catch (e) {
+    console.error('Error generando código:', e);
+    return `${prefix}-001`;
+  }
 }
 
-// ── Obtener operador por ID (busca en ambas áreas) ─────────
-function opObj(id) {
-  const all = [...(personal?.tapas || []), ...(personal?.serig || [])];
-  return all.find(p => p.id === id);
+async function actualizarEnSupabase(id, datos) {
+  const { error } = await db.from('solicitudes').update(datos).eq('id', id);
+  if (error) throw error;
+  return true;
 }
 
-function opName(id) {
-  const p = opObj(id);
-  return p ? (p.nombre?.split(' ')[0] || p.nombre) : id;
+async function cargarInventarioDB() {
+  try {
+    const { data, error } = await db
+      .from('inventario')
+      .select('sku, descripcion, existencia')
+      .eq('activo', true)
+      .limit(500);
+    
+    if (error) throw error;
+    return data || [];
+  } catch (e) {
+    console.error('Error cargando inventario:', e);
+    return [];
+  }
 }
 
-// ── Pills de estado y prioridad ────────────────────────────
-function ePill(estado) {
-  const e = ESTADOS[estado] || { css: 'p-nueva', lbl: estado };
-  return `<span class="pill ${e.css}">${e.lbl}</span>`;
+// Trazabilidad de fugas
+async function registrarPerdida(solicitudId, sku, cantidad, motivo, usuario, obs) {
+  try {
+    const { error } = await db.from('movimientos_materiales').insert({
+      solicitud_id: solicitudId,
+      sku: sku,
+      cantidad: cantidad,
+      tipo: 'perdida',
+      usuario: usuario,
+      observaciones: `${motivo} - ${obs}`
+    });
+    return { ok: !error, error: error?.message };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
-function pPill(prio) {
-  const map = {
-    urgente: { lbl: '🔴 Urgente', css: 'p-urg' },
-    normal: { lbl: '🟢 Normal', css: 'p-norm' },
-    programada: { lbl: '🟡 Programada', css: 'p-prog' },
-    vela: { lbl: '🌙 Vela', css: 'p-vela' }
-  };
-  const p = map[prio] || map.normal;
-  return `<span class="pill ${p.css}">${p.lbl}</span>`;
+async function registrarEntradaPT(solicitudId, sku, cantidad, usuario, obs) {
+  try {
+    const { error } = await db.from('movimientos_materiales').insert({
+      solicitud_id: solicitudId,
+      sku: sku,
+      cantidad: cantidad,
+      tipo: 'entrada_pt',
+      usuario: usuario,
+      observaciones: obs
+    });
+    return { ok: !error, error: error?.message };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
-// ── Toast de notificación ──────────────────────────────────
-function showToast(msg, color = 'var(--teal)') {
-  const existing = document.querySelector('.toast-message');
-  if (existing) existing.remove();
-
-  const t = document.createElement('div');
-  t.textContent = msg;
-  t.className = 'toast-message';
-  t.style.cssText = `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:${color};color:white;padding:12px 24px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.2)`;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 4000);
+async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
+  try {
+    const { error } = await db.from('movimientos_materiales').insert({
+      solicitud_id: solicitudId,
+      sku: sku,
+      cantidad: cantidad,
+      tipo: 'salida_bodega',
+      usuario: usuario,
+      observaciones: obs
+    });
+    return { ok: !error, error: error?.message };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
-// ── Buscar inventario por SKU ──────────────────────────────
-// Primero intenta el cache de Supabase, si no, usa el archivo local
-function buscarSKU(sku) {
-  if (!sku) return null;
-  const inv = (typeof getInventario === 'function' && getInventario()) || (typeof INVENTARIO !== 'undefined' ? INVENTARIO : []);
-  return inv.find(item => item.sku === sku);
+async function registrarParoMaquina(maquinaId, motivo, duracion, usuario, obs) {
+  try {
+    const { error } = await db.from('paros_maquina').insert({
+      maquina_id: maquinaId,
+      motivo: motivo,
+      duracion_minutos: duracion,
+      usuario: usuario,
+      observaciones: obs
+    });
+    return { ok: !error, error: error?.message };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
-function buscarPorDescripcion(query) {
-  if (!query || query.length < 2) return [];
-  const q = query.toLowerCase();
-  const inv = (typeof getInventario === 'function' && getInventario()) || (typeof INVENTARIO !== 'undefined' ? INVENTARIO : []);
-  return inv
-    .filter(item =>
-      (item.sku && item.sku.toLowerCase().includes(q)) ||
-      ((item.descripcion || item.desc) && (item.descripcion || item.desc).toLowerCase().includes(q))
-    )
-    .slice(0, 8);
+// Asegurar que db esté disponible
+if (typeof db === 'undefined') {
+  console.warn('⚠️ db no está definido. Asegúrate de que supabase.js se cargue antes.');
 }
