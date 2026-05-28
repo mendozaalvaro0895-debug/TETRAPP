@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TETRAPLASTIC — Sistema Digital de Operaciones</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -65,7 +66,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .area-arrow{position:absolute;top:24px;right:24px;color:var(--gray-l);font-size:20px}
 .area-card:hover .area-arrow{color:var(--teal);transform:translateX(4px);transition:all .2s}
 
-/* KPI Extra Strip */
 .kpi-extra{max-width:1100px;margin:0 auto 24px;padding:0 24px;display:flex;gap:8px;flex-wrap:wrap}
 .kpi-badge{background:var(--card);border:1px solid var(--border);border-radius:40px;padding:6px 14px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
 .kpi-badge.warning{background:#FEF3C7;border-color:#FDE68A;color:#92400E}
@@ -91,7 +91,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   <p class="hero-sub">Cada área tiene su propio módulo. Los datos viven en una base compartida, así que todo está sincronizado en tiempo real entre módulos.</p>
 </div>
 
-<!-- KPIs dinámicos en tiempo real -->
 <div class="kpi-extra" id="kpiExtra">
   <div class="kpi-badge">📊 <span id="totalActivas">—</span> solicitudes activas</div>
   <div class="kpi-badge">⏱ <span id="horasTotales">—</span> horas de producción</div>
@@ -110,7 +109,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="area-stats">
       <div class="area-stat"><strong id="tapas-activas">—</strong>Activas</div>
       <div class="area-stat"><strong id="tapas-pendientes">—</strong>Pendientes</div>
-      <div class="area-stat"><strong id="tapas-ops">10</strong>Operadores</div>
+      <div class="area-stat"><strong id="tapas-ops">12</strong>Operadores</div>
     </div>
   </a>
 
@@ -123,7 +122,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="area-stats">
       <div class="area-stat"><strong id="serig-activas">—</strong>Activas</div>
       <div class="area-stat"><strong id="serig-pendientes">—</strong>Pendientes</div>
-      <div class="area-stat"><strong id="serig-ops">8</strong>Operadores</div>
+      <div class="area-stat"><strong id="serig-ops">10</strong>Operadores</div>
     </div>
   </a>
 
@@ -135,27 +134,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="area-status active">● Activo</div>
   </a>
 
-  <a href="personal.html" class="area-card">
+  <a href="comandas.html" class="area-card">
     <div class="area-arrow">→</div>
-    <div class="area-icon prod">👥</div>
-    <div class="area-name">Personal & CRM</div>
-    <div class="area-desc">Gestión de operadores, asistencia, rotación y desempeño individual de todo el equipo.</div>
+    <div class="area-icon prod">📋</div>
+    <div class="area-name">Comandas de Trabajo</div>
+    <div class="area-desc">Registro de producción diaria por operario, tareas y rendimiento por máquina.</div>
     <div class="area-status active">● Activo</div>
   </a>
-
-  
 
   <div class="area-card disabled" title="Disponible en Fase 2">
     <div class="area-icon bodega">📦</div>
     <div class="area-name">Bodega</div>
     <div class="area-desc">Inventario en tiempo real, entradas y salidas de materia prima y producto terminado.</div>
-    <div class="area-status fase2">Fase 2 · Oct 2026</div>
-  </div>
-
-  <div class="area-card disabled" title="Disponible en Fase 2">
-    <div class="area-icon prod">⚙</div>
-    <div class="area-name">Producción General</div>
-    <div class="area-desc">Programación de producción, máquinas, moldes, torno, mantenimiento y rechazos.</div>
     <div class="area-status fase2">Fase 2 · Oct 2026</div>
   </div>
 
@@ -170,72 +160,73 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 <div class="footer-info">
   <p>Sistema base · Última actualización: <code id="last-update">cargando...</code></p>
-  <p style="margin-top:6px">Construido con HTML · Supabase · Vercel · GitHub</p>
+  <p style="margin-top:6px">Construido con HTML · Supabase · GitHub</p>
 </div>
 
-<!-- Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="shared/supabase.js"></script>
-<script src="shared/helpers.js"></script>
-
 <script>
-// Función para cargar KPIs en tiempo real
+// ════════════════════════════════════════════════════════
+// CONEXIÓN SUPABASE
+// ════════════════════════════════════════════════════════
+const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
+const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ══ CARGAR KPIs ═════════════════════════════════════════════
 async function cargarKPIs() {
   try {
-    // Cargar todas las solicitudes desde Supabase
-    const { data: tapas } = await db.from('solicitudes').select('estado, prioridad, area').eq('area', 'tapas');
-    const { data: serig } = await db.from('solicitudes').select('estado, prioridad, area').eq('area', 'serig');
+    const { data: tapas } = await db.from('solicitudes').select('estado, prioridad').eq('area', 'tapas');
+    const { data: serig } = await db.from('solicitudes').select('estado, prioridad').eq('area', 'serig');
     
     const todas = [...(tapas || []), ...(serig || [])];
     
-    // Calcular KPIs
     const activas = todas.filter(s => s.estado === 'proceso').length;
     const urgentes = todas.filter(s => s.prioridad === 'urgente' && s.estado !== 'entregada').length;
     
     document.getElementById('totalActivas').textContent = activas;
-    document.getElementById('urgentesBadge').innerHTML = urgentes > 0 ? `🔴 ${urgentes} urgentes` : `🟢 0 urgentes`;
-    document.getElementById('urgentesBadge').className = urgentes > 0 ? 'kpi-badge critical' : 'kpi-badge';
+    const urgenteBadge = document.getElementById('urgentesBadge');
+    if (urgenteBadge) {
+      urgenteBadge.innerHTML = urgentes > 0 ? `🔴 ${urgentes} urgentes` : `🟢 0 urgentes`;
+      urgenteBadge.className = urgentes > 0 ? 'kpi-badge critical' : 'kpi-badge';
+    }
     
-    // Horas totales estimadas (cálculo simple)
-    const horasEst = todas.filter(s => s.estado !== 'entregada').length * 8; // estimación
+    const horasEst = todas.filter(s => s.estado !== 'entregada').length * 8;
     document.getElementById('horasTotales').textContent = horasEst;
     
-    // Tapas KPIs
     if (tapas) {
       document.getElementById('tapas-activas').textContent = tapas.filter(s => s.estado === 'proceso').length;
       document.getElementById('tapas-pendientes').textContent = tapas.filter(s => ['nueva', 'programada'].includes(s.estado)).length;
     }
     
-    // Serigrafía KPIs
     if (serig) {
       document.getElementById('serig-activas').textContent = serig.filter(s => s.estado === 'proceso').length;
       document.getElementById('serig-pendientes').textContent = serig.filter(s => ['nueva', 'programada'].includes(s.estado)).length;
     }
     
-    // Intentar cargar fugas (si existe la tabla)
     try {
-      const { data: fugasData } = await db.from('movimientos_materiales').select('tipo, cantidad');
+      const hoy = new Date().toISOString().split('T')[0];
+      const { data: fugasData } = await db
+        .from('movimientos_materiales')
+        .select('cantidad, tipo')
+        .gte('created_at', hoy);
+      
       if (fugasData && fugasData.length > 0) {
-        const salidas = fugasData.filter(f => f.tipo === 'salida_bodega').reduce((s, f) => s + (f.cantidad || 0), 0);
-        const entradas = fugasData.filter(f => f.tipo === 'entrada_pt').reduce((s, f) => s + (f.cantidad || 0), 0);
         const perdidas = fugasData.filter(f => f.tipo === 'perdida').reduce((s, f) => s + (f.cantidad || 0), 0);
-        const fugaTotal = salidas - entradas - perdidas;
-        document.getElementById('fugasBadge').innerHTML = `📉 Fugas: ${fugaTotal.toLocaleString()} und`;
-        if (fugaTotal > 5000) document.getElementById('fugasBadge').classList.add('warning');
+        document.getElementById('fugasBadge').innerHTML = `📉 Fugas hoy: ${perdidas.toLocaleString()} und`;
+        if (perdidas > 5000) document.getElementById('fugasBadge').classList.add('warning');
+      } else {
+        document.getElementById('fugasBadge').innerHTML = `📉 Fugas hoy: 0 und`;
       }
-    } catch(e) {
-      // Tabla no existe aún
-      document.getElementById('fugasBadge').innerHTML = `📉 Fugas: -- (configurar)`;
+    } catch (e) {
+      document.getElementById('fugasBadge').innerHTML = `📉 Fugas: --`;
     }
     
-  } catch(e) {
+  } catch (e) {
     console.error('Error cargando KPIs:', e);
   }
   
   document.getElementById('last-update').textContent = new Date().toLocaleString('es-GT');
 }
 
-// Cargar al inicio y cada 30 segundos
 cargarKPIs();
 setInterval(cargarKPIs, 30000);
 </script>
