@@ -3,203 +3,503 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TETRAPLASTIC — Dashboard Ejecutivo</title>
+<title>TETRAPLASTIC — Dashboard · Producción</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root {
-  --ink:#0C0C0B; --teal:#1A6B5B; --teal-l:#C8EDE7; --teal-xl:#EBF7F4;
-  --gold:#B07D2A; --red:#B83232; --bg:#F7F6F2; --card:#fff;
-  --border:#E0DED8; --gray:#6B6B6A; --gray-l:#A8A6A0;
-  --font:'DM Sans',sans-serif; --display:'Playfair Display',serif;
-  --mono:'DM Mono',monospace;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh}
 
-.topbar{background:var(--ink);padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #1E7D6A}
-.logo{font-family:var(--display);font-size:16px;font-weight:900;color:#fff}
-.logo span{color:#7ECEC0}
-.nav-btns{display:flex;gap:8px}
-.nav-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;font-family:var(--font)}
-.nav-btn:hover{background:rgba(255,255,255,.22)}
-.nav-btn.active{background:var(--teal);border-color:var(--teal)}
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #F7F6F2;
+  color: #0C0C0B;
+  min-height: 100vh;
+}
 
-.page{max-width:1400px;margin:0 auto;padding:24px}
-.page-title{font-family:var(--display);font-size:28px;font-weight:700;margin-bottom:4px}
-.page-sub{font-size:13px;color:var(--gray);margin-bottom:24px}
+/* TOPBAR */
+.topbar {
+  background: #0C0C0B;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #1E7D6A;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 
-/* Selector de fuente de datos */
-.data-source-bar{background:var(--teal-xl);border-radius:12px;padding:12px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.data-source-title{font-size:12px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:1px}
-.data-source-btns{display:flex;gap:8px}
-.data-btn{background:var(--card);border:1.5px solid var(--border);color:var(--gray);padding:8px 20px;border-radius:30px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .15s}
-.data-btn.active{background:var(--teal);border-color:var(--teal);color:#fff}
-.data-btn:hover:not(.active){background:var(--teal-l);border-color:var(--teal);color:var(--teal)}
-.data-source-note{font-size:10px;color:var(--gray);display:flex;align-items:center;gap:8px}
-.data-source-note .badge{display:inline-block;width:10px;height:10px;border-radius:50%}
-.badge-comanda{background:var(--teal)}
-.badge-solicitud{background:var(--gold)}
+.logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 16px;
+  font-weight: 900;
+  color: #fff;
+}
 
-.period-bar{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
-.period-label{font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px}
-.period-btn{background:var(--card);border:1.5px solid var(--border);color:var(--gray);padding:7px 16px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s}
-.period-btn.active{background:var(--teal);border-color:var(--teal);color:#fff}
-.period-btn:hover:not(.active){background:var(--teal-xl);border-color:var(--teal-l);color:var(--teal)}
-.period-date{font-family:var(--mono);font-size:11px;color:var(--gray-l);margin-left:4px}
+.logo span {
+  color: #7ECEC0;
+}
 
-.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px}
-.kpi-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
-.kpi-card.highlight{background:var(--ink);border-color:var(--ink)}
-.kpi-icon{font-size:20px;margin-bottom:8px}
-.kpi-val{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--ink);line-height:1}
-.kpi-card.highlight .kpi-val{color:#7ECEC0}
-.kpi-lbl{font-size:11px;color:var(--gray);margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-.kpi-card.highlight .kpi-lbl{color:rgba(255,255,255,.4)}
-.kpi-sub{font-size:10px;color:var(--gray-l);margin-top:2px}
-.kpi-card.highlight .kpi-sub{color:rgba(255,255,255,.25)}
+.nav-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
-.sec-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.sec-title{font-family:var(--display);font-size:20px;font-weight:700}
-.sec-tag{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--teal);background:var(--teal-xl);padding:4px 10px;border-radius:20px}
+.nav-btn {
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.2);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: 'DM Sans', sans-serif;
+}
 
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
-.card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.nav-btn:hover {
+  background: rgba(255,255,255,.22);
+}
 
-.ranking-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
-.ranking-row:last-child{border-bottom:none}
-.rank-medal{font-size:16px;width:24px;text-align:center;flex-shrink:0}
-.rank-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
-.rank-info{flex:1;min-width:0}
-.rank-name{font-size:13px;font-weight:600;color:var(--ink)}
-.rank-cmds{font-size:10px;color:var(--gray)}
-.rank-bar-wrap{flex:1;background:var(--bg);border-radius:4px;height:6px;overflow:hidden}
-.rank-bar{height:6px;border-radius:4px;background:var(--teal);transition:width .6s ease}
-.rank-und{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--teal);white-space:nowrap;min-width:80px;text-align:right}
+.nav-btn.active {
+  background: #1A6B5B;
+  border-color: #1A6B5B;
+}
 
-.proc-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
-.proc-row:last-child{border-bottom:none}
-.proc-chip{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;min-width:90px;text-align:center}
-.proc-chip.armado{background:var(--teal-xl);color:var(--teal)}
-.proc-chip.banda{background:#FFF3D6;color:var(--gold)}
-.proc-chip.liner{background:#E0E7FF;color:#4338CA}
-.proc-chip.impresion{background:#FCE7F3;color:#9D174D}
-.proc-chip.encajado{background:#DCFCE7;color:#166534}
-.proc-chip.otro{background:var(--bg);color:var(--gray)}
-.proc-bar-wrap{flex:1;background:var(--bg);border-radius:4px;height:6px;overflow:hidden}
-.proc-bar{height:6px;border-radius:4px;transition:width .6s ease}
-.proc-und{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;min-width:70px;text-align:right}
-.proc-tareas{font-size:10px;color:var(--gray-l);white-space:nowrap;min-width:55px;text-align:right}
+/* MAIN CONTENT */
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
 
-.loading{text-align:center;padding:40px;color:var(--gray)}
-.spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--teal-l);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:8px}
-@keyframes spin{to{transform:rotate(360deg)}}
+.page-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
 
-.empty{text-align:center;padding:40px;color:var(--gray);font-size:13px}
+.page-sub {
+  font-size: 13px;
+  color: #6B6B6A;
+  margin-bottom: 24px;
+}
 
-.hist-table{width:100%;border-collapse:collapse}
-.hist-table th{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--gray);padding:8px 10px;border-bottom:2px solid var(--border);text-align:left}
-.hist-table td{padding:10px;border-bottom:1px solid var(--border);font-size:12px}
-.hist-table tr:last-child td{border-bottom:none}
-.hist-table tr:hover td{background:var(--bg)}
-.badge{display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px}
-.b-term{background:#DCFCE7;color:#166534}
-.b-proc{background:#DBEAFE;color:#1A3B8B}
-.b-asig{background:#FFF3D6;color:#7A4800}
-.b-comanda{background:var(--teal-xl);color:var(--teal)}
-.b-solicitud{background:#FFF3D6;color:var(--gold)}
+/* PERIOD SELECTOR */
+.period-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
 
-/* Tooltip */
-.tooltip{position:relative;cursor:help}
-.tooltip:hover::after{content:attr(data-tip);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:6px 12px;border-radius:8px;font-size:11px;white-space:nowrap;z-index:1000}
+.period-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6B6B6A;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.period-btn {
+  background: #fff;
+  border: 1.5px solid #E0DED8;
+  color: #6B6B6A;
+  padding: 7px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all .15s;
+}
+
+.period-btn.active {
+  background: #1A6B5B;
+  border-color: #1A6B5B;
+  color: #fff;
+}
+
+.period-btn:hover:not(.active) {
+  background: #EBF7F4;
+  border-color: #C8EDE7;
+  color: #1A6B5B;
+}
+
+.period-date {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: #A8A6A0;
+  margin-left: 4px;
+}
+
+/* KPI STRIP */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.kpi-card {
+  background: #fff;
+  border: 1.5px solid #E0DED8;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+
+.kpi-card.highlight {
+  background: #0C0C0B;
+  border-color: #0C0C0B;
+}
+
+.kpi-icon {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.kpi-val {
+  font-family: 'DM Mono', monospace;
+  font-size: 28px;
+  font-weight: 700;
+  color: #0C0C0B;
+  line-height: 1;
+}
+
+.kpi-card.highlight .kpi-val {
+  color: #7ECEC0;
+}
+
+.kpi-lbl {
+  font-size: 11px;
+  color: #6B6B6A;
+  margin-top: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.kpi-card.highlight .kpi-lbl {
+  color: rgba(255,255,255,.4);
+}
+
+.kpi-sub {
+  font-size: 10px;
+  color: #A8A6A0;
+  margin-top: 2px;
+}
+
+/* GRID */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.card {
+  background: #fff;
+  border: 1.5px solid #E0DED8;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+
+.sec-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.sec-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.sec-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #1A6B5B;
+  background: #EBF7F4;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+/* RANKING */
+.ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #E0DED8;
+}
+
+.ranking-row:last-child {
+  border-bottom: none;
+}
+
+.rank-medal {
+  font-size: 16px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.rank-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.rank-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rank-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0C0C0B;
+}
+
+.rank-cmds {
+  font-size: 10px;
+  color: #6B6B6A;
+}
+
+.rank-bar-wrap {
+  flex: 1;
+  background: #F7F6F2;
+  border-radius: 4px;
+  height: 6px;
+  overflow: hidden;
+}
+
+.rank-bar {
+  height: 6px;
+  border-radius: 4px;
+  background: #1A6B5B;
+  transition: width .6s ease;
+}
+
+.rank-und {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1A6B5B;
+  white-space: nowrap;
+  min-width: 80px;
+  text-align: right;
+}
+
+/* PROCESOS */
+.proc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #E0DED8;
+}
+
+.proc-row:last-child {
+  border-bottom: none;
+}
+
+.proc-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 90px;
+  text-align: center;
+}
+
+.proc-bar-wrap {
+  flex: 1;
+  background: #F7F6F2;
+  border-radius: 4px;
+  height: 6px;
+  overflow: hidden;
+}
+
+.proc-bar {
+  height: 6px;
+  border-radius: 4px;
+  transition: width .6s ease;
+}
+
+.proc-und {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0C0C0B;
+  white-space: nowrap;
+  min-width: 70px;
+  text-align: right;
+}
+
+.proc-tareas {
+  font-size: 10px;
+  color: #A8A6A0;
+  white-space: nowrap;
+  min-width: 55px;
+  text-align: right;
+}
+
+/* HISTORIAL */
+.hist-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.hist-table th {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: #6B6B6A;
+  padding: 8px 10px;
+  border-bottom: 2px solid #E0DED8;
+  text-align: left;
+}
+
+.hist-table td {
+  padding: 10px;
+  border-bottom: 1px solid #E0DED8;
+  font-size: 12px;
+}
+
+.hist-table tr:last-child td {
+  border-bottom: none;
+}
+
+.hist-table tr:hover td {
+  background: #F7F6F2;
+  cursor: pointer;
+}
+
+/* LOADING & EMPTY */
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #6B6B6A;
+}
+
+.spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #C8EDE7;
+  border-top-color: #1A6B5B;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin-bottom: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty {
+  text-align: center;
+  padding: 40px;
+  color: #6B6B6A;
+  font-size: 13px;
+}
+
+.toast-msg {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1A6B5B;
+  color: #fff;
+  padding: 11px 22px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(0,0,0,.2);
+  white-space: nowrap;
+}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div style="display:flex;align-items:center;gap:14px">
-    <div class="logo">TETRA<span>PLASTIC</span></div>
-    <div style="width:1px;height:18px;background:rgba(255,255,255,.2)"></div>
-    <span style="font-size:12px;color:rgba(255,255,255,.6)">📊 Dashboard Ejecutivo</span>
-  </div>
+  <div class="logo">TETRA<span>PLASTIC</span></div>
   <div class="nav-btns">
     <a href="tapas.html" class="nav-btn">🏷 Tapas</a>
+    <a href="serigrafia.html" class="nav-btn">🎨 Serigrafía</a>
     <a href="comandas.html" class="nav-btn">📋 Comandas</a>
     <a href="index.html" class="nav-btn">🏠 Inicio</a>
   </div>
 </div>
 
 <div class="page">
-
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
-    <div>
-      <div class="page-title">Productividad · Tapas</div>
-      <div class="page-sub" id="pageSubLabel">Cargando datos...</div>
-    </div>
-  </div>
-
-  <!-- ══ SELECTOR DE FUENTE DE DATOS ═══════════════════════ -->
-  <div class="data-source-bar">
-    <div class="data-source-title">📊 Fuente de datos</div>
-    <div class="data-source-btns">
-      <button class="data-btn" data-source="comandas" onclick="setDataSource('comandas')">📋 Producción real (Comandas)</button>
-      <button class="data-btn" data-source="solicitudes" onclick="setDataSource('solicitudes')">📝 Planificación (Solicitudes)</button>
-      <button class="data-btn active" data-source="ambas" onclick="setDataSource('ambas')">🔄 Consolidado</button>
-    </div>
-    <div class="data-source-note">
-      <span class="tooltip" data-tip="Producción real registrada en comandas del taller">
-        <span class="badge badge-comanda"></span> Comandas
-      </span>
-      <span class="tooltip" data-tip="Pedidos registrados por ventas (planificación)">
-        <span class="badge badge-solicitud"></span> Solicitudes
-      </span>
-    </div>
-  </div>
+  <div class="page-title">📊 Dashboard · Producción</div>
+  <div class="page-sub" id="pageSubLabel">Cargando datos...</div>
 
   <div class="period-bar">
     <span class="period-label">Período:</span>
     <button class="period-btn" data-p="hoy" onclick="setPeriod('hoy')">Hoy</button>
-    <button class="period-btn" data-p="semana" onclick="setPeriod('semana')">Esta semana</button>
-    <button class="period-btn active" data-p="mes" onclick="setPeriod('mes')">Este mes</button>
+    <button class="period-btn" data-p="semana" onclick="setPeriod('semana')">Semana</button>
+    <button class="period-btn active" data-p="mes" onclick="setPeriod('mes')">Mes</button>
     <span class="period-date" id="periodDateLabel"></span>
   </div>
 
-  <!-- KPI STRIP -->
   <div class="kpi-strip" id="kpiStrip">
-    <div class="kpi-card loading"><div class="spinner"></div></div>
-    <div class="kpi-card loading"><div class="spinner"></div></div>
-    <div class="kpi-card loading"><div class="spinner"></div></div>
-    <div class="kpi-card loading"><div class="spinner"></div></div>
-    <div class="kpi-card loading"><div class="spinner"></div></div>
+    <div class="kpi-card loading"><div class="spinner"></div><div class="kpi-lbl">Cargando...</div></div>
+    <div class="kpi-card loading"><div class="spinner"></div><div class="kpi-lbl">Cargando...</div></div>
+    <div class="kpi-card loading"><div class="spinner"></div><div class="kpi-lbl">Cargando...</div></div>
+    <div class="kpi-card loading"><div class="spinner"></div><div class="kpi-lbl">Cargando...</div></div>
   </div>
 
-  <!-- RANKING + PROCESOS -->
   <div class="grid-2">
     <div class="card">
       <div class="sec-header">
-        <div class="sec-title" id="rankingTitle">🏆 Ranking · Unidades PT</div>
-        <div class="sec-tag" id="rankingTag">por operario</div>
+        <div class="sec-title">🏆 Ranking · Operarios</div>
+        <div class="sec-tag">por unidades PT</div>
       </div>
-      <div id="rankingContent"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
+      <div id="rankingContent"><div class="loading"><div class="spinner"></div><div>Cargando ranking...</div></div></div>
     </div>
     <div class="card">
       <div class="sec-header">
-        <div class="sec-title" id="procesosTitle">🔧 Procesos del período</div>
-        <div class="sec-tag" id="procesosTag">distribución</div>
+        <div class="sec-title">🔧 Procesos</div>
+        <div class="sec-tag">distribución</div>
       </div>
-      <div id="procesosContent"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
+      <div id="procesosContent"><div class="loading"><div class="spinner"></div><div>Cargando procesos...</div></div></div>
     </div>
   </div>
 
-  <!-- HISTORIAL DE COMANDAS Y SOLICITUDES -->
-  <div class="card" style="margin-bottom:24px">
+  <div class="card">
     <div class="sec-header">
-      <div class="sec-title" id="historialTitle">📋 Historial</div>
+      <div class="sec-title">📋 Historial de Comandas</div>
       <div class="sec-tag" id="histCount">—</div>
     </div>
-    <div id="historialContent"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
+    <div id="historialContent"><div class="loading"><div class="spinner"></div><div>Cargando historial...</div></div></div>
   </div>
-
 </div>
 
 <script>
@@ -214,13 +514,11 @@ const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 // ESTADO GLOBAL
 // ════════════════════════════════════════════════════════
 let periodo = 'mes';
-let fuenteActual = 'ambas'; // 'comandas', 'solicitudes', 'ambas'
-let datosComandas = [];
-let datosSolicitudes = [];
+let comandas = [];
 
 const OP_COLORS = {
-  T0:'#0D4035', T1:'#1A6B5B', T2:'#2E86AB', T3:'#A23B72', T4:'#F18F01',
-  T5:'#C73E1D', T6:'#3B1F2B', T7:'#44BBA4', T8:'#E94F37', T9:'#393E41'
+  'T0':'#0D4035', 'T1':'#1A6B5B', 'T2':'#2E86AB', 'T3':'#A23B72', 'T4':'#F18F01',
+  'T5':'#C73E1D', 'T6':'#3B1F2B', 'T7':'#44BBA4', 'T8':'#E94F37', 'T9':'#393E41'
 };
 
 const PROC_COLORS = {
@@ -229,326 +527,254 @@ const PROC_COLORS = {
   'Otra tarea':'#6B6B6A'
 };
 
+// ══ UTILIDADES ═══════════════════════════════════════════
 function getFechas(p) {
   const hoy = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-
+  const fmt = d => d.toISOString().split('T')[0];
+  
   if (p === 'hoy') {
-    const f = fmt(hoy);
-    return { desde: f, hasta: f, label: 'Hoy · ' + hoy.toLocaleDateString('es-GT', { weekday: 'long', day: '2-digit', month: 'long' }) };
+    return { desde: fmt(hoy), hasta: fmt(hoy) };
   }
   if (p === 'semana') {
     const lunes = new Date(hoy);
     lunes.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7));
-    return { desde: fmt(lunes), hasta: fmt(hoy), label: `Semana ${fmt(lunes)} al ${fmt(hoy)}` };
+    return { desde: fmt(lunes), hasta: fmt(hoy) };
   }
   const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  return { desde: fmt(inicio), hasta: fmt(hoy), label: hoy.toLocaleDateString('es-GT', { month: 'long', year: 'numeric' }) };
+  return { desde: fmt(inicio), hasta: fmt(hoy) };
 }
 
 function setPeriod(p) {
   periodo = p;
-  document.querySelectorAll('.period-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.p === p);
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.p === p);
   });
-  cargarDatos();
+  cargarComandas();
 }
 
-function setDataSource(source) {
-  fuenteActual = source;
-  document.querySelectorAll('.data-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.source === source);
-  });
-  renderizarDashboard();
-}
-
-// ══ CARGA DE DATOS ════════════════════════════════════════
-async function cargarDatos() {
-  const { desde, hasta, label } = getFechas(periodo);
-  document.getElementById('pageSubLabel').textContent = label;
-  document.getElementById('periodDateLabel').textContent = desde === hasta ? desde : `${desde} → ${hasta}`;
-
+// ══ CARGA DE DATOS ═══════════════════════════════════════
+async function cargarComandas() {
+  const { desde, hasta } = getFechas(periodo);
+  
+  // Formatear fechas para mostrar
+  const fechaDisplay = desde === hasta ? desde : `${desde} → ${hasta}`;
+  document.getElementById('pageSubLabel').innerHTML = `Del ${desde} al ${hasta}`;
+  document.getElementById('periodDateLabel').textContent = fechaDisplay;
+  
+  console.log('📥 Cargando comandas desde', desde, 'hasta', hasta);
+  
   try {
-    // Cargar comandas (producción real)
-    const { data: comandasData, error: err1 } = await db
+    const { data, error } = await db
       .from('comandas')
-      .select('id, fecha, correlativo, operario_id, operario_nombre, supervisor_nombre, total_unidades, hora_inicio, hora_cierre, comanda_tareas(proceso, cantidad, unidades_completadas, estado, metodo, capacidad_hora, horas_efectivas)')
+      .select(`
+        id,
+        fecha,
+        correlativo,
+        operario_id,
+        operario_nombre,
+        supervisor_nombre,
+        total_unidades,
+        hora_inicio,
+        hora_cierre,
+        comanda_tareas (
+          proceso,
+          cantidad,
+          unidades_completadas,
+          estado,
+          metodo
+        )
+      `)
       .gte('fecha', desde)
       .lte('fecha', hasta)
       .order('fecha', { ascending: false });
-
-    if (err1) throw err1;
-    datosComandas = comandasData || [];
-
-    // Cargar solicitudes (planificación)
-    const { data: solicitudesData, error: err2 } = await db
-      .from('solicitudes')
-      .select('id, codigo, fecha_limite, cliente_nombre, prioridad, estado, total_unidades, created_at, area')
-      .eq('area', 'tapas')
-      .gte('created_at', desde)
-      .lte('created_at', hasta)
-      .order('created_at', { ascending: false });
-
-    if (err2) throw err2;
-    datosSolicitudes = solicitudesData || [];
-
-    console.log(`✅ Cargados: ${datosComandas.length} comandas, ${datosSolicitudes.length} solicitudes`);
     
-    renderizarDashboard();
-
+    if (error) {
+      console.error('❌ Error en consulta:', error);
+      showToast('Error al cargar datos: ' + error.message, '#B83232');
+      comandas = [];
+    } else {
+      comandas = data || [];
+      console.log(`✅ Cargadas ${comandas.length} comandas`);
+      if (comandas.length > 0) {
+        console.log('📊 Primera comanda:', comandas[0]);
+      } else {
+        console.log('⚠️ No hay comandas en este período');
+      }
+    }
+    
+    renderizar();
+    
   } catch (e) {
-    console.error('Error cargando datos:', e);
-    showToast('Error al cargar datos: ' + e.message, '#B83232');
+    console.error('❌ Excepción:', e);
+    showToast('Error: ' + e.message, '#B83232');
+    comandas = [];
+    renderizar();
   }
 }
 
-// ══ RENDERIZADO PRINCIPAL ══════════════════════════════════
-function renderizarDashboard() {
+// ══ RENDERIZADO ══════════════════════════════════════════
+function renderizar() {
   renderKPIs();
   renderRanking();
   renderProcesos();
   renderHistorial();
 }
 
-// ══ KPIs ═══════════════════════════════════════════════════
 function renderKPIs() {
-  let comandasUnd = 0;
-  let comandasCount = 0;
-  let solicitudesCount = 0;
-  let solicitudesPendientes = 0;
-  let operariosActivos = new Set();
-
-  // Calcular comandas
-  datosComandas.forEach(c => {
-    comandasUnd += (c.total_unidades || 0);
-    comandasCount++;
-    if (c.operario_id) operariosActivos.add(c.operario_id);
-  });
-
-  // Calcular solicitudes
-  datosSolicitudes.forEach(s => {
-    solicitudesCount++;
-    if (s.estado !== 'entregada' && s.estado !== 'lista') {
-      solicitudesPendientes++;
-    }
-  });
-
-  let totalUnd = comandasUnd;
-  let fuenteLabel = 'Producción real';
+  const totalUnd = comandas.reduce((sum, c) => sum + (c.total_unidades || 0), 0);
+  const totalCmds = comandas.length;
+  const operarios = new Set(comandas.map(c => c.operario_id).filter(Boolean));
+  const promedio = totalCmds > 0 ? Math.round(totalUnd / totalCmds) : 0;
   
-  if (fuenteActual === 'solicitudes') {
-    totalUnd = datosSolicitudes.reduce((s, sol) => s + (sol.total_unidades || 0), 0);
-    fuenteLabel = 'Planificación';
-  } else if (fuenteActual === 'ambas') {
-    totalUnd = comandasUnd;
-    fuenteLabel = 'Consolidado';
-  }
-
   document.getElementById('kpiStrip').innerHTML = `
     <div class="kpi-card highlight">
       <div class="kpi-icon">📦</div>
       <div class="kpi-val">${totalUnd.toLocaleString()}</div>
       <div class="kpi-lbl">Unidades PT</div>
-      <div class="kpi-sub">${fuenteLabel}</div>
+      <div class="kpi-sub">producción real</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon">📋</div>
-      <div class="kpi-val">${comandasCount}</div>
+      <div class="kpi-val">${totalCmds}</div>
       <div class="kpi-lbl">Comandas</div>
-      <div class="kpi-sub">registros de producción</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">📝</div>
-      <div class="kpi-val">${solicitudesCount}</div>
-      <div class="kpi-lbl">Solicitudes</div>
-      <div class="kpi-sub">pedidos de ventas</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">⏳</div>
-      <div class="kpi-val">${solicitudesPendientes}</div>
-      <div class="kpi-lbl">Pendientes</div>
-      <div class="kpi-sub">solicitudes sin iniciar</div>
+      <div class="kpi-sub">registros</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon">👥</div>
-      <div class="kpi-val">${operariosActivos.size}</div>
+      <div class="kpi-val">${operarios.size}</div>
       <div class="kpi-lbl">Operadores</div>
-      <div class="kpi-sub">con producción registrada</div>
+      <div class="kpi-sub">con producción</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">📊</div>
+      <div class="kpi-val">${promedio.toLocaleString()}</div>
+      <div class="kpi-lbl">Promedio x comanda</div>
+      <div class="kpi-sub">unidades por registro</div>
     </div>
   `;
 }
 
-// ══ RANKING ════════════════════════════════════════════════
 function renderRanking() {
   const porOp = {};
-
-  if (fuenteActual === 'comandas' || fuenteActual === 'ambas') {
-    datosComandas.forEach(c => {
-      if (!porOp[c.operario_id]) {
-        porOp[c.operario_id] = {
-          nombre: c.operario_nombre || c.operario_id,
-          und: 0,
-          cmds: 0,
-          fuente: 'comanda'
-        };
-      }
-      porOp[c.operario_id].und += (c.total_unidades || 0);
-      porOp[c.operario_id].cmds++;
-    });
-  }
-
+  
+  comandas.forEach(c => {
+    const opId = c.operario_id;
+    if (!opId) return;
+    
+    if (!porOp[opId]) {
+      porOp[opId] = {
+        nombre: c.operario_nombre || opId,
+        und: 0,
+        cmds: 0
+      };
+    }
+    porOp[opId].und += (c.total_unidades || 0);
+    porOp[opId].cmds++;
+  });
+  
   const ranking = Object.entries(porOp)
     .map(([id, d]) => ({ id, ...d }))
     .sort((a, b) => b.und - a.und);
-
-  if (ranking.length === 0 && fuenteActual === 'solicitudes') {
-    document.getElementById('rankingContent').innerHTML = '<div class="empty">ℹ️ Las solicitudes de ventas no tienen asignación por operario.<br>Para ver ranking, selecciona "Producción real" o "Consolidado".</div>';
-    document.getElementById('rankingTitle').innerHTML = '🏆 Ranking · Unidades PT';
+  
+  if (ranking.length === 0) {
+    document.getElementById('rankingContent').innerHTML = '<div class="empty">📭 No hay datos de producción en este período</div>';
     return;
   }
-
+  
+  const maxUnd = ranking[0].und;
   const medals = ['🥇', '🥈', '🥉'];
-  const maxUnd = ranking[0]?.und || 1;
-
-  let titleSuffix = '';
-  if (fuenteActual === 'comandas') titleSuffix = '· Producción real';
-  else if (fuenteActual === 'solicitudes') titleSuffix = '· No disponible';
-  else titleSuffix = '· Consolidado';
-
-  document.getElementById('rankingTitle').innerHTML = `🏆 Ranking · Unidades PT ${titleSuffix}`;
-  document.getElementById('rankingContent').innerHTML = ranking.length
-    ? ranking.map((op, i) => {
-        const color = OP_COLORS[op.id] || '#6B6B6A';
-        const ini = (op.nombre || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-        const pct = Math.round((op.und / maxUnd) * 100);
-        return `<div class="ranking-row">
-          <div class="rank-medal">${medals[i] || ''}</div>
-          <div class="rank-avatar" style="background:${color}">${ini}</div>
-          <div class="rank-info">
-            <div class="rank-name">${(op.nombre || '').split(' ').slice(0, 2).join(' ')}</div>
-            <div class="rank-cmds">${op.cmds} comanda${op.cmds !== 1 ? 's' : ''}</div>
-          </div>
-          <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div>
-          <div class="rank-und">${op.und.toLocaleString()} und</div>
-        </div>`;
-      }).join('')
-    : '<div class="empty">Sin datos de producción en este período.</div>';
-}
-
-// ══ PROCESOS ═══════════════════════════════════════════════
-function renderProcesos() {
-  const porProc = {};
-
-  if (fuenteActual === 'comandas' || fuenteActual === 'ambas') {
-    datosComandas.forEach(c => {
-      (c.comanda_tareas || []).forEach(t => {
-        if (t.estado === 'Terminada') {
-          const p = t.proceso || 'Otra tarea';
-          if (!porProc[p]) porProc[p] = { und: 0, tareas: 0 };
-          porProc[p].und += (t.unidades_completadas || t.cantidad || 0);
-          porProc[p].tareas++;
-        }
-      });
-    });
-  }
-
-  const procList = Object.entries(porProc).sort((a, b) => b[1].und - a[1].und);
-
-  if (procList.length === 0 && fuenteActual === 'solicitudes') {
-    document.getElementById('procesosContent').innerHTML = '<div class="empty">ℹ️ Las solicitudes de ventas no tienen detalle de procesos.<br>Para ver procesos, selecciona "Producción real" o "Consolidado".</div>';
-    document.getElementById('procesosTag').textContent = 'sin datos';
-    return;
-  }
-
-  const maxUnd = procList[0]?.[1]?.und || 1;
-
-  document.getElementById('procesosContent').innerHTML = procList.map(([proc, d]) => {
-    const pct = Math.round((d.und / maxUnd) * 100);
-    const color = PROC_COLORS[proc] || '#6B6B6A';
-    const cls = proc.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8);
+  
+  document.getElementById('rankingContent').innerHTML = ranking.map((op, i) => {
+    const color = OP_COLORS[op.id] || '#6B6B6A';
+    const iniciales = (op.nombre || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const pct = Math.round((op.und / maxUnd) * 100);
+    
     return `
-    <div class="proc-row">
-      <div class="proc-chip ${cls}" style="background:${color}20;color:${color}">${proc}</div>
-      <div class="proc-bar-wrap"><div class="proc-bar" style="width:${pct}%;background:${color}"></div></div>
-      <div class="proc-und">${d.und.toLocaleString()} und</div>
-      <div class="proc-tareas">${d.tareas} tareas</div>
-    </div>`;
+      <div class="ranking-row">
+        <div class="rank-medal">${medals[i] || ''}</div>
+        <div class="rank-avatar" style="background:${color}">${iniciales || '?'}</div>
+        <div class="rank-info">
+          <div class="rank-name">${op.nombre}</div>
+          <div class="rank-cmds">${op.cmds} comanda${op.cmds !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div>
+        <div class="rank-und">${op.und.toLocaleString()} und</div>
+      </div>
+    `;
   }).join('');
 }
 
-// ══ HISTORIAL ══════════════════════════════════════════════
-function renderHistorial() {
-  let items = [];
-
-  if (fuenteActual === 'comandas' || fuenteActual === 'ambas') {
-    items.push(...datosComandas.map(c => ({
-      id: c.id,
-      fecha: c.fecha,
-      correlativo: c.correlativo,
-      nombre: c.operario_nombre,
-      responsable: c.supervisor_nombre,
-      unidades: c.total_unidades || 0,
-      tipo: 'comanda',
-      badge: 'b-comanda',
-      badgeTexto: '📋 Comanda',
-      hora_inicio: c.hora_inicio,
-      hora_cierre: c.hora_cierre
-    })));
-  }
-
-  if (fuenteActual === 'solicitudes' || fuenteActual === 'ambas') {
-    items.push(...datosSolicitudes.map(s => ({
-      id: s.id,
-      fecha: s.created_at ? s.created_at.split('T')[0] : s.fecha_limite,
-      correlativo: s.codigo,
-      nombre: s.cliente_nombre,
-      responsable: s.prioridad === 'urgente' ? '🔴 Urgente' : (s.prioridad === 'vela' ? '🌙 Vela' : '🟢 Normal'),
-      unidades: s.total_unidades || 0,
-      tipo: 'solicitud',
-      badge: 'b-solicitud',
-      badgeTexto: '📝 Solicitud',
-      estado: s.estado
-    })));
-  }
-
-  items.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
-
-  document.getElementById('histCount').textContent = `${items.length} registros`;
-
-  if (!items.length) {
-    document.getElementById('historialContent').innerHTML = '<div class="empty">No hay registros en este período.</div>';
+function renderProcesos() {
+  const porProc = {};
+  
+  comandas.forEach(c => {
+    (c.comanda_tareas || []).forEach(t => {
+      if (t.estado === 'Terminada') {
+        const proc = t.proceso || 'Otra tarea';
+        const und = t.unidades_completadas || t.cantidad || 0;
+        if (!porProc[proc]) porProc[proc] = { und: 0, tareas: 0 };
+        porProc[proc].und += und;
+        porProc[proc].tareas++;
+      }
+    });
+  });
+  
+  const procList = Object.entries(porProc).sort((a, b) => b[1].und - a[1].und);
+  
+  if (procList.length === 0) {
+    document.getElementById('procesosContent').innerHTML = '<div class="empty">🔧 No hay procesos registrados en este período</div>';
     return;
   }
-
-  document.getElementById('historialContent').innerHTML = `
-    <div style="overflow-x:auto">
-    <table class="hist-table">
-      <thead>
-        <tr><th>Tipo</th><th>Fecha</th><th>ID/Correlativo</th><th>Operario/Cliente</th><th>Supervisor/Prioridad</th><th style="text-align:right">Unidades</th></tr>
-      </thead>
-      <tbody>
-        ${items.map(item => `
-          <tr style="cursor:pointer" onclick="verDetalle('${item.id}', '${item.tipo}')">
-            <td><span class="badge ${item.badge}">${item.badgeTexto}</span></td>
-            <td style="font-family:var(--mono);font-size:11px">${item.fecha || '—'}</td>
-            <td style="font-weight:600">${item.correlativo || item.id.slice(0,8)}</td>
-            <td>${item.nombre || '—'}</td>
-            <td style="color:var(--gray)">${item.responsable || '—'}</td>
-            <td style="font-family:var(--mono);font-weight:700;color:var(--teal);text-align:right">${item.unidades.toLocaleString()}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-    </div>`;
+  
+  const maxUnd = procList[0][1].und;
+  
+  document.getElementById('procesosContent').innerHTML = procList.map(([proc, d]) => {
+    const pct = Math.round((d.und / maxUnd) * 100);
+    const color = PROC_COLORS[proc] || '#6B6B6A';
+    return `
+      <div class="proc-row">
+        <div class="proc-chip" style="background:${color}20;color:${color}">${proc}</div>
+        <div class="proc-bar-wrap"><div class="proc-bar" style="width:${pct}%;background:${color}"></div></div>
+        <div class="proc-und">${d.und.toLocaleString()} und</div>
+        <div class="proc-tareas">${d.tareas} tareas</div>
+      </div>
+    `;
+  }).join('');
 }
 
-function verDetalle(id, tipo) {
-  if (tipo === 'comanda') {
-    window.location.href = `comandas.html?ver=${id}`;
-  } else {
-    window.location.href = `tapas.html?ver=${id}`;
+function renderHistorial() {
+  if (comandas.length === 0) {
+    document.getElementById('histCount').textContent = '0 comandas';
+    document.getElementById('historialContent').innerHTML = '<div class="empty">📋 No hay comandas registradas en este período</div>';
+    return;
   }
+  
+  document.getElementById('histCount').textContent = `${comandas.length} comandas`;
+  
+  document.getElementById('historialContent').innerHTML = `
+    <div style="overflow-x:auto">
+      <table class="hist-table">
+        <thead>
+          <tr><th>Fecha</th><th>Correlativo</th><th>Operario</th><th>Supervisor</th><th style="text-align:right">Unidades</th></tr>
+        </thead>
+        <tbody>
+          ${comandas.map(c => `
+            <tr onclick="verComanda('${c.id}')" style="cursor:pointer">
+              <td style="font-family:monospace;font-size:11px">${c.fecha || '—'}</td>
+              <td><strong>${c.correlativo || '—'}</strong></td>
+              <td>${c.operario_nombre || '—'}</td>
+              <td>${c.supervisor_nombre || '—'}</td>
+              <td style="text-align:right;font-weight:700;color:#1A6B5B">${(c.total_unidades || 0).toLocaleString()}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function verComanda(id) {
+  window.location.href = `comandas.html?ver=${id}`;
 }
 
 function showToast(msg, color) {
@@ -557,13 +783,16 @@ function showToast(msg, color) {
   const t = document.createElement('div');
   t.className = 'toast-msg';
   t.textContent = msg;
-  t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${color};color:#fff;padding:11px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);white-space:nowrap`;
+  t.style.background = color;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 3500);
 }
 
-// ══ INICIO ═════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => cargarDatos());
+// ══ INICIAR ════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('🚀 Dashboard iniciado');
+  cargarComandas();
+});
 </script>
 
 </body>
