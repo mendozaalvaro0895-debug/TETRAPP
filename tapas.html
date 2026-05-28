@@ -4,90 +4,181 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TETRAPLASTIC — Tapas</title>
-  <div id="modal-traz" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(12, 12, 11, 0.8); z-index:9999; align-items:center; justify-content:center; padding:20px;">
-  <div style="background:var(--card); width:100%; max-width:400px; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-    
-    <h3 style="font-family:var(--display); font-size:20px; margin-bottom:8px; color:var(--teal);">Registrar Material</h3>
-    <p id="traz-sol-id" style="font-size:12px; font-weight:700; color:var(--gray); margin-bottom:20px;"></p>
-
-    <div style="display:flex; flex-direction:column; gap:16px;">
-      <div>
-        <label style="font-size:11px; font-weight:700; color:var(--gray-l); text-transform:uppercase;">Tipo de Movimiento</label>
-        <select id="traz-tipo" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:var(--font); font-size:14px; margin-top:4px;">
-          <option value="salida_bodega">Salida (De Bodega a Planta)</option>
-          <option value="entrada_pt">Entrada (Producto Terminado)</option>
-          <option value="devolucion">Devolución (Sobrante a Bodega)</option>
-          <option value="perdida">Pérdida / Fuga reportada</option>
-        </select>
-      </div>
-
-      <div>
-        <label style="font-size:11px; font-weight:700; color:var(--gray-l); text-transform:uppercase;">SKU / Material</label>
-        <input type="text" id="traz-sku" placeholder="Ej. 10001" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:var(--font); font-size:14px; margin-top:4px;">
-      </div>
-
-      <div>
-        <label style="font-size:11px; font-weight:700; color:var(--gray-l); text-transform:uppercase;">Cantidad</label>
-        <input type="number" id="traz-cant" placeholder="0" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:var(--font); font-size:14px; margin-top:4px;">
-      </div>
-    </div>
-
-    <div style="display:flex; gap:12px; margin-top:24px;">
-      <button onclick="document.getElementById('modal-traz').style.display='none'" style="flex:1; padding:12px; border:none; background:var(--bg); color:var(--gray); border-radius:8px; font-weight:700; cursor:pointer;">Cancelar</button>
-      <button onclick="ejecutarMovimiento()" style="flex:1; padding:12px; border:none; background:var(--teal); color:#fff; border-radius:8px; font-weight:700; cursor:pointer;">Guardar</button>
-    </div>
-    
-  </div>
-</div>
-
-<script>
-// Aquí empieza tu código JavaScript actual...
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="shared/styles.css">
-<script src="shared/supabase.js"></script>
-<script src="shared/inventario.js"></script>
-<script src="shared/helpers.js"></script>
-<script src="shared/data.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0C0C0B;
+  --teal: #1A6B5B;
+  --teal-l: #C8EDE7;
+  --teal-xl: #EBF7F4;
+  --serig-m: #5A2D9E;
+  --gold: #B07D2A;
+  --red: #B83232;
+  --red-l: #FEE2E2;
+  --amber: #B87200;
+  --amber-l: #FFF3D6;
+  --green: #166534;
+  --bg: #F7F6F2;
+  --bg2: #EBE9E4;
+  --card: #FFFFFF;
+  --border: #E0DED8;
+  --gray: #6B6B6A;
+  --gray-l: #A8A6A0;
+  --font: 'DM Sans', sans-serif;
+  --display: 'Playfair Display', serif;
+  --mono: 'DM Mono', monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:var(--ink);padding:10px 20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;border-bottom:2px solid #1E7D6A}
+.logo{font-family:var(--display);font-size:18px;font-weight:900;color:#fff}
+.logo span{color:#7ECEC0}
+.topbar-sep{width:1px;height:24px;background:rgba(255,255,255,.2)}
+.topbar-sub{font-size:13px;color:rgba(255,255,255,.7);flex:1}
+.clock{font-family:var(--mono);font-size:12px;color:#7ECEC0;background:rgba(0,0,0,.3);padding:4px 10px;border-radius:20px}
+.user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:4px 12px;border-radius:20px}
+.uavatar{width:28px;height:28px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.uname{font-size:12px;color:#fff}
+
+/* APP LAYOUT */
+.app{display:flex;height:calc(100vh - 56px);overflow:hidden}
+
+/* SIDENAV */
+.sidenav{width:56px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:8px}
+.sn-btn{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:all .15s;color:var(--gray);position:relative}
+.sn-btn:hover{background:var(--teal-xl);color:var(--teal)}
+.sn-btn.active{background:var(--teal);color:#fff}
+.sn-div{width:32px;height:1px;background:var(--border);margin:8px 0}
+.sn-badge{position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--red);border-radius:50%}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* TABS */
+.tabs{display:flex;align-items:center;background:var(--card);border-bottom:1px solid var(--border);padding:0 16px;gap:16px;flex-shrink:0}
+.tab{display:flex;align-items:center;gap:8px;padding:12px 8px;font-size:13px;font-weight:600;color:var(--gray);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tab:hover{color:var(--teal)}
+.tab.active{color:var(--teal);border-bottom-color:var(--teal)}
+.tdot{width:8px;height:8px;border-radius:50%}
+.tbadge{background:var(--bg);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;color:var(--gray)}
+.tbadge.tb-teal{background:var(--teal-xl);color:var(--teal)}
+.tabs-r{flex:1;display:flex;justify-content:flex-end;gap:8px}
+
+/* BUTTONS */
+.btn{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:var(--font);transition:all .15s}
+.btn-t{background:var(--teal);color:#fff}
+.btn-t:hover{background:#0D4035}
+.btn-g{background:var(--bg);border:1px solid var(--border);color:var(--ink)}
+.btn-g:hover{background:var(--teal-xl);border-color:var(--teal-l)}
+.btn-sm{padding:4px 10px;font-size:11px}
+.btn-xs{padding:3px 8px;font-size:10px}
+.btn-del{background:var(--red-l);color:var(--red)}
+.btn-del:hover{background:#FECACA}
+
+/* KPI STRIP */
+.kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0}
+.kpi{background:var(--bg);border-radius:10px;padding:10px 12px}
+.kpi-l{font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--gray)}
+.kpi-v{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--ink);line-height:1.2}
+.kpi-s{font-size:9px;color:var(--gray-l);margin-top:2px}
+
+/* SPLIT LAYOUT */
+.split{display:flex;flex:1;overflow:hidden;gap:1px;background:var(--border)}
+.pane-l{width:380px;background:var(--card);display:flex;flex-direction:column;overflow:hidden}
+.pane-r{flex:1;background:var(--card);display:flex;flex-direction:column;overflow:hidden}
+.ph{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.ph-title{font-family:var(--display);font-size:16px;font-weight:700}
+.ph-sub{font-size:11px;color:var(--gray);margin-top:2px}
+.ph-r{display:flex;gap:8px}
+.fi{padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--font);background:var(--bg)}
+
+/* SOLICITUDES LIST */
+.sol-list{flex:1;overflow-y:auto}
+.sc{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
+.sc:hover{background:var(--teal-xl)}
+.sc.sel{background:var(--teal-xl);border-left:3px solid var(--teal)}
+.sc-top{display:flex;justify-content:space-between;margin-bottom:6px}
+.sc-id{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--teal)}
+.sc-cli{font-size:12px;font-weight:600}
+.sc-desc{font-size:11px;color:var(--gray);margin-top:2px}
+.sc-meta{display:flex;gap:12px;margin-top:6px;font-size:10px;color:var(--gray)}
+.sc-qty{font-family:var(--mono);font-weight:700;color:var(--teal)}
+.sc-date{display:flex;align-items:center;gap:3px}
+.pr-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.pr-wrap{flex:1;background:var(--bg);border-radius:4px;height:4px;overflow:hidden}
+.pr-bar{height:4px;border-radius:4px;transition:width .3s}
+.pr-bar.pb-t{background:var(--teal)}
+.pr-pct{font-size:9px;color:var(--gray)}
+
+/* PILLS */
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700}
+.pill-nueva{background:#DBEAFE;color:#1A3B8B}
+.pill-programada{background:#FEF3C7;color:#92400E}
+.pill-proceso{background:var(--teal-xl);color:var(--teal)}
+.pill-lista{background:#DCFCE7;color:#166534}
+.pill-entregada{background:#E5E7EB;color:#374151}
+.pill-normal{background:#E5E7EB;color:#374151}
+.pill-urgente{background:#FEE2E2;color:var(--red)}
+.pill-vela{background:#E0E7FF;color:#4338CA}
+
+/* DETALLE */
+.det-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--gray);gap:12px}
+.det-empty-ico{font-size:48px}
+.det-empty-txt{font-size:13px}
+.det-scroll{flex:1;overflow-y:auto;padding:16px}
+.tbox{background:var(--teal-xl);border-radius:12px;padding:14px;margin-bottom:14px}
+.tbox.tt{background:var(--teal-xl)}
+.tbox-lbl{font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--teal)}
+.tbox-val{font-family:var(--display);font-size:28px;font-weight:700;color:var(--teal);line-height:1}
+.tbox-val.tc{color:var(--teal)}
+.tbox-sub{font-size:10px;color:var(--gray);margin-top:4px}
+.dc{border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.dc-h{padding:10px 14px;background:var(--bg);font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);border-bottom:1px solid var(--border)}
+.dc-b{padding:12px 14px}
+.dt{width:100%;border-collapse:collapse}
+.dt th{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}
+.dt td{padding:8px;font-size:12px;border-bottom:1px solid var(--bg)}
+.op-chip{padding:3px 8px;background:var(--bg);border-radius:20px;font-size:9px;cursor:pointer;transition:all .1s}
+.op-chip.sel-proc{background:var(--teal);color:#fff}
+
+/* MODAL */
+.overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(12,12,11,.8);z-index:10000;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--card);border-radius:16px;width:90%;max-width:650px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,.3)}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)}
+.mh-title{font-family:var(--display);font-size:18px;font-weight:700}
+.m-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray)}
+.mb{padding:20px;overflow-y:auto;flex:1}
+.mf{display:flex;justify-content:flex-end;gap:12px;padding:14px 20px;border-top:1px solid var(--border)}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg.full{grid-column:1/-1}
+.fl{font-size:11px;font-weight:700;color:var(--gray)}
+.fs{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font)}
+.fta{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--font);resize:vertical;min-height:60px}
+.cbox{background:var(--teal-xl);border-radius:12px;padding:14px;margin:14px 0}
+.c-lbl{font-size:10px;font-weight:800;letter-spacing:1px;color:var(--teal);margin-bottom:10px}
+.c-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.c-item{text-align:center}
+.c-val{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--teal)}
+.c-lbl2{font-size:9px;color:var(--gray);margin-top:2px}
+.c-note{font-size:10px;color:var(--gray);margin-top:10px;padding-top:8px;border-top:1px solid rgba(0,0,0,.05)}
+.pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:16px}
+.op-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
+.op-top{display:flex;gap:12px;align-items:center}
+.op-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+.op-name{font-size:13px;font-weight:700}
+.op-proc{font-size:10px;color:var(--gray)}
+.p-lista{background:#DCFCE7;color:#166534}
+.p-urg{background:#FEE2E2;color:var(--red)}
+</style>
 </head>
 <body>
-<div id="modal-traz" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(12, 12, 11, 0.8); z-index:9999; align-items:center; justify-content:center; padding:20px;">
-  <div style="background:var(--card); width:100%; max-width:400px; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-    
-    <h3 style="font-family:var(--display); font-size:20px; margin-bottom:8px; color:var(--teal);">Registrar Material</h3>
-    <p id="traz-sol-id" style="font-size:12px; font-weight:700; color:var(--gray); margin-bottom:20px;"></p>
 
-    <div style="display:flex; flex-direction:column; gap:16px;">
-      
-      <div>
-        <label style="font-size:11px; font-weight:700; color:var(--gray-l); text-transform:uppercase;">Tipo de Movimiento</label>
-        <select id="traz-tipo" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:var(--font); font-size:14px; margin-top:4px;">
-          <option value="salida_bodega">Salida (De Bodega a Planta)</option>
-          <option value="entrada_pt">Entrada (Producto Terminado)</option>
-          <option value="devolucion">Devolución (Sobrante a Bodega)</option>
-          <option value="perdida">Pérdida / Fuga reportada</option>
-        </select>
-      </div>
-
-      <div>
-        <label style="font-size:11px; font-weight:700; color:var(--gray-l); text-transform:uppercase;">SKU / Material</label>
-        <input type="text" id="traz-sku" placeholder="Ej. 10001" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:var(--font); font-size:14px; margin-top:4px;">
-      </div>
-
-      <div>
-        <label style="font-size:11px; font-weight:700; color:var(--gray-l); text-transform:uppercase;">Cantidad</label>
-        <input type="number" id="traz-cant" placeholder="0" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:var(--font); font-size:14px; margin-top:4px;">
-      </div>
-
-    </div>
-
-    <div style="display:flex; gap:12px; margin-top:24px;">
-      <button onclick="document.getElementById('modal-traz').style.display='none'" style="flex:1; padding:12px; border:none; background:var(--bg); color:var(--gray); border-radius:8px; font-weight:700; cursor:pointer;">Cancelar</button>
-      <button onclick="ejecutarMovimiento()" style="flex:1; padding:12px; border:none; background:var(--teal); color:#fff; border-radius:8px; font-weight:700; cursor:pointer;">Guardar</button>
-    </div>
-    
-  </div>
-</div>
-<div class="topbar" style="background:#0C0C0B!important">
+<div class="topbar">
   <div class="logo">TETRA<span>PLASTIC</span></div>
   <div class="topbar-sep"></div>
   <div class="topbar-sub">Tapas · Control de Solicitudes</div>
@@ -96,7 +187,7 @@
     <div class="uavatar">AM</div>
     <div class="uname">Álvaro Mendoza</div>
   </div>
-  <a href="index.html" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;margin-left:8px">🏠 Inicio</a>
+  <a href="index.html" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;">🏠 Inicio</a>
 </div>
 
 <div class="app">
@@ -118,7 +209,7 @@
       Tapas
       <span class="tbadge tb-teal" id="cnt-tapas">0</span>
     </div>
-    <div class="tab t-dash" id="tab-dash" onclick="location.href='dashboard.html'">📊 Dashboard</div>
+    <div class="tab t-dash" id="tab-dash" onclick="switchTab('dash')">📊 Dashboard</div>
     <div class="tab t-personal" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
     <div class="tabs-r">
       <button class="btn btn-t btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>
@@ -130,7 +221,7 @@
   <div class="views">
 
     <!-- TAPAS VIEW -->
-    <div class="view active" id="view-tapas">
+    <div class="view" style="display:flex;flex-direction:column;flex:1;overflow:hidden" id="view-tapas">
       <div class="kpi-strip">
         <div class="kpi"><div class="kpi-l">En proceso</div><div class="kpi-v" style="color:var(--teal)" id="kt-proc">0</div><div class="kpi-s">solicitudes activas</div></div>
         <div class="kpi"><div class="kpi-l">Pendientes</div><div class="kpi-v" style="color:var(--amber)" id="kt-pend">0</div><div class="kpi-s">sin iniciar</div></div>
@@ -172,12 +263,12 @@
     </div>
 
     <!-- DASHBOARD VIEW -->
-    <div class="view" id="view-dash">
-      <div class="dash" id="dashGrid"></div>
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-dash">
+      <div class="dash" id="dashGrid" style="padding:20px"></div>
     </div>
 
     <!-- PERSONAL VIEW -->
-    <div class="view" id="view-personal">
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
       <div class="ph">
         <div><div class="ph-title">Personal · Tapas</div><div class="ph-sub">Asistencia y asignación del día</div></div>
         <div class="ph-r">
@@ -191,7 +282,7 @@
 </div>
 </div>
 
-<!-- FORM MODAL -->
+<!-- MODAL FORMULARIO -->
 <div class="overlay" id="overlay">
   <div class="modal">
     <div class="mh">
@@ -274,7 +365,7 @@
   </div>
 </div>
 
-<!-- MODAL PARA REGISTRAR PÉRDIDA -->
+<!-- MODAL PÉRDIDA -->
 <div class="overlay" id="modalPerdida">
   <div class="modal" style="max-width:400px">
     <div class="mh">
@@ -313,7 +404,7 @@
   </div>
 </div>
 
-<!-- MODAL PARA REGISTRAR PARO DE MÁQUINA -->
+<!-- MODAL PARO MÁQUINA -->
 <div class="overlay" id="modalParo">
   <div class="modal" style="max-width:400px">
     <div class="mh">
@@ -361,137 +452,121 @@
 
 <script>
 // ════════════════════════════════════════════════════════════
-// TAPAS.JS - VERSIÓN CON TRAZABILIDAD DE FUGAS
+// TAPAS.JS - VERSIÓN CORREGIDA
 // ════════════════════════════════════════════════════════════
 
+// Conexión Supabase
+const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
+const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// Estado global
 let solicitudes = [];
 let selId = null;
 let lineas = [];
-let fArea = 'tapas';
+let inventarioCache = [];
 let personalData = null;
-let INVENTARIO_LOCAL = [];
-
-const ALL_PROCS_TAPAS = [
-  {val:'armado',lbl:'Armado'},{val:'banda',lbl:'Banda'},
-  {val:'liner',lbl:'Liner'},{val:'impresion',lbl:'Impresión'},
-  {val:'encajado',lbl:'Encajado'}
-];
-
 let perdidaSolicitudActual = null;
 
-// ══ INICIALIZACIÓN ══════════════════════════════════════════
-async function init() {
-  // Cargar clientes
-  const clientesSelect = document.getElementById('fCli');
-  if (clientesSelect && window.CLIENTES) {
-    CLIENTES.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c;
-      opt.textContent = c;
-      clientesSelect.appendChild(opt);
-    });
+const ALL_PROCS_TAPAS = [
+  {val:'armado', lbl:'Armado'}, {val:'banda', lbl:'Banda'},
+  {val:'liner', lbl:'Liner'}, {val:'impresion', lbl:'Impresión'},
+  {val:'encajado', lbl:'Encajado'}
+];
+
+// Clientes predefinidos
+const CLIENTES = [
+  'A. CORP UNIVERSAL', 'AMERICAN NATURAL', 'ANCORA (HN)', 'BELLEZA S.A.',
+  'CALLE DE LA PLAZA', 'CAVE LULU (HN)', 'CHAMER (HN)', 'CLEMENTE VELASQUEZ ROCA',
+  'DAROSA (HN)', 'DISUFIX', 'DISTRIBUIDORA DEL CARIBE', 'ERICK DAVID CASTRO VELIZ',
+  'ETIFLEX', 'FARMAYA', 'FLUSHING', 'HUGO FERNANDO DURAN', 'INCOGUA', 'INTERCORP',
+  'JOSE IBAÑEZ', 'JULIA ALVARADO', 'NATUFARMA', 'PETROPLASTIC', 'ROMO S.A.',
+  'SCENTIA', 'SHALOM', 'SINERGIA', 'TECNIPLAST', 'VESA'
+];
+
+// ══ FUNCIONES DE CARGA ══════════════════════════════════════
+async function cargarInventario() {
+  try {
+    const { data, error } = await db
+      .from('inventario')
+      .select('sku, descripcion, existencia')
+      .eq('activo', true)
+      .limit(200);
+    
+    if (error) throw error;
+    inventarioCache = data || [];
+    return inventarioCache;
+  } catch(e) {
+    console.error('Error cargando inventario:', e);
+    return [];
   }
-  
-  // Cargar inventario
-  const inv = await cargarInventarioDB();
-  if (inv) INVENTARIO_LOCAL = inv;
-  
-  // Cargar personal
-  if (window.personal) personalData = personal;
-  
-  // Cargar solicitudes
-  await cargarSolicitudes();
-  
-  // Fecha por defecto +3 días
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
-  const fechaInput = document.getElementById('fFecha');
-  if (fechaInput) fechaInput.value = d.toISOString().split('T')[0];
-  
-  renderListas();
-  tick();
-  setInterval(tick, 30000);
-  setInterval(refreshKPIs, 30000);
+}
+
+async function cargarPersonal() {
+  try {
+    const { data, error } = await db
+      .from('personal')
+      .select('*')
+      .eq('area', 'tapas')
+      .eq('activo', true);
+    
+    if (error) throw error;
+    personalData = { tapas: data || [] };
+    return personalData;
+  } catch(e) {
+    console.error('Error cargando personal:', e);
+    return { tapas: [] };
+  }
 }
 
 async function cargarSolicitudes() {
-  const { data, error } = await db
-    .from('solicitudes')
-    .select('*, solicitud_lineas(*)')
-    .eq('area', 'tapas')
-    .order('created_at', { ascending: false });
-  
-  if (error) {
-    console.error('Error:', error);
-    return;
+  try {
+    const { data, error } = await db
+      .from('solicitudes')
+      .select('*, solicitud_lineas(*)')
+      .eq('area', 'tapas')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    solicitudes = (data || []).map(s => {
+      const lineasData = s.solicitud_lineas || [];
+      return {
+        id: s.id,
+        dbId: s.id,
+        id_display: s.codigo,
+        area: s.area,
+        cliente: s.cliente_nombre,
+        area_sol: s.area_solicitante,
+        sku: lineasData[0]?.sku || '—',
+        desc: lineasData.length === 1 ? (lineasData[0]?.descripcion || '—') : 
+              (lineasData[0]?.descripcion || '—') + (lineasData.length > 1 ? ` (+${lineasData.length-1})` : ''),
+        lineas: lineasData.map(l => ({
+          id: l.id,
+          sku: l.sku,
+          desc: l.descripcion,
+          cant: l.cantidad,
+          existencia: l.existencia_snap,
+          procs: l.procesos || [],
+          operadores: l.operadores_ids || []
+        })),
+        cant: lineasData.reduce((sum, l) => sum + (l.cantidad || 0), 0),
+        fecha_lim: s.fecha_limite || '',
+        prio: s.prioridad,
+        estado: s.estado,
+        prog: s.progreso_pct || 0,
+        ops: [],
+        notas: s.notas || '',
+        created: new Date(s.created_at).toLocaleString('es-GT')
+      };
+    });
+    
+    renderListas();
+    refreshKPIs();
+  } catch(e) {
+    console.error('Error cargando solicitudes:', e);
+    showToast('Error al cargar solicitudes', '#B83232');
   }
-  
-  solicitudes = (data || []).map(s => {
-    const lineasData = s.solicitud_lineas || [];
-    return {
-      id: s.id,
-      dbId: s.id,
-      id_display: s.codigo,
-      area: s.area,
-      cliente: s.cliente_nombre,
-      area_sol: s.area_solicitante,
-      sku: lineasData[0]?.sku || '—',
-      desc: lineasData.length === 1 ? (lineasData[0]?.descripcion || '—') : 
-            (lineasData[0]?.descripcion || '—') + (lineasData.length > 1 ? ` (+${lineasData.length-1})` : ''),
-      lineas: lineasData.map(l => ({
-        id: l.id,
-        sku: l.sku,
-        desc: l.descripcion,
-        cant: l.cantidad,
-        existencia: l.existencia_snap,
-        procs: l.procesos || [],
-        operadores: l.operadores_ids || []
-      })),
-      cant: lineasData.reduce((sum, l) => sum + (l.cantidad || 0), 0),
-      fecha_lim: s.fecha_limite || '',
-      prio: s.prioridad,
-      estado: s.estado,
-      prog: s.progreso_pct || 0,
-      ops: [],
-      notas: s.notas || '',
-      created: new Date(s.created_at).toLocaleString('es-GT')
-    };
-  });
-  
-  renderListas();
-}
-
-async function guardarEnSupabase(datos) {
-  const codigo = await generarCodigo('tapas');
-  
-  const { data: sol, error: err1 } = await db
-    .from('solicitudes')
-    .insert({
-      codigo, area: 'tapas',
-      cliente_nombre: datos.cliente,
-      area_solicitante: datos.area_sol,
-      fecha_limite: datos.fecha_lim,
-      prioridad: datos.prio,
-      estado: 'nueva',
-      progreso_pct: 0,
-      notas: datos.notas
-    })
-    .select()
-    .single();
-  
-  if (err1) throw err1;
-  
-  if (datos.lineas.length > 0) {
-    const lineasInsert = datos.lineas.map((l, i) => ({
-      solicitud_id: sol.id, orden: i + 1,
-      sku: l.sku, descripcion: l.desc,
-      cantidad: l.cant, existencia_snap: l.existencia || 0,
-      procesos: l.procs || [], operadores_ids: l.operadores || []
-    }));
-    await db.from('solicitud_lineas').insert(lineasInsert);
-  }
-  
-  return { ok: true, codigo };
 }
 
 // ══ RENDER LISTS ════════════════════════════════════════════
@@ -503,26 +578,83 @@ function renderListas() {
   if (!container) return;
   
   container.innerHTML = filtradas.map(s => `
-    <div class="sc at ${selId === s.id ? 'sel' : ''}" onclick="mostrarDetalle('${s.id}')">
+    <div class="sc ${selId === s.id ? 'sel' : ''}" onclick="mostrarDetalle('${s.id}')">
       <div class="sc-top">
         <div>
           <div class="sc-id">${s.id_display || s.id.slice(0,8)}</div>
           <div class="sc-cli">${s.cliente}</div>
           <div class="sc-desc">${s.sku} — ${s.desc}</div>
         </div>
-        <div>${ePill(s.estado)} ${pPill(s.prio)}</div>
+        <div>${estadoPill(s.estado)} ${prioridadPill(s.prio)}</div>
       </div>
       <div class="sc-meta">
         <span class="sc-qty">${s.cant.toLocaleString()} und</span>
         <span class="sc-date">🗓 ${s.fecha_lim || '—'}</span>
-        <span class="sc-date">⏱ ${calcHoras(s.cant, 1).toFixed(1)}h</span>
+        <span class="sc-date">⏱ ${calcularHoras(s.cant, 1).toFixed(1)}h</span>
       </div>
       ${s.prog > 0 ? `<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:${s.prog}%"></div></div><div class="pr-pct">${s.prog}%</div></div>` : ''}
     </div>
   `).join('');
   
   document.getElementById('cnt-tapas').textContent = solicitudes.length;
-  refreshKPIs();
+}
+
+function estadoPill(estado) {
+  const clases = {
+    'nueva': 'pill-nueva', 'programada': 'pill-programada',
+    'proceso': 'pill-proceso', 'lista': 'pill-lista', 'entregada': 'pill-entregada'
+  };
+  const textos = {
+    'nueva': '🟡 Nueva', 'programada': '📅 Programada',
+    'proceso': '🟢 En proceso', 'lista': '✅ Lista', 'entregada': '📦 Entregada'
+  };
+  return `<span class="pill ${clases[estado] || 'pill-nueva'}">${textos[estado] || estado}</span>`;
+}
+
+function prioridadPill(prioridad) {
+  const clases = {
+    'normal': 'pill-normal', 'urgente': 'pill-urgente',
+    'programada': 'pill-programada', 'vela': 'pill-vela'
+  };
+  const textos = {
+    'normal': '🟢 Normal', 'urgente': '🔴 Urgente',
+    'programada': '📅 Programada', 'vela': '🌙 Vela'
+  };
+  return `<span class="pill ${clases[prioridad] || 'pill-normal'}">${textos[prioridad] || prioridad}</span>`;
+}
+
+function calcularHoras(cantidad, opsCount = 1) {
+  const velocidadBase = 1200;
+  return cantidad / (velocidadBase * opsCount);
+}
+
+function fechaEst(turnos) {
+  const fecha = new Date();
+  fecha.setDate(fecha.getDate() + turnos);
+  return fecha.toLocaleDateString('es-GT');
+}
+
+async function generarCodigo(area) {
+  const prefix = area === 'tapas' ? 'T' : 'S';
+  try {
+    const { data, error } = await db
+      .from('solicitudes')
+      .select('codigo')
+      .eq('area', area)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    if (error) throw error;
+    
+    let lastNum = 0;
+    if (data && data.length > 0 && data[0].codigo) {
+      const match = data[0].codigo.match(/\d+$/);
+      if (match) lastNum = parseInt(match[0]);
+    }
+    return `${prefix}-${String(lastNum + 1).padStart(3, '0')}`;
+  } catch(e) {
+    return `${prefix}-001`;
+  }
 }
 
 async function refreshKPIs() {
@@ -542,23 +674,102 @@ async function refreshKPIs() {
     if (fugasHoy) {
       const perdidas = fugasHoy.filter(f => f.tipo === 'perdida').reduce((s, f) => s + (f.cantidad || 0), 0);
       document.getElementById('kt-fugas').textContent = perdidas.toLocaleString();
-  cargarKPIComandas();
     }
   } catch(e) {}
   
-  const opsLibres = personalData?.tapas?.filter(p => p.rol !== 'supervisor' && p.presente).length || 0;
+  const opsLibres = personalData?.tapas?.filter(p => p.rol !== 'supervisor' && p.activo).length || 0;
   document.getElementById('kt-ops').textContent = opsLibres + ' libres';
   document.getElementById('kt-cap').textContent = (opsLibres * 1200).toLocaleString();
+  
+  // Cargar KPI de comandas
+  await cargarKPIComandas();
 }
 
-// ══ DETALLE CON TRAZABILIDAD ════════════════════════════════
+async function cargarKPIComandas() {
+  try {
+    const hoy = new Date().toISOString().split('T')[0];
+    const { data } = await db.from('comandas').select('total_unidades, operario_id').eq('fecha', hoy);
+    if (!data) return;
+    const totalUnd = data.reduce((s,c) => s + (c.total_unidades||0), 0);
+    const opCount = new Set(data.map(c => c.operario_id)).size;
+    const elUnd = document.getElementById('kt-cmd-und');
+    const elCount = document.getElementById('kt-cmd-count');
+    if (elUnd) elUnd.textContent = totalUnd.toLocaleString();
+    if (elCount) elCount.textContent = opCount;
+  } catch(e) { console.warn('KPI comandas:', e); }
+}
+
+// ══ TRAZABILIDAD (FUNCIONES FALTANTES) ══════════════════════
+async function registrarPerdida(solicitudId, sku, cantidad, motivo, usuario, obs) {
+  try {
+    const { error } = await db.from('movimientos_materiales').insert({
+      solicitud_id: solicitudId,
+      sku: sku,
+      cantidad: cantidad,
+      tipo: 'perdida',
+      usuario: usuario,
+      observaciones: `${motivo} - ${obs}`
+    });
+    return { ok: !error, error: error?.message };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function registrarEntradaPT(solicitudId, sku, cantidad, usuario, obs) {
+  try {
+    const { error } = await db.from('movimientos_materiales').insert({
+      solicitud_id: solicitudId,
+      sku: sku,
+      cantidad: cantidad,
+      tipo: 'entrada_pt',
+      usuario: usuario,
+      observaciones: obs
+    });
+    return { ok: !error, error: error?.message };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
+  try {
+    const { error } = await db.from('movimientos_materiales').insert({
+      solicitud_id: solicitudId,
+      sku: sku,
+      cantidad: cantidad,
+      tipo: 'salida_bodega',
+      usuario: usuario,
+      observaciones: obs
+    });
+    return { ok: !error, error: error?.message };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function registrarParoMaquina(maquinaId, motivo, duracion, usuario, obs) {
+  try {
+    const { error } = await db.from('paros_maquina').insert({
+      maquina_id: maquinaId,
+      motivo: motivo,
+      duracion_minutos: duracion,
+      usuario: usuario,
+      observaciones: obs
+    });
+    return { ok: !error, error: error?.message };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+// ══ MOSTRAR DETALLE ═════════════════════════════════════════
 async function mostrarDetalle(id) {
   const s = solicitudes.find(x => x.id === id);
   if (!s) return;
   selId = s.id;
   renderListas();
   
-  // Cargar fugas de esta solicitud
   let fugas = { salidas: 0, entradas: 0, perdidas: 0, fugaTotal: 0 };
   try {
     const { data } = await db
@@ -575,7 +786,7 @@ async function mostrarDetalle(id) {
   } catch(e) {}
   
   const det = document.getElementById('detTapas');
-  const horas = calcHoras(s.cant, 1);
+  const horas = calcularHoras(s.cant, 1);
   
   det.innerHTML = `
     <div class="ph" style="flex-shrink:0">
@@ -587,7 +798,7 @@ async function mostrarDetalle(id) {
         ${s.estado === 'nueva' ? `<button class="btn btn-t btn-xs" onclick="cambiarEstado('${s.id}','proceso')">▶ Iniciar</button>` : ''}
         ${s.estado === 'proceso' ? `<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista')">✓ Lista</button>` : ''}
         ${s.estado === 'lista' ? `<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada')">📦 Entregar</button>` : ''}
-        <button class="btn btn-xs" style="background:var(--red-l);color:var(--red)" onclick="confirmarBorrar('${s.id}')">🗑</button>
+        <button class="btn btn-del btn-xs" onclick="confirmarBorrar('${s.id}')">🗑</button>
       </div>
     </div>
     <div class="det-scroll">
@@ -598,7 +809,6 @@ async function mostrarDetalle(id) {
         <div class="tbox-sub">${Math.ceil(horas/12)} turno(s) · Entrega estimada: ${fechaEst(Math.ceil(horas/12))}</div>
       </div>
       
-      <!-- PANEL DE TRAZABILIDAD DE FUGAS -->
       <div class="dc" style="border-color:var(--amber)">
         <div class="dc-h" style="background:var(--amber-l);color:var(--amber)">📉 Trazabilidad de fugas</div>
         <div class="dc-b">
@@ -620,15 +830,17 @@ async function mostrarDetalle(id) {
         <div class="dc-h">Líneas del pedido</div>
         <div class="dc-b">
           <table class="dt">
-            <tr><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock</th></tr>
-            ${s.lineas.map(l => `
-              <tr>
-                <td style="font-family:var(--mono)">${l.sku || '—'}</td>
-                <td>${l.desc || '—'}</td>
-                <td style="text-align:right">${(l.cant || 0).toLocaleString()}</td>
-                <td style="text-align:right;color:${(l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)'}">${(l.existencia || 0).toLocaleString()}</td>
-              </tr>
-            `).join('')}
+            <thead><tr><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock</th></tr></thead>
+            <tbody>
+              ${s.lineas.map(l => `
+                <tr>
+                  <td style="font-family:var(--mono)">${l.sku || '—'}</td>
+                  <td>${l.desc || '—'}</td>
+                  <td style="text-align:right">${(l.cant || 0).toLocaleString()}</td>
+                  <td style="text-align:right;color:${(l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)'}">${(l.existencia || 0).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
           </table>
         </div>
       </div>
@@ -656,7 +868,7 @@ async function mostrarDetalle(id) {
   }
 }
 
-// ══ ACCIONES DE TRAZABILIDAD ════════════════════════════════
+// ══ ACCIONES ════════════════════════════════════════════════
 function abrirModalPerdida(solicitudId) {
   perdidaSolicitudActual = solicitudId;
   document.getElementById('perdidaSku').value = '';
@@ -678,7 +890,7 @@ async function confirmarPerdida() {
   const obs = document.getElementById('perdidaObs').value;
   
   if (!sku || !cantidad || cantidad <= 0) {
-    showToast('⚠️ Completa SKU y cantidad válida', 'var(--red)');
+    showToast('⚠️ Completa SKU y cantidad válida', '#B83232');
     return;
   }
   
@@ -689,7 +901,7 @@ async function confirmarPerdida() {
     mostrarDetalle(perdidaSolicitudActual);
     refreshKPIs();
   } else {
-    showToast(`❌ Error: ${result.error}`, 'var(--red)');
+    showToast(`❌ Error: ${result.error}`, '#B83232');
   }
 }
 
@@ -706,7 +918,7 @@ async function registrarEntradaRapida(solicitudId) {
     mostrarDetalle(solicitudId);
     refreshKPIs();
   } else {
-    showToast(`❌ Error: ${result.error}`, 'var(--red)');
+    showToast(`❌ Error: ${result.error}`, '#B83232');
   }
 }
 
@@ -723,11 +935,61 @@ async function registrarSalidaRapida(solicitudId) {
     mostrarDetalle(solicitudId);
     refreshKPIs();
   } else {
-    showToast(`❌ Error: ${result.error}`, 'var(--red)');
+    showToast(`❌ Error: ${result.error}`, '#B83232');
   }
 }
 
-// ══ PAROS DE MÁQUINA ════════════════════════════════════════
+async function cambiarEstado(id, nuevoEstado) {
+  const s = solicitudes.find(x => x.id === id);
+  if (!s) return;
+  
+  try {
+    await db.from('solicitudes').update({ estado: nuevoEstado }).eq('id', s.dbId);
+    s.estado = nuevoEstado;
+    if (nuevoEstado === 'lista' || nuevoEstado === 'entregada') s.prog = 100;
+    renderListas();
+    mostrarDetalle(id);
+    showToast(`✅ Solicitud ${nuevoEstado === 'lista' ? 'marcada como lista' : nuevoEstado === 'entregada' ? 'entregada' : 'en proceso'}`);
+  } catch(e) {
+    showToast('❌ Error al cambiar estado', '#B83232');
+  }
+}
+
+async function actualizarProg(id) {
+  const s = solicitudes.find(x => x.id === id);
+  const slider = document.getElementById(`sldr_${id}`);
+  if (!s || !slider) return;
+  
+  const prog = parseInt(slider.value);
+  try {
+    await db.from('solicitudes').update({ progreso_pct: prog }).eq('id', s.dbId);
+    s.prog = prog;
+    mostrarDetalle(id);
+    showToast(`✅ Progreso actualizado a ${prog}%`);
+  } catch(e) {
+    showToast('❌ Error al actualizar progreso', '#B83232');
+  }
+}
+
+async function confirmarBorrar(id) {
+  if (!confirm('¿Eliminar esta solicitud? Esta acción no se puede deshacer.')) return;
+  
+  const s = solicitudes.find(x => x.id === id);
+  if (s?.dbId) {
+    try {
+      await db.from('solicitud_lineas').delete().eq('solicitud_id', s.dbId);
+      await db.from('solicitudes').delete().eq('id', s.dbId);
+      solicitudes = solicitudes.filter(x => x.id !== id);
+      renderListas();
+      document.getElementById('detTapas').innerHTML = '<div class="det-empty"><div class="det-empty-ico">🗑️</div><div class="det-empty-txt">Solicitud eliminada</div></div>';
+      showToast('🗑 Solicitud eliminada');
+      selId = null;
+    } catch(e) {
+      showToast('❌ Error al eliminar', '#B83232');
+    }
+  }
+}
+
 function reportarParo() {
   document.getElementById('modalParo').classList.add('open');
 }
@@ -743,7 +1005,7 @@ async function confirmarParo() {
   const obs = document.getElementById('paroObs').value;
   
   if (!duracion || duracion <= 0) {
-    showToast('⚠️ Duración válida requerida', 'var(--red)');
+    showToast('⚠️ Duración válida requerida', '#B83232');
     return;
   }
   
@@ -752,46 +1014,7 @@ async function confirmarParo() {
     showToast(`✅ Paro registrado: ${duracion} min por ${motivo}`);
     cerrarModalParo();
   } else {
-    showToast(`❌ Error: ${result.error}`, 'var(--red)');
-  }
-}
-
-// ══ ACCIONES BÁSICAS ════════════════════════════════════════
-async function cambiarEstado(id, nuevoEstado) {
-  const s = solicitudes.find(x => x.id === id);
-  if (!s) return;
-  
-  await actualizarEnSupabase(s.dbId, { estado: nuevoEstado });
-  s.estado = nuevoEstado;
-  if (nuevoEstado === 'lista' || nuevoEstado === 'entregada') s.prog = 100;
-  renderListas();
-  mostrarDetalle(id);
-  showToast(`✅ Solicitud ${nuevoEstado === 'lista' ? 'marcada como lista' : nuevoEstado === 'entregada' ? 'entregada' : 'en proceso'}`);
-}
-
-async function actualizarProg(id) {
-  const s = solicitudes.find(x => x.id === id);
-  const slider = document.getElementById(`sldr_${id}`);
-  if (!s || !slider) return;
-  
-  const prog = parseInt(slider.value);
-  await actualizarEnSupabase(s.dbId, { progreso_pct: prog });
-  s.prog = prog;
-  mostrarDetalle(id);
-  showToast(`✅ Progreso actualizado a ${prog}%`);
-}
-
-async function confirmarBorrar(id) {
-  if (!confirm('¿Eliminar esta solicitud? Esta acción no se puede deshacer.')) return;
-  
-  const s = solicitudes.find(x => x.id === id);
-  if (s?.dbId) {
-    await db.from('solicitud_lineas').delete().eq('solicitud_id', s.dbId);
-    await db.from('solicitudes').delete().eq('id', s.dbId);
-    solicitudes = solicitudes.filter(x => x.id !== id);
-    renderListas();
-    document.getElementById('detTapas').innerHTML = '<div class="det-empty"><div class="det-empty-ico">🗑️</div><div class="det-empty-txt">Solicitud eliminada</div></div>';
-    showToast('🗑 Solicitud eliminada');
+    showToast(`❌ Error: ${result.error}`, '#B83232');
   }
 }
 
@@ -814,7 +1037,7 @@ function cerrarForm() {
 
 function addLinea() {
   if (lineas.length >= 5) return;
-  lineas.push({ sku: '', desc: '', cant: 0, procs: [], existencia: undefined, operadores: [] });
+  lineas.push({ sku: '', desc: '', cant: 0, procs: [], existencia: undefined });
   renderLineas();
 }
 
@@ -858,9 +1081,10 @@ function toggleLineaProc(idx, procVal) {
 
 async function buscarExistencia(idx, sku) {
   if (!sku) return;
-  const item = INVENTARIO_LOCAL.find(i => i.sku === sku);
+  if (inventarioCache.length === 0) await cargarInventario();
+  const item = inventarioCache.find(i => i.sku === sku);
   if (item) {
-    lineas[idx].existencia = item.existencia;
+    lineas[idx].existencia = item.existencia || 0;
     lineas[idx].desc = item.descripcion;
     renderLineas();
   }
@@ -891,36 +1115,61 @@ async function guardar() {
   const lineasValidas = lineas.filter(l => l.cant > 0);
   if (lineasValidas.length === 0) { alert('Agrega al menos una línea con cantidad'); return; }
   
-  const result = await guardarEnSupabase({
-    area: 'tapas',
-    cliente: cliente,
-    area_sol: document.getElementById('fArea').value,
-    fecha_lim: document.getElementById('fFecha').value,
-    prio: document.getElementById('fPrioSelect').value,
-    notas: document.getElementById('fNotas').value,
-    lineas: lineasValidas.map(l => ({
-      sku: l.sku, desc: l.desc, cant: l.cant,
-      existencia: l.existencia, procs: l.procs, operadores: []
-    }))
-  });
+  const codigo = await generarCodigo('tapas');
   
-  if (result.ok) {
+  try {
+    const { data: sol, error: err1 } = await db
+      .from('solicitudes')
+      .insert({
+        codigo, area: 'tapas',
+        cliente_nombre: cliente,
+        area_solicitante: document.getElementById('fArea').value,
+        fecha_limite: document.getElementById('fFecha').value,
+        prioridad: document.getElementById('fPrioSelect').value,
+        estado: 'nueva',
+        progreso_pct: 0,
+        notas: document.getElementById('fNotas').value
+      })
+      .select()
+      .single();
+    
+    if (err1) throw err1;
+    
+    if (lineasValidas.length > 0) {
+      const lineasInsert = lineasValidas.map((l, i) => ({
+        solicitud_id: sol.id, orden: i + 1,
+        sku: l.sku, descripcion: l.desc,
+        cantidad: l.cant, existencia_snap: l.existencia || 0,
+        procesos: l.procs || [], operadores_ids: []
+      }));
+      await db.from('solicitud_lineas').insert(lineasInsert);
+    }
+    
     cerrarForm();
     await cargarSolicitudes();
-    showToast(`✅ ${result.codigo} guardada`);
-  } else {
-    alert('Error al guardar');
+    showToast(`✅ ${codigo} guardada`);
+  } catch(e) {
+    console.error('Error guardando:', e);
+    alert('Error al guardar: ' + e.message);
   }
 }
 
 // ══ NAVEGACIÓN ══════════════════════════════════════════════
 function switchTab(tab) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const views = document.querySelectorAll('.view');
+  const tabs = document.querySelectorAll('.tab');
   
-  document.getElementById(`view-${tab}`).classList.add('active');
-  const tabBtn = document.getElementById(`tab-${tab}`);
-  if (tabBtn) tabBtn.classList.add('active');
+  views.forEach(v => v.style.display = 'none');
+  tabs.forEach(t => t.classList.remove('active'));
+  
+  const viewMap = { tapas: 'view-tapas', dash: 'view-dash', personal: 'view-personal' };
+  const tabMap = { tapas: 'tab-tapas', dash: 'tab-dash', personal: 'tab-personal' };
+  
+  const viewId = viewMap[tab];
+  const tabId = tabMap[tab];
+  
+  if (viewId) document.getElementById(viewId).style.display = 'flex';
+  if (tabId) document.getElementById(tabId).classList.add('active');
   
   if (tab === 'dash') renderDash();
   if (tab === 'personal') renderPersonal();
@@ -932,11 +1181,14 @@ function renderDash() {
   const activas = solicitudes.filter(s => s.estado === 'proceso').length;
   const pendientes = solicitudes.filter(s => ['nueva', 'programada'].includes(s.estado)).length;
   g.innerHTML = `
-    <div class="dash-card"><div class="dash-h">Resumen Tapas</div><div class="dash-b">
-      <div>📊 Activas: <strong>${activas}</strong></div>
-      <div>⏳ Pendientes: <strong>${pendientes}</strong></div>
-      <div>✅ Completadas: <strong>${solicitudes.filter(s => s.estado === 'entregada').length}</strong></div>
-    </div></div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px">
+      <div style="font-family:var(--display);font-size:18px;font-weight:700;margin-bottom:12px">Resumen Tapas</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div><div style="font-size:9px;color:var(--gray)">Activas</div><div style="font-size:24px;font-weight:700;color:var(--teal)">${activas}</div></div>
+        <div><div style="font-size:9px;color:var(--gray)">Pendientes</div><div style="font-size:24px;font-weight:700;color:var(--amber)">${pendientes}</div></div>
+        <div><div style="font-size:9px;color:var(--gray)">Completadas</div><div style="font-size:24px;font-weight:700;color:var(--green)">${solicitudes.filter(s => s.estado === 'entregada').length}</div></div>
+      </div>
+    </div>
   `;
 }
 
@@ -948,10 +1200,10 @@ function renderPersonal() {
       ${personalData.tapas.map(p => `
         <div class="op-card">
           <div class="op-top">
-            <div class="op-avatar" style="background:${p.color}">${p.ini}</div>
-            <div><div class="op-name">${p.nombre}</div><div class="op-proc">${p.proc}</div></div>
+            <div class="op-avatar" style="background:${p.color_hex || '#1A6B5B'}">${p.iniciales || '?'}</div>
+            <div><div class="op-name">${p.nombre}</div><div class="op-proc">${p.proceso_hab || 'General'}</div></div>
           </div>
-          <div class="pill ${p.presente ? 'p-lista' : 'p-urg'}">${p.presente ? 'Presente' : 'Ausente'}</div>
+          <div class="pill ${p.activo ? 'p-lista' : 'p-urg'}">${p.activo ? 'Activo' : 'Inactivo'}</div>
         </div>
       `).join('')}
     </div>
@@ -965,206 +1217,50 @@ function tick() {
   }
 }
 
-// ══ KPIs COMANDAS ═══════════════════════════════════════════
-async function cargarKPIComandas() {
-  try {
-    const hoy = new Date().toISOString().split('T')[0];
-    const { data } = await db.from('comandas').select('total_unidades, operario_id').eq('fecha', hoy);
-    if (!data) return;
-    const totalUnd = data.reduce((s,c) => s + (c.total_unidades||0), 0);
-    const opCount = new Set(data.map(c => c.operario_id)).size;
-    const elUnd = document.getElementById('kt-cmd-und');
-    const elCount = document.getElementById('kt-cmd-count');
-    if (elUnd) elUnd.textContent = totalUnd.toLocaleString();
-    if (elCount) elCount.textContent = opCount;
-  } catch(e) { console.warn('KPI comandas:', e); }
+function showToast(msg, color = '#1A6B5B') {
+  const existing = document.querySelector('.toast-msg');
+  if (existing) existing.remove();
+  const t = document.createElement('div');
+  t.className = 'toast-msg';
+  t.textContent = msg;
+  t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${color};color:#fff;padding:11px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);white-space:nowrap`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
 }
 
 // ══ INICIO ══════════════════════════════════════════════════
+async function init() {
+  console.log('🚀 Iniciando Tapas');
+  
+  // Cargar clientes
+  const clientesSelect = document.getElementById('fCli');
+  if (clientesSelect) {
+    CLIENTES.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      clientesSelect.appendChild(opt);
+    });
+  }
+  
+  // Cargar datos
+  await cargarInventario();
+  await cargarPersonal();
+  await cargarSolicitudes();
+  
+  // Fecha por defecto
+  const d = new Date();
+  d.setDate(d.getDate() + 3);
+  const fechaInput = document.getElementById('fFecha');
+  if (fechaInput) fechaInput.value = d.toISOString().split('T')[0];
+  
+  tick();
+  setInterval(tick, 30000);
+  setInterval(refreshKPIs, 30000);
+}
+
 init();
 </script>
 
-<!-- PANEL PRODUCTIVIDAD COLAPSABLE -->
-<div id="prodPanel" style="position:fixed;bottom:0;left:0;right:0;background:#0C0C0B;border-top:2px solid #1A6B5B;z-index:9999;transition:height .3s cubic-bezier(.4,0,.2,1);height:44px;overflow:hidden;box-shadow:0 -4px 20px rgba(0,0,0,.35)">
-
-  <div onclick="toggleProd()" style="display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:44px;cursor:pointer;user-select:none">
-    <div style="display:flex;align-items:center;gap:12px">
-      <span style="font-size:13px;font-weight:700;color:#7ECEC0">📊 Productividad · Tapas</span>
-      <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
-        <button class="prod-p-btn" data-p="hoy" onclick="setProdPeriod('hoy')">Hoy</button>
-        <button class="prod-p-btn" data-p="semana" onclick="setProdPeriod('semana')">Semana</button>
-        <button class="prod-p-btn active" data-p="mes" onclick="setProdPeriod('mes')">Mes</button>
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:16px">
-      <span style="font-size:11px;color:rgba(255,255,255,.4)" id="prodResumen">Haz clic para expandir</span>
-      <span id="prodArrow" style="color:#7ECEC0;font-size:14px;transition:transform .3s">▲</span>
-    </div>
-  </div>
-
-  <div id="prodContent" style="padding:14px 20px 16px;overflow-y:auto;max-height:310px">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
-
-      <div style="background:rgba(0,0,0,.2);border-radius:10px;padding:14px">
-        <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:10px">Resumen</div>
-        <div style="font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#7ECEC0" id="pTotalUnd">—</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.3);margin-bottom:10px">unidades PT</div>
-        <div style="display:flex;gap:16px">
-          <div><div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#fff" id="pTotalCmds">—</div><div style="font-size:9px;color:rgba(255,255,255,.3)">Comandas</div></div>
-          <div><div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#fff" id="pProm">—</div><div style="font-size:9px;color:rgba(255,255,255,.3)">Prom/op</div></div>
-        </div>
-      </div>
-
-      <div style="background:rgba(0,0,0,.2);border-radius:10px;padding:14px">
-        <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:10px">🏆 Ranking operarios</div>
-        <div id="pRanking" style="overflow-y:auto;max-height:180px"><div style="font-size:11px;color:rgba(255,255,255,.3)">Cargando...</div></div>
-      </div>
-
-      <div style="background:rgba(0,0,0,.2);border-radius:10px;padding:14px">
-        <div style="font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.35);text-transform:uppercase;margin-bottom:10px">🔧 Procesos</div>
-        <div id="pProcesos" style="overflow-y:auto;max-height:180px"><div style="font-size:11px;color:rgba(255,255,255,.3)">Cargando...</div></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<style>
-.prod-p-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
-.prod-p-btn.active{background:#1A6B5B;border-color:#1A6B5B;color:#fff}
-.app{padding-bottom:44px}
-</style>
-
-<script>
-let _prodOpen = false;
-let _prodPeriod = 'mes';
-
-function toggleProd() {
-  _prodOpen = !_prodOpen;
-  document.getElementById('prodPanel').style.height = _prodOpen ? '370px' : '44px';
-  document.getElementById('prodArrow').style.transform = _prodOpen ? 'rotate(180deg)' : 'rotate(0deg)';
-  if (_prodOpen) loadProd();
-}
-
-function setProdPeriod(p) {
-  _prodPeriod = p;
-  document.querySelectorAll('.prod-p-btn').forEach(b => b.classList.toggle('active', b.dataset.p === p));
-  if (_prodOpen) loadProd();
-}
-
-function getProdFechas(p) {
-  const hoy = new Date();
-  const fmt = d => d.toISOString().split('T')[0];
-  if (p === 'hoy') return { desde: fmt(hoy), hasta: fmt(hoy) };
-  if (p === 'semana') {
-    const lun = new Date(hoy); lun.setDate(hoy.getDate() - ((hoy.getDay()+6)%7));
-    return { desde: fmt(lun), hasta: fmt(hoy) };
-  }
-  const ini = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  return { desde: fmt(ini), hasta: fmt(hoy) };
-}
-
-async function loadProd() {
-  const { desde, hasta } = getProdFechas(_prodPeriod);
-  try {
-    const { data } = await db.from('comandas')
-      .select('operario_id, operario_nombre, total_unidades, comanda_tareas(proceso, unidades_completadas, estado)')
-      .gte('fecha', desde).lte('fecha', hasta);
-
-    const cmds = data || [];
-    const totalUnd = cmds.reduce((s,c) => s+(c.total_unidades||0), 0);
-    const ops = new Set(cmds.map(c=>c.operario_id));
-    const prom = ops.size > 0 ? Math.round(totalUnd/ops.size) : 0;
-
-    document.getElementById('pTotalUnd').textContent = totalUnd.toLocaleString();
-    document.getElementById('pTotalCmds').textContent = cmds.length;
-    document.getElementById('pProm').textContent = prom.toLocaleString();
-    document.getElementById('prodResumen').textContent = totalUnd.toLocaleString() + ' und · ' + cmds.length + ' comandas';
-
-    // Ranking
-    const porOp = {};
-    cmds.forEach(c => {
-      if (!porOp[c.operario_id]) porOp[c.operario_id] = { nombre: c.operario_nombre, und: 0, cmds: 0 };
-      porOp[c.operario_id].und += (c.total_unidades||0);
-      porOp[c.operario_id].cmds++;
-    });
-    const ranking = Object.values(porOp).sort((a,b) => b.und-a.und);
-    const maxU = ranking[0]?.und || 1;
-    const medals = ['🥇','🥈','🥉'];
-    document.getElementById('pRanking').innerHTML = ranking.length
-      ? ranking.map((op,i) => `<div style="margin-bottom:6px">
-          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
-            <span style="color:#fff;font-weight:600">${medals[i]||''} ${(op.nombre||'').split(' ')[0]}</span>
-            <span style="font-family:'DM Mono',monospace;color:#7ECEC0;font-size:10px">${op.und.toLocaleString()}</span>
-          </div>
-          <div style="background:rgba(255,255,255,.1);border-radius:4px;height:4px">
-            <div style="background:#1A6B5B;height:4px;border-radius:4px;width:${Math.round(op.und/maxU*100)}%"></div>
-          </div>
-        </div>`).join('')
-      : '<div style="font-size:11px;color:rgba(255,255,255,.3)">Sin datos.</div>';
-
-    // Procesos
-    const porProc = {};
-    cmds.forEach(c => (c.comanda_tareas||[]).forEach(t => {
-      const p = t.proceso||'Otro';
-      if (!porProc[p]) porProc[p] = { und:0, n:0 };
-      porProc[p].und += (t.unidades_completadas||0);
-      porProc[p].n++;
-    }));
-    const procs = Object.entries(porProc).sort((a,b)=>b[1].und-a[1].und);
-    const maxP = procs[0]?.[1]?.und || 1;
-    const procColors = {Armado:'#1A6B5B',Banda:'#B07D2A',Liner:'#4338CA',Impresión:'#9D174D',Encajado:'#166534',Flameado:'#0369A1'};
-    document.getElementById('pProcesos').innerHTML = procs.length
-      ? procs.map(([proc,d]) => `<div style="margin-bottom:6px">
-          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">
-            <span style="color:#fff;font-weight:600">${proc}</span>
-            <span style="color:rgba(255,255,255,.5)">${d.und.toLocaleString()} · ${d.n}t</span>
-          </div>
-          <div style="background:rgba(255,255,255,.1);border-radius:4px;height:4px">
-            <div style="background:${procColors[proc]||'#6B6B6A'};height:4px;border-radius:4px;width:${Math.round(d.und/maxP*100)}%"></div>
-          </div>
-        </div>`).join('')
-      : '<div style="font-size:11px;color:rgba(255,255,255,.3)">Sin tareas.</div>';
-
-  } catch(e) { console.error('loadProd:', e); }
-}
-  <div id="modal-traz" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(12, 12, 11, 0.8); z-index:9999; align-items:center; justify-content:center; padding:20px;">
-  <div style="background:var(--card); width:100%; max-width:400px; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-    
-    <h3 style="font-family:var(--display); font-size:20px; margin-bottom:8px; color:var(--teal);">Registrar Material</h3>
-    <p id="traz-sol-id" style="font-size:12px; font-weight:700; color:var(--gray); margin-bottom:20px;"></p>
-
-    <div style="display:flex; flex-direction:column; gap:16px;">
-      <div>
-        <label style="font-size:11px; font-weight:700; color:var(--gray-l); text-transform:uppercase;">Tipo de Movimiento</label>
-        <select id="traz-tipo" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:var(--font); font-size:14px; margin-top:4px;">
-          <option value="salida_bodega">Salida (De Bodega a Planta)</option>
-          <option value="entrada_pt">Entrada (Producto Terminado)</option>
-          <option value="devolucion">Devolución (Sobrante a Bodega)</option>
-          <option value="perdida">Pérdida / Fuga reportada</option>
-        </select>
-      </div>
-
-      <div>
-        <label style="font-size:11px; font-weight:700; color:var(--gray-l); text-transform:uppercase;">SKU / Material</label>
-        <input type="text" id="traz-sku" placeholder="Ej. 10001" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:var(--font); font-size:14px; margin-top:4px;">
-      </div>
-
-      <div>
-        <label style="font-size:11px; font-weight:700; color:var(--gray-l); text-transform:uppercase;">Cantidad</label>
-        <input type="number" id="traz-cant" placeholder="0" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:var(--font); font-size:14px; margin-top:4px;">
-      </div>
-    </div>
-
-    <div style="display:flex; gap:12px; margin-top:24px;">
-      <button onclick="document.getElementById('modal-traz').style.display='none'" style="flex:1; padding:12px; border:none; background:var(--bg); color:var(--gray); border-radius:8px; font-weight:700; cursor:pointer;">Cancelar</button>
-      <button onclick="ejecutarMovimiento()" style="flex:1; padding:12px; border:none; background:var(--teal); color:#fff; border-radius:8px; font-weight:700; cursor:pointer;">Guardar</button>
-    </div>
-    
-  </div>
-</div>
-
-<script>
-// Aquí empieza tu código JavaScript actual...
-</script>
 </body>
 </html>
