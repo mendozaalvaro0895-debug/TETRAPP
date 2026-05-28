@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* --- ESTILOS COMPACTOS --- */
+/* --- ESTILOS (compactos pero completos) --- */
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-height:100vh; }
 .topbar { background:#0C0C0B; padding:10px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid #1E7D6A; flex-wrap:wrap; gap:10px; }
@@ -180,7 +180,6 @@ let devCount = 0;
 let timeoutBusqueda = null;
 let modoActual = 'fecha';
 let operariosCache = [];
-let comandaPendienteId = null;
 
 const PROCS_LIST = ['Armado','Banda','Liner','Impresión','Encajado','Flameado','Otra tarea'];
 const ESTADOS_TAREA = ['Asignada','En proceso','Terminada'];
@@ -293,10 +292,13 @@ function onSearchInput() {
   timeoutBusqueda = setTimeout(() => renderLista(), 300);
 }
 
-// Esta función carga comandas por fecha para la lista lateral
+// Carga comandas por fecha para la lista lateral
 async function cargarComandasPorFecha() {
   const fecha = document.getElementById('filtroFecha')?.value;
-  if (!fecha) return;
+  if (!fecha) {
+    console.log('No hay fecha seleccionada');
+    return;
+  }
   
   const loader = showLoadingOverlay('Cargando comandas...');
   try {
@@ -319,30 +321,34 @@ async function cargarComandasPorFecha() {
 }
 
 // Función para cargar UNA comanda específica por ID (para redirección desde Dashboard)
-async function cargarComandaPorId(id) {
+async function cargarYMostrarComandaPorId(id) {
   const loader = showLoadingOverlay('Cargando comanda...');
   try {
     const { data, error } = await db
       .from('comandas')
       .select('*, comanda_tareas(*)')
       .eq('id', id)
-      .maybeSingle();
+      .single();
     if (error) throw error;
     if (data) {
-      // Si la comanda existe, actualizar la lista y mostrarla
-      const exists = comandas.find(c => c.id === data.id);
-      if (!exists) {
-        comandas.unshift(data);
-        renderLista();
+      console.log('✅ Comanda encontrada:', data.correlativo, 'Fecha:', data.fecha);
+      
+      // Actualizar el filtro de fecha a la fecha de la comanda
+      if (data.fecha) {
+        document.getElementById('filtroFecha').value = data.fecha;
+        // Recargar la lista lateral con esa fecha
+        await cargarComandasPorFecha();
       }
-      verComanda(data.id);
+      
+      // Mostrar el detalle
+      mostrarDetalleComanda(data);
     } else {
       showToast('❌ Comanda no encontrada', '#B83232');
       showPanel('welcome');
     }
   } catch(e) {
     console.error(e);
-    showToast('❌ Error al cargar la comanda', '#B83232');
+    showToast('❌ Error al cargar la comanda: ' + e.message, '#B83232');
   } finally {
     if(loader) loader.remove();
   }
@@ -385,36 +391,17 @@ function actualizarKPIs() {
 }
 
 // ============================================
-// VER DETALLE (MODIFICADA PARA ACTUALIZAR FECHA SI ES NECESARIO)
+// VER DETALLE
 // ============================================
 function verComanda(id) {
   console.log('🔍 verComanda llamado con ID:', id);
   const c = comandas.find(x => x.id === id);
   if(!c){ 
     console.log('❌ Comanda no encontrada en lista local, cargando directamente...');
-    cargarComandaPorId(id);
+    cargarYMostrarComandaPorId(id);
     return; 
   }
-  console.log('✅ Comanda encontrada:', c.correlativo);
-  
-  // Si la fecha de la comanda es diferente a la fecha seleccionada en el filtro, actualizar el filtro
-  const fechaFiltro = document.getElementById('filtroFecha').value;
-  if (c.fecha && c.fecha !== fechaFiltro && modoActual === 'fecha') {
-    console.log(`📅 Comanda es de fecha ${c.fecha}, cambiando filtro y recargando...`);
-    document.getElementById('filtroFecha').value = c.fecha;
-    cargarComandasPorFecha().then(() => {
-      // Después de recargar, intentar encontrar la comanda nuevamente
-      const refreshedComanda = comandas.find(x => x.id === id);
-      if(refreshedComanda) {
-        mostrarDetalleComanda(refreshedComanda);
-      } else {
-        // Si aún no está (caso raro), cargarla directamente
-        cargarComandaPorId(id);
-      }
-    });
-    return;
-  }
-  
+  console.log('✅ Comanda encontrada en lista local:', c.correlativo);
   mostrarDetalleComanda(c);
 }
 
@@ -432,7 +419,7 @@ function mostrarDetalleComanda(c) {
   if(c.material_devuelto){
     try{
       const devs = JSON.parse(c.material_devuelto);
-      if(devs.length) devHtml = `<div class="sec"><div class="sec-label">📦 Material devuelto</div><table class="det-table"><thead><tr><th>Material</th><th>Cantidad</th></tr></thead><tbody>${devs.map(d=>`<tr><td>${d.desc||'—'}</td><td>${(d.cantidad||0).toLocaleString()}</td></tr>`).join('')}</tbody>} ninety eight</div>`;
+      if(devs.length) devHtml = `<div class="sec"><div class="sec-label">📦 Material devuelto</div><table class="det-table"><thead><tr><th>Material</th><th>Cantidad</th></tr></thead><tbody>${devs.map(d=>`<tr><td>${d.desc||'—'}</td><td>${(d.cantidad||0).toLocaleString()}</td></tr>`).join('')}</tbody>} </div>`;
       else devHtml = `<div class="sec"><div class="sec-label">📦 Material devuelto</div><p style="font-size:13px">${c.material_devuelto}</p></div>`;
     } catch(e){ devHtml = `<div class="sec"><div class="sec-label">📦 Material devuelto</div><p style="font-size:13px">${c.material_devuelto}</p></div>`; }
   }
@@ -440,7 +427,7 @@ function mostrarDetalleComanda(c) {
   document.getElementById('detailContent').innerHTML = `
     <div class="det-head"><div style="display:flex;gap:14px;align-items:center"><div class="det-avatar" style="background:${color}">${op.iniciales||'?'}</div><div><div class="det-name">${c.operario_nombre||'—'}</div><div class="det-meta">📅 ${c.fecha||''} · ${c.correlativo||'—'} · Supervisor: ${c.supervisor_nombre||'—'}</div><div class="det-meta">🕐 Inicio: ${c.hora_inicio||'—'} · Cierre: ${c.hora_cierre||'—'}</div></div></div><div style="display:flex;gap:8px"><button class="btn btn-cancel" onclick="editarComanda('${c.id}')">✏️ Editar</button><button class="btn btn-del" onclick="borrarComanda('${c.id}')">🗑 Eliminar</button></div></div>
     <div class="total-bar"><div><div class="total-bar-lbl">Total unidades PT del día</div></div><div class="total-bar-val">${totalPT.toLocaleString()} und</div></div>
-    <div class="sec"><div class="sec-label">🔧 Tareas</div><table class="det-table"><thead><tr><th>#</th><th>Proceso</th><th>Tapa asignada</th><th>Cantidad</th><th>Método</th><th>Estado</th></tr></thead><tbody>${tareas.map((t,i)=>`<tr><td>${i+1}</td><td><strong>${t.proceso||'—'}</strong></td><td>${t.tapa_desc||'—'}</td><td style="font-weight:700">${(t.cantidad||0).toLocaleString()}</td><td>${t.metodo==='manual'?'✋ Manual':t.metodo==='maquina_liner'?'⚙ Máquina Liner':'⚙ Máquina Armado'}</td><td><span class="status-badge sb-${(t.estado||'asignada').toLowerCase().replace(' ','')}">${t.estado||'Asignada'}</span></td></tr>`).join('')}</tbody>} eighty six</div>
+    <div class="sec"><div class="sec-label">🔧 Tareas</div><table class="det-table"><thead><tr><th>#</th><th>Proceso</th><th>Tapa asignada</th><th>Cantidad</th><th>Método</th><th>Estado</th><tr></thead><tbody>${tareas.map((t,i)=>`<tr><td style="width:30px">${i+1}</td><td><strong>${t.proceso||'—'}</strong></td><td>${t.tapa_desc||'—'}</td><td style="font-weight:700">${(t.cantidad||0).toLocaleString()}</td><td>${t.metodo==='manual'?'✋ Manual':t.metodo==='maquina_liner'?'⚙ Máquina Liner':'⚙ Máquina Armado'}</td><td><span class="status-badge sb-${(t.estado||'asignada').toLowerCase().replace(' ','')}">${t.estado||'Asignada'}</span></td></tr>`).join('')}</tbody>} </div>
     ${devHtml}
     ${c.observaciones ? `<div class="sec"><div class="sec-label">📝 Observaciones</div><p style="font-size:13px">${c.observaciones}</p></div>` : ''}
     <div style="background:#EBF7F4;border:1.5px solid #1A6B5B;border-radius:10px;padding:12px 16px;font-size:12px;color:#0D4035;font-weight:600">✍️ Firmado por: <strong>${c.supervisor_nombre||'—'}</strong> · Cierre: <strong>${c.hora_cierre||'—'}</strong></div>
@@ -448,22 +435,81 @@ function mostrarDetalleComanda(c) {
   showPanel('detail');
 }
 
-function editarComanda(id) { const c = comandas.find(x => x.id === id); if(!c) return; editandoId = id; rowCount = 0; devCount = 0; document.getElementById('formTitle').textContent = 'Editar comanda'; document.getElementById('fCorr').value = c.correlativo || ''; document.getElementById('fFecha').value = c.fecha || ''; document.getElementById('fHoraInicio').value = c.hora_inicio || '06:00'; document.getElementById('fHoraCierre').value = c.hora_cierre || ''; document.getElementById('fOperario').value = c.operario_id || ''; document.getElementById('fObs').value = c.observaciones || ''; document.getElementById('tareasBody').innerHTML = ''; document.getElementById('devolucionBody').innerHTML = ''; let devLineas = []; try { devLineas = JSON.parse(c.material_devuelto || '[]'); } catch(e){ if(c.material_devuelto) devLineas = [{ desc: c.material_devuelto, cantidad: 0, sku: '' }]; } if(devLineas.length) devLineas.forEach(d => addDevolucionRow(d)); else addDevolucionRow(); (c.comanda_tareas || []).forEach(t => addTareaRow({ proceso: t.proceso, tapa_desc: t.tapa_desc || '', tapa_sku: t.tapa_sku || '', cantidad: t.cantidad || 0, metodo: t.metodo || 'manual', estado: t.estado || 'Asignada' })); recalcTotal(); showPanel('form'); }
+function editarComanda(id) { 
+  const c = comandas.find(x => x.id === id); 
+  if(!c) return; 
+  editandoId = id; rowCount = 0; devCount = 0; 
+  document.getElementById('formTitle').textContent = 'Editar comanda'; 
+  document.getElementById('fCorr').value = c.correlativo || ''; 
+  document.getElementById('fFecha').value = c.fecha || ''; 
+  document.getElementById('fHoraInicio').value = c.hora_inicio || '06:00'; 
+  document.getElementById('fHoraCierre').value = c.hora_cierre || ''; 
+  document.getElementById('fOperario').value = c.operario_id || ''; 
+  document.getElementById('fObs').value = c.observaciones || ''; 
+  document.getElementById('tareasBody').innerHTML = ''; 
+  document.getElementById('devolucionBody').innerHTML = ''; 
+  let devLineas = []; 
+  try { devLineas = JSON.parse(c.material_devuelto || '[]'); } catch(e){ if(c.material_devuelto) devLineas = [{ desc: c.material_devuelto, cantidad: 0, sku: '' }]; } 
+  if(devLineas.length) devLineas.forEach(d => addDevolucionRow(d)); else addDevolucionRow(); 
+  (c.comanda_tareas || []).forEach(t => addTareaRow({ proceso: t.proceso, tapa_desc: t.tapa_desc || '', tapa_sku: t.tapa_sku || '', cantidad: t.cantidad || 0, metodo: t.metodo || 'manual', estado: t.estado || 'Asignada' })); 
+  recalcTotal(); 
+  showPanel('form'); 
+}
 
-async function borrarComanda(id) { if(!confirm('¿Borrar esta comanda? No se puede deshacer.')) return; try { await db.from('comanda_tareas').delete().eq('comanda_id', id); await db.from('comandas').delete().eq('id', id); showToast('🗑 Comanda eliminada'); comandaActual = null; await cargarComandasPorFecha(); showPanel('welcome'); } catch(e){ showToast('❌ Error: '+e.message, '#B83232'); } }
+async function borrarComanda(id) { 
+  if(!confirm('¿Borrar esta comanda? No se puede deshacer.')) return; 
+  try { 
+    await db.from('comanda_tareas').delete().eq('comanda_id', id); 
+    await db.from('comandas').delete().eq('id', id); 
+    showToast('🗑 Comanda eliminada'); 
+    comandaActual = null; 
+    await cargarComandasPorFecha(); 
+    showPanel('welcome'); 
+  } catch(e){ showToast('❌ Error: '+e.message, '#B83232'); } 
+}
 
-function showPanel(cual) { const welcome = document.getElementById('stWelcome'), form = document.getElementById('stForm'), detail = document.getElementById('stDetail'); if(welcome) welcome.style.display = cual === 'welcome' ? 'flex' : 'none'; if(form) form.classList.toggle('vis', cual === 'form'); if(detail) detail.classList.toggle('vis', cual === 'detail'); }
+function showPanel(cual) { 
+  const welcome = document.getElementById('stWelcome'), form = document.getElementById('stForm'), detail = document.getElementById('stDetail'); 
+  if(welcome) welcome.style.display = cual === 'welcome' ? 'flex' : 'none'; 
+  if(form) form.classList.toggle('vis', cual === 'form'); 
+  if(detail) detail.classList.toggle('vis', cual === 'detail'); 
+}
 
-function cancelar() { if(comandaActual) verComanda(comandaActual.id); else showPanel('welcome'); }
+function cancelar() { 
+  if(comandaActual) verComanda(comandaActual.id); 
+  else showPanel('welcome'); 
+}
 
-function showToast(msg, color) { const t = document.createElement('div'); t.className = 'toast-msg'; t.textContent = msg; t.style.background = color; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); }
+function showToast(msg, color) { 
+  const t = document.createElement('div'); 
+  t.className = 'toast-msg'; 
+  t.textContent = msg; 
+  t.style.background = color; 
+  document.body.appendChild(t); 
+  setTimeout(()=>t.remove(),3000); 
+}
 
-function showLoadingOverlay(text) { const overlay = document.createElement('div'); overlay.className = 'loader-overlay'; overlay.innerHTML = `<div class="loader"><div class="spinner"></div><div>${text || 'Cargando...'}</div></div>`; document.body.appendChild(overlay); return overlay; }
+function showLoadingOverlay(text) { 
+  const overlay = document.createElement('div'); 
+  overlay.className = 'loader-overlay'; 
+  overlay.innerHTML = `<div class="loader"><div class="spinner"></div><div>${text || 'Cargando...'}</div></div>`; 
+  document.body.appendChild(overlay); 
+  return overlay; 
+}
 
 // ============================================
 // TAREAS Y DEVOLUCIONES
 // ============================================
-function addTareaRow(datos = {}) { rowCount++; const n = rowCount; const procsOpts = PROCS_LIST.map(p => `<option value="${p}" ${datos.proceso === p ? 'selected' : ''}>${p}</option>`).join(''); const estadoOpts = ESTADOS_TAREA.map(e => `<option value="${e}" ${(datos.estado || 'Asignada') === e ? 'selected' : ''}>${e}</option>`).join(''); const tbody = document.getElementById('tareasBody'); tbody.insertAdjacentHTML('beforeend', `<tr class="tarea-row" id="row_${n}"><td><select onchange="actualizarCapHint(${n})" id="row_${n}_proc">${procsOpts}</select></td><td><div class="ac-wrap"><input type="text" id="row_${n}_tapa" value="${datos.tapa_desc || ''}" placeholder="SKU o descripción..." autocomplete="off" oninput="buscarSKURow(${n}, this.value)" data-sku="${datos.tapa_sku || ''}"><div class="ac-drop" id="row_${n}_drop"></div></div></td><td><input type="number" id="row_${n}_cant" value="${datos.cantidad || ''}" min="0" placeholder="0" oninput="recalcTotal()"><div id="row_${n}_cap_hint" style="font-size:9px;color:#6B6B6A;margin-top:2px;text-align:right"></div></td><td><select class="metodo-sel" id="row_${n}_met" onchange="actualizarMetodo(${n})">${['manual','maquina_liner','maquina_armado'].map(m => `<option value="${m}" ${(datos.metodo || 'manual') === m ? 'selected' : ''}>${m === 'manual' ? '✋ Manual' : m === 'maquina_liner' ? '⚙ Máq. Liner PP33' : '⚙ Máq. Armado PP28'}</option>`).join('')}</select></td><td><select class="estado-sel" id="row_${n}_est" onchange="recalcTotal()">${estadoOpts}</select></td><td style="text-align:center"><div id="row_${n}_cap" style="font-size:9px;font-weight:700;color:#6B6B6A;margin-bottom:4px">✋ 833/h</div><button class="btn-rm-row" onclick="removeRow(${n})">✕</button></td></tr>`)); actualizarCapHint(n); recalcTotal(); }
+function addTareaRow(datos = {}) { 
+  rowCount++; 
+  const n = rowCount; 
+  const procsOpts = PROCS_LIST.map(p => `<option value="${p}" ${datos.proceso === p ? 'selected' : ''}>${p}</option>`).join(''); 
+  const estadoOpts = ESTADOS_TAREA.map(e => `<option value="${e}" ${(datos.estado || 'Asignada') === e ? 'selected' : ''}>${e}</option>`).join(''); 
+  const tbody = document.getElementById('tareasBody'); 
+  tbody.insertAdjacentHTML('beforeend', `<tr class="tarea-row" id="row_${n}"><td><select onchange="actualizarCapHint(${n})" id="row_${n}_proc">${procsOpts}</select></td><td><div class="ac-wrap"><input type="text" id="row_${n}_tapa" value="${datos.tapa_desc || ''}" placeholder="SKU o descripción..." autocomplete="off" oninput="buscarSKURow(${n}, this.value)" data-sku="${datos.tapa_sku || ''}"><div class="ac-drop" id="row_${n}_drop"></div></div></td><td><input type="number" id="row_${n}_cant" value="${datos.cantidad || ''}" min="0" placeholder="0" oninput="recalcTotal()"><div id="row_${n}_cap_hint" style="font-size:9px;color:#6B6B6A;margin-top:2px;text-align:right"></div></td><td><select class="metodo-sel" id="row_${n}_met" onchange="actualizarMetodo(${n})">${['manual','maquina_liner','maquina_armado'].map(m => `<option value="${m}" ${(datos.metodo || 'manual') === m ? 'selected' : ''}>${m === 'manual' ? '✋ Manual' : m === 'maquina_liner' ? '⚙ Máq. Liner PP33' : '⚙ Máq. Armado PP28'}</option>`).join('')}</select></td><td><select class="estado-sel" id="row_${n}_est" onchange="recalcTotal()">${estadoOpts}</select></td><td style="text-align:center"><div id="row_${n}_cap" style="font-size:9px;font-weight:700;color:#6B6B6A;margin-bottom:4px">✋ 833/h</div><button class="btn-rm-row" onclick="removeRow(${n})">✕</button></td></tr>`)); 
+  actualizarCapHint(n); 
+  recalcTotal(); 
+}
 
 function removeRow(n) { document.getElementById(`row_${n}`)?.remove(); recalcTotal(); }
 function actualizarMetodo(n) { const sel = document.getElementById(`row_${n}_met`); if(sel) sel.className = sel.value === 'manual' ? 'metodo-sel' : 'metodo-sel maquina'; actualizarCapHint(n); }
@@ -483,43 +529,60 @@ function nuevaComanda() { editandoId = null; comandaActual = null; rowCount = 0;
 
 function recopilarDevolucion() { const lineas = []; document.querySelectorAll('[id^="dev_"][id$="_mat"]').forEach(inp => { const n = inp.id.replace('dev_','').replace('_mat',''); const cant = document.getElementById(`dev_${n}_cant`)?.value; if(inp.value || (cant && parseInt(cant)>0)) lineas.push({ sku: inp.dataset.sku || '', desc: inp.value, cantidad: parseInt(cant||0) }); }); return JSON.stringify(lineas); }
 
-async function guardar() { const operarioId = document.getElementById('fOperario').value; const fecha = document.getElementById('fFecha').value; if(!operarioId || !fecha){ showToast('❌ Completa operario y fecha', '#B83232'); return; } const tareas = []; document.querySelectorAll('.tarea-row').forEach(row => { const n = row.id.replace('row_',''); const tapaInput = document.getElementById(`row_${n}_tapa`); const metodo = document.getElementById(`row_${n}_met`)?.value || 'manual'; const cantidad = parseInt(document.getElementById(`row_${n}_cant`)?.value || 0); const proceso = document.getElementById(`row_${n}_proc`)?.value || ''; const estado = document.getElementById(`row_${n}_est`)?.value || 'Asignada'; const cap = getCapacidad(proceso, metodo); if(cantidad > 0 || proceso) tareas.push({ proceso, tapa_desc: tapaInput?.value || '', tapa_sku: tapaInput?.dataset?.sku || '', cantidad, metodo, capacidad_hora: cap, horas_efectivas: cantidad>0 ? Math.round((cantidad/cap)*100)/100 : 0, estado, unidades_completadas: estado==='Terminada'? cantidad : 0 }); }); if(tareas.length === 0){ showToast('❌ Agrega al menos una tarea', '#B83232'); return; } const op = getOperarioById(operarioId); const totalPT = tareas.filter(t => t.estado === 'Terminada').reduce((s,t)=>s+t.cantidad,0); const cabecera = { correlativo: document.getElementById('fCorr').value, fecha, operario_id: operarioId, operario_nombre: op.nombre || '', supervisor_id: 'T0', supervisor_nombre: 'Heidy', hora_inicio: document.getElementById('fHoraInicio').value, hora_cierre: document.getElementById('fHoraCierre').value, total_unidades: totalPT, material_devuelto: recopilarDevolucion(), observaciones: document.getElementById('fObs').value }; try { let cmdId; if(editandoId){ await db.from('comandas').update(cabecera).eq('id', editandoId); cmdId = editandoId; await db.from('comanda_tareas').delete().eq('comanda_id', cmdId); } else { const { data, error } = await db.from('comandas').insert(cabecera).select(); if(error) throw error; cmdId = data[0].id; } if(tareas.length){ const tareasData = tareas.map((t,i) => ({ comanda_id: cmdId, orden: i+1, proceso: t.proceso, tapa_desc: t.tapa_desc, tapa_sku: t.tapa_sku, cantidad: t.cantidad, metodo: t.metodo, capacidad_hora: t.capacidad_hora, horas_efectivas: t.horas_efectivas, unidades_completadas: t.unidades_completadas, estado: t.estado })); const { error: errT } = await db.from('comanda_tareas').insert(tareasData); if(errT) throw errT; } showToast('✅ Comanda guardada correctamente'); await cargarComandasPorFecha(); const cmd = comandas.find(c => c.id === cmdId); if(cmd) verComanda(cmdId); else showPanel('welcome'); } catch(e){ console.error(e); showToast('❌ Error: '+e.message, '#B83232'); } }
+async function guardar() { 
+  const operarioId = document.getElementById('fOperario').value; 
+  const fecha = document.getElementById('fFecha').value; 
+  if(!operarioId || !fecha){ showToast('❌ Completa operario y fecha', '#B83232'); return; } 
+  const tareas = []; 
+  document.querySelectorAll('.tarea-row').forEach(row => { 
+    const n = row.id.replace('row_',''); 
+    const tapaInput = document.getElementById(`row_${n}_tapa`); 
+    const metodo = document.getElementById(`row_${n}_met`)?.value || 'manual'; 
+    const cantidad = parseInt(document.getElementById(`row_${n}_cant`)?.value || 0); 
+    const proceso = document.getElementById(`row_${n}_proc`)?.value || ''; 
+    const estado = document.getElementById(`row_${n}_est`)?.value || 'Asignada'; 
+    const cap = getCapacidad(proceso, metodo); 
+    if(cantidad > 0 || proceso) tareas.push({ proceso, tapa_desc: tapaInput?.value || '', tapa_sku: tapaInput?.dataset?.sku || '', cantidad, metodo, capacidad_hora: cap, horas_efectivas: cantidad>0 ? Math.round((cantidad/cap)*100)/100 : 0, estado, unidades_completadas: estado==='Terminada'? cantidad : 0 }); 
+  }); 
+  if(tareas.length === 0){ showToast('❌ Agrega al menos una tarea', '#B83232'); return; } 
+  const op = getOperarioById(operarioId); 
+  const totalPT = tareas.filter(t => t.estado === 'Terminada').reduce((s,t)=>s+t.cantidad,0); 
+  const cabecera = { correlativo: document.getElementById('fCorr').value, fecha, operario_id: operarioId, operario_nombre: op.nombre || '', supervisor_id: 'T0', supervisor_nombre: 'Heidy', hora_inicio: document.getElementById('fHoraInicio').value, hora_cierre: document.getElementById('fHoraCierre').value, total_unidades: totalPT, material_devuelto: recopilarDevolucion(), observaciones: document.getElementById('fObs').value }; 
+  try { 
+    let cmdId; 
+    if(editandoId){ 
+      await db.from('comandas').update(cabecera).eq('id', editandoId); 
+      cmdId = editandoId; 
+      await db.from('comanda_tareas').delete().eq('comanda_id', cmdId); 
+    } else { 
+      const { data, error } = await db.from('comandas').insert(cabecera).select(); 
+      if(error) throw error; 
+      cmdId = data[0].id; 
+    } 
+    if(tareas.length){ 
+      const tareasData = tareas.map((t,i) => ({ comanda_id: cmdId, orden: i+1, proceso: t.proceso, tapa_desc: t.tapa_desc, tapa_sku: t.tapa_sku, cantidad: t.cantidad, metodo: t.metodo, capacidad_hora: t.capacidad_hora, horas_efectivas: t.horas_efectivas, unidades_completadas: t.unidades_completadas, estado: t.estado })); 
+      const { error: errT } = await db.from('comanda_tareas').insert(tareasData); 
+      if(errT) throw errT; 
+    } 
+    showToast('✅ Comanda guardada correctamente'); 
+    await cargarComandasPorFecha(); 
+    const cmd = comandas.find(c => c.id === cmdId); 
+    if(cmd) verComanda(cmdId); 
+    else showPanel('welcome'); 
+  } catch(e){ console.error(e); showToast('❌ Error: '+e.message, '#B83232'); } 
+}
 
 // ============================================
-// INICIALIZACIÓN Y REDIRECCIÓN
+// INICIALIZACIÓN - PUNTO DE ENTRADA PRINCIPAL
 // ============================================
 async function inicializar() {
   console.log('🚀 Comandas iniciado');
+  
+  // 1. Cargar operarios primero
   await cargarOperarios();
   
-  const hoy = new Date().toISOString().split('T')[0];
-  if(document.getElementById('filtroFecha')) document.getElementById('filtroFecha').value = hoy;
-  if(document.getElementById('fFecha')) document.getElementById('fFecha').value = hoy;
-  if(document.getElementById('fHoraInicio')) document.getElementById('fHoraInicio').value = '06:00';
-  if(document.getElementById('fHoraCierre')) document.getElementById('fHoraCierre').value = new Date().toTimeString().slice(0,5);
-  
-  document.getElementById('btnNuevaComanda')?.addEventListener('click', (e) => { e.preventDefault(); nuevaComanda(); });
-  
-  // Verificar si hay ID en la URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const comandaId = urlParams.get('id');
-  
-  if (comandaId) {
-    console.log('📌 URL contiene ID de comanda:', comandaId);
-    // Primero cargar la comanda específica directamente
-    await cargarComandaPorId(comandaId);
-    // También cargar comandas de la fecha actual para la lista lateral
-    await cargarComandasPorFecha();
-  } else {
-    // Cargar comandas de la fecha actual normalmente
-    await cargarComandasPorFecha();
-    showPanel('welcome');
-  }
-  
-  document.addEventListener('click', e => { if(!e.target.closest('.ac-wrap') && !e.target.closest('.ac-drop')) cerrarAC(); });
-}
-
-inicializar();
-</script>
-</body>
-</html>
+  // 2. Obtener la fecha actual en formato YYYY-MM-DD
+  const hoy = new Date();
+  const año = hoy.getFullYear();
+  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+ 
