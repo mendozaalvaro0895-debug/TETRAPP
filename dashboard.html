@@ -7,442 +7,76 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: #F7F6F2; color: #0C0C0B; min-height: 100vh; }
 
-body {
-  font-family: 'DM Sans', sans-serif;
-  background: #F7F6F2;
-  color: #0C0C0B;
-  min-height: 100vh;
-}
+.topbar { background: #0C0C0B; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #1E7D6A; flex-wrap: wrap; gap: 10px; }
+.logo { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 900; color: #fff; }
+.logo span { color: #7ECEC0; }
+.nav-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.nav-btn { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #fff; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; text-decoration: none; }
+.nav-btn:hover { background: rgba(255,255,255,.22); }
 
-/* TOPBAR */
-.topbar {
-  background: #0C0C0B;
-  padding: 10px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 2px solid #1E7D6A;
-  flex-wrap: wrap;
-  gap: 10px;
-}
+.page { max-width: 1280px; margin: 0 auto; padding: 24px; }
+.page-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+.page-sub { font-size: 13px; color: #6B6B6A; margin-bottom: 24px; }
 
-.logo {
-  font-family: 'Playfair Display', serif;
-  font-size: 16px;
-  font-weight: 900;
-  color: #fff;
-}
+.period-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+.period-btn { background: #fff; border: 1.5px solid #E0DED8; color: #6B6B6A; padding: 7px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.period-btn.active { background: #1A6B5B; border-color: #1A6B5B; color: #fff; }
+.period-date { font-family: 'DM Mono', monospace; font-size: 11px; color: #A8A6A0; }
 
-.logo span {
-  color: #7ECEC0;
-}
+.kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+.kpi-card { background: #fff; border: 1.5px solid #E0DED8; border-radius: 12px; padding: 16px; }
+.kpi-card.highlight { background: #0C0C0B; border-color: #0C0C0B; }
+.kpi-val { font-family: 'DM Mono', monospace; font-size: 28px; font-weight: 700; line-height: 1; }
+.kpi-card.highlight .kpi-val { color: #7ECEC0; }
+.kpi-lbl { font-size: 11px; color: #6B6B6A; margin-top: 4px; font-weight: 600; text-transform: uppercase; }
+.kpi-card.highlight .kpi-lbl { color: rgba(255,255,255,.4); }
+.kpi-sub { font-size: 10px; color: #A8A6A0; margin-top: 2px; }
 
-.nav-btns {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+.card { background: #fff; border: 1.5px solid #E0DED8; border-radius: 14px; padding: 20px; }
+.sec-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.sec-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+.sec-tag { font-size: 10px; font-weight: 700; color: #1A6B5B; background: #EBF7F4; padding: 4px 10px; border-radius: 20px; }
 
-.nav-btn {
-  background: rgba(255,255,255,.1);
-  border: 1px solid rgba(255,255,255,.2);
-  color: #fff;
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  font-family: 'DM Sans', sans-serif;
-}
+.ranking-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #E0DED8; }
+.rank-medal { font-size: 16px; width: 24px; text-align: center; }
+.rank-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; }
+.rank-info { flex: 1; }
+.rank-name { font-size: 13px; font-weight: 600; }
+.rank-cmds { font-size: 10px; color: #6B6B6A; }
+.rank-bar-wrap { flex: 1; background: #F7F6F2; border-radius: 4px; height: 6px; }
+.rank-bar { height: 6px; border-radius: 4px; background: #1A6B5B; }
+.rank-und { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 700; color: #1A6B5B; min-width: 80px; text-align: right; }
 
-.nav-btn:hover {
-  background: rgba(255,255,255,.22);
-}
+.proc-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #E0DED8; }
+.proc-chip { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px; min-width: 90px; text-align: center; }
+.proc-bar-wrap { flex: 1; background: #F7F6F2; border-radius: 4px; height: 6px; }
+.proc-bar { height: 6px; border-radius: 4px; }
+.proc-und { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; min-width: 70px; text-align: right; }
+.proc-tareas { font-size: 10px; color: #A8A6A0; min-width: 55px; text-align: right; }
 
-.nav-btn.active {
-  background: #1A6B5B;
-  border-color: #1A6B5B;
-}
+/* HISTORIAL CON DESPLEGABLE */
+.historial-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #F7F6F2; border-radius: 10px; cursor: pointer; margin-bottom: 12px; }
+.historial-header:hover { background: #EBF7F4; }
+.toggle-icon { font-size: 14px; transition: transform .2s; color: #1A6B5B; }
+.toggle-icon.rotated { transform: rotate(180deg); }
+.historial-body { display: none; overflow-x: auto; }
+.historial-body.open { display: block; }
+.hist-table { width: 100%; border-collapse: collapse; }
+.hist-table th { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #6B6B6A; padding: 8px 10px; border-bottom: 2px solid #E0DED8; text-align: left; }
+.hist-table td { padding: 10px; border-bottom: 1px solid #E0DED8; font-size: 12px; }
+.hist-table tr:hover td { background: #F7F6F2; cursor: pointer; }
+.ver-mas-btn { background: none; border: none; color: #1A6B5B; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 12px; padding: 10px; width: 100%; text-align: center; border-top: 1px solid #E0DED8; }
+.ver-mas-btn:hover { background: #EBF7F4; border-radius: 0 0 14px 14px; }
 
-/* MAIN CONTENT */
-.page {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 24px;
-}
-
-.page-title {
-  font-family: 'Playfair Display', serif;
-  font-size: 28px;
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.page-sub {
-  font-size: 13px;
-  color: #6B6B6A;
-  margin-bottom: 24px;
-}
-
-/* PERIOD SELECTOR */
-.period-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-}
-
-.period-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #6B6B6A;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-}
-
-.period-btn {
-  background: #fff;
-  border: 1.5px solid #E0DED8;
-  color: #6B6B6A;
-  padding: 7px 16px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  transition: all .15s;
-}
-
-.period-btn.active {
-  background: #1A6B5B;
-  border-color: #1A6B5B;
-  color: #fff;
-}
-
-.period-btn:hover:not(.active) {
-  background: #EBF7F4;
-  border-color: #C8EDE7;
-  color: #1A6B5B;
-}
-
-.period-date {
-  font-family: 'DM Mono', monospace;
-  font-size: 11px;
-  color: #A8A6A0;
-  margin-left: 4px;
-}
-
-/* KPI STRIP */
-.kpi-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  margin-bottom: 24px;
-}
-
-.kpi-card {
-  background: #fff;
-  border: 1.5px solid #E0DED8;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.04);
-}
-
-.kpi-card.highlight {
-  background: #0C0C0B;
-  border-color: #0C0C0B;
-}
-
-.kpi-icon {
-  font-size: 20px;
-  margin-bottom: 8px;
-}
-
-.kpi-val {
-  font-family: 'DM Mono', monospace;
-  font-size: 28px;
-  font-weight: 700;
-  color: #0C0C0B;
-  line-height: 1;
-}
-
-.kpi-card.highlight .kpi-val {
-  color: #7ECEC0;
-}
-
-.kpi-lbl {
-  font-size: 11px;
-  color: #6B6B6A;
-  margin-top: 4px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-}
-
-.kpi-card.highlight .kpi-lbl {
-  color: rgba(255,255,255,.4);
-}
-
-.kpi-sub {
-  font-size: 10px;
-  color: #A8A6A0;
-  margin-top: 2px;
-}
-
-/* GRID */
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  margin-bottom: 24px;
-}
-
-.card {
-  background: #fff;
-  border: 1.5px solid #E0DED8;
-  border-radius: 14px;
-  padding: 20px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.04);
-}
-
-.sec-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
-.sec-title {
-  font-family: 'Playfair Display', serif;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.sec-tag {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: #1A6B5B;
-  background: #EBF7F4;
-  padding: 4px 10px;
-  border-radius: 20px;
-}
-
-/* RANKING */
-.ranking-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid #E0DED8;
-}
-
-.ranking-row:last-child {
-  border-bottom: none;
-}
-
-.rank-medal {
-  font-size: 16px;
-  width: 24px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.rank-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-  flex-shrink: 0;
-}
-
-.rank-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.rank-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #0C0C0B;
-}
-
-.rank-cmds {
-  font-size: 10px;
-  color: #6B6B6A;
-}
-
-.rank-bar-wrap {
-  flex: 1;
-  background: #F7F6F2;
-  border-radius: 4px;
-  height: 6px;
-  overflow: hidden;
-}
-
-.rank-bar {
-  height: 6px;
-  border-radius: 4px;
-  background: #1A6B5B;
-  transition: width .6s ease;
-}
-
-.rank-und {
-  font-family: 'DM Mono', monospace;
-  font-size: 13px;
-  font-weight: 700;
-  color: #1A6B5B;
-  white-space: nowrap;
-  min-width: 80px;
-  text-align: right;
-}
-
-/* PROCESOS */
-.proc-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid #E0DED8;
-}
-
-.proc-row:last-child {
-  border-bottom: none;
-}
-
-.proc-chip {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 20px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  min-width: 90px;
-  text-align: center;
-}
-
-.proc-bar-wrap {
-  flex: 1;
-  background: #F7F6F2;
-  border-radius: 4px;
-  height: 6px;
-  overflow: hidden;
-}
-
-.proc-bar {
-  height: 6px;
-  border-radius: 4px;
-  transition: width .6s ease;
-}
-
-.proc-und {
-  font-family: 'DM Mono', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  color: #0C0C0B;
-  white-space: nowrap;
-  min-width: 70px;
-  text-align: right;
-}
-
-.proc-tareas {
-  font-size: 10px;
-  color: #A8A6A0;
-  white-space: nowrap;
-  min-width: 55px;
-  text-align: right;
-}
-
-/* HISTORIAL */
-.hist-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.hist-table th {
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .8px;
-  text-transform: uppercase;
-  color: #6B6B6A;
-  padding: 8px 10px;
-  border-bottom: 2px solid #E0DED8;
-  text-align: left;
-}
-
-.hist-table td {
-  padding: 10px;
-  border-bottom: 1px solid #E0DED8;
-  font-size: 12px;
-}
-
-.hist-table tr:last-child td {
-  border-bottom: none;
-}
-
-.hist-table tr:hover td {
-  background: #F7F6F2;
-  cursor: pointer;
-}
-
-/* LOADING & EMPTY */
-.loading {
-  text-align: center;
-  padding: 40px;
-  color: #6B6B6A;
-}
-
-.spinner {
-  display: inline-block;
-  width: 24px;
-  height: 24px;
-  border: 3px solid #C8EDE7;
-  border-top-color: #1A6B5B;
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-  margin-bottom: 8px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.empty {
-  text-align: center;
-  padding: 40px;
-  color: #6B6B6A;
-  font-size: 13px;
-}
-
-.toast-msg {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1A6B5B;
-  color: #fff;
-  padding: 11px 22px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  z-index: 9999;
-  box-shadow: 0 4px 16px rgba(0,0,0,.2);
-  white-space: nowrap;
-}
+.loading { text-align: center; padding: 40px; color: #6B6B6A; }
+.spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #C8EDE7; border-top-color: #1A6B5B; border-radius: 50%; animation: spin .7s linear infinite; margin-bottom: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { text-align: center; padding: 40px; color: #6B6B6A; font-size: 13px; }
+.toast-msg { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1A6B5B; color: #fff; padding: 11px 22px; border-radius: 10px; font-size: 13px; font-weight: 700; z-index: 9999; }
 </style>
 </head>
 <body>
@@ -462,7 +96,6 @@ body {
   <div class="page-sub" id="pageSubLabel">Cargando datos...</div>
 
   <div class="period-bar">
-    <span class="period-label">Período:</span>
     <button class="period-btn" data-p="hoy" onclick="setPeriod('hoy')">Hoy</button>
     <button class="period-btn" data-p="semana" onclick="setPeriod('semana')">Semana</button>
     <button class="period-btn active" data-p="mes" onclick="setPeriod('mes')">Mes</button>
@@ -478,27 +111,18 @@ body {
 
   <div class="grid-2">
     <div class="card">
-      <div class="sec-header">
-        <div class="sec-title">🏆 Ranking · Operarios</div>
-        <div class="sec-tag">por unidades PT</div>
-      </div>
-      <div id="rankingContent"><div class="loading"><div class="spinner"></div><div>Cargando ranking...</div></div></div>
+      <div class="sec-header"><div class="sec-title">🏆 Ranking · Operarios</div><div class="sec-tag">por unidades PT</div></div>
+      <div id="rankingContent"><div class="loading"><div class="spinner"></div></div></div>
     </div>
     <div class="card">
-      <div class="sec-header">
-        <div class="sec-title">🔧 Procesos</div>
-        <div class="sec-tag">distribución</div>
-      </div>
-      <div id="procesosContent"><div class="loading"><div class="spinner"></div><div>Cargando procesos...</div></div></div>
+      <div class="sec-header"><div class="sec-title">🔧 Procesos</div><div class="sec-tag">distribución</div></div>
+      <div id="procesosContent"><div class="loading"><div class="spinner"></div></div></div>
     </div>
   </div>
 
   <div class="card">
-    <div class="sec-header">
-      <div class="sec-title">📋 Historial de Comandas</div>
-      <div class="sec-tag" id="histCount">—</div>
-    </div>
-    <div id="historialContent"><div class="loading"><div class="spinner"></div><div>Cargando historial...</div></div></div>
+    <div class="sec-header"><div class="sec-title">📋 Historial de Comandas</div><div class="sec-tag" id="histCount">—</div></div>
+    <div id="historialContent"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 </div>
 
@@ -515,6 +139,8 @@ const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 // ════════════════════════════════════════════════════════
 let periodo = 'mes';
 let comandas = [];
+let historialLimit = 10;
+let historialOpen = true;
 
 const OP_COLORS = {
   'T0':'#0D4035', 'T1':'#1A6B5B', 'T2':'#2E86AB', 'T3':'#A23B72', 'T4':'#F18F01',
@@ -527,14 +153,10 @@ const PROC_COLORS = {
   'Otra tarea':'#6B6B6A'
 };
 
-// ══ UTILIDADES ═══════════════════════════════════════════
 function getFechas(p) {
   const hoy = new Date();
   const fmt = d => d.toISOString().split('T')[0];
-  
-  if (p === 'hoy') {
-    return { desde: fmt(hoy), hasta: fmt(hoy) };
-  }
+  if (p === 'hoy') return { desde: fmt(hoy), hasta: fmt(hoy) };
   if (p === 'semana') {
     const lunes = new Date(hoy);
     lunes.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7));
@@ -552,67 +174,30 @@ function setPeriod(p) {
   cargarComandas();
 }
 
-// ══ CARGA DE DATOS ═══════════════════════════════════════
 async function cargarComandas() {
   const { desde, hasta } = getFechas(periodo);
-  
-  // Formatear fechas para mostrar
-  const fechaDisplay = desde === hasta ? desde : `${desde} → ${hasta}`;
   document.getElementById('pageSubLabel').innerHTML = `Del ${desde} al ${hasta}`;
-  document.getElementById('periodDateLabel').textContent = fechaDisplay;
-  
-  console.log('📥 Cargando comandas desde', desde, 'hasta', hasta);
+  document.getElementById('periodDateLabel').textContent = `${desde} → ${hasta}`;
   
   try {
     const { data, error } = await db
       .from('comandas')
-      .select(`
-        id,
-        fecha,
-        correlativo,
-        operario_id,
-        operario_nombre,
-        supervisor_nombre,
-        total_unidades,
-        hora_inicio,
-        hora_cierre,
-        comanda_tareas (
-          proceso,
-          cantidad,
-          unidades_completadas,
-          estado,
-          metodo
-        )
-      `)
+      .select('id, fecha, correlativo, operario_id, operario_nombre, supervisor_nombre, total_unidades, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
       .gte('fecha', desde)
       .lte('fecha', hasta)
       .order('fecha', { ascending: false });
     
-    if (error) {
-      console.error('❌ Error en consulta:', error);
-      showToast('Error al cargar datos: ' + error.message, '#B83232');
-      comandas = [];
-    } else {
-      comandas = data || [];
-      console.log(`✅ Cargadas ${comandas.length} comandas`);
-      if (comandas.length > 0) {
-        console.log('📊 Primera comanda:', comandas[0]);
-      } else {
-        console.log('⚠️ No hay comandas en este período');
-      }
-    }
-    
+    if (error) throw error;
+    comandas = data || [];
+    console.log(`✅ Cargadas ${comandas.length} comandas`);
     renderizar();
-    
-  } catch (e) {
-    console.error('❌ Excepción:', e);
-    showToast('Error: ' + e.message, '#B83232');
+  } catch(e) {
+    console.error('Error:', e);
     comandas = [];
     renderizar();
   }
 }
 
-// ══ RENDERIZADO ══════════════════════════════════════════
 function renderizar() {
   renderKPIs();
   renderRanking();
@@ -621,92 +206,47 @@ function renderizar() {
 }
 
 function renderKPIs() {
-  const totalUnd = comandas.reduce((sum, c) => sum + (c.total_unidades || 0), 0);
+  const totalUnd = comandas.reduce((s, c) => s + (c.total_unidades || 0), 0);
   const totalCmds = comandas.length;
   const operarios = new Set(comandas.map(c => c.operario_id).filter(Boolean));
   const promedio = totalCmds > 0 ? Math.round(totalUnd / totalCmds) : 0;
   
   document.getElementById('kpiStrip').innerHTML = `
-    <div class="kpi-card highlight">
-      <div class="kpi-icon">📦</div>
-      <div class="kpi-val">${totalUnd.toLocaleString()}</div>
-      <div class="kpi-lbl">Unidades PT</div>
-      <div class="kpi-sub">producción real</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">📋</div>
-      <div class="kpi-val">${totalCmds}</div>
-      <div class="kpi-lbl">Comandas</div>
-      <div class="kpi-sub">registros</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">👥</div>
-      <div class="kpi-val">${operarios.size}</div>
-      <div class="kpi-lbl">Operadores</div>
-      <div class="kpi-sub">con producción</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-icon">📊</div>
-      <div class="kpi-val">${promedio.toLocaleString()}</div>
-      <div class="kpi-lbl">Promedio x comanda</div>
-      <div class="kpi-sub">unidades por registro</div>
-    </div>
+    <div class="kpi-card highlight"><div class="kpi-val">${totalUnd.toLocaleString()}</div><div class="kpi-lbl">Unidades PT</div><div class="kpi-sub">producción real</div></div>
+    <div class="kpi-card"><div class="kpi-val">${totalCmds}</div><div class="kpi-lbl">Comandas</div><div class="kpi-sub">registros</div></div>
+    <div class="kpi-card"><div class="kpi-val">${operarios.size}</div><div class="kpi-lbl">Operadores</div><div class="kpi-sub">con producción</div></div>
+    <div class="kpi-card"><div class="kpi-val">${promedio.toLocaleString()}</div><div class="kpi-lbl">Promedio x comanda</div><div class="kpi-sub">unidades por registro</div></div>
   `;
 }
 
 function renderRanking() {
   const porOp = {};
-  
   comandas.forEach(c => {
     const opId = c.operario_id;
     if (!opId) return;
-    
-    if (!porOp[opId]) {
-      porOp[opId] = {
-        nombre: c.operario_nombre || opId,
-        und: 0,
-        cmds: 0
-      };
-    }
+    if (!porOp[opId]) porOp[opId] = { nombre: c.operario_nombre || opId, und: 0, cmds: 0 };
     porOp[opId].und += (c.total_unidades || 0);
     porOp[opId].cmds++;
   });
   
-  const ranking = Object.entries(porOp)
-    .map(([id, d]) => ({ id, ...d }))
-    .sort((a, b) => b.und - a.und);
-  
+  const ranking = Object.entries(porOp).map(([id, d]) => ({ id, ...d })).sort((a, b) => b.und - a.und);
   if (ranking.length === 0) {
-    document.getElementById('rankingContent').innerHTML = '<div class="empty">📭 No hay datos de producción en este período</div>';
+    document.getElementById('rankingContent').innerHTML = '<div class="empty">📭 No hay datos de producción</div>';
     return;
   }
   
   const maxUnd = ranking[0].und;
   const medals = ['🥇', '🥈', '🥉'];
-  
   document.getElementById('rankingContent').innerHTML = ranking.map((op, i) => {
     const color = OP_COLORS[op.id] || '#6B6B6A';
-    const iniciales = (op.nombre || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const ini = (op.nombre || '').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
     const pct = Math.round((op.und / maxUnd) * 100);
-    
-    return `
-      <div class="ranking-row">
-        <div class="rank-medal">${medals[i] || ''}</div>
-        <div class="rank-avatar" style="background:${color}">${iniciales || '?'}</div>
-        <div class="rank-info">
-          <div class="rank-name">${op.nombre}</div>
-          <div class="rank-cmds">${op.cmds} comanda${op.cmds !== 1 ? 's' : ''}</div>
-        </div>
-        <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div>
-        <div class="rank-und">${op.und.toLocaleString()} und</div>
-      </div>
-    `;
+    return `<div class="ranking-row"><div class="rank-medal">${medals[i] || ''}</div><div class="rank-avatar" style="background:${color}">${ini || '?'}</div><div class="rank-info"><div class="rank-name">${op.nombre}</div><div class="rank-cmds">${op.cmds} comanda${op.cmds !== 1 ? 's' : ''}</div></div><div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div><div class="rank-und">${op.und.toLocaleString()} und</div></div>`;
   }).join('');
 }
 
 function renderProcesos() {
   const porProc = {};
-  
   comandas.forEach(c => {
     (c.comanda_tareas || []).forEach(t => {
       if (t.estado === 'Terminada') {
@@ -720,80 +260,84 @@ function renderProcesos() {
   });
   
   const procList = Object.entries(porProc).sort((a, b) => b[1].und - a[1].und);
-  
   if (procList.length === 0) {
-    document.getElementById('procesosContent').innerHTML = '<div class="empty">🔧 No hay procesos registrados en este período</div>';
+    document.getElementById('procesosContent').innerHTML = '<div class="empty">🔧 No hay procesos registrados</div>';
     return;
   }
   
   const maxUnd = procList[0][1].und;
-  
   document.getElementById('procesosContent').innerHTML = procList.map(([proc, d]) => {
     const pct = Math.round((d.und / maxUnd) * 100);
     const color = PROC_COLORS[proc] || '#6B6B6A';
-    return `
-      <div class="proc-row">
-        <div class="proc-chip" style="background:${color}20;color:${color}">${proc}</div>
-        <div class="proc-bar-wrap"><div class="proc-bar" style="width:${pct}%;background:${color}"></div></div>
-        <div class="proc-und">${d.und.toLocaleString()} und</div>
-        <div class="proc-tareas">${d.tareas} tareas</div>
-      </div>
-    `;
+    return `<div class="proc-row"><div class="proc-chip" style="background:${color}20;color:${color}">${proc}</div><div class="proc-bar-wrap"><div class="proc-bar" style="width:${pct}%;background:${color}"></div></div><div class="proc-und">${d.und.toLocaleString()} und</div><div class="proc-tareas">${d.tareas} tareas</div></div>`;
   }).join('');
 }
 
 function renderHistorial() {
   if (comandas.length === 0) {
     document.getElementById('histCount').textContent = '0 comandas';
-    document.getElementById('historialContent').innerHTML = '<div class="empty">📋 No hay comandas registradas en este período</div>';
+    document.getElementById('historialContent').innerHTML = '<div class="empty">📋 No hay comandas registradas</div>';
     return;
   }
   
-  document.getElementById('histCount').textContent = `${comandas.length} comandas`;
+  const total = comandas.length;
+  const mostrar = comandas.slice(0, historialLimit);
+  const tieneMas = total > historialLimit;
+  
+  document.getElementById('histCount').textContent = `${total} comandas`;
   
   document.getElementById('historialContent').innerHTML = `
-    <div style="overflow-x:auto">
-      <table class="hist-table">
-        <thead>
-          <tr><th>Fecha</th><th>Correlativo</th><th>Operario</th><th>Supervisor</th><th style="text-align:right">Unidades</th></tr>
-        </thead>
-        <tbody>
-          ${comandas.map(c => `
-            <tr onclick="verComanda('${c.id}')" style="cursor:pointer">
-              <td style="font-family:monospace;font-size:11px">${c.fecha || '—'}</td>
-              <td><strong>${c.correlativo || '—'}</strong></td>
-              <td>${c.operario_nombre || '—'}</td>
-              <td>${c.supervisor_nombre || '—'}</td>
-              <td style="text-align:right;font-weight:700;color:#1A6B5B">${(c.total_unidades || 0).toLocaleString()}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+    <div>
+      <div class="historial-header" onclick="toggleHistorial()">
+        <span>📋 Mostrar / Ocultar historial (${total} comandas)</span>
+        <span class="toggle-icon ${historialOpen ? 'rotated' : ''}">▼</span>
+      </div>
+      <div class="historial-body ${historialOpen ? 'open' : ''}">
+        <div style="overflow-x:auto">
+          <table class="hist-table">
+            <thead><tr><th>Fecha</th><th>Correlativo</th><th>Operario</th><th>Supervisor</th><th style="text-align:right">Unidades</th></tr></thead>
+            <tbody>
+              ${mostrar.map(c => `
+                <tr onclick="verComanda('${c.id}')">
+                  <td style="font-family:monospace;font-size:11px">${c.fecha || '—'}</td>
+                  <td><strong>${c.correlativo || '—'}</strong></td>
+                  <td>${c.operario_nombre || '—'}</td>
+                  <td>${c.supervisor_nombre || '—'}</td>
+                  <td style="text-align:right;font-weight:700;color:#1A6B5B">${(c.total_unidades || 0).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ${tieneMas ? `<button class="ver-mas-btn" onclick="cargarMasHistorial()">+ Ver ${total - historialLimit} comandas más</button>` : ''}
+      </div>
     </div>
   `;
 }
 
+function toggleHistorial() {
+  historialOpen = !historialOpen;
+  const body = document.querySelector('.historial-body');
+  const icon = document.querySelector('.toggle-icon');
+  if (body) body.classList.toggle('open', historialOpen);
+  if (icon) icon.classList.toggle('rotated', historialOpen);
+}
+
+function cargarMasHistorial() {
+  historialLimit = comandas.length;
+  renderHistorial();
+}
+
 function verComanda(id) {
-  window.location.href = `comandas.html?ver=${id}`;
+  // Redirige a comandas.html con el ID como parámetro
+  window.location.href = `comandas.html?id=${id}`;
 }
 
-function showToast(msg, color) {
-  const existing = document.querySelector('.toast-msg');
-  if (existing) existing.remove();
-  const t = document.createElement('div');
-  t.className = 'toast-msg';
-  t.textContent = msg;
-  t.style.background = color;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3500);
-}
-
-// ══ INICIAR ════════════════════════════════════════════════
+// ══ INICIO ════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   console.log('🚀 Dashboard iniciado');
   cargarComandas();
 });
 </script>
-
 </body>
 </html>
