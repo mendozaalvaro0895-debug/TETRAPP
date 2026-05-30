@@ -10,114 +10,82 @@
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-height:100vh; }
 
-/* TOPBAR */
 .topbar { background:#0C0C0B; padding:10px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid #1E7D6A; flex-wrap:wrap; gap:10px; }
 .logo { font-family:'Playfair Display',serif; font-size:16px; font-weight:900; color:#fff; }
 .logo span { color:#7ECEC0; }
 .logo-sub { font-size:12px; color:rgba(255,255,255,.6); margin-left:10px; }
 .nav-btns { display:flex; gap:8px; }
-.nav-btn { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; text-decoration:none; font-family:'DM Sans',sans-serif; }
+.nav-btn { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; text-decoration:none; }
 .nav-btn:hover { background:rgba(255,255,255,.22); }
 
-/* LAYOUT 2 columnas */
 .layout { display:grid; grid-template-columns:380px 1fr; height:calc(100vh - 56px); overflow:hidden; }
-
-/* COLUMNA IZQUIERDA */
 .col-left { border-right:2px solid #E0DED8; display:flex; flex-direction:column; overflow:hidden; background:#fff; }
 .col-left-head { padding:14px 16px; border-bottom:2px solid #E0DED8; }
 .col-left-title { font-family:'Playfair Display',serif; font-size:17px; font-weight:700; margin-bottom:10px; }
 .fecha-row { display:flex; gap:8px; margin-bottom:8px; }
-.fecha-input { flex:1; border:1.5px solid #C8C6C0; border-radius:8px; padding:7px 10px; font-size:13px; font-family:'DM Sans',sans-serif; background:#F7F6F2; }
-.btn-nueva { flex:1; background:#1A6B5B; color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; font-family:'DM Sans',sans-serif; }
+.fecha-input { flex:1; border:1.5px solid #C8C6C0; border-radius:8px; padding:7px 10px; font-size:13px; background:#F7F6F2; }
+.btn-nueva { flex:1; background:#1A6B5B; color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; }
 .btn-nueva:hover { background:#0D4035; }
-.buscar { width:100%; border:1.5px solid #C8C6C0; border-radius:8px; padding:7px 12px; font-size:13px; font-family:'DM Sans',sans-serif; background:#F7F6F2; }
-
-/* KPI strip */
+.buscar { width:100%; border:1.5px solid #C8C6C0; border-radius:8px; padding:7px 12px; font-size:13px; background:#F7F6F2; margin-top:8px; }
 .kpi-strip { display:flex; background:#0C0C0B; border-bottom:2px solid #E0DED8; }
 .kpi-box { flex:1; padding:8px 12px; text-align:center; border-right:1px solid rgba(255,255,255,.1); }
-.kpi-box:last-child { border-right:none; }
 .kpi-v { font-family:'DM Mono',monospace; font-size:18px; font-weight:700; color:#7ECEC0; }
 .kpi-l { font-size:9px; color:rgba(255,255,255,.45); text-transform:uppercase; letter-spacing:.5px; margin-top:1px; }
-
-/* Lista de comandas */
 .cmd-list { overflow-y:auto; flex:1; }
 .cmd-item { padding:12px 14px; border-bottom:1px solid #E0DED8; cursor:pointer; display:flex; gap:10px; align-items:flex-start; transition:background .12s; }
 .cmd-item:hover { background:#F0FAF8; }
 .cmd-item.active { background:#EBF7F4; border-left:3px solid #1A6B5B; }
 .cmd-av { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; flex-shrink:0; }
-.cmd-name { font-size:13px; font-weight:700; color:#0C0C0B; margin-bottom:2px; }
+.cmd-name { font-size:13px; font-weight:700; margin-bottom:2px; }
 .cmd-meta { font-size:11px; color:#6B6B6A; }
 .cmd-und { font-family:'DM Mono',monospace; font-size:13px; font-weight:700; color:#1A6B5B; white-space:nowrap; text-align:right; }
-.cmd-und small { display:block; font-size:9px; color:#6B6B6A; font-family:'DM Sans',sans-serif; font-weight:400; }
+.cmd-und small { display:block; font-size:9px; color:#6B6B6A; font-weight:400; }
 .empty { padding:40px 20px; text-align:center; color:#6B6B6A; font-size:13px; }
-
-/* COLUMNA DERECHA */
 .col-right { overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:0; }
-
-/* Welcome */
 .welcome { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#6B6B6A; gap:10px; padding:60px; text-align:center; }
 .welcome h3 { font-family:'Playfair Display',serif; font-size:20px; color:#0C0C0B; }
-
-/* Formulario */
 .form-wrap { display:none; }
 .form-wrap.vis { display:block; }
-
 .form-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
 .form-title { font-family:'Playfair Display',serif; font-size:20px; font-weight:700; }
-.form-btns { display:flex; gap:8px; }
-.btn { padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; font-family:'DM Sans',sans-serif; }
+.btn { padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; }
 .btn-save { background:#1A6B5B; color:#fff; }
 .btn-save:hover { background:#0D4035; }
 .btn-del { background:#FEE2E2; color:#B83232; }
 .btn-del:hover { background:#FECACA; }
 .btn-cancel { background:#F7F6F2; color:#0C0C0B; border:1.5px solid #C8C6C0; }
-
-/* Secciones */
 .sec { background:#fff; border:1.5px solid #D8D6D0; border-radius:12px; padding:16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
 .sec-label { font-size:10px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; color:#1A6B5B; border-bottom:2px solid #C8EDE7; padding-bottom:8px; margin-bottom:14px; }
 .sec.cierre { background:#E8F5F2; border-color:#1A6B5B; }
 .sec.cierre .sec-label { color:#0D4035; border-color:#1A6B5B; }
-
-/* Grid de campos */
 .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
 .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
-.grid-1 { display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:10px; }
 .field { display:flex; flex-direction:column; gap:4px; }
 .field label { font-size:11px; font-weight:700; color:#3A3A38; }
-.field input, .field select { border:1.5px solid #C8C6C0; border-radius:8px; padding:8px 10px; font-size:13px; font-family:'DM Sans',sans-serif; background:#fff; color:#0C0C0B; }
+.field input, .field select { border:1.5px solid #C8C6C0; border-radius:8px; padding:8px 10px; font-size:13px; background:#fff; }
 .field input:focus, .field select:focus { outline:none; border-color:#1A6B5B; }
-
-/* TABLA DE TAREAS */
 .tareas-table { width:100%; border-collapse:collapse; }
 .tareas-table th { font-size:10px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:#6B6B6A; padding:6px 8px; border-bottom:2px solid #E0DED8; text-align:left; }
 .tareas-table th:last-child { width:32px; }
 .tarea-row td { padding:5px 4px; vertical-align:middle; border-bottom:1px solid #F0EDE8; }
 .tarea-row:last-child td { border-bottom:none; }
-.tarea-row select, .tarea-row input { border:1.5px solid #C8C6C0; border-radius:8px; padding:7px 8px; font-size:12px; font-family:'DM Sans',sans-serif; background:#fff; color:#0C0C0B; width:100%; }
-.tarea-row select:focus, .tarea-row input:focus { outline:none; border-color:#1A6B5B; }
-
-/* Estado chips en tabla */
-.estado-sel { border:1.5px solid #C8C6C0; border-radius:8px; padding:6px 8px; font-size:12px; font-family:'DM Sans',sans-serif; background:#fff; cursor:pointer; }
-.metodo-sel { border:1.5px solid #C8C6C0; border-radius:8px; padding:6px 8px; font-size:11px; font-family:'DM Sans',sans-serif; background:#fff; cursor:pointer; width:100%; }
+.tarea-row select, .tarea-row input { border:1.5px solid #C8C6C0; border-radius:8px; padding:7px 8px; font-size:12px; width:100%; }
+.estado-sel, .metodo-sel { border:1.5px solid #C8C6C0; border-radius:8px; padding:6px 8px; font-size:12px; background:#fff; cursor:pointer; }
+.metodo-sel { font-size:11px; width:100%; }
 .metodo-sel.maquina { border-color:#1A6B5B; background:#EBF7F4; color:#0D4035; font-weight:700; }
 .estado-sel.asignada { border-color:#B87200; background:#FFF3D6; color:#7A4800; }
 .estado-sel.proceso  { border-color:#1A3B8B; background:#DBEAFE; color:#1A3B8B; }
 .estado-sel.terminada{ border-color:#166534; background:#DCFCE7; color:#166534; }
-
-.modo-btn { flex:1; border:1.5px solid #C8C6C0; background:#fff; color:#6B6B6A; border-radius:8px; padding:6px 8px; font-size:11px; font-weight:700; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .15s; }
+.modo-btn { flex:1; border:1.5px solid #C8C6C0; background:#fff; color:#6B6B6A; border-radius:8px; padding:6px 8px; font-size:11px; font-weight:700; cursor:pointer; transition:all .15s; }
 .modo-btn.active { background:#1A6B5B; border-color:#1A6B5B; color:#fff; }
 .modo-btn:hover:not(.active) { border-color:#1A6B5B; color:#1A6B5B; }
-.btn-add-row { background:#EBF7F4; border:1.5px dashed #1A6B5B; color:#1A6B5B; border-radius:8px; padding:7px 14px; font-size:12px; font-weight:700; cursor:pointer; margin-top:10px; font-family:'DM Sans',sans-serif; width:100%; }
+.btn-add-row { background:#EBF7F4; border:1.5px dashed #1A6B5B; color:#1A6B5B; border-radius:8px; padding:7px 14px; font-size:12px; font-weight:700; cursor:pointer; margin-top:10px; width:100%; }
 .btn-add-row:hover { background:#C8EDE7; }
 .btn-rm-row { background:none; border:none; color:#C8C6C0; cursor:pointer; font-size:18px; line-height:1; padding:0 4px; }
 .btn-rm-row:hover { color:#B83232; }
-
-/* Total bar */
 .total-bar { background:#0C0C0B; border-radius:10px; padding:12px 18px; display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
 .total-bar-lbl { font-size:11px; color:rgba(255,255,255,.5); }
 .total-bar-val { font-family:'DM Mono',monospace; font-size:22px; font-weight:700; color:#7ECEC0; }
-
-/* Detalle */
 .detail-wrap { display:none; }
 .detail-wrap.vis { display:block; }
 .det-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
@@ -127,13 +95,10 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
 .det-table { width:100%; border-collapse:collapse; }
 .det-table th { font-size:10px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:#6B6B6A; padding:6px 10px; border-bottom:2px solid #E0DED8; text-align:left; }
 .det-table td { padding:10px; border-bottom:1px solid #F0EDE8; font-size:13px; }
-.det-table tr:last-child td { border-bottom:none; }
 .status-badge { font-size:10px; font-weight:700; padding:3px 10px; border-radius:20px; display:inline-block; }
 .sb-asignada  { background:#FFF3D6; color:#7A4800; }
 .sb-proceso   { background:#DBEAFE; color:#1A3B8B; }
 .sb-terminada { background:#DCFCE7; color:#166534; }
-
-/* Autocomplete */
 .ac-wrap { position:relative; }
 .ac-drop { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid #1A6B5B; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.12); z-index:999; max-height:200px; overflow-y:auto; margin-top:2px; }
 .ac-item { padding:8px 12px; cursor:pointer; border-bottom:1px solid #F0EDE8; font-size:12px; }
@@ -142,12 +107,8 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
 .ac-sku { font-family:'DM Mono',monospace; font-weight:700; color:#1A6B5B; margin-bottom:2px; }
 .ac-desc { color:#3A3A38; }
 .ac-exist { color:#6B6B6A; font-size:10px; margin-top:2px; }
-
-/* Toast */
-.toast-msg { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1A6B5B; color:#fff; padding:11px 22px; border-radius:10px; font-size:13px; font-weight:700; z-index:9999; box-shadow:0 4px 16px rgba(0,0,0,.2); white-space:nowrap; animation:fadeInUp .3s ease; }
+.toast-msg { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1A6B5B; color:#fff; padding:11px 22px; border-radius:10px; font-size:13px; font-weight:700; z-index:9999; white-space:nowrap; animation:fadeInUp .3s ease; }
 @keyframes fadeInUp { from { opacity:0; transform:translateX(-50%) translateY(20px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
-
-/* Loader */
 .loader-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000; }
 .loader { background:#fff; padding:20px 30px; border-radius:12px; text-align:center; }
 .spinner { display:inline-block; width:30px; height:30px; border:3px solid #C8EDE7; border-top-color:#1A6B5B; border-radius:50%; animation:spin .8s linear infinite; margin-bottom:10px; }
@@ -182,7 +143,7 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
         <button class="btn-nueva" type="button" id="btnNuevaComanda">+ Nueva</button>
       </div>
       <div id="filtroOperarioWrap" style="display:none;margin-bottom:8px">
-        <select class="buscar" id="filtroOperarioSel" onchange="cargarPorOperario()" style="width:100%;background:#F7F6F2"><option value="">— Selecciona operario —</option></select>
+        <select class="buscar" id="filtroOperarioSel" onchange="cargarPorOperario()" style="width:100%"><option value="">— Selecciona operario —</option></select>
         <div style="display:flex;gap:6px;margin-top:6px">
           <input type="date" class="fecha-input" id="filtroDesde" placeholder="Desde" style="flex:1">
           <input type="date" class="fecha-input" id="filtroHasta" placeholder="Hasta" style="flex:1">
@@ -203,7 +164,7 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
     <div class="form-wrap" id="stForm">
       <div class="form-top"><div class="form-title" id="formTitle">Nueva comanda</div><div class="form-btns"><button class="btn btn-cancel" onclick="cancelar()">Cancelar</button><button class="btn btn-save" onclick="guardar()">💾 Guardar</button></div></div>
       <div class="sec"><div class="sec-label">📋 Encabezado de comanda</div><div class="grid-3"><div class="field"><label>Correlativo</label><input type="text" id="fCorr" placeholder="CMD-001"></div><div class="field"><label>Fecha</label><input type="date" id="fFecha"></div><div class="field"><label>Hora de inicio</label><input type="time" id="fHoraInicio"></div></div><div class="grid-2"><div class="field"><label>Operario *</label><select id="fOperario"></select></div><div class="field"><label>Supervisor</label><select id="fSupervisor"><option value="T0">Heidy</option></select></div></div></div>
-      <div class="sec"><div class="sec-label">🔧 Tareas del día</div><table class="tareas-table"><thead><tr><th style="width:130px">Proceso</th><th>Tapa asignada</th><th style="width:90px">Cantidad</th><th style="width:130px">Método</th><th style="width:110px">Estado</th><th></th></tr></thead><tbody id="tareasBody"></tbody></td><button class="btn-add-row" onclick="addTareaRow()">+ Agregar línea</button></div>
+      <div class="sec"><div class="sec-label">🔧 Tareas del día</div><table class="tareas-table"><thead><tr><th style="width:130px">Proceso</th><th>Tapa asignada</th><th style="width:90px">Cantidad</th><th style="width:130px">Método</th><th style="width:110px">Estado</th><th></th></tr></thead><tbody id="tareasBody"></tbody></table><button class="btn-add-row" onclick="addTareaRow()">+ Agregar línea</button></div>
       <div class="total-bar"><div><div class="total-bar-lbl">Total unidades PT del día</div><div style="font-size:10px;color:rgba(255,255,255,.3)">Solo líneas marcadas como "Terminada"</div></div><div class="total-bar-val" id="totalVal">0 und</div></div>
       <div class="sec cierre"><div class="sec-label">✅ Cierre · Firma del supervisor</div><div style="margin-bottom:12px"><label style="font-size:11px;font-weight:700;color:#3A3A38;display:block;margin-bottom:8px">📦 MATERIAL DEVUELTO A BODEGA</label><table class="tareas-table"><thead><tr><th>Material / SKU</th><th style="width:90px">Cantidad</th><th></th></tr></thead><tbody id="devolucionBody"></tbody></table><button type="button" class="btn-add-row" onclick="addDevolucionRow()">+ Agregar línea</button></div><div class="grid-2"><div class="field"><label>Hora de cierre</label><input type="time" id="fHoraCierre"></div><div class="field"><label>Observaciones</label><input type="text" id="fObs" placeholder="Notas del día..."></div></div></div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;margin-bottom:24px;padding-top:8px;border-top:2px solid #E0DED8"><button class="btn btn-cancel" type="button" onclick="cancelar()">Cancelar</button><button class="btn btn-save" type="button" onclick="guardar()">💾 Guardar comanda</button></div>
@@ -277,12 +238,11 @@ function getOperarioById(id) {
 }
 
 // ============================================
-// INVENTARIO - SIN LIMITE PARA TRAER TODOS LOS SKUS
+// INVENTARIO
 // ============================================
 async function getInventario() {
   if (inventarioCache.length) return inventarioCache;
   try {
-    // Quitamos el limit(200) para traer TODOS los SKUs
     const { data, error } = await db.from('inventario').select('sku, descripcion, existencia').eq('activo', true);
     if (error) throw error;
     inventarioCache = data || [];
@@ -557,7 +517,7 @@ function hideLoading() {
 }
 
 // ============================================
-// TAREAS Y DEVOLUCIONES (CON AUTOCOMPLETADO CORREGIDO)
+// TAREAS Y DEVOLUCIONES (CORREGIDAS)
 // ============================================
 function addTareaRow(datos = {}) {
   rowCount++;
@@ -569,7 +529,9 @@ function addTareaRow(datos = {}) {
   const tbody = document.getElementById('tareasBody');
   tbody.insertAdjacentHTML('beforeend', `
     <tr class="tarea-row" id="row_${n}">
-      <td><select onchange="actualizarCapHint(${n})" id="row_${n}_proc">${procsOpts}</select></td>
+      <td style="width:130px">
+        <select onchange="actualizarCapHint(${n})" id="row_${n}_proc" style="width:100%">${procsOpts}</select>
+      </td>
       <td>
         <div class="ac-wrap">
           <input type="text" id="row_${n}_tapa" value="${datos.tapa_desc || ''}"
@@ -579,30 +541,27 @@ function addTareaRow(datos = {}) {
             style="width:100%">
           <div class="ac-drop" id="row_${n}_drop"></div>
         </div>
-      </div>
       </td>
-      <td>
+      <td style="width:90px">
         <input type="number" id="row_${n}_cant" value="${datos.cantidad || ''}" min="0" placeholder="0" oninput="recalcTotal()" style="width:100%">
         <div id="row_${n}_cap_hint" style="font-size:9px;color:#6B6B6A;margin-top:2px;text-align:right"></div>
-      </div>
       </td>
-      <td>
+      <td style="width:130px">
         <select class="metodo-sel" id="row_${n}_met" onchange="actualizarMetodo(${n})" style="width:100%">
           <option value="manual" ${(datos.metodo || 'manual') === 'manual' ? 'selected' : ''}>✋ Manual</option>
           <option value="maquina_liner" ${datos.metodo === 'maquina_liner' ? 'selected' : ''}>⚙ Máq. Liner PP33</option>
           <option value="maquina_armado" ${datos.metodo === 'maquina_armado' ? 'selected' : ''}>⚙ Máq. Armado PP28</option>
         </select>
-      </div>
-      <tr>
-      <td>
+      </td>
+      <td style="width:110px">
         <select class="estado-sel ${estadoClass}" id="row_${n}_est" onchange="recalcTotal()" style="width:100%">
           ${estadoOpts}
         </select>
-      </div>
-      <td>
+      </td>
+      <td style="text-align:center">
         <div id="row_${n}_cap" style="font-size:9px;font-weight:700;color:#6B6B6A;margin-bottom:4px">✋ 833/h</div>
         <button class="btn-rm-row" onclick="removeRow(${n})">✕</button>
-      </div>
+      </td>
     </tr>
   `);
   actualizarCapHint(n);
@@ -650,19 +609,13 @@ function recalcTotal() {
 async function buscarSKURow(n, query) {
   const drop = document.getElementById(`row_${n}_drop`);
   if (!drop) return;
-  if (!query || query.length < 2) { 
-    drop.style.display = 'none'; 
-    return; 
-  }
+  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
   
   const inv = await getInventario();
   const q = query.toLowerCase();
   const results = inv.filter(i => ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().includes(q)).slice(0, 7);
   
-  if (!results.length) { 
-    drop.style.display = 'none'; 
-    return; 
-  }
+  if (!results.length) { drop.style.display = 'none'; return; }
   
   drop.innerHTML = results.map(i => {
     const sku = i.sku || '';
@@ -706,10 +659,13 @@ function addDevolucionRow(datos = {}) {
             style="width:100%">
           <div class="ac-drop" id="dev_${n}_drop"></div>
         </div>
-      </div>
       </td>
-      <td><input type="number" id="dev_${n}_cant" value="${datos.cantidad || ''}" min="0" placeholder="0" style="width:100%"></div>
-      <td><button class="btn-rm-row" onclick="removeDevRow(${n})">✕</button></div>
+      <td style="width:90px">
+        <input type="number" id="dev_${n}_cant" value="${datos.cantidad || ''}" min="0" placeholder="0" style="width:100%">
+      </td>
+      <td style="width:32px">
+        <button class="btn-rm-row" onclick="removeDevRow(${n})">✕</button>
+      </td>
     </tr>
   `);
 }
@@ -721,19 +677,13 @@ function removeDevRow(n) {
 async function buscarSKUDev(n, query) {
   const drop = document.getElementById(`dev_${n}_drop`);
   if (!drop) return;
-  if (!query || query.length < 2) { 
-    drop.style.display = 'none'; 
-    return; 
-  }
+  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
   
   const inv = await getInventario();
   const q = query.toLowerCase();
   const results = inv.filter(i => ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().includes(q)).slice(0, 7);
   
-  if (!results.length) { 
-    drop.style.display = 'none'; 
-    return; 
-  }
+  if (!results.length) { drop.style.display = 'none'; return; }
   
   drop.innerHTML = results.map(i => {
     const sku = i.sku || '';
@@ -904,7 +854,7 @@ async function guardar() {
 async function inicializar() {
   console.log('🚀 Comandas iniciado');
   await cargarOperarios();
-  await getInventario(); // Precargar inventario para que esté listo
+  await getInventario(); // Precargar inventario
   console.log('✅ Inventario precargado');
   
   const hoy = new Date().toISOString().split('T')[0];
@@ -915,7 +865,6 @@ async function inicializar() {
   
   document.getElementById('btnNuevaComanda')?.addEventListener('click', (e) => { e.preventDefault(); nuevaComanda(); });
   
-  // Verificar si hay ID en URL (redirección desde Dashboard)
   const urlParams = new URLSearchParams(window.location.search);
   const comandaId = urlParams.get('id');
   
