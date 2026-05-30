@@ -203,7 +203,7 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
     <div class="form-wrap" id="stForm">
       <div class="form-top"><div class="form-title" id="formTitle">Nueva comanda</div><div class="form-btns"><button class="btn btn-cancel" onclick="cancelar()">Cancelar</button><button class="btn btn-save" onclick="guardar()">💾 Guardar</button></div></div>
       <div class="sec"><div class="sec-label">📋 Encabezado de comanda</div><div class="grid-3"><div class="field"><label>Correlativo</label><input type="text" id="fCorr" placeholder="CMD-001"></div><div class="field"><label>Fecha</label><input type="date" id="fFecha"></div><div class="field"><label>Hora de inicio</label><input type="time" id="fHoraInicio"></div></div><div class="grid-2"><div class="field"><label>Operario *</label><select id="fOperario"></select></div><div class="field"><label>Supervisor</label><select id="fSupervisor"><option value="T0">Heidy</option></select></div></div></div>
-      <div class="sec"><div class="sec-label">🔧 Tareas del día</div><table class="tareas-table"><thead><tr><th style="width:130px">Proceso</th><th>Tapa asignada</th><th style="width:90px">Cantidad</th><th style="width:130px">Método</th><th style="width:110px">Estado</th><th></th></tr></thead><tbody id="tareasBody"></tbody></table><button class="btn-add-row" onclick="addTareaRow()">+ Agregar línea</button></div>
+      <div class="sec"><div class="sec-label">🔧 Tareas del día</div><table class="tareas-table"><thead><tr><th style="width:130px">Proceso</th><th>Tapa asignada</th><th style="width:90px">Cantidad</th><th style="width:130px">Método</th><th style="width:110px">Estado</th><th></th></tr></thead><tbody id="tareasBody"></tbody></td><button class="btn-add-row" onclick="addTareaRow()">+ Agregar línea</button></div>
       <div class="total-bar"><div><div class="total-bar-lbl">Total unidades PT del día</div><div style="font-size:10px;color:rgba(255,255,255,.3)">Solo líneas marcadas como "Terminada"</div></div><div class="total-bar-val" id="totalVal">0 und</div></div>
       <div class="sec cierre"><div class="sec-label">✅ Cierre · Firma del supervisor</div><div style="margin-bottom:12px"><label style="font-size:11px;font-weight:700;color:#3A3A38;display:block;margin-bottom:8px">📦 MATERIAL DEVUELTO A BODEGA</label><table class="tareas-table"><thead><tr><th>Material / SKU</th><th style="width:90px">Cantidad</th><th></th></tr></thead><tbody id="devolucionBody"></tbody></table><button type="button" class="btn-add-row" onclick="addDevolucionRow()">+ Agregar línea</button></div><div class="grid-2"><div class="field"><label>Hora de cierre</label><input type="time" id="fHoraCierre"></div><div class="field"><label>Observaciones</label><input type="text" id="fObs" placeholder="Notas del día..."></div></div></div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;margin-bottom:24px;padding-top:8px;border-top:2px solid #E0DED8"><button class="btn btn-cancel" type="button" onclick="cancelar()">Cancelar</button><button class="btn btn-save" type="button" onclick="guardar()">💾 Guardar comanda</button></div>
@@ -277,14 +277,16 @@ function getOperarioById(id) {
 }
 
 // ============================================
-// INVENTARIO
+// INVENTARIO - SIN LIMITE PARA TRAER TODOS LOS SKUS
 // ============================================
 async function getInventario() {
   if (inventarioCache.length) return inventarioCache;
   try {
-    const { data, error } = await db.from('inventario').select('sku, descripcion, existencia').eq('activo', true).limit(200);
+    // Quitamos el limit(200) para traer TODOS los SKUs
+    const { data, error } = await db.from('inventario').select('sku, descripcion, existencia').eq('activo', true);
     if (error) throw error;
     inventarioCache = data || [];
+    console.log(`📦 Inventario cargado: ${inventarioCache.length} SKUs`);
     return inventarioCache;
   } catch(e) { console.error('Error inventario:', e); return []; }
 }
@@ -555,7 +557,7 @@ function hideLoading() {
 }
 
 // ============================================
-// TAREAS Y DEVOLUCIONES (CON AUTOCOMPLETADO)
+// TAREAS Y DEVOLUCIONES (CON AUTOCOMPLETADO CORREGIDO)
 // ============================================
 function addTareaRow(datos = {}) {
   rowCount++;
@@ -573,26 +575,27 @@ function addTareaRow(datos = {}) {
           <input type="text" id="row_${n}_tapa" value="${datos.tapa_desc || ''}"
             placeholder="SKU o descripción..." autocomplete="off"
             oninput="buscarSKURow(${n}, this.value)"
-            data-sku="${datos.tapa_sku || ''}">
+            data-sku="${datos.tapa_sku || ''}"
+            style="width:100%">
           <div class="ac-drop" id="row_${n}_drop"></div>
         </div>
       </div>
       </td>
       <td>
-        <input type="number" id="row_${n}_cant" value="${datos.cantidad || ''}" min="0" placeholder="0" oninput="recalcTotal()">
+        <input type="number" id="row_${n}_cant" value="${datos.cantidad || ''}" min="0" placeholder="0" oninput="recalcTotal()" style="width:100%">
         <div id="row_${n}_cap_hint" style="font-size:9px;color:#6B6B6A;margin-top:2px;text-align:right"></div>
       </div>
       </td>
       <td>
-        <select class="metodo-sel" id="row_${n}_met" onchange="actualizarMetodo(${n})">
+        <select class="metodo-sel" id="row_${n}_met" onchange="actualizarMetodo(${n})" style="width:100%">
           <option value="manual" ${(datos.metodo || 'manual') === 'manual' ? 'selected' : ''}>✋ Manual</option>
           <option value="maquina_liner" ${datos.metodo === 'maquina_liner' ? 'selected' : ''}>⚙ Máq. Liner PP33</option>
           <option value="maquina_armado" ${datos.metodo === 'maquina_armado' ? 'selected' : ''}>⚙ Máq. Armado PP28</option>
         </select>
       </div>
-      </div>
+      <tr>
       <td>
-        <select class="estado-sel ${estadoClass}" id="row_${n}_est" onchange="recalcTotal()">
+        <select class="estado-sel ${estadoClass}" id="row_${n}_est" onchange="recalcTotal()" style="width:100%">
           ${estadoOpts}
         </select>
       </div>
@@ -624,6 +627,8 @@ function actualizarCapHint(n) {
   if (!hint || !metSel || !procSel) return;
   const cap = getCapacidad(procSel.value, metSel.value);
   hint.textContent = cap.toLocaleString() + ' und/h · ' + (cap * 12).toLocaleString() + '/turno';
+  const capDiv = document.getElementById(`row_${n}_cap`);
+  if (capDiv) capDiv.innerHTML = `${metSel.value === 'manual' ? '✋' : '⚙'} ${cap.toLocaleString()}/h`;
 }
 
 function recalcTotal() {
@@ -645,13 +650,19 @@ function recalcTotal() {
 async function buscarSKURow(n, query) {
   const drop = document.getElementById(`row_${n}_drop`);
   if (!drop) return;
-  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
+  if (!query || query.length < 2) { 
+    drop.style.display = 'none'; 
+    return; 
+  }
   
   const inv = await getInventario();
   const q = query.toLowerCase();
   const results = inv.filter(i => ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().includes(q)).slice(0, 7);
   
-  if (!results.length) { drop.style.display = 'none'; return; }
+  if (!results.length) { 
+    drop.style.display = 'none'; 
+    return; 
+  }
   
   drop.innerHTML = results.map(i => {
     const sku = i.sku || '';
@@ -691,12 +702,13 @@ function addDevolucionRow(datos = {}) {
           <input type="text" id="dev_${n}_mat" value="${datos.desc || ''}"
             placeholder="SKU o descripción del material..." autocomplete="off"
             oninput="buscarSKUDev(${n}, this.value)"
-            data-sku="${datos.sku || ''}">
+            data-sku="${datos.sku || ''}"
+            style="width:100%">
           <div class="ac-drop" id="dev_${n}_drop"></div>
         </div>
       </div>
-      </div>
-      <td><input type="number" id="dev_${n}_cant" value="${datos.cantidad || ''}" min="0" placeholder="0"></div>
+      </td>
+      <td><input type="number" id="dev_${n}_cant" value="${datos.cantidad || ''}" min="0" placeholder="0" style="width:100%"></div>
       <td><button class="btn-rm-row" onclick="removeDevRow(${n})">✕</button></div>
     </tr>
   `);
@@ -709,13 +721,19 @@ function removeDevRow(n) {
 async function buscarSKUDev(n, query) {
   const drop = document.getElementById(`dev_${n}_drop`);
   if (!drop) return;
-  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
+  if (!query || query.length < 2) { 
+    drop.style.display = 'none'; 
+    return; 
+  }
   
   const inv = await getInventario();
   const q = query.toLowerCase();
   const results = inv.filter(i => ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().includes(q)).slice(0, 7);
   
-  if (!results.length) { drop.style.display = 'none'; return; }
+  if (!results.length) { 
+    drop.style.display = 'none'; 
+    return; 
+  }
   
   drop.innerHTML = results.map(i => {
     const sku = i.sku || '';
@@ -886,6 +904,8 @@ async function guardar() {
 async function inicializar() {
   console.log('🚀 Comandas iniciado');
   await cargarOperarios();
+  await getInventario(); // Precargar inventario para que esté listo
+  console.log('✅ Inventario precargado');
   
   const hoy = new Date().toISOString().split('T')[0];
   if (document.getElementById('filtroFecha')) document.getElementById('filtroFecha').value = hoy;
