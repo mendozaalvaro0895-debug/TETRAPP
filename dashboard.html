@@ -76,12 +76,30 @@ body { font-family: 'DM Sans', sans-serif; background: #F7F6F2; color: #0C0C0B; 
 .det-proc-und { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; min-width: 74px; text-align: right; flex-shrink: 0; }
 .det-proc-meta { font-size: 10px; color: #A8A6A0; min-width: 52px; text-align: right; flex-shrink: 0; }
 
-.proc-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #E0DED8; }
-.proc-chip { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px; min-width: 90px; text-align: center; }
+.proc-item { border-bottom: 1px solid #E0DED8; }
+.proc-item:last-child { border-bottom: none; }
+.proc-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer; border-radius: 8px; transition: background .12s; }
+.proc-row:hover { background: #F7F6F2; padding-left: 6px; padding-right: 6px; margin: 0 -6px; }
+.proc-row.expanded { background: #EBF7F4; padding-left: 6px; padding-right: 6px; margin: 0 -6px; border-radius: 8px 8px 0 0; }
+.proc-chip { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px; min-width: 90px; text-align: center; flex-shrink: 0; }
 .proc-bar-wrap { flex: 1; background: #F7F6F2; border-radius: 4px; height: 6px; }
 .proc-bar { height: 6px; border-radius: 4px; width: 0%; }
-.proc-und { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; min-width: 70px; text-align: right; }
-.proc-tareas { font-size: 10px; color: #A8A6A0; min-width: 55px; text-align: right; }
+.proc-und { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; min-width: 70px; text-align: right; flex-shrink: 0; }
+.proc-tareas { font-size: 10px; color: #A8A6A0; min-width: 55px; text-align: right; flex-shrink: 0; }
+.proc-chevron { font-size: 12px; color: #A8A6A0; transition: transform .2s; width: 16px; text-align: center; flex-shrink: 0; }
+.proc-chevron.open { transform: rotate(180deg); color: #1A6B5B; }
+
+.proc-detail { display: none; background: #F7F9F8; border-radius: 0 0 10px 10px; border: 1px solid #C8EDE7; border-top: none; padding: 14px 16px 10px; margin: 0 -1px 4px; }
+.proc-detail.open { display: block; }
+.proc-detail-title { font-size: 9px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #1A6B5B; margin-bottom: 10px; }
+.det-op-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #E8F5F2; }
+.det-op-row:last-child { border-bottom: none; }
+.det-op-avatar { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.det-op-name { font-size: 12px; font-weight: 600; min-width: 110px; flex-shrink: 0; }
+.det-op-bar-wrap { flex: 1; background: #E0EDE9; border-radius: 4px; height: 5px; }
+.det-op-bar { height: 5px; border-radius: 4px; background: #1A6B5B; }
+.det-op-und { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; color: #1A6B5B; min-width: 74px; text-align: right; flex-shrink: 0; }
+.det-op-meta { font-size: 10px; color: #A8A6A0; min-width: 52px; text-align: right; flex-shrink: 0; }
 
 .historial-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #F7F6F2; border-radius: 10px; cursor: pointer; margin-bottom: 12px; }
 .historial-header:hover { background: #EBF7F4; }
@@ -166,7 +184,8 @@ let fechaRef = new Date();       // fecha de referencia navegable
 let comandas = [];
 let historialLimit = 10;
 let historialOpen = true;
-let expandedOp = null;           // id del operario con detalle abierto
+let expandedOp   = null;          // id del operario con detalle abierto
+let expandedProc = null;          // nombre del proceso con detalle abierto
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const OP_COLORS = { 'T0':'#0D4035','T1':'#1A6B5B','T2':'#2E86AB','T3':'#A23B72','T4':'#F18F01','T5':'#C73E1D','T6':'#3B1F2B','T7':'#44BBA4','T8':'#E94F37','T9':'#393E41' };
@@ -409,13 +428,102 @@ function renderRanking() {
   }).join('');
 }
 
+// ── Helpers procesos detalle ─────────────────────────────────
+function getProcOperarios(proc) {
+  var porOp = {};
+  comandas.forEach(function(c) {
+    if (!c.operario_id) return;
+    (c.comanda_tareas || []).forEach(function(t) {
+      if ((t.proceso || 'Otra tarea') !== proc) return;
+      var und = t.unidades_completadas || t.cantidad || 0;
+      if (!porOp[c.operario_id]) porOp[c.operario_id] = { nombre: c.operario_nombre || c.operario_id, und: 0, tareas: 0, terminadas: 0 };
+      porOp[c.operario_id].und += und;
+      porOp[c.operario_id].tareas++;
+      if (t.estado === 'Terminada') porOp[c.operario_id].terminadas++;
+    });
+  });
+  return Object.entries(porOp).sort(function(a, b) { return b[1].und - a[1].und; });
+}
+
+function buildProcOpRow(opId, d, maxUnd) {
+  var color    = OP_COLORS[opId] || '#6B6B6A';
+  var pct      = maxUnd > 0 ? Math.round((d.und / maxUnd) * 100) : 0;
+  var initials = (d.nombre || '').split(' ').map(function(w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase();
+  var pend     = d.tareas - d.terminadas;
+  var meta     = d.terminadas + ' OK' + (pend > 0 ? ' · ' + pend + ' pend.' : '');
+  return '<div class="det-op-row">'
+    + '<div class="det-op-avatar" style="background:' + color + '">' + initials + '</div>'
+    + '<div class="det-op-name">' + d.nombre + '</div>'
+    + '<div class="det-op-bar-wrap"><div class="det-op-bar" style="width:' + pct + '%"></div></div>'
+    + '<div class="det-op-und">' + d.und.toLocaleString() + ' und</div>'
+    + '<div class="det-op-meta">' + meta + '</div>'
+    + '</div>';
+}
+
+function buildProcDetail(proc) {
+  var ops = getProcOperarios(proc);
+  if (ops.length === 0) return '<div style="font-size:12px;color:#A8A6A0;padding:6px 0">Sin operarios registrados</div>';
+  var maxUnd   = ops[0][1].und;
+  var totalUnd = ops.reduce(function(s, e) { return s + e[1].und; }, 0);
+  var totalTar = ops.reduce(function(s, e) { return s + e[1].tareas; }, 0);
+  var html = '<div class="proc-detail-title">Ranking de operarios · ' + proc + '</div>';
+  ops.forEach(function(e) { html += buildProcOpRow(e[0], e[1], maxUnd); });
+  html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #C8EDE7;display:flex;gap:16px;font-size:11px;color:#6B6B6A">'
+    + '<span>Total: <strong style="color:#0C0C0B">' + totalUnd.toLocaleString() + ' und</strong></span>'
+    + '<span>' + ops.length + ' operario' + (ops.length !== 1 ? 's' : '') + '</span>'
+    + '<span>' + totalTar + ' tarea' + (totalTar !== 1 ? 's' : '') + '</span>'
+    + '</div>';
+  return html;
+}
+
+function toggleProcDetail(proc) {
+  expandedProc = expandedProc === proc ? null : proc;
+  document.querySelectorAll('.proc-item').forEach(function(item) {
+    var p      = item.dataset.proc;
+    var row    = item.querySelector('.proc-row');
+    var detail = item.querySelector('.proc-detail');
+    var chev   = item.querySelector('.proc-chevron');
+    var open   = p === expandedProc;
+    if (row)    row.classList.toggle('expanded', open);
+    if (detail) { detail.classList.toggle('open', open); if (open) detail.innerHTML = buildProcDetail(p); }
+    if (chev)   chev.classList.toggle('open', open);
+  });
+}
+
 function renderProcesos() {
-  const porProc = {};
-  comandas.forEach(c => { (c.comanda_tareas || []).forEach(t => { if (t.estado === 'Terminada') { const proc = t.proceso || 'Otra tarea'; const und = t.unidades_completadas || t.cantidad || 0; if (!porProc[proc]) porProc[proc] = { und: 0, tareas: 0 }; porProc[proc].und += und; porProc[proc].tareas++; } }); });
-  const procList = Object.entries(porProc).sort((a, b) => b[1].und - a[1].und);
+  var porProc = {};
+  comandas.forEach(function(c) {
+    (c.comanda_tareas || []).forEach(function(t) {
+      if (t.estado === 'Terminada') {
+        var proc = t.proceso || 'Otra tarea';
+        var und  = t.unidades_completadas || t.cantidad || 0;
+        if (!porProc[proc]) porProc[proc] = { und: 0, tareas: 0 };
+        porProc[proc].und += und;
+        porProc[proc].tareas++;
+      }
+    });
+  });
+  var procList = Object.entries(porProc).sort(function(a, b) { return b[1].und - a[1].und; });
   if (procList.length === 0) { document.getElementById('procesosContent').innerHTML = '<div class="empty">🔧 No hay procesos registrados</div>'; return; }
-  const maxUnd = procList[0][1].und;
-  document.getElementById('procesosContent').innerHTML = procList.map(([proc, d]) => `<div class="proc-row"><div class="proc-chip" style="background:${(PROC_COLORS[proc] || '#6B6B6A')}20;color:${PROC_COLORS[proc] || '#6B6B6A'}">${proc}</div><div class="proc-bar-wrap"><div class="proc-bar" style="width:${Math.round((d.und / maxUnd) * 100)}%;background:${PROC_COLORS[proc] || '#6B6B6A'}"></div></div><div class="proc-und">${d.und.toLocaleString()} und</div><div class="proc-tareas">${d.tareas} tareas</div></div>`).join('');
+  var maxUnd = procList[0][1].und;
+  document.getElementById('procesosContent').innerHTML = procList.map(function(entry) {
+    var proc   = entry[0];
+    var d      = entry[1];
+    var color  = PROC_COLORS[proc] || '#6B6B6A';
+    var pct    = Math.round((d.und / maxUnd) * 100);
+    var isOpen = expandedProc === proc;
+    var safeProc = proc.replace(/'/g, "\\'");
+    return '<div class="proc-item" data-proc="' + proc + '">'
+      + '<div class="proc-row' + (isOpen ? ' expanded' : '') + '" onclick="toggleProcDetail(\'' + safeProc + '\')">'
+      + '<div class="proc-chip" style="background:' + color + '20;color:' + color + '">' + proc + '</div>'
+      + '<div class="proc-bar-wrap"><div class="proc-bar" style="width:' + pct + '%;background:' + color + '"></div></div>'
+      + '<div class="proc-und">' + d.und.toLocaleString() + ' und</div>'
+      + '<div class="proc-tareas">' + d.tareas + ' tareas</div>'
+      + '<div class="proc-chevron' + (isOpen ? ' open' : '') + '">▼</div>'
+      + '</div>'
+      + '<div class="proc-detail' + (isOpen ? ' open' : '') + '">' + (isOpen ? buildProcDetail(proc) : '') + '</div>'
+      + '</div>';
+  }).join('');
 }
 
 function renderHistorial() {
