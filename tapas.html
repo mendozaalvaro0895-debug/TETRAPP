@@ -36,6 +36,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .topbar{background:var(--ink);padding:10px 20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;border-bottom:2px solid #1E7D6A}
 .logo{font-family:var(--display);font-size:18px;font-weight:900;color:#fff}
 .logo span{color:#7ECEC0}
+.logo-wrap{position:relative;cursor:pointer;user-select:none;display:flex;align-items:center}
+.logo-chevron{font-size:10px;color:rgba(255,255,255,.4);margin-left:6px;transition:transform .2s}
+.logo-chevron.open{transform:rotate(180deg);color:#7ECEC0}
+.logo-nav{display:none;position:absolute;top:calc(100% + 12px);left:0;background:#1A1A19;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:6px;min-width:214px;box-shadow:0 8px 28px rgba(0,0,0,.5);z-index:9999}
+.logo-nav.open{display:block}
+.logo-nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,.8);text-decoration:none;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;transition:background .12s}
+.logo-nav a:hover{background:rgba(255,255,255,.09);color:#fff}
+.logo-nav a.nav-active{background:#1A6B5B;color:#fff}
+.logo-nav-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
 .topbar-sep{width:1px;height:24px;background:rgba(255,255,255,.2)}
 .topbar-sub{font-size:13px;color:rgba(255,255,255,.7);flex:1}
 .clock{font-family:var(--mono);font-size:12px;color:#7ECEC0;background:rgba(0,0,0,.3);padding:4px 10px;border-radius:20px}
@@ -179,7 +188,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 <body>
 
 <div class="topbar">
-  <div class="logo">TETRA<span>PLASTIC</span></div>
+  <div class="logo-wrap" onclick="toggleLogoNav(event)">
+    <div class="logo">TETRA<span>PLASTIC</span><span class="logo-chevron" id="logoChev">▾</span></div>
+    <div class="logo-nav" id="logoNav">
+      <a href="index.html">🏠 Inicio</a>
+      <div class="logo-nav-sep"></div>
+      <a href="tapas.html" class="nav-active">🏷 Tapas</a>
+      <a href="serigrafia.html">🎨 Serigrafía</a>
+      <a href="comandas.html">📋 Producción</a>
+      <div class="logo-nav-sep"></div>
+      <a href="dashboard.html">📊 Dashboard</a>
+    </div>
+  </div>
   <div class="topbar-sep"></div>
   <div class="topbar-sub">Tapas · Control de Solicitudes</div>
   <div class="clock" id="clk"></div>
@@ -1291,6 +1311,18 @@ async function init() {
 }
 
 init();
+
+function toggleLogoNav(e) {
+  e.stopPropagation();
+  var n = document.getElementById('logoNav'), c = document.getElementById('logoChev');
+  var o = n.classList.toggle('open');
+  c.classList.toggle('open', o);
+}
+document.addEventListener('click', function() {
+  var n = document.getElementById('logoNav'), c = document.getElementById('logoChev');
+  if (n) n.classList.remove('open');
+  if (c) c.classList.remove('open');
+});
 </script>
 
 </body>

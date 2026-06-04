@@ -13,6 +13,15 @@ body { font-family: 'DM Sans', sans-serif; background: #F7F6F2; color: #0C0C0B; 
 .topbar { background: #0C0C0B; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #1E7D6A; flex-wrap: wrap; gap: 10px; }
 .logo { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 900; color: #fff; }
 .logo span { color: #7ECEC0; }
+.logo-wrap{position:relative;cursor:pointer;user-select:none;display:flex;align-items:center}
+.logo-chevron{font-size:10px;color:rgba(255,255,255,.4);margin-left:6px;transition:transform .2s}
+.logo-chevron.open{transform:rotate(180deg);color:#7ECEC0}
+.logo-nav{display:none;position:absolute;top:calc(100% + 12px);left:0;background:#1A1A19;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:6px;min-width:214px;box-shadow:0 8px 28px rgba(0,0,0,.5);z-index:9999}
+.logo-nav.open{display:block}
+.logo-nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,.8);text-decoration:none;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;transition:background .12s}
+.logo-nav a:hover{background:rgba(255,255,255,.09);color:#fff}
+.logo-nav a.nav-active{background:#1A6B5B;color:#fff}
+.logo-nav-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
 .nav-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .nav-btn { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #fff; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; text-decoration: none; }
 .nav-btn:hover { background: rgba(255,255,255,.22); }
@@ -124,7 +133,18 @@ body { font-family: 'DM Sans', sans-serif; background: #F7F6F2; color: #0C0C0B; 
 <body>
 
 <div class="topbar">
-  <div class="logo">TETRA<span>PLASTIC</span></div>
+  <div class="logo-wrap" onclick="toggleLogoNav(event)">
+    <div class="logo">TETRA<span>PLASTIC</span><span class="logo-chevron" id="logoChev">▾</span></div>
+    <div class="logo-nav" id="logoNav">
+      <a href="index.html">🏠 Inicio</a>
+      <div class="logo-nav-sep"></div>
+      <a href="tapas.html">🏷 Tapas</a>
+      <a href="serigrafia.html">🎨 Serigrafía</a>
+      <a href="comandas.html">📋 Producción</a>
+      <div class="logo-nav-sep"></div>
+      <a href="dashboard.html" class="nav-active">📊 Dashboard</a>
+    </div>
+  </div>
   <div class="nav-btns">
     <a href="tapas.html" class="nav-btn">🏷 Tapas</a>
     <a href="serigrafia.html" class="nav-btn">🎨 Serigrafía</a>
@@ -574,6 +594,18 @@ function toggleHistorial() { historialOpen = !historialOpen; const body = docume
 function cargarMasHistorial() { historialLimit = comandas.length; renderHistorial(); }
 
 document.addEventListener('DOMContentLoaded', () => { sincPicker(); cargarComandas(); });
+
+function toggleLogoNav(e) {
+  e.stopPropagation();
+  var n = document.getElementById('logoNav'), c = document.getElementById('logoChev');
+  var o = n.classList.toggle('open');
+  c.classList.toggle('open', o);
+}
+document.addEventListener('click', function() {
+  var n = document.getElementById('logoNav'), c = document.getElementById('logoChev');
+  if (n) n.classList.remove('open');
+  if (c) c.classList.remove('open');
+});
 </script>
 </body>
 </html>
