@@ -477,8 +477,7 @@ async function cargarInventario() {
     const { data, error } = await db
       .from('inventario')
       .select('sku, descripcion, existencia')
-      .eq('activo', true)
-      .limit(200);
+      .eq('activo', true);
     
     if (error) throw error;
     inventarioCache = data || [];
@@ -673,11 +672,12 @@ async function registrarPerdida(solicitudId, sku, cantidad, motivo, usuario, obs
   try {
     const { error } = await db.from('movimientos_materiales').insert({
       solicitud_id: solicitudId,
-      sku: sku,
+      sku_original: sku,
       cantidad: cantidad,
       tipo: 'perdida',
-      usuario: usuario,
-      observaciones: `${motivo} - ${obs}`
+      operador_id: usuario,
+      motivo_perdida: motivo,
+      observaciones: obs
     });
     return { ok: !error, error: error?.message };
   } catch(e) {
@@ -689,10 +689,10 @@ async function registrarEntradaPT(solicitudId, sku, cantidad, usuario, obs) {
   try {
     const { error } = await db.from('movimientos_materiales').insert({
       solicitud_id: solicitudId,
-      sku: sku,
+      sku_original: sku,
       cantidad: cantidad,
       tipo: 'entrada_pt',
-      usuario: usuario,
+      operador_id: usuario,
       observaciones: obs
     });
     return { ok: !error, error: error?.message };
@@ -705,10 +705,10 @@ async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
   try {
     const { error } = await db.from('movimientos_materiales').insert({
       solicitud_id: solicitudId,
-      sku: sku,
+      sku_original: sku,
       cantidad: cantidad,
       tipo: 'salida_bodega',
-      usuario: usuario,
+      operador_id: usuario,
       observaciones: obs
     });
     return { ok: !error, error: error?.message };

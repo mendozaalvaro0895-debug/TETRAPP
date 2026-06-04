@@ -21,10 +21,19 @@ body { font-family: 'DM Sans', sans-serif; background: #F7F6F2; color: #0C0C0B; 
 .page-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 4px; }
 .page-sub { font-size: 13px; color: #6B6B6A; margin-bottom: 24px; }
 
-.period-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
-.period-btn { background: #fff; border: 1.5px solid #E0DED8; color: #6B6B6A; padding: 7px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.period-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+.period-btn { background: #fff; border: 1.5px solid #E0DED8; color: #6B6B6A; padding: 7px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s; }
+.period-btn:hover { border-color: #1A6B5B; color: #1A6B5B; }
 .period-btn.active { background: #1A6B5B; border-color: #1A6B5B; color: #fff; }
-.period-date { font-family: 'DM Mono', monospace; font-size: 11px; color: #A8A6A0; }
+.period-sep { width: 1px; height: 28px; background: #E0DED8; }
+.nav-group { display: flex; align-items: center; gap: 6px; background: #fff; border: 1.5px solid #E0DED8; border-radius: 20px; padding: 4px 6px; }
+.nav-arrow { background: none; border: none; cursor: pointer; font-size: 14px; color: #6B6B6A; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.nav-arrow:hover { background: #EBF7F4; color: #1A6B5B; }
+.nav-label { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; color: #0C0C0B; padding: 0 6px; min-width: 140px; text-align: center; white-space: nowrap; }
+.period-picker { padding: 6px 12px; border: 1.5px solid #E0DED8; border-radius: 20px; font-size: 12px; font-family: 'DM Sans', sans-serif; color: #0C0C0B; background: #fff; cursor: pointer; outline: none; transition: border-color .15s; }
+.period-picker:hover, .period-picker:focus { border-color: #1A6B5B; }
+.today-chip { background: #EBF7F4; border: 1.5px solid #C8EDE7; color: #1A6B5B; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all .15s; }
+.today-chip:hover { background: #1A6B5B; color: #fff; border-color: #1A6B5B; }
 
 .kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
 .kpi-card { background: #fff; border: 1.5px solid #E0DED8; border-radius: 12px; padding: 16px; }
@@ -93,10 +102,17 @@ body { font-family: 'DM Sans', sans-serif; background: #F7F6F2; color: #0C0C0B; 
   <div class="page-sub" id="pageSubLabel">Cargando datos...</div>
 
   <div class="period-bar">
-    <button class="period-btn" data-p="hoy" onclick="setPeriod('hoy')">Hoy</button>
+    <button class="period-btn" data-p="hoy" onclick="setPeriod('hoy')">Día</button>
     <button class="period-btn" data-p="semana" onclick="setPeriod('semana')">Semana</button>
     <button class="period-btn active" data-p="mes" onclick="setPeriod('mes')">Mes</button>
-    <span class="period-date" id="periodDateLabel"></span>
+    <div class="period-sep"></div>
+    <div class="nav-group">
+      <button class="nav-arrow" onclick="navPeriod(-1)" title="Período anterior">‹</button>
+      <span class="nav-label" id="periodDateLabel">—</span>
+      <button class="nav-arrow" onclick="navPeriod(1)" title="Período siguiente">›</button>
+    </div>
+    <input class="period-picker" type="month" id="periodPicker" onchange="pickerChanged(this.value)" title="Ir a un mes específico">
+    <button class="today-chip" onclick="irHoy()">↩ Hoy</button>
   </div>
 
   <div class="kpi-strip" id="kpiStrip">
@@ -129,35 +145,143 @@ const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
 const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 
 let periodo = 'mes';
+let fechaRef = new Date();       // fecha de referencia navegable
 let comandas = [];
 let historialLimit = 10;
 let historialOpen = true;
 
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const OP_COLORS = { 'T0':'#0D4035','T1':'#1A6B5B','T2':'#2E86AB','T3':'#A23B72','T4':'#F18F01','T5':'#C73E1D','T6':'#3B1F2B','T7':'#44BBA4','T8':'#E94F37','T9':'#393E41' };
 const PROC_COLORS = { 'Armado':'#1A6B5B','Banda':'#B07D2A','Liner':'#4338CA','Impresión':'#9D174D','Encajado':'#166534','Flameado':'#0369A1','Otra tarea':'#6B6B6A' };
 
-function getFechas(p) {
-  const hoy = new Date();
-  const fmt = d => d.toISOString().split('T')[0];
-  if (p === 'hoy') return { desde: fmt(hoy), hasta: fmt(hoy) };
-  if (p === 'semana') { const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7)); return { desde: fmt(lunes), hasta: fmt(hoy) }; }
-  const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  return { desde: fmt(inicio), hasta: fmt(hoy) };
+// ── Helpers de fecha ─────────────────────────────────────────
+const fmt = d => d.toISOString().split('T')[0];
+
+function getFechas() {
+  const r = new Date(fechaRef);
+  if (periodo === 'hoy') {
+    return { desde: fmt(r), hasta: fmt(r) };
+  }
+  if (periodo === 'semana') {
+    const lunes = new Date(r);
+    lunes.setDate(r.getDate() - ((r.getDay() + 6) % 7));
+    const domingo = new Date(lunes);
+    domingo.setDate(lunes.getDate() + 6);
+    return { desde: fmt(lunes), hasta: fmt(domingo) };
+  }
+  // mes
+  const inicio = new Date(r.getFullYear(), r.getMonth(), 1);
+  const fin    = new Date(r.getFullYear(), r.getMonth() + 1, 0);
+  return { desde: fmt(inicio), hasta: fmt(fin) };
 }
 
-function setPeriod(p) { periodo = p; document.querySelectorAll('.period-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.p === p)); cargarComandas(); }
+function getLabelPeriod() {
+  const r = new Date(fechaRef);
+  if (periodo === 'hoy') {
+    return r.toLocaleDateString('es-GT', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  if (periodo === 'semana') {
+    const lunes = new Date(r);
+    lunes.setDate(r.getDate() - ((r.getDay() + 6) % 7));
+    const domingo = new Date(lunes);
+    domingo.setDate(lunes.getDate() + 6);
+    const optsS = { day: 'numeric', month: 'short' };
+    return lunes.toLocaleDateString('es-GT', optsS) + ' – ' + domingo.toLocaleDateString('es-GT', optsS) + ' ' + domingo.getFullYear();
+  }
+  return MESES[r.getMonth()] + ' ' + r.getFullYear();
+}
 
+// ── Navegación ───────────────────────────────────────────────
+function navPeriod(dir) {
+  const r = new Date(fechaRef);
+  if (periodo === 'hoy')    r.setDate(r.getDate() + dir);
+  if (periodo === 'semana') r.setDate(r.getDate() + dir * 7);
+  if (periodo === 'mes')    r.setMonth(r.getMonth() + dir);
+  fechaRef = r;
+  sincPicker();
+  cargarComandas();
+}
+
+function irHoy() {
+  fechaRef = new Date();
+  sincPicker();
+  cargarComandas();
+}
+
+function pickerChanged(val) {
+  // val viene como "2026-05" (type=month) o "2026-W22" (type=week) o "2026-06-04" (type=date)
+  if (!val) return;
+  if (periodo === 'mes') {
+    const [y, m] = val.split('-');
+    fechaRef = new Date(parseInt(y), parseInt(m) - 1, 1);
+  } else if (periodo === 'semana') {
+    // type=week devuelve YYYY-Www
+    const [y, w] = val.split('-W');
+    const d = new Date(parseInt(y), 0, 1 + (parseInt(w) - 1) * 7);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    fechaRef = d;
+  } else {
+    fechaRef = new Date(val + 'T12:00:00');
+  }
+  cargarComandas();
+}
+
+function sincPicker() {
+  const picker = document.getElementById('periodPicker');
+  if (!picker) return;
+  const r = new Date(fechaRef);
+  if (periodo === 'mes') {
+    picker.type = 'month';
+    picker.value = r.getFullYear() + '-' + String(r.getMonth() + 1).padStart(2, '0');
+  } else if (periodo === 'semana') {
+    picker.type = 'week';
+    // calcular número de semana ISO
+    const lunes = new Date(r);
+    lunes.setDate(r.getDate() - ((r.getDay() + 6) % 7));
+    const startOfYear = new Date(lunes.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((lunes - startOfYear) / 86400000 + 1) / 7);
+    picker.value = lunes.getFullYear() + '-W' + String(weekNum).padStart(2, '0');
+  } else {
+    picker.type = 'date';
+    picker.value = fmt(r);
+  }
+}
+
+function setPeriod(p) {
+  periodo = p;
+  document.querySelectorAll('.period-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.p === p));
+  sincPicker();
+  cargarComandas();
+}
+
+// ── Carga de datos ───────────────────────────────────────────
 async function cargarComandas() {
-  const { desde, hasta } = getFechas(periodo);
-  document.getElementById('pageSubLabel').innerHTML = `Del ${desde} al ${hasta}`;
-  document.getElementById('periodDateLabel').textContent = `${desde} → ${hasta}`;
+  const { desde, hasta } = getFechas();
+  const label = getLabelPeriod();
+  document.getElementById('pageSubLabel').innerHTML = `Período: <strong>${label}</strong> &nbsp;·&nbsp; <span style="font-family:monospace;font-size:11px;color:#A8A6A0">${desde} → ${hasta}</span>`;
+  document.getElementById('periodDateLabel').textContent = label;
+
+  // Deshabilitar flechas hacia futuro si ya estamos en el período actual
+  const hoy = new Date();
+  const esActual = (periodo === 'mes' && fechaRef.getMonth() === hoy.getMonth() && fechaRef.getFullYear() === hoy.getFullYear())
+                || (periodo === 'semana' && fmt(fechaRef) >= fmt(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - ((hoy.getDay()+6)%7))))
+                || (periodo === 'hoy' && fmt(fechaRef) === fmt(hoy));
+  const btnNext = document.querySelectorAll('.nav-arrow')[1];
+  if (btnNext) { btnNext.style.opacity = esActual ? '.3' : '1'; btnNext.disabled = esActual; }
+
   try {
-    const { data } = await db.from('comandas').select('id, fecha, correlativo, operario_id, operario_nombre, supervisor_nombre, total_unidades, comanda_tareas(proceso, cantidad, unidades_completadas, estado)').gte('fecha', desde).lte('fecha', hasta).order('fecha', { ascending: false });
+    const { data } = await db
+      .from('comandas')
+      .select('id, fecha, correlativo, operario_id, operario_nombre, supervisor_nombre, total_unidades, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
+      .gte('fecha', desde)
+      .lte('fecha', hasta)
+      .order('fecha', { ascending: false });
     comandas = data || [];
     renderizar();
   } catch(e) { console.error(e); comandas = []; renderizar(); }
 }
 
+// ── Render ───────────────────────────────────────────────────
 function renderizar() { renderKPIs(); renderRanking(); renderProcesos(); renderHistorial(); }
 
 function renderKPIs() {
@@ -193,7 +317,7 @@ function renderProcesos() {
 }
 
 function renderHistorial() {
-  if (comandas.length === 0) { document.getElementById('histCount').textContent = '0 comandas'; document.getElementById('historialContent').innerHTML = '<div class="empty">📋 No hay comandas registradas</div>'; return; }
+  if (comandas.length === 0) { document.getElementById('histCount').textContent = '0 comandas'; document.getElementById('historialContent').innerHTML = '<div class="empty">📋 No hay comandas en este período</div>'; return; }
   const total = comandas.length;
   const mostrar = comandas.slice(0, historialLimit);
   const tieneMas = total > historialLimit;
@@ -209,7 +333,7 @@ function renderHistorial() {
 function toggleHistorial() { historialOpen = !historialOpen; const body = document.querySelector('.historial-body'); const icon = document.querySelector('.toggle-icon'); if(body) body.classList.toggle('open', historialOpen); if(icon) icon.classList.toggle('rotated', historialOpen); }
 function cargarMasHistorial() { historialLimit = comandas.length; renderHistorial(); }
 
-document.addEventListener('DOMContentLoaded', () => { cargarComandas(); });
+document.addEventListener('DOMContentLoaded', () => { sincPicker(); cargarComandas(); });
 </script>
 </body>
 </html>
