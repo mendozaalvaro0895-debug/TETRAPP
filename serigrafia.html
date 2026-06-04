@@ -461,6 +461,37 @@ const ALL_PROCS_SERIG = [
   {val:'secado', lbl:'Secado'}, {val:'empaque', lbl:'Empaque'}
 ];
 
+// ── Metas de producción por proceso (und/hora) ───────────────
+const METAS = {
+  armado:            1500,
+  'armado_pushpull':  700,
+  liner:             1500,
+  flameado:          2000,
+  impresion:         1200,
+  encajado:          3000,
+  banda:             1000,
+  serigrafia:        1200,
+  tampografia:       1200,
+  horno:             2000,
+  secado:            2000,
+  empaque:           2500,
+  'separar cavidad': 2500,
+  'limpiar grasa':   2000,
+  'limpiar pestana': 1000,
+  'otra tarea':      1000,
+  'armadora tapa 28':2000,
+  'liner tapa 33':   2200
+};
+const META_DEFAULT = 1000;
+
+function metaParaProcesos(procs) {
+  if (!procs || procs.length === 0) return META_DEFAULT;
+  const vals = procs.map(function(p) {
+    return METAS[p] || METAS[p.toLowerCase()] || META_DEFAULT;
+  });
+  return Math.min.apply(null, vals);
+}
+
 // Clientes predefinidos
 const CLIENTES = [
   'A. CORP UNIVERSAL', 'AMERICAN NATURAL', 'ANCORA (HN)', 'BELLEZA S.A.',
@@ -576,7 +607,7 @@ function renderListas() {
       <div class="sc-meta">
         <span class="sc-qty">${s.cant.toLocaleString()} und</span>
         <span class="sc-date">🗓 ${s.fecha_lim || '—'}</span>
-        <span class="sc-date">⏱ ${calcularHoras(s.cant, 1).toFixed(1)}h</span>
+        <span class="sc-date">⏱ ${calcularHoras(s.cant, 1, s.lineas.flatMap(l => l.procs || [])).toFixed(1)}h</span>
       </div>
       ${s.prog > 0 ? `<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-s" style="width:${s.prog}%"></div></div><div class="pr-pct">${s.prog}%</div></div>` : ''}
     </div>
@@ -609,9 +640,10 @@ function prioridadPill(prioridad) {
   return `<span class="pill ${clases[prioridad] || 'pill-normal'}">${textos[prioridad] || prioridad}</span>`;
 }
 
-function calcularHoras(cantidad, opsCount = 1) {
-  const velocidadBase = 1200;
-  return cantidad / (velocidadBase * opsCount);
+function calcularHoras(cantidad, opsCount, procs) {
+  if (opsCount === undefined) opsCount = 1;
+  const meta = metaParaProcesos(procs);
+  return cantidad / (meta * opsCount);
 }
 
 function fechaEst(turnos) {
@@ -755,7 +787,9 @@ async function mostrarDetalle(id) {
   } catch(e) {}
   
   const det = document.getElementById('detSerig');
-  const horas = calcularHoras(s.cant, 1);
+  const allProcs = s.lineas.flatMap(l => l.procs || []);
+  const metaSol  = metaParaProcesos(allProcs);
+  const horas = calcularHoras(s.cant, 1, allProcs);
   
   det.innerHTML = `
     <div class="ph" style="flex-shrink:0">
@@ -775,7 +809,7 @@ async function mostrarDetalle(id) {
       <div class="tbox ts">
         <div class="tbox-lbl">Tiempo estimado</div>
         <div class="tbox-val sc">${horas.toFixed(1)} horas</div>
-        <div class="tbox-sub">${Math.ceil(horas/12)} turno(s) · Entrega estimada: ${fechaEst(Math.ceil(horas/12))}</div>
+        <div class="tbox-sub">${Math.ceil(horas/12)} turno(s) · Meta: ${metaSol.toLocaleString()} und/h · Entrega est.: ${fechaEst(Math.ceil(horas/12))}</div>
       </div>
       
       <div class="dc" style="border-color:var(--amber)">
@@ -1078,15 +1112,17 @@ function updateTotals() {
 }
 
 function calcular() {
-  const total = lineas.reduce((s, l) => s + (l.cant || 0), 0);
+  const total    = lineas.reduce((s, l) => s + (l.cant || 0), 0);
   const opsCount = 1;
-  const horas = total / (1200 * opsCount);
-  const turnos = Math.ceil(horas / 12);
-  
-  document.getElementById('cHoras').textContent = horas.toFixed(1) + 'h';
+  const allProcs = [...new Set(lineas.flatMap(l => l.procs || []))];
+  const meta     = metaParaProcesos(allProcs);
+  const horas    = total / (meta * opsCount);
+  const turnos   = Math.ceil(horas / 12);
+
+  document.getElementById('cHoras').textContent  = horas.toFixed(1) + 'h';
   document.getElementById('cTurnos').textContent = turnos + (turnos > 1 ? ' turnos' : ' turno');
-  document.getElementById('cCap').textContent = (1200 * opsCount).toLocaleString();
-  document.getElementById('cFecha').textContent = fechaEst(turnos);
+  document.getElementById('cCap').textContent    = meta.toLocaleString();
+  document.getElementById('cFecha').textContent  = fechaEst(turnos);
 }
 
 async function guardar() {

@@ -86,6 +86,7 @@ body { font-family: 'DM Sans', sans-serif; background: #F7F6F2; color: #0C0C0B; 
 .proc-bar { height: 6px; border-radius: 4px; width: 0%; }
 .proc-und { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; min-width: 70px; text-align: right; flex-shrink: 0; }
 .proc-tareas { font-size: 10px; color: #A8A6A0; min-width: 55px; text-align: right; flex-shrink: 0; }
+.proc-meta-tag { font-size: 10px; font-weight: 700; color: #1A6B5B; background: #EBF7F4; padding: 2px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
 .proc-chevron { font-size: 12px; color: #A8A6A0; transition: transform .2s; width: 16px; text-align: center; flex-shrink: 0; }
 .proc-chevron.open { transform: rotate(180deg); color: #1A6B5B; }
 
@@ -190,6 +191,33 @@ let expandedProc = null;          // nombre del proceso con detalle abierto
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const OP_COLORS = { 'T0':'#0D4035','T1':'#1A6B5B','T2':'#2E86AB','T3':'#A23B72','T4':'#F18F01','T5':'#C73E1D','T6':'#3B1F2B','T7':'#44BBA4','T8':'#E94F37','T9':'#393E41' };
 const PROC_COLORS = { 'Armado':'#1A6B5B','Banda':'#B07D2A','Liner':'#4338CA','Impresión':'#9D174D','Encajado':'#166534','Flameado':'#0369A1','Otra tarea':'#6B6B6A' };
+
+// ── Metas de producción por proceso (und/hora) ───────────────
+// Nota: Armado tapa PUSH PULL → meta especial de 700/hora
+const METAS = {
+  'Armado':             1500,
+  'Armado (Push Pull)':  700,
+  'Liner':              1500,
+  'Flameado':           2000,
+  'Impresión':          1200,
+  'Impresion':          1200,
+  'Encajado':           3000,
+  'Banda':              1000,
+  'Separar cavidad':    2500,
+  'Limpiar grasa':      2000,
+  'Limpiar pestaña':    1000,
+  'Otra tarea':         1000,
+  'Armadora tapa 28':   2000,
+  'Liner tapa 33':      2200
+};
+const META_DEFAULT = 1000;
+function metaProc(proc) {
+  if (!proc) return META_DEFAULT;
+  if (METAS[proc] !== undefined) return METAS[proc];
+  var lo = proc.toLowerCase();
+  for (var k in METAS) { if (k.toLowerCase() === lo) return METAS[k]; }
+  return META_DEFAULT;
+}
 
 // ── Helpers de fecha ─────────────────────────────────────────
 const fmt = d => d.toISOString().split('T')[0];
@@ -468,10 +496,11 @@ function buildProcDetail(proc) {
   var totalTar = ops.reduce(function(s, e) { return s + e[1].tareas; }, 0);
   var html = '<div class="proc-detail-title">Ranking de operarios · ' + proc + '</div>';
   ops.forEach(function(e) { html += buildProcOpRow(e[0], e[1], maxUnd); });
-  html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #C8EDE7;display:flex;gap:16px;font-size:11px;color:#6B6B6A">'
+  html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #C8EDE7;display:flex;gap:16px;font-size:11px;color:#6B6B6A;flex-wrap:wrap;align-items:center">'
     + '<span>Total: <strong style="color:#0C0C0B">' + totalUnd.toLocaleString() + ' und</strong></span>'
     + '<span>' + ops.length + ' operario' + (ops.length !== 1 ? 's' : '') + '</span>'
     + '<span>' + totalTar + ' tarea' + (totalTar !== 1 ? 's' : '') + '</span>'
+    + '<span style="margin-left:auto;background:#EBF7F4;color:#1A6B5B;font-weight:700;padding:2px 10px;border-radius:20px">Meta: ' + metaProc(proc).toLocaleString() + ' und/h</span>'
     + '</div>';
   return html;
 }
@@ -519,6 +548,7 @@ function renderProcesos() {
       + '<div class="proc-bar-wrap"><div class="proc-bar" style="width:' + pct + '%;background:' + color + '"></div></div>'
       + '<div class="proc-und">' + d.und.toLocaleString() + ' und</div>'
       + '<div class="proc-tareas">' + d.tareas + ' tareas</div>'
+      + '<div class="proc-meta-tag">⚡ ' + metaProc(proc).toLocaleString() + '/h</div>'
       + '<div class="proc-chevron' + (isOpen ? ' open' : '') + '">▼</div>'
       + '</div>'
       + '<div class="proc-detail' + (isOpen ? ' open' : '') + '">' + (isOpen ? buildProcDetail(proc) : '') + '</div>'
