@@ -183,6 +183,27 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .op-proc{font-size:10px;color:var(--gray)}
 .p-lista{background:#DCFCE7;color:#166534}
 .p-urg{background:#FEE2E2;color:var(--red)}
+
+/* ── Tabs Salidas / Ingresos ───────────────────────────────── */
+.mov-toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+.mov-scroll{flex:1;overflow-y:auto;padding:16px}
+.mov-table{width:100%;border-collapse:collapse}
+.mov-table th{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);padding:8px 10px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
+.mov-table td{padding:9px 10px;font-size:12px;border-bottom:1px solid var(--bg);vertical-align:middle}
+.mov-table tr:hover td{background:var(--teal-xl)}
+.mov-doc{font-family:var(--mono);font-weight:700;color:var(--ink);font-size:12px}
+.mov-sku{font-family:var(--mono);font-size:11px;color:var(--teal)}
+.mov-cant{font-family:var(--mono);font-weight:700;color:var(--teal);text-align:right}
+.mov-badge-sal{background:#FFF3D6;color:#92400E;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
+.mov-badge-ing{background:#DCFCE7;color:#166534;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
+.sku-wrap{position:relative}
+.sku-drop{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--teal);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:999;max-height:180px;overflow-y:auto;margin-top:2px}
+.sku-drop.open{display:block}
+.sku-item{padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--bg);font-size:12px}
+.sku-item:last-child{border-bottom:none}
+.sku-item:hover{background:var(--teal-xl)}
+.sku-code{font-family:var(--mono);font-weight:700;color:var(--teal);font-size:11px;margin-bottom:2px}
+.sku-desc{color:var(--ink);font-size:11px}
 </style>
 </head>
 <body>
@@ -228,6 +249,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="tdot" style="background:var(--teal)"></div>
       Tapas
       <span class="tbadge tb-teal" id="cnt-tapas">0</span>
+    </div>
+    <div class="tab" id="tab-salidas" onclick="switchTab('salidas')">
+      📤 Salidas
+      <span class="tbadge" id="cnt-salidas">—</span>
+    </div>
+    <div class="tab" id="tab-ingresos" onclick="switchTab('ingresos')">
+      📦 Ingresos PT
+      <span class="tbadge" id="cnt-ingresos">—</span>
     </div>
     <div class="tab t-dash" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
     <div class="tab t-personal" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
@@ -279,6 +308,48 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- SALIDAS VIEW -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-salidas">
+      <div class="kpi-strip" id="salidaKPIs">
+        <div class="kpi"><div class="kpi-l">Unidades salidas</div><div class="kpi-v" style="color:var(--amber)" id="ks-und">—</div><div class="kpi-s">total período</div></div>
+        <div class="kpi"><div class="kpi-l">Documentos</div><div class="kpi-v" id="ks-docs">—</div><div class="kpi-s">registros únicos</div></div>
+        <div class="kpi"><div class="kpi-l">SKUs distintos</div><div class="kpi-v" id="ks-skus">—</div><div class="kpi-s">materias primas</div></div>
+        <div class="kpi"><div class="kpi-l">Último registro</div><div class="kpi-v" style="font-size:14px" id="ks-ultimo">—</div><div class="kpi-s">fecha</div></div>
+      </div>
+      <div class="mov-toolbar">
+        <span style="font-size:11px;font-weight:700;color:var(--gray)">Período:</span>
+        <input class="fi" type="date" id="salidaDesde" style="font-size:11px;padding:4px 8px">
+        <span style="font-size:11px;color:var(--gray)">→</span>
+        <input class="fi" type="date" id="salidaHasta" style="font-size:11px;padding:4px 8px">
+        <button class="btn btn-g btn-sm" onclick="filtrarMov('salida')">Filtrar</button>
+        <input class="fi" type="text" placeholder="🔍 Buscar Nº Doc o SKU..." id="salidaBuscar" oninput="filtrarMov('salida')" style="font-size:12px;min-width:200px">
+        <div style="flex:1"></div>
+        <button class="btn btn-t btn-sm" onclick="abrirModalMov('salida')">+ Registrar Salida</button>
+      </div>
+      <div class="mov-scroll"><div id="salidaTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div></div>
+    </div>
+
+    <!-- INGRESOS PT VIEW -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-ingresos">
+      <div class="kpi-strip" id="ingresoKPIs">
+        <div class="kpi"><div class="kpi-l">Unidades ingresadas</div><div class="kpi-v" style="color:var(--green)" id="ki-und">—</div><div class="kpi-s">producto terminado</div></div>
+        <div class="kpi"><div class="kpi-l">Documentos</div><div class="kpi-v" id="ki-docs">—</div><div class="kpi-s">registros únicos</div></div>
+        <div class="kpi"><div class="kpi-l">SKUs distintos</div><div class="kpi-v" id="ki-skus">—</div><div class="kpi-s">tapas terminadas</div></div>
+        <div class="kpi"><div class="kpi-l">Último registro</div><div class="kpi-v" style="font-size:14px" id="ki-ultimo">—</div><div class="kpi-s">fecha</div></div>
+      </div>
+      <div class="mov-toolbar">
+        <span style="font-size:11px;font-weight:700;color:var(--gray)">Período:</span>
+        <input class="fi" type="date" id="ingresoDesde" style="font-size:11px;padding:4px 8px">
+        <span style="font-size:11px;color:var(--gray)">→</span>
+        <input class="fi" type="date" id="ingresoHasta" style="font-size:11px;padding:4px 8px">
+        <button class="btn btn-g btn-sm" onclick="filtrarMov('ingreso')">Filtrar</button>
+        <input class="fi" type="text" placeholder="🔍 Buscar Nº Doc o SKU..." id="ingresoBuscar" oninput="filtrarMov('ingreso')" style="font-size:12px;min-width:200px">
+        <div style="flex:1"></div>
+        <button class="btn btn-t btn-sm" onclick="abrirModalMov('ingreso')">+ Registrar Ingreso PT</button>
+      </div>
+      <div class="mov-scroll"><div id="ingresoTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div></div>
     </div>
 
     <!-- DASHBOARD VIEW -->
@@ -419,6 +490,61 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="mf">
       <button class="btn btn-g" onclick="cerrarModalPerdida()">Cancelar</button>
       <button class="btn btn-t" onclick="confirmarPerdida()">Registrar pérdida</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SALIDA / INGRESO PT -->
+<div class="overlay" id="modalMov">
+  <div class="modal" style="max-width:580px">
+    <div class="mh">
+      <div class="mh-title" id="movTitulo">📤 Registrar Salida de Bodega</div>
+      <button class="m-close" onclick="cerrarModalMov()">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Nº Documento (sistema local) *</div>
+          <input class="fi" id="movNumDoc" placeholder="Ej: S-004521">
+        </div>
+        <div class="fg">
+          <div class="fl">Fecha del documento *</div>
+          <input class="fi" id="movFecha" type="date">
+        </div>
+      </div>
+      <div class="fg full" style="margin-bottom:12px">
+        <div class="fl">SKU del Producto *</div>
+        <div class="sku-wrap">
+          <input class="fi" id="movSku" placeholder="Escribe el código SKU..." autocomplete="off"
+            oninput="movSkuInput(this.value)" onblur="setTimeout(()=>cerrarSkuDrop(),200)" style="width:100%">
+          <div class="sku-drop" id="movSkuDrop"></div>
+        </div>
+      </div>
+      <div class="fg full" style="margin-bottom:12px">
+        <div class="fl">Descripción</div>
+        <input class="fi" id="movDesc" placeholder="Se completa automáticamente al seleccionar SKU" readonly
+          style="background:var(--bg);color:var(--gray)">
+      </div>
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Cantidad (unidades) *</div>
+          <input class="fi" id="movCant" type="number" min="1" placeholder="0">
+        </div>
+        <div class="fg">
+          <div class="fl">Solicitud vinculada (opcional)</div>
+          <select class="fs" id="movSolicitud" style="font-size:12px">
+            <option value="">— Sin vincular —</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg full">
+        <div class="fl">Observaciones</div>
+        <textarea class="fta" id="movObs" rows="2" placeholder="Notas adicionales..."></textarea>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cerrarModalMov()">Cancelar</button>
+      <button class="btn btn-t" id="movBtnOk" onclick="confirmarMov()">Registrar</button>
     </div>
   </div>
 </div>
@@ -1213,17 +1339,18 @@ function switchTab(tab) {
   views.forEach(v => v.style.display = 'none');
   tabs.forEach(t => t.classList.remove('active'));
   
-  const viewMap = { tapas: 'view-tapas', dash: 'view-dash', personal: 'view-personal' };
-  const tabMap = { tapas: 'tab-tapas', dash: 'tab-dash', personal: 'tab-personal' };
-  
+  const viewMap = { tapas:'view-tapas', salidas:'view-salidas', ingresos:'view-ingresos', dash:'view-dash', personal:'view-personal' };
+  const tabMap  = { tapas:'tab-tapas', salidas:'tab-salidas', ingresos:'tab-ingresos', dash:'tab-dash', personal:'tab-personal' };
+
   const viewId = viewMap[tab];
-  const tabId = tabMap[tab];
-  
+  const tabId  = tabMap[tab];
+
   if (viewId) document.getElementById(viewId).style.display = 'flex';
-  if (tabId) document.getElementById(tabId).classList.add('active');
-  
-  if (tab === 'dash') renderDash();
+  if (tabId)  document.getElementById(tabId).classList.add('active');
+
+  if (tab === 'dash')     renderDash();
   if (tab === 'personal') renderPersonal();
+  if (tab === 'salidas' || tab === 'ingresos') cargarMovimientos();
 }
 
 function renderDash() {
@@ -1294,6 +1421,13 @@ async function init() {
     });
   }
   
+  // Fechas por defecto para filtros (mes actual)
+  const hoy = new Date();
+  const primerDia = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-01';
+  const hoyStr    = hoy.toISOString().split('T')[0];
+  ['salidaDesde','ingresoDesde'].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=primerDia; });
+  ['salidaHasta','ingresoHasta'].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=hoyStr; });
+
   // Cargar datos
   await cargarInventario();
   await cargarPersonal();
@@ -1311,6 +1445,225 @@ async function init() {
 }
 
 init();
+
+// ══ SALIDAS / INGRESOS PT ════════════════════════════════════
+let salidaMovs   = [];
+let ingresoMovs  = [];
+let movTipoActual = 'salida_bodega';
+
+// ── Helpers ──────────────────────────────────────────────────
+function getSkuDesc(sku) {
+  if (!sku) return '—';
+  const item = inventarioCache.find(function(i) { return i.sku === sku; });
+  return item ? item.descripcion : '—';
+}
+
+function parseFechaDoc(obs) {
+  if (!obs) return null;
+  var m = obs.match(/^FECHA:(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+}
+
+function parseObs(obs) {
+  if (!obs) return '';
+  return obs.replace(/^FECHA:\d{4}-\d{2}-\d{2} \| ?/, '');
+}
+
+function formatFecha(isoStr) {
+  if (!isoStr) return '—';
+  return isoStr.split('T')[0];
+}
+
+// ── Carga ─────────────────────────────────────────────────────
+async function cargarMovimientos() {
+  try {
+    var sal = await db.from('movimientos_materiales').select('*').eq('tipo','salida_bodega').order('created_at', { ascending: false });
+    var ing = await db.from('movimientos_materiales').select('*').eq('tipo','entrada_pt').order('created_at', { ascending: false });
+    salidaMovs  = sal.data || [];
+    ingresoMovs = ing.data || [];
+    renderMov('salida');
+    renderMov('ingreso');
+  } catch(e) { console.error('cargarMovimientos:', e); }
+}
+
+// ── Render ────────────────────────────────────────────────────
+function filtrarMov(tipo) { renderMov(tipo); }
+
+function renderMov(tipo) {
+  var movs      = tipo === 'salida' ? salidaMovs : ingresoMovs;
+  var desde     = document.getElementById(tipo + 'Desde')?.value || '';
+  var hasta     = document.getElementById(tipo + 'Hasta')?.value || '';
+  var buscar    = (document.getElementById(tipo + 'Buscar')?.value || '').toLowerCase();
+  var tabla     = document.getElementById(tipo === 'salida' ? 'salidaTabla' : 'ingresoTabla');
+  var cntEl     = document.getElementById(tipo === 'salida' ? 'cnt-salidas' : 'cnt-ingresos');
+
+  var filtered = movs.filter(function(m) {
+    var fechaDoc  = parseFechaDoc(m.observaciones) || formatFecha(m.created_at);
+    if (desde && fechaDoc < desde) return false;
+    if (hasta && fechaDoc > hasta) return false;
+    if (buscar) {
+      var hayDoc = (m.num_documento || '').toLowerCase().includes(buscar);
+      var haySku = (m.sku_original || '').toLowerCase().includes(buscar);
+      if (!hayDoc && !haySku) return false;
+    }
+    return true;
+  });
+
+  // KPIs
+  var totalUnd  = filtered.reduce(function(s,m){ return s+(m.cantidad||0); }, 0);
+  var totalDocs = new Set(filtered.map(function(m){ return m.num_documento; }).filter(Boolean)).size;
+  var totalSkus = new Set(filtered.map(function(m){ return m.sku_original; }).filter(Boolean)).size;
+  var ultimo    = filtered.length > 0 ? (parseFechaDoc(filtered[0].observaciones) || formatFecha(filtered[0].created_at)) : '—';
+
+  if (tipo === 'salida') {
+    document.getElementById('ks-und').textContent   = totalUnd.toLocaleString();
+    document.getElementById('ks-docs').textContent  = totalDocs;
+    document.getElementById('ks-skus').textContent  = totalSkus;
+    document.getElementById('ks-ultimo').textContent = ultimo;
+  } else {
+    document.getElementById('ki-und').textContent   = totalUnd.toLocaleString();
+    document.getElementById('ki-docs').textContent  = totalDocs;
+    document.getElementById('ki-skus').textContent  = totalSkus;
+    document.getElementById('ki-ultimo').textContent = ultimo;
+  }
+  if (cntEl) cntEl.textContent = filtered.length;
+
+  if (!tabla) return;
+
+  if (filtered.length === 0) {
+    tabla.innerHTML = '<div class="empty">📭 No hay registros para este período</div>';
+    return;
+  }
+
+  var badgeClass = tipo === 'salida' ? 'mov-badge-sal' : 'mov-badge-ing';
+  var badgeLabel = tipo === 'salida' ? 'SALIDA' : 'INGRESO PT';
+
+  var rows = filtered.map(function(m) {
+    var fechaDoc = parseFechaDoc(m.observaciones) || formatFecha(m.created_at);
+    var obsText  = parseObs(m.observaciones);
+    var sol      = solicitudes.find(function(s){ return s.id === m.solicitud_id; });
+    var solLabel = sol ? (sol.id_display || sol.id.slice(0,8)) : '—';
+    var desc     = getSkuDesc(m.sku_original);
+    return '<tr>'
+      + '<td><span class="' + badgeClass + '">' + badgeLabel + '</span></td>'
+      + '<td class="mov-doc">' + (m.num_documento || '—') + '</td>'
+      + '<td style="font-family:var(--mono);font-size:11px">' + fechaDoc + '</td>'
+      + '<td class="mov-sku">' + (m.sku_original || '—') + '</td>'
+      + '<td style="font-size:11px;max-width:200px">' + desc + '</td>'
+      + '<td class="mov-cant">' + (m.cantidad || 0).toLocaleString() + '</td>'
+      + '<td style="font-size:11px;color:var(--teal)">' + solLabel + '</td>'
+      + '<td style="font-size:11px;color:var(--gray-l)">' + obsText + '</td>'
+      + '</tr>';
+  }).join('');
+
+  tabla.innerHTML = '<table class="mov-table">'
+    + '<thead><tr><th></th><th>Nº Documento</th><th>Fecha Doc.</th><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th>Solicitud</th><th>Observaciones</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table>';
+}
+
+// ── Modal registro ────────────────────────────────────────────
+function abrirModalMov(tipo) {
+  movTipoActual = tipo === 'salida' ? 'salida_bodega' : 'entrada_pt';
+  var esSalida  = tipo === 'salida';
+  document.getElementById('movTitulo').textContent   = esSalida ? '📤 Registrar Salida de Bodega' : '📦 Registrar Ingreso de PT';
+  document.getElementById('movBtnOk').textContent    = esSalida ? 'Registrar Salida' : 'Registrar Ingreso PT';
+  document.getElementById('movBtnOk').className      = 'btn btn-t';
+
+  // Reset
+  ['movNumDoc','movSku','movDesc','movCant','movObs'].forEach(function(id){ document.getElementById(id).value = ''; });
+  document.getElementById('movFecha').value = new Date().toISOString().split('T')[0];
+  cerrarSkuDrop();
+
+  // Solicitudes dropdown
+  var sel = document.getElementById('movSolicitud');
+  sel.innerHTML = '<option value="">— Sin vincular —</option>';
+  solicitudes.filter(function(s){ return s.estado !== 'entregada'; }).forEach(function(s) {
+    var opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = (s.id_display || s.id.slice(0,8)) + ' — ' + s.cliente;
+    sel.appendChild(opt);
+  });
+
+  document.getElementById('modalMov').classList.add('open');
+}
+
+function cerrarModalMov() {
+  document.getElementById('modalMov').classList.remove('open');
+  cerrarSkuDrop();
+}
+
+// ── Autocomplete SKU ──────────────────────────────────────────
+function movSkuInput(val) {
+  var drop = document.getElementById('movSkuDrop');
+  var v    = val.trim().toLowerCase();
+  if (v.length < 2) { drop.classList.remove('open'); return; }
+  var matches = inventarioCache.filter(function(i) {
+    return i.sku.toLowerCase().includes(v) || (i.descripcion || '').toLowerCase().includes(v);
+  }).slice(0, 10);
+  if (matches.length === 0) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(function(i) {
+    return '<div class="sku-item" onmousedown="seleccionarSku(\'' + i.sku.replace(/'/g,"\\'") + '\')">'
+      + '<div class="sku-code">' + i.sku + '</div>'
+      + '<div class="sku-desc">' + (i.descripcion || '') + '</div>'
+      + '</div>';
+  }).join('');
+  drop.classList.add('open');
+}
+
+function seleccionarSku(sku) {
+  var item = inventarioCache.find(function(i){ return i.sku === sku; });
+  document.getElementById('movSku').value  = sku;
+  document.getElementById('movDesc').value = item ? item.descripcion : '';
+  cerrarSkuDrop();
+}
+
+function cerrarSkuDrop() {
+  var d = document.getElementById('movSkuDrop');
+  if (d) d.classList.remove('open');
+}
+
+// ── Confirmar registro ────────────────────────────────────────
+async function confirmarMov() {
+  var numDoc = document.getElementById('movNumDoc').value.trim();
+  var fecha  = document.getElementById('movFecha').value;
+  var sku    = document.getElementById('movSku').value.trim();
+  var cant   = parseInt(document.getElementById('movCant').value);
+  var solId  = document.getElementById('movSolicitud').value || null;
+  var obs    = document.getElementById('movObs').value.trim();
+
+  if (!numDoc)         { showToast('⚠️ Nº de documento requerido', '#B83232'); return; }
+  if (!sku)            { showToast('⚠️ SKU requerido', '#B83232'); return; }
+  if (!cant || cant<1) { showToast('⚠️ Cantidad debe ser mayor a 0', '#B83232'); return; }
+
+  var obsFinal = 'FECHA:' + fecha + (obs ? ' | ' + obs : '');
+  var btnOk = document.getElementById('movBtnOk');
+  btnOk.disabled = true;
+  btnOk.textContent = 'Guardando...';
+
+  try {
+    var { error } = await db.from('movimientos_materiales').insert({
+      solicitud_id:  solId,
+      sku_original:  sku,
+      cantidad:      cant,
+      tipo:          movTipoActual,
+      num_documento: numDoc,
+      observaciones: obsFinal
+    });
+    if (error) throw error;
+
+    var label = movTipoActual === 'salida_bodega' ? 'Salida' : 'Ingreso PT';
+    showToast('✅ ' + label + ' registrado: Doc ' + numDoc + ' · ' + cant.toLocaleString() + ' und');
+    cerrarModalMov();
+    await cargarMovimientos();
+    switchTab(movTipoActual === 'salida_bodega' ? 'salidas' : 'ingresos');
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  } finally {
+    btnOk.disabled = false;
+    btnOk.textContent = movTipoActual === 'salida_bodega' ? 'Registrar Salida' : 'Registrar Ingreso PT';
+  }
+}
 
 function toggleLogoNav(e) {
   e.stopPropagation();
