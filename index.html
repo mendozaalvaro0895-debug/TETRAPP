@@ -6,6 +6,7 @@
 <title>TETRAPLASTIC — Sistema Digital de Operaciones</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css">
 <style>
 :root {
   --ink: #0C0C0B;
@@ -49,19 +50,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .hero-title{font-family:var(--display);font-size:clamp(32px,5vw,52px);font-weight:700;line-height:1.1;margin-bottom:16px}
 .hero-sub{font-size:16px;color:var(--gray);max-width:600px;margin:0 auto}
 
-.areas-grid{padding:24px;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+.areas-grid{padding:24px;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media(max-width:840px){.areas-grid{grid-template-columns:repeat(2,1fr);gap:14px}}
+@media(max-width:540px){.areas-grid{grid-template-columns:1fr;padding:14px;gap:12px}}
 
 .area-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;text-decoration:none;color:inherit;display:block;transition:all .2s;position:relative;overflow:hidden;cursor:pointer}
 .area-card:hover{box-shadow:0 8px 32px rgba(0,0,0,.1);transform:translateY(-2px)}
 .area-card.disabled{opacity:.5;cursor:not-allowed;background:repeating-linear-gradient(45deg,var(--card),var(--card) 10px,var(--bg) 10px,var(--bg) 20px)}
 .area-card.disabled:hover{transform:none;box-shadow:none}
 .area-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:14px}
-.area-icon.tapas{background:var(--teal-xl);color:var(--teal)}
-.area-icon.serig{background:#F0EBFF;color:var(--serig-m)}
-.area-icon.prod{background:#FFF3D6;color:var(--gold)}
-.area-icon.bodega{background:#DBEAFE;color:#1e40af}
-.area-icon.calidad{background:#FCE7F3;color:#9d174d}
-.area-icon.dash{background:#E7F5F0;color:#065F46}
+.area-icon.tapas  { background:var(--teal-xl);  color:var(--teal) }
+.area-icon.serig  { background:#F0EBFF;          color:#5A2D9E }
+.area-icon.prod   { background:var(--prod-xl,#FFFBEB);  color:var(--prod,#B07D2A) }
+.area-icon.ventas { background:var(--ventas-xl,#EFF6FF); color:var(--ventas,#1D4ED8) }
+.area-icon.bodega { background:var(--bodega-xl,#ECFEFF); color:var(--bodega,#0E7490) }
+.area-icon.dash   { background:#ECFDF5;          color:#065F46 }
 .area-name{font-family:var(--display);font-size:20px;font-weight:700;margin-bottom:6px}
 .area-desc{font-size:13px;color:var(--gray);line-height:1.5;margin-bottom:14px}
 .area-status{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;padding:3px 10px;border-radius:20px}
@@ -94,9 +97,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="logo-nav-sep"></div>
       <a href="tapas.html">🏷 Tapas</a>
       <a href="serigrafia.html">🎨 Serigrafía</a>
-      <a href="produccion.html">🏭 Producción</a>
-      <div class="logo-nav-sep"></div>
       <a href="dashboard.html">📊 Dashboard</a>
+      <div class="logo-nav-sep"></div>
+      <a href="produccion.html">🏭 Producción</a>
+      <a class="nav-locked">💼 Ventas</a>
+      <a class="nav-locked">📦 Bodega</a>
     </div>
   </div>
   <div class="user-pill">
@@ -120,60 +125,65 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 <div class="areas-grid">
 
+  <!-- ① TAPAS — ACTIVO -->
   <a href="tapas.html" class="area-card">
     <div class="area-arrow">→</div>
     <div class="area-icon tapas">🏷</div>
     <div class="area-name">Tapas</div>
-    <div class="area-desc">Control de solicitudes, asignación de operadores y trazabilidad de armado, liner, banda, impresión y encajado.</div>
+    <div class="area-desc">Solicitudes de producción, asignación de operadores y trazabilidad por proceso: armado, liner, impresión y encajado.</div>
     <div class="area-status active">● Activo</div>
     <div class="area-stats">
-      <div class="area-stat"><strong id="tapas-activas">—</strong>Activas</div>
+      <div class="area-stat"><strong id="tapas-activas">—</strong>En proceso</div>
       <div class="area-stat"><strong id="tapas-pendientes">—</strong>Pendientes</div>
-      <div class="area-stat"><strong id="tapas-ops">12</strong>Operadores</div>
+      <div class="area-stat"><strong>12</strong>Operadores</div>
     </div>
   </a>
 
+  <!-- ② SERIGRAFÍA — ACTIVO -->
   <a href="serigrafia.html" class="area-card">
     <div class="area-arrow">→</div>
     <div class="area-icon serig">🎨</div>
     <div class="area-name">Serigrafía</div>
-    <div class="area-desc">Flameado, impresión serigráfica, horno, secado y empaque. Trazabilidad completa por lote.</div>
+    <div class="area-desc">Flameado, impresión serigráfica, horno, secado y empaque. Control de personal activo por turno.</div>
     <div class="area-status active">● Activo</div>
     <div class="area-stats">
-      <div class="area-stat"><strong id="serig-activas">—</strong>Activas</div>
+      <div class="area-stat"><strong id="serig-activas">—</strong>En proceso</div>
       <div class="area-stat"><strong id="serig-pendientes">—</strong>Pendientes</div>
-      <div class="area-stat"><strong id="serig-ops">10</strong>Operadores</div>
+      <div class="area-stat"><strong>9</strong>Operadores</div>
     </div>
   </a>
 
+  <!-- ③ DASHBOARD — ACTIVO -->
   <a href="dashboard.html" class="area-card">
     <div class="area-arrow">→</div>
     <div class="area-icon dash">📊</div>
-    <div class="area-name">Dashboard Ejecutivo</div>
-    <div class="area-desc">Vista consolidada de KPIs de toda la planta. Eficiencia, rechazos, productividad y entregas en tiempo real.</div>
+    <div class="area-name">Dashboard</div>
+    <div class="area-desc">Vista ejecutiva de KPIs de toda la planta: eficiencia, ranking de operarios y producción por proceso.</div>
     <div class="area-status active">● Activo</div>
   </a>
 
-  <a href="comandas.html" class="area-card">
-    <div class="area-arrow">→</div>
-    <div class="area-icon prod">📋</div>
-    <div class="area-name">Comandas de Trabajo</div>
-    <div class="area-desc">Registro de producción diaria por operario, tareas y rendimiento por máquina.</div>
-    <div class="area-status active">● Activo</div>
-  </a>
+  <!-- ④ PRODUCCIÓN MÁQUINAS — BLOQUEADO -->
+  <div class="area-card disabled" title="En construcción">
+    <div class="area-icon prod">🏭</div>
+    <div class="area-name">Producción</div>
+    <div class="area-desc">Órdenes de fabricación, control de máquinas, eficiencia de línea y planificación de turnos.</div>
+    <div class="area-status fase2">🔒 Próximamente</div>
+  </div>
 
-  <div class="area-card disabled" title="Disponible en Fase 2">
+  <!-- ⑤ VENTAS — BLOQUEADO -->
+  <div class="area-card disabled" title="En construcción">
+    <div class="area-icon ventas">💼</div>
+    <div class="area-name">Ventas</div>
+    <div class="area-desc">Pedidos de clientes, seguimiento de órdenes y facturación vinculada al stock de producto terminado.</div>
+    <div class="area-status fase2">🔒 Próximamente</div>
+  </div>
+
+  <!-- ⑥ BODEGA — BLOQUEADO -->
+  <div class="area-card disabled" title="En construcción">
     <div class="area-icon bodega">📦</div>
     <div class="area-name">Bodega</div>
     <div class="area-desc">Inventario en tiempo real, entradas y salidas de materia prima y producto terminado.</div>
-    <div class="area-status fase2">Fase 2 · Oct 2026</div>
-  </div>
-
-  <div class="area-card disabled" title="Disponible en Fase 2">
-    <div class="area-icon calidad">🔍</div>
-    <div class="area-name">Control de Calidad</div>
-    <div class="area-desc">Inspección, seguimiento de rechazos y análisis de causas raíz por lote y proceso.</div>
-    <div class="area-status fase2">Fase 2 · Ene 2027</div>
+    <div class="area-status fase2">🔒 Próximamente</div>
   </div>
 
 </div>

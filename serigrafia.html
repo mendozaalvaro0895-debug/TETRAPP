@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TETRAPLASTIC — Serigrafía</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css">
 <style>
 :root {
   --ink: #0C0C0B;
@@ -188,9 +190,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="logo-nav-sep"></div>
       <a href="tapas.html">🏷 Tapas</a>
       <a href="serigrafia.html" class="nav-active">🎨 Serigrafía</a>
-      <a href="produccion.html">🏭 Producción</a>
-      <div class="logo-nav-sep"></div>
       <a href="dashboard.html">📊 Dashboard</a>
+      <div class="logo-nav-sep"></div>
+      <a href="produccion.html">🏭 Producción</a>
+      <a class="nav-locked">💼 Ventas</a>
+      <a class="nav-locked">📦 Bodega</a>
     </div>
   </div>
   <div class="topbar-sep"></div>
@@ -217,23 +221,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 <div class="main">
 
   <div class="tabs">
-    <div class="tab active" id="tab-serig" onclick="switchTab('serig')">
+    <div class="tab" id="tab-serig" onclick="switchTab('serig')">
       <div class="tdot" style="background:var(--serig-m)"></div>
       Serigrafía
       <span class="tbadge tb-serig" id="cnt-serig">0</span>
     </div>
     <div class="tab t-dash" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
-    <div class="tab t-personal" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
+    <div class="tab active" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
+    <div class="tab" id="tab-salidas" onclick="switchTab('salidas')">📤 Salidas</div>
+    <div class="tab" id="tab-ingresos" onclick="switchTab('ingresos')">📦 Ingresos PT</div>
     <div class="tabs-r">
       <button class="btn btn-s btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>
-      <button class="btn btn-g btn-sm" onclick="reportarParo()">⏸ Reportar Paro</button>
     </div>
   </div>
 
   <div class="views">
 
-    <!-- SERIGRAFÍA VIEW -->
-    <div class="view" style="display:flex;flex-direction:column;flex:1;overflow:hidden" id="view-serig">
+    <!-- SERIGRAFÍA VIEW (deshabilitado temporalmente) -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-serig">
       <div class="kpi-strip">
         <div class="kpi"><div class="kpi-l">En proceso</div><div class="kpi-v" style="color:var(--serig-m)" id="ks-proc">0</div><div class="kpi-s">solicitudes activas</div></div>
         <div class="kpi"><div class="kpi-l">Pendientes</div><div class="kpi-v" style="color:var(--amber)" id="ks-pend">0</div><div class="kpi-s">sin iniciar</div></div>
@@ -269,8 +274,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="dash" id="dashGrid" style="padding:20px"></div>
     </div>
 
-    <!-- PERSONAL VIEW -->
-    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
+    <!-- PERSONAL VIEW (activo por defecto) -->
+    <div class="view" style="display:flex;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
       <div class="ph">
         <div><div class="ph-title">Personal · Serigrafía</div><div class="ph-sub">Asistencia y asignación del día</div></div>
         <div class="ph-r">
@@ -278,6 +283,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
       </div>
       <div id="personalGrid" style="flex:1;overflow-y:auto"></div>
+    </div>
+
+    <!-- WIP VIEW (Solicitudes / Salidas / Ingresos) -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-wip">
+      <div class="wip-view">
+        <div class="wip-icon" id="wipIcon">🚧</div>
+        <div class="wip-title" id="wipTitle">En Construcción</div>
+        <div class="wip-sub" id="wipSub">Esta sección está siendo desarrollada.</div>
+        <div class="wip-chips" id="wipChips"></div>
+      </div>
     </div>
 
   </div>
@@ -1192,24 +1207,76 @@ async function guardar() {
 }
 
 // ══ NAVEGACIÓN ══════════════════════════════════════════════
+
+// Configuración de vistas WIP (sin template literals anidados)
+var WIP_CONFIG = {
+  serig: {
+    icon: '🎨',
+    title: 'Solicitudes · Serigrafía',
+    sub: 'El módulo de solicitudes está siendo construido. Próximamente podrás crear órdenes, asignar operadores y hacer seguimiento por lote desde aquí.',
+    chips: [
+      { text: '📋 Nueva solicitud', tag: 'Próximamente' },
+      { text: '👥 Asignar operadores', tag: 'Próximamente' },
+      { text: '📊 Trazabilidad por lote', tag: 'Próximamente' },
+      { text: '⚡ Serigrafía · Horno · Tampografía', tag: 'Próximamente' }
+    ]
+  },
+  salidas: {
+    icon: '📤',
+    title: 'Salidas de Bodega',
+    sub: 'Registro de salida de materiales y materia prima hacia el área de serigrafía. Se vinculará con cada solicitud de producción.',
+    chips: [
+      { text: '📦 Salida por SKU', tag: 'Próximamente' },
+      { text: '🔗 Vincular a solicitud', tag: 'Próximamente' },
+      { text: '📄 Número de documento', tag: 'Próximamente' }
+    ]
+  },
+  ingresos: {
+    icon: '📦',
+    title: 'Ingresos · Producto Terminado',
+    sub: 'Registro de entrada de producto terminado a bodega desde el área de serigrafía.',
+    chips: [
+      { text: '✅ Ingreso PT por SKU', tag: 'Próximamente' },
+      { text: '🔗 Vincular a solicitud', tag: 'Próximamente' },
+      { text: '📄 Número de documento', tag: 'Próximamente' }
+    ]
+  }
+};
+
+function buildWipChip(chip) {
+  return '<div class="wip-chip">' + chip.text + '<span>' + chip.tag + '</span></div>';
+}
+
+function showWipView(key) {
+  var cfg = WIP_CONFIG[key] || { icon: '🚧', title: 'En construcción', sub: '', chips: [] };
+  var vWip = document.getElementById('view-wip');
+  if (vWip) vWip.style.display = 'flex';
+  var el;
+  el = document.getElementById('wipIcon');  if (el) el.textContent = cfg.icon;
+  el = document.getElementById('wipTitle'); if (el) el.textContent = cfg.title;
+  el = document.getElementById('wipSub');   if (el) el.textContent = cfg.sub;
+  el = document.getElementById('wipChips');
+  if (el) el.innerHTML = cfg.chips.map(buildWipChip).join('');
+}
+
 function switchTab(tab) {
-  const views = document.querySelectorAll('.view');
-  const tabs = document.querySelectorAll('.tab');
-  
-  views.forEach(v => v.style.display = 'none');
-  tabs.forEach(t => t.classList.remove('active'));
-  
-  const viewMap = { serig: 'view-serig', dash: 'view-dash', personal: 'view-personal' };
-  const tabMap = { serig: 'tab-serig', dash: 'tab-dash', personal: 'tab-personal' };
-  
-  const viewId = viewMap[tab];
-  const tabId = tabMap[tab];
-  
-  if (viewId) document.getElementById(viewId).style.display = 'flex';
-  if (tabId) document.getElementById(tabId).classList.add('active');
-  
-  if (tab === 'dash') renderDash();
-  if (tab === 'personal') renderPersonal();
+  // Ocultar todas las vistas y quitar active de todos los tabs
+  document.querySelectorAll('.view').forEach(function(v) { v.style.display = 'none'; });
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+
+  // Activar tab correspondiente
+  var tabEl = document.getElementById('tab-' + tab);
+  if (tabEl) tabEl.classList.add('active');
+
+  // Mostrar vista
+  var WIP_TABS = ['serig', 'salidas', 'ingresos'];
+  if (WIP_TABS.indexOf(tab) !== -1) {
+    showWipView(tab);
+  } else if (tab === 'personal') {
+    var vPersonal = document.getElementById('view-personal');
+    if (vPersonal) vPersonal.style.display = 'flex';
+    renderPersonal();
+  }
 }
 
 function renderDash() {
