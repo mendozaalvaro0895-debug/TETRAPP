@@ -185,7 +185,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .p-lista{background:#DCFCE7;color:#166534}
 .p-urg{background:#FEE2E2;color:var(--red)}
 
-/* ── Tabs Salidas / Ingresos ───────────────────────────────── */
+/* ── Movimientos (Entradas / Salidas) ───────────────────────── */
+.seg-btn{background:transparent;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;color:var(--gray);cursor:pointer;transition:all .15s;font-family:var(--sans)}
+.seg-btn:hover{color:var(--ink)}
+.seg-active{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.12)}
 .mov-toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
 .mov-scroll{flex:1;overflow-y:auto;padding:16px}
 .mov-table{width:100%;border-collapse:collapse}
@@ -278,7 +281,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 <div class="sidenav">
   <div class="sn-btn active" id="sn-inicio" title="Inicio" onclick="switchTab('inicio')">🏠</div>
   <div class="sn-btn" id="sn-pedidos" title="Pedidos" onclick="switchTab('tapas')">📋</div>
-  <div class="sn-btn" id="sn-procesos" title="Procesos (Salidas · Ingresos)" onclick="switchTab('salidas')">⚙️</div>
+  <div class="sn-btn" id="sn-movimientos" title="Movimientos (Entradas · Salidas)" onclick="switchTab('movimientos')">⚙️</div>
   <div class="sn-btn" id="sn-rechazos" title="Rechazos" onclick="switchTab('rechazos')">⛔</div>
   <div class="sn-div"></div>
   <div class="sn-btn" id="sn-personal" title="Personal" onclick="switchTab('personal')">👥</div>
@@ -296,13 +299,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       Pedidos
       <span class="tbadge tb-teal" id="cnt-tapas">0</span>
     </div>
-    <div class="tab" id="tab-salidas" onclick="switchTab('salidas')">
-      📤 Salidas
-      <span class="tbadge" id="cnt-salidas">—</span>
-    </div>
-    <div class="tab" id="tab-ingresos" onclick="switchTab('ingresos')">
-      📦 Ingresos PT
-      <span class="tbadge" id="cnt-ingresos">—</span>
+    <div class="tab" id="tab-movimientos" onclick="switchTab('movimientos')">
+      ⚙️ Movimientos
+      <span class="tbadge" id="cnt-movimientos">—</span>
     </div>
     <div class="tab" id="tab-rechazos" onclick="switchTab('rechazos')">
       ⛔ Rechazos
@@ -313,6 +312,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="tabs-r">
       <button class="btn btn-t btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>
       <a href="comandas.html" class="btn btn-g btn-sm" style="text-decoration:none">📋 Comandas</a>
+      <div style="position:relative">
+        <button class="btn btn-g btn-sm" id="movDropBtn" onclick="toggleMovDrop(event)">⬆⬇ Entrada/Salida ▾</button>
+        <div id="movDrop" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:#1A1A19;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:5px;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.45);z-index:999">
+          <div onclick="movDropSelect('salida')" style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:7px;color:rgba(255,255,255,.85);font-size:12px;font-weight:600;cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,.09)'" onmouseout="this.style.background=''">📤 Salida de Bodega</div>
+          <div onclick="movDropSelect('ingreso')" style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:7px;color:rgba(255,255,255,.85);font-size:12px;font-weight:600;cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,.09)'" onmouseout="this.style.background=''">📦 Ingreso PT</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -360,7 +366,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
             </div>
           </div>
 
-          <div class="sub-card" onclick="switchTab('salidas')">
+          <div class="sub-card" onclick="switchTab('movimientos')">
             <div class="sub-card-arrow">→</div>
             <div class="sub-card-icon procesos">⚙️</div>
             <div class="sub-card-title">Procesos</div>
@@ -456,47 +462,47 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
     </div>
 
-    <!-- SALIDAS VIEW -->
-    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-salidas">
-      <div class="kpi-strip" id="salidaKPIs">
-        <div class="kpi"><div class="kpi-l">Unidades salidas</div><div class="kpi-v" style="color:var(--amber)" id="ks-und">—</div><div class="kpi-s">total período</div></div>
-        <div class="kpi"><div class="kpi-l">Documentos</div><div class="kpi-v" id="ks-docs">—</div><div class="kpi-s">registros únicos</div></div>
-        <div class="kpi"><div class="kpi-l">SKUs distintos</div><div class="kpi-v" id="ks-skus">—</div><div class="kpi-s">materias primas</div></div>
-        <div class="kpi"><div class="kpi-l">Último registro</div><div class="kpi-v" style="font-size:14px" id="ks-ultimo">—</div><div class="kpi-s">fecha</div></div>
-      </div>
-      <div class="mov-toolbar">
-        <span style="font-size:11px;font-weight:700;color:var(--gray)">Período:</span>
-        <input class="fi" type="date" id="salidaDesde" style="font-size:11px;padding:4px 8px">
-        <span style="font-size:11px;color:var(--gray)">→</span>
-        <input class="fi" type="date" id="salidaHasta" style="font-size:11px;padding:4px 8px">
-        <button class="btn btn-g btn-sm" onclick="filtrarMov('salida')">Filtrar</button>
-        <input class="fi" type="text" placeholder="🔍 Buscar Nº Doc o SKU..." id="salidaBuscar" oninput="filtrarMov('salida')" style="font-size:12px;min-width:200px">
-        <div style="flex:1"></div>
-        <button class="btn btn-t btn-sm" onclick="abrirModalMov('salida')">+ Registrar Salida</button>
-      </div>
-      <div class="mov-scroll"><div id="salidaTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div></div>
-    </div>
+    <!-- ════ MOVIMIENTOS VIEW (Entradas + Salidas) ══════════════ -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-movimientos">
 
-    <!-- INGRESOS PT VIEW -->
-    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-ingresos">
-      <div class="kpi-strip" id="ingresoKPIs">
-        <div class="kpi"><div class="kpi-l">Unidades ingresadas</div><div class="kpi-v" style="color:var(--green)" id="ki-und">—</div><div class="kpi-s">producto terminado</div></div>
-        <div class="kpi"><div class="kpi-l">Documentos</div><div class="kpi-v" id="ki-docs">—</div><div class="kpi-s">registros únicos</div></div>
-        <div class="kpi"><div class="kpi-l">SKUs distintos</div><div class="kpi-v" id="ki-skus">—</div><div class="kpi-s">tapas terminadas</div></div>
-        <div class="kpi"><div class="kpi-l">Último registro</div><div class="kpi-v" style="font-size:14px" id="ki-ultimo">—</div><div class="kpi-s">fecha</div></div>
+      <!-- Header con segmented control -->
+      <div class="ph" style="flex-shrink:0;padding:12px 20px 10px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="ph-title">Movimientos · Tapas</div>
+          <div style="display:inline-flex;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;padding:3px;gap:2px">
+            <button id="seg-sal" class="seg-btn seg-active" onclick="setMovVista('salida')">📤 Salidas de Bodega</button>
+            <button id="seg-ing" class="seg-btn" onclick="setMovVista('ingreso')">📦 Ingresos PT</button>
+          </div>
+        </div>
+        <div class="ph-r">
+          <button class="btn btn-t btn-sm" id="movRegistrarBtn" onclick="abrirModalMov(movVistaActual)">+ Registrar Salida</button>
+        </div>
       </div>
-      <div class="mov-toolbar">
+
+      <!-- KPI strip unificado -->
+      <div class="kpi-strip" id="movKPIs" style="flex-shrink:0">
+        <div class="kpi"><div class="kpi-l" id="mkpi-l1">Unidades salidas</div><div class="kpi-v" id="mkpi-v1" style="color:var(--amber)">—</div><div class="kpi-s">total período</div></div>
+        <div class="kpi"><div class="kpi-l">Documentos</div><div class="kpi-v" id="mkpi-docs">—</div><div class="kpi-s">registros únicos</div></div>
+        <div class="kpi"><div class="kpi-l">SKUs distintos</div><div class="kpi-v" id="mkpi-skus">—</div><div class="kpi-s" id="mkpi-s3">materias primas</div></div>
+        <div class="kpi"><div class="kpi-l">Último registro</div><div class="kpi-v" style="font-size:14px" id="mkpi-ultimo">—</div><div class="kpi-s">fecha</div></div>
+      </div>
+
+      <!-- Toolbar unificado -->
+      <div class="mov-toolbar" style="flex-shrink:0">
         <span style="font-size:11px;font-weight:700;color:var(--gray)">Período:</span>
-        <input class="fi" type="date" id="ingresoDesde" style="font-size:11px;padding:4px 8px">
+        <input class="fi" type="date" id="movDesde" style="font-size:11px;padding:4px 8px" onchange="filtrarMovActual()">
         <span style="font-size:11px;color:var(--gray)">→</span>
-        <input class="fi" type="date" id="ingresoHasta" style="font-size:11px;padding:4px 8px">
-        <button class="btn btn-g btn-sm" onclick="filtrarMov('ingreso')">Filtrar</button>
-        <input class="fi" type="text" placeholder="🔍 Buscar Nº Doc o SKU..." id="ingresoBuscar" oninput="filtrarMov('ingreso')" style="font-size:12px;min-width:200px">
+        <input class="fi" type="date" id="movHasta" style="font-size:11px;padding:4px 8px" onchange="filtrarMovActual()">
+        <input class="fi" type="text" placeholder="🔍 Buscar Nº Doc o SKU..." id="movBuscar" oninput="filtrarMovActual()" style="font-size:12px;min-width:200px">
         <div style="flex:1"></div>
-        <button class="btn btn-t btn-sm" onclick="abrirModalMov('ingreso')">+ Registrar Ingreso PT</button>
       </div>
-      <div class="mov-scroll"><div id="ingresoTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div></div>
-    </div>
+
+      <!-- Tabla unificada -->
+      <div class="mov-scroll">
+        <div id="movTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
+      </div>
+
+    </div><!-- /view-movimientos -->
 
     <!-- DASHBOARD VIEW -->
     <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-dash">
@@ -1637,22 +1643,20 @@ function switchTab(tab) {
   tabs.forEach(function(t){ t.classList.remove('active'); });
 
   var viewMap = {
-    inicio:    'view-inicio',
-    tapas:     'view-tapas',
-    salidas:   'view-salidas',
-    ingresos:  'view-ingresos',
-    dash:      'view-dash',
-    personal:  'view-personal',
-    rechazos:  'view-rechazos'
+    inicio:       'view-inicio',
+    tapas:        'view-tapas',
+    movimientos:  'view-movimientos',
+    dash:         'view-dash',
+    personal:     'view-personal',
+    rechazos:     'view-rechazos'
   };
   var tabMap = {
-    inicio:    'tab-inicio',
-    tapas:     'tab-tapas',
-    salidas:   'tab-salidas',
-    ingresos:  'tab-ingresos',
-    dash:      'tab-dash',
-    personal:  'tab-personal',
-    rechazos:  'tab-rechazos'
+    inicio:       'tab-inicio',
+    tapas:        'tab-tapas',
+    movimientos:  'tab-movimientos',
+    dash:         'tab-dash',
+    personal:     'tab-personal',
+    rechazos:     'tab-rechazos'
   };
 
   var viewId = viewMap[tab];
@@ -1661,11 +1665,11 @@ function switchTab(tab) {
   if (viewId) document.getElementById(viewId).style.display = 'flex';
   if (tabId)  document.getElementById(tabId).classList.add('active');
 
-  if (tab === 'dash')     renderDash();
-  if (tab === 'personal') renderPersonal();
-  if (tab === 'salidas' || tab === 'ingresos') cargarMovimientos();
-  if (tab === 'rechazos') cargarRechazos();
-  if (tab === 'inicio')   renderInicio();
+  if (tab === 'dash')         renderDash();
+  if (tab === 'personal')     renderPersonal();
+  if (tab === 'movimientos')  cargarMovimientos();
+  if (tab === 'rechazos')     cargarRechazos();
+  if (tab === 'inicio')       renderInicio();
 }
 
 function renderDash() {
@@ -1994,8 +1998,8 @@ async function init() {
   const hoy = new Date();
   const primerDia = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-01';
   const hoyStr    = hoy.toISOString().split('T')[0];
-  ['salidaDesde','ingresoDesde','rechDesde'].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=primerDia; });
-  ['salidaHasta','ingresoHasta','rechHasta'].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=hoyStr; });
+  ['movDesde','rechDesde'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=primerDia; });
+  ['movHasta','rechHasta'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=hoyStr; });
 
   // Cargar datos
   await cargarInventario();
@@ -2022,10 +2026,57 @@ async function init() {
 
 init();
 
-// ══ SALIDAS / INGRESOS PT ════════════════════════════════════
-let salidaMovs   = [];
-let ingresoMovs  = [];
-let movTipoActual = 'salida_bodega';
+// ══ MOVIMIENTOS (Entradas / Salidas) ════════════════════════
+var salidaMovs    = [];
+var ingresoMovs   = [];
+var movTipoActual = 'salida_bodega';   // usado por el modal
+var movVistaActual = 'salida';          // toggle interno de la vista
+
+// ── Segmented control ─────────────────────────────────────────
+function setMovVista(tipo) {
+  movVistaActual = tipo;
+  var esSalida = tipo === 'salida';
+
+  // Toggle visual
+  var segSal = document.getElementById('seg-sal');
+  var segIng = document.getElementById('seg-ing');
+  if (segSal) { segSal.classList.toggle('seg-active', esSalida); }
+  if (segIng) { segIng.classList.toggle('seg-active', !esSalida); }
+
+  // Botón "Registrar" en el header
+  var btn = document.getElementById('movRegistrarBtn');
+  if (btn) btn.textContent = esSalida ? '+ Registrar Salida' : '+ Registrar Ingreso PT';
+
+  // KPI labels
+  var l1 = document.getElementById('mkpi-l1');
+  var v1 = document.getElementById('mkpi-v1');
+  var s3 = document.getElementById('mkpi-s3');
+  if (l1) l1.textContent = esSalida ? 'Unidades salidas'    : 'Unidades ingresadas';
+  if (v1) v1.style.color = esSalida ? 'var(--amber)'        : 'var(--green)';
+  if (s3) s3.textContent = esSalida ? 'materias primas'     : 'tapas terminadas';
+
+  // Render con datos ya cargados
+  renderMov(tipo);
+}
+
+// ── Dropdown rápido en tabs-r ─────────────────────────────────
+function toggleMovDrop(e) {
+  e.stopPropagation();
+  var d = document.getElementById('movDrop');
+  if (!d) return;
+  d.style.display = d.style.display === 'none' ? 'block' : 'none';
+}
+
+function movDropSelect(tipo) {
+  var d = document.getElementById('movDrop');
+  if (d) d.style.display = 'none';
+  abrirModalMov(tipo);
+}
+
+document.addEventListener('click', function() {
+  var d = document.getElementById('movDrop');
+  if (d) d.style.display = 'none';
+});
 
 // ── Helpers ──────────────────────────────────────────────────
 function getSkuDesc(sku) {
@@ -2057,51 +2108,44 @@ async function cargarMovimientos() {
     var ing = await db.from('movimientos_materiales').select('*').eq('tipo','entrada_pt').order('created_at', { ascending: false });
     salidaMovs  = sal.data || [];
     ingresoMovs = ing.data || [];
-    renderMov('salida');
-    renderMov('ingreso');
+    renderMov(movVistaActual);
   } catch(e) { console.error('cargarMovimientos:', e); }
 }
 
 // ── Render ────────────────────────────────────────────────────
-function filtrarMov(tipo) { renderMov(tipo); }
+function filtrarMovActual() { renderMov(movVistaActual); }
 
 function renderMov(tipo) {
-  var movs      = tipo === 'salida' ? salidaMovs : ingresoMovs;
-  var desde     = document.getElementById(tipo + 'Desde')?.value || '';
-  var hasta     = document.getElementById(tipo + 'Hasta')?.value || '';
-  var buscar    = (document.getElementById(tipo + 'Buscar')?.value || '').toLowerCase();
-  var tabla     = document.getElementById(tipo === 'salida' ? 'salidaTabla' : 'ingresoTabla');
-  var cntEl     = document.getElementById(tipo === 'salida' ? 'cnt-salidas' : 'cnt-ingresos');
+  var movs   = tipo === 'salida' ? salidaMovs : ingresoMovs;
+  var desde  = (document.getElementById('movDesde')  || {}).value || '';
+  var hasta  = (document.getElementById('movHasta')  || {}).value || '';
+  var buscar = ((document.getElementById('movBuscar') || {}).value || '').toLowerCase();
+  var tabla  = document.getElementById('movTabla');
+  var cntEl  = document.getElementById('cnt-movimientos');
 
   var filtered = movs.filter(function(m) {
-    var fechaDoc  = parseFechaDoc(m.observaciones) || formatFecha(m.created_at);
+    var fechaDoc = parseFechaDoc(m.observaciones) || formatFecha(m.created_at);
     if (desde && fechaDoc < desde) return false;
     if (hasta && fechaDoc > hasta) return false;
     if (buscar) {
       var hayDoc = (m.num_documento || '').toLowerCase().includes(buscar);
-      var haySku = (m.sku_original || '').toLowerCase().includes(buscar);
+      var haySku = (m.sku_original  || '').toLowerCase().includes(buscar);
       if (!hayDoc && !haySku) return false;
     }
     return true;
   });
 
-  // KPIs
+  // KPIs unificados
   var totalUnd  = filtered.reduce(function(s,m){ return s+(m.cantidad||0); }, 0);
   var totalDocs = new Set(filtered.map(function(m){ return m.num_documento; }).filter(Boolean)).size;
-  var totalSkus = new Set(filtered.map(function(m){ return m.sku_original; }).filter(Boolean)).size;
+  var totalSkus = new Set(filtered.map(function(m){ return m.sku_original;  }).filter(Boolean)).size;
   var ultimo    = filtered.length > 0 ? (parseFechaDoc(filtered[0].observaciones) || formatFecha(filtered[0].created_at)) : '—';
 
-  if (tipo === 'salida') {
-    document.getElementById('ks-und').textContent   = totalUnd.toLocaleString();
-    document.getElementById('ks-docs').textContent  = totalDocs;
-    document.getElementById('ks-skus').textContent  = totalSkus;
-    document.getElementById('ks-ultimo').textContent = ultimo;
-  } else {
-    document.getElementById('ki-und').textContent   = totalUnd.toLocaleString();
-    document.getElementById('ki-docs').textContent  = totalDocs;
-    document.getElementById('ki-skus').textContent  = totalSkus;
-    document.getElementById('ki-ultimo').textContent = ultimo;
-  }
+  function setEl(id, v){ var el=document.getElementById(id); if(el) el.textContent=v; }
+  setEl('mkpi-v1',    totalUnd.toLocaleString());
+  setEl('mkpi-docs',  totalDocs);
+  setEl('mkpi-skus',  totalSkus);
+  setEl('mkpi-ultimo', ultimo);
   if (cntEl) cntEl.textContent = filtered.length;
 
   if (!tabla) return;
@@ -2111,8 +2155,9 @@ function renderMov(tipo) {
     return;
   }
 
-  var badgeClass = tipo === 'salida' ? 'mov-badge-sal' : 'mov-badge-ing';
-  var badgeLabel = tipo === 'salida' ? 'SALIDA' : 'INGRESO PT';
+  var esSalida   = tipo === 'salida';
+  var badgeClass = esSalida ? 'mov-badge-sal' : 'mov-badge-ing';
+  var badgeLabel = esSalida ? 'SALIDA' : 'INGRESO PT';
 
   var rows = filtered.map(function(m) {
     var fechaDoc = parseFechaDoc(m.observaciones) || formatFecha(m.created_at);
@@ -2124,7 +2169,7 @@ function renderMov(tipo) {
       + '<td><span class="' + badgeClass + '">' + badgeLabel + '</span></td>'
       + '<td class="mov-doc">' + (m.num_documento || '—') + '</td>'
       + '<td style="font-family:var(--mono);font-size:11px">' + fechaDoc + '</td>'
-      + '<td class="mov-sku">' + (m.sku_original || '—') + '</td>'
+      + '<td class="mov-sku">' + (m.sku_original  || '—') + '</td>'
       + '<td style="font-size:11px;max-width:200px">' + desc + '</td>'
       + '<td class="mov-cant">' + (m.cantidad || 0).toLocaleString() + '</td>'
       + '<td style="font-size:11px;color:var(--teal)">' + solLabel + '</td>'
@@ -2133,9 +2178,9 @@ function renderMov(tipo) {
   }).join('');
 
   tabla.innerHTML = '<table class="mov-table">'
-    + '<thead><tr><th></th><th>Nº Documento</th><th>Fecha Doc.</th><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th>Solicitud</th><th>Observaciones</th></tr></thead>'
-    + '<tbody>' + rows + '</tbody>'
-    + '</table>';
+    + '<thead><tr><th></th><th>Nº Documento</th><th>Fecha Doc.</th><th>SKU</th><th>Descripción</th>'
+    + '<th style="text-align:right">Cantidad</th><th>Solicitud</th><th>Observaciones</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table>';
 }
 
 // ── Modal registro ────────────────────────────────────────────
@@ -2232,7 +2277,8 @@ async function confirmarMov() {
     showToast('✅ ' + label + ' registrado: Doc ' + numDoc + ' · ' + cant.toLocaleString() + ' und');
     cerrarModalMov();
     await cargarMovimientos();
-    switchTab(movTipoActual === 'salida_bodega' ? 'salidas' : 'ingresos');
+    setMovVista(movTipoActual === 'salida_bodega' ? 'salida' : 'ingreso');
+    switchTab('movimientos');
   } catch(e) {
     showToast('❌ Error: ' + e.message, '#B83232');
   } finally {
