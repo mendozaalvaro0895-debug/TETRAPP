@@ -205,6 +205,45 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sku-item:hover{background:var(--teal-xl)}
 .sku-code{font-family:var(--mono);font-weight:700;color:var(--teal);font-size:11px;margin-bottom:2px}
 .sku-desc{color:var(--ink);font-size:11px}
+
+/* ── Spinner / Loading ─────────────────────────────────────── */
+.loading{text-align:center;padding:40px;color:var(--gray)}
+.spinner{display:inline-block;width:22px;height:22px;border:2.5px solid var(--teal-l);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:6px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Vista Inicio (Hub) ────────────────────────────────────── */
+.inicio-wrap{flex:1;overflow-y:auto;padding:20px 24px}
+.inicio-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.inicio-kpi{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px}
+.inicio-kpi-l{font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--gray)}
+.inicio-kpi-v{font-family:var(--mono);font-size:24px;font-weight:700;line-height:1.2;margin:4px 0 2px}
+.inicio-kpi-s{font-size:10px;color:var(--gray-l)}
+.sub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+.sub-grid-b{display:grid;grid-template-columns:1fr 2fr;gap:14px}
+.sub-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:18px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.sub-card:hover{box-shadow:0 6px 24px rgba(0,0,0,.1);transform:translateY(-2px);border-color:var(--teal-l)}
+.sub-card-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:12px}
+.sub-card-icon.pedidos{background:var(--teal-xl);color:var(--teal)}
+.sub-card-icon.procesos{background:#FFF3D6;color:#B07D2A}
+.sub-card-icon.personal{background:#EFF6FF;color:#1D4ED8}
+.sub-card-icon.rechazos{background:var(--red-l);color:var(--red)}
+.sub-card-icon.sdash{background:#ECFDF5;color:#065F46}
+.sub-card-title{font-family:var(--display);font-size:16px;font-weight:700;margin-bottom:6px}
+.sub-card-desc{font-size:11px;color:var(--gray);line-height:1.55;margin-bottom:12px}
+.sub-card-stats{display:flex;gap:16px;padding-top:10px;border-top:1px solid var(--border)}
+.sub-stat strong{display:block;font-family:var(--mono);font-size:18px;font-weight:700}
+.sub-stat span{font-size:10px;color:var(--gray)}
+.sub-card-arrow{position:absolute;top:16px;right:16px;color:var(--gray-l);font-size:18px;transition:all .15s}
+.sub-card:hover .sub-card-arrow{color:var(--teal);transform:translateX(3px)}
+
+/* ── Vista Rechazos ────────────────────────────────────────── */
+.rechazo-toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+.rechazo-scroll{flex:1;overflow-y:auto;padding:16px}
+.rechazo-table{width:100%;border-collapse:collapse}
+.rechazo-table th{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);padding:8px 10px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
+.rechazo-table td{padding:9px 10px;font-size:12px;border-bottom:1px solid var(--bg);vertical-align:middle}
+.rechazo-table tr:hover td{background:var(--red-l)}
+.rbadge{font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;background:#FFF3D6;color:#92400E;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -225,7 +264,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     </div>
   </div>
   <div class="topbar-sep"></div>
-  <div class="topbar-sub">Tapas · Control de Solicitudes</div>
+  <div class="topbar-sub">Tapas · Módulo de Producción</div>
   <div class="clock" id="clk"></div>
   <div class="user-pill">
     <div class="uavatar">AM</div>
@@ -237,10 +276,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 <div class="app">
 
 <div class="sidenav">
-  <div class="sn-btn active" title="Solicitudes">📋</div>
-  <div class="sn-btn" title="Dashboard" onclick="window.location.href='dashboard.html'">📊</div>
-  <div class="sn-btn" title="Personal" onclick="switchTab('personal')">👥</div>
+  <div class="sn-btn active" id="sn-inicio" title="Inicio" onclick="switchTab('inicio')">🏠</div>
+  <div class="sn-btn" id="sn-pedidos" title="Pedidos" onclick="switchTab('tapas')">📋</div>
+  <div class="sn-btn" id="sn-procesos" title="Procesos (Salidas · Ingresos)" onclick="switchTab('salidas')">⚙️</div>
+  <div class="sn-btn" id="sn-rechazos" title="Rechazos" onclick="switchTab('rechazos')">⛔</div>
   <div class="sn-div"></div>
+  <div class="sn-btn" id="sn-personal" title="Personal" onclick="switchTab('personal')">👥</div>
+  <div class="sn-btn" title="Dashboard" onclick="window.location.href='dashboard.html'">📊</div>
   <div style="flex:1"></div>
   <div class="sn-btn" title="Alertas">🔔<div class="sn-badge"></div></div>
 </div>
@@ -248,9 +290,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 <div class="main">
 
   <div class="tabs">
-    <div class="tab active" id="tab-tapas" onclick="switchTab('tapas')">
+    <div class="tab active" id="tab-inicio" onclick="switchTab('inicio')">🏠 Inicio</div>
+    <div class="tab" id="tab-tapas" onclick="switchTab('tapas')">
       <div class="tdot" style="background:var(--teal)"></div>
-      Tapas
+      Pedidos
       <span class="tbadge tb-teal" id="cnt-tapas">0</span>
     </div>
     <div class="tab" id="tab-salidas" onclick="switchTab('salidas')">
@@ -260,6 +303,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="tab" id="tab-ingresos" onclick="switchTab('ingresos')">
       📦 Ingresos PT
       <span class="tbadge" id="cnt-ingresos">—</span>
+    </div>
+    <div class="tab" id="tab-rechazos" onclick="switchTab('rechazos')">
+      ⛔ Rechazos
+      <span class="tbadge" id="cnt-rechazos">—</span>
     </div>
     <div class="tab t-dash" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
     <div class="tab t-personal" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
@@ -271,8 +318,104 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
   <div class="views">
 
-    <!-- TAPAS VIEW -->
-    <div class="view" style="display:flex;flex-direction:column;flex:1;overflow:hidden" id="view-tapas">
+    <!-- ════ INICIO HUB VIEW ════════════════════════════════════ -->
+    <div class="view" style="display:flex;flex-direction:column;flex:1;overflow:hidden" id="view-inicio">
+      <div class="inicio-wrap">
+
+        <!-- KPIs globales rápidos -->
+        <div class="inicio-kpi-row">
+          <div class="inicio-kpi">
+            <div class="inicio-kpi-l">En proceso</div>
+            <div class="inicio-kpi-v" style="color:var(--teal)" id="ih-proc">—</div>
+            <div class="inicio-kpi-s">solicitudes activas</div>
+          </div>
+          <div class="inicio-kpi">
+            <div class="inicio-kpi-l">Pendientes</div>
+            <div class="inicio-kpi-v" style="color:var(--amber)" id="ih-pend">—</div>
+            <div class="inicio-kpi-s">sin iniciar</div>
+          </div>
+          <div class="inicio-kpi">
+            <div class="inicio-kpi-l">Rechazos hoy</div>
+            <div class="inicio-kpi-v" style="color:var(--red)" id="ih-rech">—</div>
+            <div class="inicio-kpi-s">unidades rechazadas</div>
+          </div>
+          <div class="inicio-kpi">
+            <div class="inicio-kpi-l">Capacidad estimada</div>
+            <div class="inicio-kpi-v" style="color:var(--green)" id="ih-cap">—</div>
+            <div class="inicio-kpi-s">und / hora hoy</div>
+          </div>
+        </div>
+
+        <!-- Fila 1: Pedidos · Procesos · Personal -->
+        <div class="sub-grid">
+
+          <div class="sub-card" onclick="switchTab('tapas')">
+            <div class="sub-card-arrow">→</div>
+            <div class="sub-card-icon pedidos">📋</div>
+            <div class="sub-card-title">Pedidos</div>
+            <div class="sub-card-desc">Solicitudes de producción activas, programadas y entregadas por cliente y referencia.</div>
+            <div class="sub-card-stats">
+              <div class="sub-stat"><strong id="icard-proc" style="color:var(--teal)">—</strong><span>En proceso</span></div>
+              <div class="sub-stat"><strong id="icard-pend" style="color:var(--amber)">—</strong><span>Pendientes</span></div>
+            </div>
+          </div>
+
+          <div class="sub-card" onclick="switchTab('salidas')">
+            <div class="sub-card-arrow">→</div>
+            <div class="sub-card-icon procesos">⚙️</div>
+            <div class="sub-card-title">Procesos</div>
+            <div class="sub-card-desc">Salidas de bodega, ingresos de producto terminado y comandas de trabajo diarias.</div>
+            <div class="sub-card-stats">
+              <div class="sub-stat"><strong id="icard-sal" style="color:var(--amber)">—</strong><span>Salidas</span></div>
+              <div class="sub-stat"><strong id="icard-ing" style="color:var(--green)">—</strong><span>Ingresos PT</span></div>
+              <div class="sub-stat"><strong id="icard-cmd" style="color:var(--teal)">—</strong><span>Und PT hoy</span></div>
+            </div>
+          </div>
+
+          <div class="sub-card" onclick="switchTab('personal')">
+            <div class="sub-card-arrow">→</div>
+            <div class="sub-card-icon personal">👥</div>
+            <div class="sub-card-title">Personal</div>
+            <div class="sub-card-desc">Operadores activos, asignaciones por proceso y control de asistencia del turno.</div>
+            <div class="sub-card-stats">
+              <div class="sub-stat"><strong id="icard-ops" style="color:var(--teal)">—</strong><span>Operadores</span></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Fila 2: Rechazos · Dashboard -->
+        <div class="sub-grid-b">
+
+          <div class="sub-card" onclick="switchTab('rechazos')">
+            <div class="sub-card-arrow">→</div>
+            <div class="sub-card-icon rechazos">⛔</div>
+            <div class="sub-card-title">Rechazos</div>
+            <div class="sub-card-desc">Registro de lotes y unidades rechazadas. Trazabilidad de tiempo y material perdido durante selección.</div>
+            <div class="sub-card-stats">
+              <div class="sub-stat"><strong id="icard-rech-hoy" style="color:var(--red)">—</strong><span>Hoy</span></div>
+              <div class="sub-stat"><strong id="icard-rech-sem" style="color:var(--amber)">—</strong><span>Esta semana</span></div>
+            </div>
+          </div>
+
+          <div class="sub-card" onclick="window.location.href='dashboard.html'">
+            <div class="sub-card-arrow">→</div>
+            <div class="sub-card-icon sdash">📊</div>
+            <div class="sub-card-title">Dashboard</div>
+            <div class="sub-card-desc">KPIs ejecutivos de todo el área de Tapas: eficiencia por proceso, ranking de operarios y producción acumulada.</div>
+            <div class="sub-card-stats">
+              <div class="sub-stat"><strong id="icard-cmd2" style="color:var(--teal)">—</strong><span>Und PT hoy</span></div>
+              <div class="sub-stat"><strong id="icard-fugas" style="color:var(--red)">—</strong><span>Fugas hoy</span></div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div><!-- /view-inicio -->
+
+    <!-- TAPAS / PEDIDOS VIEW -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-tapas">
       <div class="kpi-strip">
         <div class="kpi"><div class="kpi-l">En proceso</div><div class="kpi-v" style="color:var(--teal)" id="kt-proc">0</div><div class="kpi-s">solicitudes activas</div></div>
         <div class="kpi"><div class="kpi-l">Pendientes</div><div class="kpi-v" style="color:var(--amber)" id="kt-pend">0</div><div class="kpi-s">sin iniciar</div></div>
@@ -370,6 +513,68 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
       <div id="personalGrid" style="flex:1;overflow-y:auto"></div>
     </div>
+
+    <!-- ════ RECHAZOS VIEW ════════════════════════════════════════ -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-rechazos">
+      <div class="ph">
+        <div>
+          <div class="ph-title">⛔ Rechazos · Tapas</div>
+          <div class="ph-sub">Lotes y unidades rechazadas — tiempo y material perdido</div>
+        </div>
+        <div class="ph-r">
+          <input type="date" id="rechDesde" class="fi" style="width:130px;font-size:11px" onchange="cargarRechazos()">
+          <input type="date" id="rechHasta" class="fi" style="width:130px;font-size:11px" onchange="cargarRechazos()">
+          <button class="btn btn-t btn-sm" onclick="abrirModalRechazo()">+ Registrar rechazo</button>
+        </div>
+      </div>
+
+      <!-- KPI strip rechazos -->
+      <div id="rechKPIStrip" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 20px 4px;flex-shrink:0">
+        <div class="inicio-kpi">
+          <div class="inicio-kpi-l">Unidades rechazadas</div>
+          <div class="inicio-kpi-v" style="color:var(--red)" id="rk-unid">—</div>
+          <div class="inicio-kpi-s">en el período</div>
+        </div>
+        <div class="inicio-kpi">
+          <div class="inicio-kpi-l">Unidades recuperadas</div>
+          <div class="inicio-kpi-v" style="color:var(--green)" id="rk-rec">—</div>
+          <div class="inicio-kpi-s">rescatadas</div>
+        </div>
+        <div class="inicio-kpi">
+          <div class="inicio-kpi-l">Pérdida neta</div>
+          <div class="inicio-kpi-v" style="color:var(--amber)" id="rk-neta">—</div>
+          <div class="inicio-kpi-s">unidades no recuperadas</div>
+        </div>
+        <div class="inicio-kpi">
+          <div class="inicio-kpi-l">Tiempo perdido</div>
+          <div class="inicio-kpi-v" style="color:var(--gray)" id="rk-tiempo">—</div>
+          <div class="inicio-kpi-s">minutos de selección</div>
+        </div>
+      </div>
+
+      <!-- Tabla rechazos -->
+      <div style="flex:1;overflow-y:auto;padding:0 20px 20px">
+        <div id="rechTablaWrap" style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;overflow:hidden">
+          <table class="rechazo-table" style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:var(--bg2);border-bottom:1.5px solid var(--border)">
+                <th style="padding:10px 14px;font-size:10px;font-weight:700;text-align:left;color:var(--gray)">FECHA</th>
+                <th style="padding:10px 14px;font-size:10px;font-weight:700;text-align:left;color:var(--gray)">SKU / PRODUCTO</th>
+                <th style="padding:10px 14px;font-size:10px;font-weight:700;text-align:left;color:var(--gray)">MOTIVO</th>
+                <th style="padding:10px 14px;font-size:10px;font-weight:700;text-align:right;color:var(--gray)">RECHAZADO</th>
+                <th style="padding:10px 14px;font-size:10px;font-weight:700;text-align:right;color:var(--gray)">RECUPERADO</th>
+                <th style="padding:10px 14px;font-size:10px;font-weight:700;text-align:right;color:var(--gray)">TIEMPO</th>
+                <th style="padding:10px 14px;font-size:10px;font-weight:700;text-align:left;color:var(--gray)">OPERADOR</th>
+                <th style="padding:10px 14px;font-size:10px;font-weight:700;text-align:left;color:var(--gray)">NOTAS</th>
+              </tr>
+            </thead>
+            <tbody id="rechTbody">
+              <tr><td colspan="8" style="padding:36px;text-align:center;color:var(--gray);font-size:13px">Cargando rechazos…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /view-rechazos -->
 
   </div>
 </div>
@@ -493,6 +698,95 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="mf">
       <button class="btn btn-g" onclick="cerrarModalPerdida()">Cancelar</button>
       <button class="btn btn-t" onclick="confirmarPerdida()">Registrar pérdida</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RECHAZO -->
+<div class="overlay" id="modalRechazo">
+  <div class="modal" style="max-width:500px">
+    <div class="mh">
+      <div class="mh-title">⛔ Registrar Rechazo</div>
+      <button class="m-close" onclick="cerrarModalRechazo()">✕</button>
+    </div>
+    <div class="mb">
+
+      <div class="fr">
+        <div class="fg full">
+          <div class="fl">SKU / Producto *</div>
+          <div class="sku-wrap">
+            <input class="fi" id="rechSku" placeholder="Código SKU del producto rechazado…" autocomplete="off"
+              oninput="rechSkuInput(this.value)" onblur="setTimeout(()=>cerrarRechSkuDrop(),200)">
+            <div class="sku-drop" id="rechSkuDrop"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fg full">
+        <div class="fl">Descripción</div>
+        <input class="fi" id="rechDesc" placeholder="Se completa al seleccionar SKU" readonly
+          style="background:var(--bg);color:var(--gray)">
+      </div>
+
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Cantidad rechazada *</div>
+          <input class="fi" id="rechCantRech" type="number" min="0" placeholder="0"
+            oninput="actualizarPerdidaNeta()">
+        </div>
+        <div class="fg">
+          <div class="fl">Cantidad recuperada</div>
+          <input class="fi" id="rechCantRec" type="number" min="0" placeholder="0"
+            oninput="actualizarPerdidaNeta()">
+        </div>
+      </div>
+
+      <div class="fg full">
+        <div class="fl">Pérdida neta</div>
+        <div class="fi" id="rechNeta" style="background:var(--bg);color:var(--red);font-weight:700;cursor:default">—</div>
+      </div>
+
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Motivo *</div>
+          <select class="fs" id="rechMotivo">
+            <option value="">— Selecciona motivo —</option>
+            <option value="defecto_material">Defecto de material</option>
+            <option value="defecto_proceso">Defecto de proceso</option>
+            <option value="contaminacion">Contaminación / suciedad</option>
+            <option value="fuera_tolerancia">Fuera de tolerancia dimensional</option>
+            <option value="color_incorrecto">Color incorrecto</option>
+            <option value="deformacion">Deformación / quemado</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fl">Tiempo de selección (min)</div>
+          <input class="fi" id="rechTiempo" type="number" min="0" placeholder="0">
+        </div>
+      </div>
+
+      <div class="fg full">
+        <div class="fl">Operador responsable</div>
+        <select class="fs" id="rechOperador">
+          <option value="">— Selecciona operador —</option>
+        </select>
+      </div>
+
+      <div class="fg full">
+        <div class="fl">Código de lote / Nº solicitud (opcional)</div>
+        <input class="fi" id="rechLote" placeholder="Ej: T-041, Lote-2024-07">
+      </div>
+
+      <div class="fg full">
+        <div class="fl">Observaciones</div>
+        <textarea class="fta" id="rechObs" rows="2" placeholder="Descripción del rechazo, acciones tomadas…"></textarea>
+      </div>
+
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cerrarModalRechazo()">Cancelar</button>
+      <button class="btn" style="background:var(--red);color:#fff" onclick="confirmarRechazo()">⛔ Guardar rechazo</button>
     </div>
   </div>
 </div>
@@ -1338,15 +1632,31 @@ async function guardar() {
 function switchTab(tab) {
   const views = document.querySelectorAll('.view');
   const tabs = document.querySelectorAll('.tab');
-  
-  views.forEach(v => v.style.display = 'none');
-  tabs.forEach(t => t.classList.remove('active'));
-  
-  const viewMap = { tapas:'view-tapas', salidas:'view-salidas', ingresos:'view-ingresos', dash:'view-dash', personal:'view-personal' };
-  const tabMap  = { tapas:'tab-tapas', salidas:'tab-salidas', ingresos:'tab-ingresos', dash:'tab-dash', personal:'tab-personal' };
 
-  const viewId = viewMap[tab];
-  const tabId  = tabMap[tab];
+  views.forEach(function(v){ v.style.display = 'none'; });
+  tabs.forEach(function(t){ t.classList.remove('active'); });
+
+  var viewMap = {
+    inicio:    'view-inicio',
+    tapas:     'view-tapas',
+    salidas:   'view-salidas',
+    ingresos:  'view-ingresos',
+    dash:      'view-dash',
+    personal:  'view-personal',
+    rechazos:  'view-rechazos'
+  };
+  var tabMap = {
+    inicio:    'tab-inicio',
+    tapas:     'tab-tapas',
+    salidas:   'tab-salidas',
+    ingresos:  'tab-ingresos',
+    dash:      'tab-dash',
+    personal:  'tab-personal',
+    rechazos:  'tab-rechazos'
+  };
+
+  var viewId = viewMap[tab];
+  var tabId  = tabMap[tab];
 
   if (viewId) document.getElementById(viewId).style.display = 'flex';
   if (tabId)  document.getElementById(tabId).classList.add('active');
@@ -1354,6 +1664,8 @@ function switchTab(tab) {
   if (tab === 'dash')     renderDash();
   if (tab === 'personal') renderPersonal();
   if (tab === 'salidas' || tab === 'ingresos') cargarMovimientos();
+  if (tab === 'rechazos') cargarRechazos();
+  if (tab === 'inicio')   renderInicio();
 }
 
 function renderDash() {
@@ -1389,6 +1701,260 @@ function renderPersonal() {
       `).join('')}
     </div>
   `;
+}
+
+// ══ INICIO HUB ══════════════════════════════════════════════
+function renderInicio() {
+  // KPIs top
+  var proc  = solicitudes.filter(function(s){ return s.estado === 'proceso'; }).length;
+  var pend  = solicitudes.filter(function(s){ return s.estado === 'nueva' || s.estado === 'programada'; }).length;
+  var ops   = personalData && personalData.tapas ? personalData.tapas.filter(function(p){ return p.activo; }).length : 0;
+
+  // KPI rechazos hoy
+  var hoyStr = new Date().toISOString().split('T')[0];
+  var rechHoy = rechazosData.filter(function(r){
+    return r.created_at && r.created_at.startsWith(hoyStr);
+  });
+  var rechHoyUnid = rechHoy.reduce(function(a, r){ return a + (r.cantidad_rechazada || 0); }, 0);
+
+  function setEl(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
+
+  setEl('ih-proc', proc);
+  setEl('ih-pend', pend);
+  setEl('ih-rech', rechHoyUnid);
+  setEl('ih-cap',  '—');
+
+  // Cards de pedidos
+  setEl('icard-proc', proc);
+  setEl('icard-pend', pend);
+  setEl('icard-ops',  ops);
+  setEl('icard-sal',  '—');
+  setEl('icard-ing',  '—');
+  setEl('icard-cmd',  '—');
+
+  // Cards rechazos
+  var semanaMs = 7 * 24 * 60 * 60 * 1000;
+  var hace7 = new Date(Date.now() - semanaMs).toISOString().split('T')[0];
+  var rechSem = rechazosData.filter(function(r){
+    return r.created_at && r.created_at.slice(0,10) >= hace7;
+  });
+  var rechSemUnid = rechSem.reduce(function(a, r){ return a + (r.cantidad_rechazada || 0); }, 0);
+  setEl('icard-rech-hoy', rechHoyUnid);
+  setEl('icard-rech-sem', rechSemUnid);
+  setEl('icard-cmd2', '—');
+  setEl('icard-fugas', '—');
+}
+
+// ══ RECHAZOS ════════════════════════════════════════════════
+var rechazosData = [];
+
+async function cargarRechazos() {
+  var desde = (document.getElementById('rechDesde') || {}).value || '';
+  var hasta = (document.getElementById('rechHasta') || {}).value || '';
+  try {
+    var url = SUPA_URL + '/rest/v1/rechazos?order=created_at.desc&limit=200';
+    if (desde) url += '&created_at=gte.' + desde + 'T00:00:00';
+    if (hasta) url += '&created_at=lte.' + hasta + 'T23:59:59';
+    var res = await fetch(url, { headers: HEADERS });
+    if (!res.ok) {
+      var err = await res.json();
+      // Tabla aún no existe — mostrar mensaje amigable
+      if (err.code === 'PGRST205' || err.code === '42P01') {
+        renderRechazos([]);
+        mostrarSinTablaRechazo();
+        return;
+      }
+    }
+    rechazosData = await res.json();
+    renderRechazos(rechazosData);
+    actualizarKPIsRechazos(rechazosData);
+  } catch(e) {
+    console.error('cargarRechazos:', e);
+    renderRechazos([]);
+  }
+}
+
+function mostrarSinTablaRechazo() {
+  var tb = document.getElementById('rechTbody');
+  if (tb) tb.innerHTML = '<tr><td colspan="8" style="padding:36px;text-align:center;color:var(--gray);font-size:13px">'
+    + '⚠️ La tabla <code>rechazos</code> no existe aún en Supabase.<br>'
+    + '<span style="font-size:11px">Ejecuta el SQL de creación en el dashboard de Supabase.</span>'
+    + '</td></tr>';
+}
+
+function renderRechazos(data) {
+  var tb = document.getElementById('rechTbody');
+  if (!tb) return;
+  if (!data || data.length === 0) {
+    tb.innerHTML = '<tr><td colspan="8" style="padding:36px;text-align:center;color:var(--gray);font-size:13px">'
+      + 'No hay rechazos registrados en este período.</td></tr>';
+    return;
+  }
+  tb.innerHTML = data.map(buildRechazoRow).join('');
+}
+
+function buildRechazoRow(r) {
+  var fecha = r.created_at ? r.created_at.slice(0,10) : '—';
+  var sku   = r.sku || '—';
+  var desc  = r.descripcion ? (r.descripcion.length > 36 ? r.descripcion.slice(0,36) + '…' : r.descripcion) : '—';
+  var motivo = r.motivo ? r.motivo.replace(/_/g,' ') : '—';
+  var rech  = r.cantidad_rechazada || 0;
+  var rec   = r.cantidad_recuperada || 0;
+  var tiempo = r.tiempo_min ? r.tiempo_min + ' min' : '—';
+  var op    = r.operador_id || '—';
+  var obs   = r.observaciones ? (r.observaciones.length > 32 ? r.observaciones.slice(0,32) + '…' : r.observaciones) : '';
+
+  return '<tr>'
+    + '<td style="padding:10px 14px;font-size:12px;font-family:var(--mono);white-space:nowrap">' + fecha + '</td>'
+    + '<td style="padding:10px 14px;font-size:12px"><strong style="font-family:var(--mono)">' + sku + '</strong>'
+    + '<div style="font-size:10px;color:var(--gray)">' + desc + '</div></td>'
+    + '<td style="padding:10px 14px;font-size:12px;text-transform:capitalize">' + motivo + '</td>'
+    + '<td style="padding:10px 14px;font-size:14px;font-weight:700;text-align:right;color:var(--red)">' + rech + '</td>'
+    + '<td style="padding:10px 14px;font-size:14px;font-weight:700;text-align:right;color:var(--green)">' + rec + '</td>'
+    + '<td style="padding:10px 14px;font-size:12px;text-align:right;color:var(--gray)">' + tiempo + '</td>'
+    + '<td style="padding:10px 14px;font-size:12px">' + op + '</td>'
+    + '<td style="padding:10px 14px;font-size:11px;color:var(--gray)">' + obs + '</td>'
+    + '</tr>';
+}
+
+function actualizarKPIsRechazos(data) {
+  var unid  = data.reduce(function(a,r){ return a + (r.cantidad_rechazada  || 0); }, 0);
+  var rec   = data.reduce(function(a,r){ return a + (r.cantidad_recuperada || 0); }, 0);
+  var neta  = unid - rec;
+  var mins  = data.reduce(function(a,r){ return a + (r.tiempo_min || 0); }, 0);
+  function setEl(id, v){ var el=document.getElementById(id); if(el) el.textContent=v; }
+  setEl('rk-unid',   unid);
+  setEl('rk-rec',    rec);
+  setEl('rk-neta',   neta);
+  setEl('rk-tiempo', mins);
+}
+
+// ── Modal rechazo ────────────────────────────────────────────
+function poblarSelectOperadoresRechazo() {
+  var sel = document.getElementById('rechOperador');
+  if (!sel || !personalData || !personalData.tapas) return;
+  sel.innerHTML = '<option value="">— Selecciona operador —</option>';
+  personalData.tapas.forEach(function(p) {
+    var opt = document.createElement('option');
+    opt.value = p.codigo || p.id;
+    opt.textContent = p.nombre + (p.codigo ? ' (' + p.codigo + ')' : '');
+    sel.appendChild(opt);
+  });
+}
+
+function abrirModalRechazo() {
+  var m = document.getElementById('modalRechazo');
+  if (!m) return;
+  // Limpiar campos
+  ['rechSku','rechDesc','rechCantRech','rechCantRec','rechTiempo','rechLote','rechObs'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  var neta = document.getElementById('rechNeta');
+  if (neta) neta.textContent = '—';
+  var motEl = document.getElementById('rechMotivo');
+  if (motEl) motEl.value = '';
+  m.classList.add('open');
+}
+
+function cerrarModalRechazo() {
+  var m = document.getElementById('modalRechazo');
+  if (m) m.classList.remove('open');
+}
+
+function actualizarPerdidaNeta() {
+  var rech = parseInt(document.getElementById('rechCantRech').value) || 0;
+  var rec  = parseInt(document.getElementById('rechCantRec').value)  || 0;
+  var neta = rech - rec;
+  var el   = document.getElementById('rechNeta');
+  if (el) el.textContent = neta >= 0 ? neta + ' und' : '—';
+}
+
+function rechSkuInput(val) {
+  var drop = document.getElementById('rechSkuDrop');
+  if (!drop) return;
+  if (!val || val.length < 2) { drop.style.display = 'none'; return; }
+  var term = val.toLowerCase();
+  var matches = inventario.filter(function(i){
+    return (i.sku && i.sku.toLowerCase().includes(term))
+      || (i.descripcion && i.descripcion.toLowerCase().includes(term));
+  }).slice(0, 8);
+  if (!matches.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = matches.map(function(i){
+    return '<div class="sku-opt" onmousedown="selRechSku(\'' + i.sku + '\',\'' + (i.descripcion||'').replace(/'/g,'') + '\')">'
+      + '<strong>' + i.sku + '</strong> — ' + (i.descripcion || '') + '</div>';
+  }).join('');
+  drop.style.display = 'block';
+}
+
+function cerrarRechSkuDrop() {
+  var drop = document.getElementById('rechSkuDrop');
+  if (drop) drop.style.display = 'none';
+}
+
+function selRechSku(sku, desc) {
+  var skuEl  = document.getElementById('rechSku');
+  var descEl = document.getElementById('rechDesc');
+  if (skuEl)  skuEl.value  = sku;
+  if (descEl) descEl.value = desc;
+  cerrarRechSkuDrop();
+}
+
+async function confirmarRechazo() {
+  var sku    = (document.getElementById('rechSku')      || {}).value || '';
+  var desc   = (document.getElementById('rechDesc')     || {}).value || '';
+  var rech   = parseInt((document.getElementById('rechCantRech') || {}).value) || 0;
+  var rec    = parseInt((document.getElementById('rechCantRec')  || {}).value) || 0;
+  var motivo = (document.getElementById('rechMotivo')   || {}).value || '';
+  var tiempo = parseInt((document.getElementById('rechTiempo')   || {}).value) || 0;
+  var op     = (document.getElementById('rechOperador') || {}).value || '';
+  var lote   = (document.getElementById('rechLote')     || {}).value || '';
+  var obs    = (document.getElementById('rechObs')      || {}).value || '';
+
+  if (!sku)    { showToast('Ingresa el SKU del producto rechazado', '#D97706'); return; }
+  if (!rech)   { showToast('Ingresa la cantidad rechazada', '#D97706'); return; }
+  if (!motivo) { showToast('Selecciona el motivo del rechazo', '#D97706'); return; }
+
+  var payload = {
+    sku:                sku,
+    descripcion:        desc,
+    cantidad_rechazada: rech,
+    cantidad_recuperada: rec,
+    motivo:             motivo,
+    tiempo_min:         tiempo || null,
+    operador_id:        op     || null,
+    lote_codigo:        lote   || null,
+    observaciones:      obs    || null,
+    area:               'tapas'
+  };
+
+  var btn = document.querySelector('#modalRechazo .btn[onclick="confirmarRechazo()"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+
+  try {
+    var res = await fetch(SUPA_URL + '/rest/v1/rechazos', {
+      method: 'POST',
+      headers: Object.assign({}, HEADERS, { 'Prefer': 'return=minimal' }),
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      var err = await res.json();
+      if (err.code === 'PGRST205' || err.code === '42P01') {
+        showToast('⚠️ Tabla rechazos no existe — ejecuta el SQL en Supabase', '#D97706');
+      } else {
+        showToast('Error al guardar: ' + (err.message || res.status), '#EF4444');
+      }
+    } else {
+      cerrarModalRechazo();
+      showToast('✅ Rechazo registrado correctamente');
+      await cargarRechazos();
+      renderInicio();
+    }
+  } catch(e) {
+    showToast('Error de red: ' + e.message, '#EF4444');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⛔ Guardar rechazo'; }
+  }
 }
 
 function tick() {
@@ -1428,23 +1994,30 @@ async function init() {
   const hoy = new Date();
   const primerDia = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-01';
   const hoyStr    = hoy.toISOString().split('T')[0];
-  ['salidaDesde','ingresoDesde'].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=primerDia; });
-  ['salidaHasta','ingresoHasta'].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=hoyStr; });
+  ['salidaDesde','ingresoDesde','rechDesde'].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=primerDia; });
+  ['salidaHasta','ingresoHasta','rechHasta'].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=hoyStr; });
 
   // Cargar datos
   await cargarInventario();
   await cargarPersonal();
   await cargarSolicitudes();
-  
+  await cargarRechazos();
+
+  // Poblar select de operadores en modal rechazo
+  poblarSelectOperadoresRechazo();
+
   // Fecha por defecto
   const d = new Date();
   d.setDate(d.getDate() + 3);
   const fechaInput = document.getElementById('fFecha');
   if (fechaInput) fechaInput.value = d.toISOString().split('T')[0];
-  
+
   tick();
   setInterval(tick, 30000);
   setInterval(refreshKPIs, 30000);
+
+  // Arrancar en el hub de inicio
+  switchTab('inicio');
 }
 
 init();
