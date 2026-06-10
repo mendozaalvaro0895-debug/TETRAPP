@@ -46,40 +46,33 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .logo-nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,.8);text-decoration:none;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;transition:background .12s}
 .logo-nav a:hover{background:rgba(255,255,255,.09);color:#fff}
 .logo-nav a.nav-active{background:#1A6B5B;color:#fff}
+.logo-nav a.nav-locked{color:rgba(255,255,255,.3);cursor:not-allowed;pointer-events:none}
+.logo-nav a.nav-locked::after{content:'🔒';font-size:10px;margin-left:auto}
 .logo-nav-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
 .topbar-sep{width:1px;height:24px;background:rgba(255,255,255,.2)}
 .topbar-sub{font-size:13px;color:rgba(255,255,255,.7);flex:1}
 .clock{font-family:var(--mono);font-size:12px;color:#7ECEC0;background:rgba(0,0,0,.3);padding:4px 10px;border-radius:20px}
 .user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:4px 12px;border-radius:20px}
-.uavatar{width:28px;height:28px;border-radius:50%;background:var(--serig-m);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.uavatar{width:28px;height:28px;border-radius:50%;background:var(--serig-m);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff}
 .uname{font-size:12px;color:#fff}
 
-/* APP LAYOUT */
+/* APP LAYOUT — sin sidenav */
 .app{display:flex;height:calc(100vh - 56px);overflow:hidden}
-
-/* SIDENAV */
-.sidenav{width:56px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:8px}
-.sn-btn{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:all .15s;color:var(--gray);position:relative}
-.sn-btn:hover{background:var(--serig-l);color:var(--serig-m)}
-.sn-btn.active{background:var(--serig-m);color:#fff}
-.sn-div{width:32px;height:1px;background:var(--border);margin:8px 0}
-.sn-badge{position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--red);border-radius:50%}
-
-/* MAIN */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 
 /* TABS */
-.tabs{display:flex;align-items:center;background:var(--card);border-bottom:1px solid var(--border);padding:0 16px;gap:16px;flex-shrink:0}
-.tab{display:flex;align-items:center;gap:8px;padding:12px 8px;font-size:13px;font-weight:600;color:var(--gray);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tabs{display:flex;align-items:center;background:var(--card);border-bottom:1px solid var(--border);padding:0 16px;gap:4px;flex-shrink:0}
+.tab{display:flex;align-items:center;gap:7px;padding:12px 10px;font-size:13px;font-weight:600;color:var(--gray);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
 .tab:hover{color:var(--serig-m)}
 .tab.active{color:var(--serig-m);border-bottom-color:var(--serig-m)}
 .tdot{width:8px;height:8px;border-radius:50%}
 .tbadge{background:var(--bg);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;color:var(--gray)}
 .tbadge.tb-serig{background:var(--serig-l);color:var(--serig-m)}
-.tabs-r{flex:1;display:flex;justify-content:flex-end;gap:8px}
+.tabs-r{flex:1;display:flex;justify-content:flex-end;gap:8px;padding-left:8px}
 
 /* BUTTONS */
 .btn{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:var(--font);transition:all .15s}
+.btn:active{transform:scale(.97)}
 .btn-s{background:var(--serig-m);color:#fff}
 .btn-s:hover{background:#3D1A6B}
 .btn-g{background:var(--bg);border:1px solid var(--border);color:var(--ink)}
@@ -94,7 +87,46 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .kpi-v{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--ink);line-height:1.2}
 .kpi-s{font-size:9px;color:var(--gray-l);margin-top:2px}
 
-/* SPLIT LAYOUT */
+/* ── HUB CARDS ────────────────────────────────────────────── */
+.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.hub-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:18px 16px;cursor:pointer;transition:all .16s;display:flex;flex-direction:column;gap:5px}
+.hub-card:hover{border-color:var(--serig-m);box-shadow:0 4px 18px rgba(90,45,158,.13);transform:translateY(-2px)}
+.hub-card-ico{font-size:30px;margin-bottom:2px}
+.hub-card-title{font-family:var(--display);font-size:15px;font-weight:700;color:var(--ink)}
+.hub-card-sub{font-size:11px;color:var(--gray);line-height:1.45}
+
+/* ── SECTION HEADERS ──────────────────────────────────────── */
+.sec-hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.sec-title{font-family:var(--display);font-size:15px;font-weight:700}
+.sec-sub{font-size:11px;color:var(--gray-l)}
+
+/* ── LÍNEAS DE PRODUCCIÓN ─────────────────────────────────── */
+.lineas-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px}
+.linea-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;transition:border-color .15s}
+.linea-card:hover{border-color:var(--serig-m)}
+.linea-inactiva{opacity:.5}
+.linea-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.linea-nombre{font-weight:700;font-size:13px}
+.linea-sol{font-size:10px;color:var(--gray);margin-left:auto;text-align:right;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proceso-pipeline{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.proc-node{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;transition:all .2s}
+.proc-pending{background:var(--bg2);color:var(--gray-l)}
+.proc-active{background:var(--serig-m);color:#fff;box-shadow:0 2px 10px rgba(90,45,158,.28)}
+.proc-done{background:#DCFCE7;color:#166534}
+.proc-arrow{color:var(--gray-l);font-size:11px;font-weight:700;margin:0 1px}
+
+/* ── PRODUCCIÓN ACTUAL ────────────────────────────────────── */
+.prod-table{width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.prod-table th{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg);text-align:left}
+.prod-table td{padding:10px 12px;font-size:12px;border-bottom:1px solid var(--bg);vertical-align:middle}
+.prod-table tbody tr:last-child td{border-bottom:none}
+.prod-table tbody tr:hover td{background:var(--serig-l);cursor:pointer}
+.prod-pr-wrap{flex:1;background:var(--bg2);border-radius:4px;height:6px;overflow:hidden;min-width:70px}
+.prod-pr-bar{height:6px;border-radius:4px;background:var(--serig-m);transition:width .75s}
+.prod-pr-row{display:flex;align-items:center;gap:6px}
+.prod-empty{text-align:center;padding:32px;color:var(--gray-l);font-size:13px;background:var(--card);border:1px solid var(--border);border-radius:12px}
+
+/* ── SPLIT LAYOUT ─────────────────────────────────────────── */
 .split{display:flex;flex:1;overflow:hidden;gap:1px;background:var(--border)}
 .pane-l{width:380px;background:var(--card);display:flex;flex-direction:column;overflow:hidden}
 .pane-r{flex:1;background:var(--card);display:flex;flex-direction:column;overflow:hidden}
@@ -104,7 +136,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ph-r{display:flex;gap:8px}
 .fi{padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--font);background:var(--bg)}
 
-/* SOLICITUDES LIST */
+/* ── SOLICITUDES LIST ─────────────────────────────────────── */
 .sol-list{flex:1;overflow-y:auto}
 .sc{padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
 .sc:hover{background:var(--serig-l)}
@@ -122,7 +154,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .pr-bar.pb-s{background:var(--serig-m)}
 .pr-pct{font-size:9px;color:var(--gray)}
 
-/* PILLS */
+/* ── PILLS ────────────────────────────────────────────────── */
 .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700}
 .pill-nueva{background:#DBEAFE;color:#1A3B8B}
 .pill-programada{background:#FEF3C7;color:#92400E}
@@ -130,16 +162,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .pill-lista{background:#DCFCE7;color:#166534}
 .pill-entregada{background:#E5E7EB;color:#374151}
 
-/* DETALLE */
+/* ── DETALLE ──────────────────────────────────────────────── */
 .det-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--gray);gap:12px}
 .det-empty-ico{font-size:48px}
 .det-empty-txt{font-size:13px}
 .det-scroll{flex:1;overflow-y:auto;padding:16px}
 .tbox{background:var(--serig-l);border-radius:12px;padding:14px;margin-bottom:14px}
-.tbox.ts{background:var(--serig-l)}
 .tbox-lbl{font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--serig-m)}
 .tbox-val{font-family:var(--display);font-size:28px;font-weight:700;color:var(--serig-m);line-height:1}
-.tbox-val.sc{color:var(--serig-m)}
 .tbox-sub{font-size:10px;color:var(--gray);margin-top:4px}
 .dc{border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden}
 .dc-h{padding:10px 14px;background:var(--bg);font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);border-bottom:1px solid var(--border)}
@@ -150,7 +180,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .op-chip{padding:3px 8px;background:var(--bg);border-radius:20px;font-size:9px;cursor:pointer;transition:all .1s}
 .op-chip.sel-proc{background:var(--serig-m);color:#fff}
 
-/* MODAL */
+/* ── MODAL ────────────────────────────────────────────────── */
 .overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(12,12,11,.8);z-index:10000;align-items:center;justify-content:center}
 .overlay.open{display:flex}
 .modal{background:var(--card);border-radius:16px;width:90%;max-width:650px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,.3)}
@@ -178,10 +208,40 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .op-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
 .op-name{font-size:13px;font-weight:700}
 .op-proc{font-size:10px;color:var(--gray)}
+
+/* ── PIPELINE SERIG (view-serig) ──────────────────────────── */
+.pipeline-serig{flex-shrink:0;background:var(--card);border-bottom:1px solid var(--border);padding:10px 16px}
+.pipeline-serig-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.pipeline-serig-title{font-family:var(--display);font-size:13px;font-weight:700}
+.pipeline-serig-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.psc{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:9px 11px;cursor:pointer;transition:all .15s}
+.psc:hover{border-color:var(--serig-m);background:var(--serig-l)}
+.psc.psc-sel{border-color:var(--serig-m);background:var(--serig-l)}
+.psc-inactiva{opacity:.5;cursor:default}
+.psc-inactiva:hover{border-color:var(--border);background:var(--bg)}
+.psc-hdr{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.psc-nombre{font-weight:700;font-size:12px}
+.psc-sol{font-size:10px;font-weight:600;color:var(--serig-m);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.psc-empty-lbl{font-size:10px;color:var(--gray-l);margin-bottom:4px}
+.psc-meta-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px}
+.psc-stat{font-size:9px;color:var(--gray);background:var(--card);padding:2px 7px;border-radius:20px;border:1px solid var(--border);white-space:nowrap}
+.psc-stat strong{color:var(--ink)}
+.psc-pipeline{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+.psc-proc{font-size:9px;font-weight:600;padding:3px 7px;border-radius:20px}
+.psc-pending{background:var(--bg2);color:var(--gray-l)}
+.psc-active{background:var(--serig-m);color:#fff;box-shadow:0 1px 6px rgba(90,45,158,.3)}
+.psc-done{background:#DCFCE7;color:#166534}
+.psc-arr{font-size:9px;color:var(--gray-l);margin:0 1px}
+
+/* ── RESPONSIVE ───────────────────────────────────────────── */
+@media(max-width:1200px){.pipeline-serig-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:1100px){.hub-grid{grid-template-columns:repeat(2,1fr)}.lineas-grid{grid-template-columns:1fr}}
+@media(max-width:768px){.tabs{gap:0;padding:0 8px}.tab{font-size:12px;padding:10px 7px}.hub-grid{grid-template-columns:1fr 1fr}.lineas-grid{grid-template-columns:1fr}.proceso-pipeline{gap:3px}.proc-node{font-size:10px;padding:4px 7px}.pipeline-serig-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
 
+<!-- ══════════════════ TOPBAR ══════════════════════════════ -->
 <div class="topbar">
   <div class="logo-wrap" onclick="toggleLogoNav(event)">
     <div class="logo">TETRA<span>PLASTIC</span><span class="logo-chevron" id="logoChev">▾</span></div>
@@ -198,7 +258,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     </div>
   </div>
   <div class="topbar-sep"></div>
-  <div class="topbar-sub">Serigrafía · Control de Solicitudes</div>
+  <div class="topbar-sub">Serigrafía · Control de Producción</div>
   <div class="clock" id="clk"></div>
   <div class="user-pill">
     <div class="uavatar">AM</div>
@@ -207,29 +267,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   <a href="index.html" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;">🏠 Inicio</a>
 </div>
 
+<!-- ══════════════════ APP ════════════════════════════════ -->
 <div class="app">
-
-<div class="sidenav">
-  <div class="sn-btn active" title="Solicitudes">📋</div>
-  <div class="sn-btn" title="Dashboard" onclick="window.location.href='dashboard.html'">📊</div>
-  <div class="sn-btn" title="Personal" onclick="switchTab('personal')">👥</div>
-  <div class="sn-div"></div>
-  <div style="flex:1"></div>
-  <div class="sn-btn" title="Alertas">🔔<div class="sn-badge"></div></div>
-</div>
-
 <div class="main">
 
+  <!-- TABS (encabezado — única navegación) -->
   <div class="tabs">
+    <div class="tab active" id="tab-inicio" onclick="switchTab('inicio')">🏠 Inicio</div>
     <div class="tab" id="tab-serig" onclick="switchTab('serig')">
       <div class="tdot" style="background:var(--serig-m)"></div>
-      Serigrafía
+      Programación
       <span class="tbadge tb-serig" id="cnt-serig">0</span>
     </div>
-    <div class="tab t-dash" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
-    <div class="tab active" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
-    <div class="tab" id="tab-salidas" onclick="switchTab('salidas')">📤 Salidas</div>
-    <div class="tab" id="tab-ingresos" onclick="switchTab('ingresos')">📦 Ingresos PT</div>
+    <div class="tab" id="tab-movimientos" onclick="switchTab('movimientos')">⬇⬆ Movimientos</div>
+    <div class="tab" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
+    <div class="tab" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
     <div class="tabs-r">
       <button class="btn btn-s btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>
     </div>
@@ -237,13 +289,94 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
   <div class="views">
 
-    <!-- SERIGRAFÍA VIEW (deshabilitado temporalmente) -->
+    <!-- ══ INICIO / HUB ══════════════════════════════════════ -->
+    <div class="view" style="display:flex;flex-direction:column;flex:1;overflow:hidden" id="view-inicio">
+
+      <!-- KPI strip -->
+      <div class="kpi-strip">
+        <div class="kpi">
+          <div class="kpi-l">En proceso</div>
+          <div class="kpi-v" style="color:var(--serig-m)" id="ki-proc">0</div>
+          <div class="kpi-s">solicitudes activas</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l">Pendientes</div>
+          <div class="kpi-v" style="color:var(--amber)" id="ki-pend">0</div>
+          <div class="kpi-s">sin iniciar</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l">Operadores</div>
+          <div class="kpi-v" id="ki-ops">—</div>
+          <div class="kpi-s">activos hoy</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l">Líneas activas</div>
+          <div class="kpi-v" style="color:var(--green)" id="ki-lineas">3 / 4</div>
+          <div class="kpi-s">en producción</div>
+        </div>
+      </div>
+
+      <!-- Scroll content -->
+      <div style="flex:1;overflow-y:auto;padding:20px 24px">
+
+        <!-- Nav cards -->
+        <div class="hub-grid">
+          <div class="hub-card" onclick="switchTab('serig')">
+            <div class="hub-card-ico">🎨</div>
+            <div class="hub-card-title">Programación</div>
+            <div class="hub-card-sub" id="hc-prog-sub">Cargando solicitudes…</div>
+          </div>
+          <div class="hub-card" onclick="switchTab('movimientos')">
+            <div class="hub-card-ico">⬇⬆</div>
+            <div class="hub-card-title">Movimientos</div>
+            <div class="hub-card-sub">Salidas de bodega · Ingresos PT</div>
+          </div>
+          <div class="hub-card" onclick="switchTab('personal')">
+            <div class="hub-card-ico">👥</div>
+            <div class="hub-card-title">Personal</div>
+            <div class="hub-card-sub" id="hc-personal-sub">Cargando…</div>
+          </div>
+          <div class="hub-card" onclick="window.location.href='dashboard.html'">
+            <div class="hub-card-ico">📊</div>
+            <div class="hub-card-title">Dashboard</div>
+            <div class="hub-card-sub">KPIs ejecutivos →</div>
+          </div>
+        </div>
+
+        <!-- Líneas de producción -->
+        <div class="sec-hdr">
+          <div class="sec-title">Líneas de Producción</div>
+          <div class="sec-sub" id="sec-lineas-sub">4 líneas · 3 activas</div>
+        </div>
+        <div class="lineas-grid" id="lineasGrid"></div>
+
+        <!-- Producción actual -->
+        <div class="sec-hdr">
+          <div class="sec-title">Producción Actual</div>
+          <div class="sec-sub">Solicitudes en proceso · actualizado <span id="lastUpdate">—</span></div>
+        </div>
+        <div id="produccionActual"></div>
+
+      </div>
+    </div><!-- /view-inicio -->
+
+    <!-- ══ PROGRAMACIÓN / SERIGRAFÍA (DESBLOQUEADO) ══════════ -->
     <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-serig">
+
+      <!-- Pipeline por línea -->
+      <div class="pipeline-serig">
+        <div class="pipeline-serig-hdr">
+          <div class="pipeline-serig-title">Pipeline de Líneas</div>
+          <div style="font-size:11px;color:var(--gray-l)">Flameado · Impresión · Secado · Empaque</div>
+        </div>
+        <div class="pipeline-serig-grid" id="pipelineSerigGrid"></div>
+      </div>
+
       <div class="kpi-strip">
         <div class="kpi"><div class="kpi-l">En proceso</div><div class="kpi-v" style="color:var(--serig-m)" id="ks-proc">0</div><div class="kpi-s">solicitudes activas</div></div>
         <div class="kpi"><div class="kpi-l">Pendientes</div><div class="kpi-v" style="color:var(--amber)" id="ks-pend">0</div><div class="kpi-s">sin iniciar</div></div>
         <div class="kpi"><div class="kpi-l">Cap. disponible</div><div class="kpi-v" style="color:var(--green)" id="ks-cap">—</div><div class="kpi-s">und/hora hoy</div></div>
-        <div class="kpi"><div class="kpi-l">Operadores</div><div class="kpi-v" id="ks-ops">—</div><div class="kpi-s">libres / proceso</div></div>
+        <div class="kpi"><div class="kpi-l">Operadores</div><div class="kpi-v" id="ks-ops">—</div><div class="kpi-s">activos</div></div>
         <div class="kpi"><div class="kpi-l">Fugas hoy</div><div class="kpi-v" id="ks-fugas">0</div><div class="kpi-s">unidades perdidas</div></div>
       </div>
       <div class="split">
@@ -263,19 +396,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
         <div class="pane-r">
           <div id="detSerig" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-            <div class="det-empty"><div class="det-empty-ico">🎨</div><div class="det-empty-txt">Selecciona una solicitud</div></div>
+            <div class="det-empty">
+              <div class="det-empty-ico">🎨</div>
+              <div class="det-empty-txt">Selecciona una solicitud</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </div><!-- /view-serig -->
 
-    <!-- DASHBOARD VIEW -->
-    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-dash">
-      <div class="dash" id="dashGrid" style="padding:20px"></div>
-    </div>
-
-    <!-- PERSONAL VIEW (activo por defecto) -->
-    <div class="view" style="display:flex;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
+    <!-- ══ PERSONAL ══════════════════════════════════════════ -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
       <div class="ph">
         <div><div class="ph-title">Personal · Serigrafía</div><div class="ph-sub">Asistencia y asignación del día</div></div>
         <div class="ph-r">
@@ -285,7 +416,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div id="personalGrid" style="flex:1;overflow-y:auto"></div>
     </div>
 
-    <!-- WIP VIEW (Solicitudes / Salidas / Ingresos) -->
+    <!-- ══ WIP (Movimientos y otros pendientes) ═════════════ -->
     <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-wip">
       <div class="wip-view">
         <div class="wip-icon" id="wipIcon">🚧</div>
@@ -295,11 +426,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
     </div>
 
-  </div>
-</div>
-</div>
+  </div><!-- /views -->
+</div><!-- /main -->
+</div><!-- /app -->
 
-<!-- MODAL FORMULARIO -->
+<!-- ══════════════════ MODAL NUEVA SOLICITUD ══════════════ -->
 <div class="overlay" id="overlay">
   <div class="modal">
     <div class="mh">
@@ -322,7 +453,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </select>
         </div>
       </div>
-
       <div class="fr">
         <div class="fg">
           <div class="fl">Fecha límite</div>
@@ -338,7 +468,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </select>
         </div>
       </div>
-
       <div class="fg full">
         <div class="fl">Líneas de pedido</div>
         <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;overflow:hidden">
@@ -351,28 +480,42 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
           <div id="lineasPedido"></div>
           <div style="padding:6px 10px;border-top:1px solid var(--border)">
-            <button type="button" class="btn btn-g btn-xs" onclick="addLinea()" id="btnAddLinea">+ Agregar línea</button>
+            <button type="button" class="btn btn-g btn-xs" onclick="addLinea()">+ Agregar línea</button>
           </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:16px;margin-top:6px">
           <span>Total: <strong id="totalUnid" style="font-family:var(--mono)">0</strong> und</span>
         </div>
       </div>
-
       <div class="cbox cs" id="cboxEl">
         <div class="c-lbl">⏱ Cálculo automático</div>
         <div class="c-grid">
-          <div class="c-item"><div class="c-val cs2" id="cHoras">—</div><div class="c-lbl2">Horas</div></div>
-          <div class="c-item"><div class="c-val cs2" id="cTurnos">—</div><div class="c-lbl2">Turnos</div></div>
-          <div class="c-item"><div class="c-val cs2" id="cCap">—</div><div class="c-lbl2">Und/hora</div></div>
-          <div class="c-item"><div class="c-val cs2" id="cFecha">—</div><div class="c-lbl2">Entrega est.</div></div>
+          <div class="c-item"><div class="c-val" id="cHoras">—</div><div class="c-lbl2">Horas</div></div>
+          <div class="c-item"><div class="c-val" id="cTurnos">—</div><div class="c-lbl2">Turnos</div></div>
+          <div class="c-item"><div class="c-val" id="cCap">—</div><div class="c-lbl2">Und/hora</div></div>
+          <div class="c-item"><div class="c-val" id="cFecha">—</div><div class="c-lbl2">Entrega est.</div></div>
         </div>
         <div class="c-note" id="cNote"></div>
       </div>
-
+      <div class="fr" style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+        <div class="fg full">
+          <div class="fl">Envase solicitado</div>
+          <input class="fi" id="fEnvase" placeholder="Ej: Tapa 28mm, Tapa 38mm Sport, Tapa 53mm…">
+        </div>
+      </div>
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Capacidad de impresión (und/h)</div>
+          <input class="fi" id="fCapImpresion" type="number" placeholder="1200" min="1">
+        </div>
+        <div class="fg">
+          <div class="fl">Tiros de impresión</div>
+          <input class="fi" id="fTiros" type="number" placeholder="1" min="1" max="10">
+        </div>
+      </div>
       <div class="fg full">
         <div class="fl">Notas</div>
-        <textarea class="fta" id="fNotas" placeholder="Instrucciones especiales, colores pantone, arte..."></textarea>
+        <textarea class="fta" id="fNotas" placeholder="Instrucciones especiales, colores pantone, arte…"></textarea>
       </div>
     </div>
     <div class="mf">
@@ -382,7 +525,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 </div>
 
-<!-- MODAL PÉRDIDA -->
+<!-- ══════════════════ MODAL PÉRDIDA ══════════════════════ -->
 <div class="overlay" id="modalPerdida">
   <div class="modal" style="max-width:400px">
     <div class="mh">
@@ -390,14 +533,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <button class="m-close" onclick="cerrarModalPerdida()">✕</button>
     </div>
     <div class="mb">
-      <div class="fg full">
-        <div class="fl">SKU / Producto</div>
-        <input class="fi" id="perdidaSku" placeholder="Ej: 10041">
-      </div>
-      <div class="fg full">
-        <div class="fl">Cantidad perdida</div>
-        <input class="fi" id="perdidaCant" type="number" placeholder="0">
-      </div>
+      <div class="fg full"><div class="fl">SKU / Producto</div><input class="fi" id="perdidaSku" placeholder="Ej: 10041"></div>
+      <div class="fg full"><div class="fl">Cantidad perdida</div><input class="fi" id="perdidaCant" type="number" placeholder="0"></div>
       <div class="fg full">
         <div class="fl">Motivo</div>
         <select class="fs" id="perdidaMotivo">
@@ -410,10 +547,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <option value="otro">Otro</option>
         </select>
       </div>
-      <div class="fg full">
-        <div class="fl">Observaciones</div>
-        <textarea class="fta" id="perdidaObs" rows="2"></textarea>
-      </div>
+      <div class="fg full"><div class="fl">Observaciones</div><textarea class="fta" id="perdidaObs" rows="2"></textarea></div>
     </div>
     <div class="mf">
       <button class="btn btn-g" onclick="cerrarModalPerdida()">Cancelar</button>
@@ -422,7 +556,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 </div>
 
-<!-- MODAL PARO MÁQUINA -->
+<!-- ══════════════════ MODAL PARO MÁQUINA ═════════════════ -->
 <div class="overlay" id="modalParo">
   <div class="modal" style="max-width:400px">
     <div class="mh">
@@ -455,14 +589,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <option value="otro">Otro</option>
         </select>
       </div>
-      <div class="fg full">
-        <div class="fl">Duración (minutos)</div>
-        <input class="fi" id="paroDuracion" type="number" placeholder="minutos" value="30">
-      </div>
-      <div class="fg full">
-        <div class="fl">Observaciones</div>
-        <textarea class="fta" id="paroObs" rows="2"></textarea>
-      </div>
+      <div class="fg full"><div class="fl">Duración (minutos)</div><input class="fi" id="paroDuracion" type="number" placeholder="minutos" value="30"></div>
+      <div class="fg full"><div class="fl">Observaciones</div><textarea class="fta" id="paroObs" rows="2"></textarea></div>
     </div>
     <div class="mf">
       <button class="btn btn-g" onclick="cerrarModalParo()">Cancelar</button>
@@ -473,452 +601,653 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 <script>
 // ════════════════════════════════════════════════════════════
-// SERIGRAFIA.JS - VERSIÓN CORREGIDA
+// SERIGRAFIA.JS
 // ════════════════════════════════════════════════════════════
 
-// Conexión Supabase
 const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
 const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
 const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-// Estado global
-let solicitudes = [];
-let selId = null;
-let lineas = [];
-let inventarioCache = [];
-let personalData = null;
-let perdidaSolicitudActual = null;
+// ── Meta-encoding (envase/cap/tiros en campo notas) ──────────
+var META_SEP = '__M__';
 
-const ALL_PROCS_SERIG = [
+function encodeMeta(envase, cap, tiros, notasUsuario) {
+  var m = META_SEP + envase + '|' + cap + '|' + tiros + META_SEP;
+  return notasUsuario ? m + '\n' + notasUsuario : m;
+}
+
+function decodeMeta(notas) {
+  var dflt = { envase: '', cap_impresion: 0, tiros: 0, notas_usuario: notas || '' };
+  if (!notas) return dflt;
+  var start = notas.indexOf(META_SEP);
+  var end   = notas.indexOf(META_SEP, start + META_SEP.length);
+  if (start !== 0 || end < 0) return dflt;
+  var inner = notas.slice(META_SEP.length, end);
+  var parts = inner.split('|');
+  if (parts.length < 3) return dflt;
+  var rest = notas.slice(end + META_SEP.length);
+  if (rest.charAt(0) === '\n') rest = rest.slice(1);
+  return { envase: parts[0] || '', cap_impresion: parseInt(parts[1]) || 0, tiros: parseInt(parts[2]) || 0, notas_usuario: rest };
+}
+
+// ── Estado global ────────────────────────────────────────────
+var solicitudes = [];
+var selId = null;
+var lineas = [];
+var inventarioCache = [];
+var personalData = null;
+var perdidaSolicitudActual = null;
+
+// ── Constantes de área ───────────────────────────────────────
+var ALL_PROCS_SERIG = [
   {val:'serigrafia', lbl:'Serigrafía'}, {val:'tampografia', lbl:'Tampografía'},
-  {val:'impresion', lbl:'Impresión'}, {val:'encajado', lbl:'Encajado'},
-  {val:'flameado', lbl:'Flameado'}, {val:'horno', lbl:'Horno'},
-  {val:'secado', lbl:'Secado'}, {val:'empaque', lbl:'Empaque'}
+  {val:'impresion',  lbl:'Impresión'},  {val:'encajado',    lbl:'Encajado'},
+  {val:'flameado',   lbl:'Flameado'},   {val:'horno',       lbl:'Horno'},
+  {val:'secado',     lbl:'Secado'},     {val:'empaque',     lbl:'Empaque'}
+];
+
+// Procesos secuenciales de cada línea (en orden de producción)
+var PROCESOS_SEQ = [
+  { val: 'flameado',  lbl: 'Flameado',  ico: '🔥' },
+  { val: 'impresion', lbl: 'Impresión', ico: '🖨️' },
+  { val: 'secado',    lbl: 'Secado',    ico: '💨' },
+  { val: 'empaque',   lbl: 'Empaque',   ico: '📦' }
+];
+
+// 4 líneas físicas (3 activas)
+var LINEAS_PRODUCCION = [
+  { id: 1, nombre: 'Línea 1', activa: true },
+  { id: 2, nombre: 'Línea 2', activa: true },
+  { id: 3, nombre: 'Línea 3', activa: true },
+  { id: 4, nombre: 'Línea 4', activa: false, nota: 'En mantenimiento' }
 ];
 
 // ── Metas de producción por proceso (und/hora) ───────────────
-const METAS = {
-  armado:            1500,
-  'armado_pushpull':  700,
-  liner:             1500,
-  flameado:          2000,
-  impresion:         1200,
-  encajado:          3000,
-  banda:             1000,
-  serigrafia:        1200,
-  tampografia:       1200,
-  horno:             2000,
-  secado:            2000,
-  empaque:           2500,
-  'separar cavidad': 2500,
-  'limpiar grasa':   2000,
-  'limpiar pestana': 1000,
-  'otra tarea':      1000,
-  'armadora tapa 28':2000,
-  'liner tapa 33':   2200
+var METAS = {
+  armado: 1500, 'armado_pushpull': 700, liner: 1500,
+  flameado: 2000, impresion: 1200, encajado: 3000,
+  banda: 1000, serigrafia: 1200, tampografia: 1200,
+  horno: 2000, secado: 2000, empaque: 2500,
+  'separar cavidad': 2500, 'limpiar grasa': 2000,
+  'limpiar pestana': 1000, 'otra tarea': 1000,
+  'armadora tapa 28': 2000, 'liner tapa 33': 2200
 };
-const META_DEFAULT = 1000;
+var META_DEFAULT = 1000;
 
 function metaParaProcesos(procs) {
   if (!procs || procs.length === 0) return META_DEFAULT;
-  const vals = procs.map(function(p) {
-    return METAS[p] || METAS[p.toLowerCase()] || META_DEFAULT;
-  });
+  var vals = procs.map(function(p) { return METAS[p] || METAS[p.toLowerCase()] || META_DEFAULT; });
   return Math.min.apply(null, vals);
 }
 
 // Clientes predefinidos
-const CLIENTES = [
-  'A. CORP UNIVERSAL', 'AMERICAN NATURAL', 'ANCORA (HN)', 'BELLEZA S.A.',
-  'CALLE DE LA PLAZA', 'CAVE LULU (HN)', 'CHAMER (HN)', 'CLEMENTE VELASQUEZ ROCA',
-  'DAROSA (HN)', 'DISUFIX', 'DISTRIBUIDORA DEL CARIBE', 'ERICK DAVID CASTRO VELIZ',
-  'ETIFLEX', 'FARMAYA', 'FLUSHING', 'HUGO FERNANDO DURAN', 'INCOGUA', 'INTERCORP',
-  'JOSE IBAÑEZ', 'JULIA ALVARADO', 'NATUFARMA', 'PETROPLASTIC', 'ROMO S.A.',
-  'SCENTIA', 'SHALOM', 'SINERGIA', 'TECNIPLAST', 'VESA'
+var CLIENTES = [
+  'A. CORP UNIVERSAL','AMERICAN NATURAL','ANCORA (HN)','BELLEZA S.A.',
+  'CALLE DE LA PLAZA','CAVE LULU (HN)','CHAMER (HN)','CLEMENTE VELASQUEZ ROCA',
+  'DAROSA (HN)','DISUFIX','DISTRIBUIDORA DEL CARIBE','ERICK DAVID CASTRO VELIZ',
+  'ETIFLEX','FARMAYA','FLUSHING','HUGO FERNANDO DURAN','INCOGUA','INTERCORP',
+  'JOSE IBAÑEZ','JULIA ALVARADO','NATUFARMA','PETROPLASTIC','ROMO S.A.',
+  'SCENTIA','SHALOM','SINERGIA','TECNIPLAST','VESA'
 ];
 
-// ══ FUNCIONES DE CARGA ══════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// CARGA DE DATOS
+// ════════════════════════════════════════════════════════════
+
 async function cargarInventario() {
   try {
-    const { data, error } = await db
-      .from('inventario')
-      .select('sku, descripcion, existencia')
-      .eq('activo', true);
-    
-    if (error) throw error;
-    inventarioCache = data || [];
+    var r = await db.from('inventario').select('sku,descripcion,existencia').eq('activo', true);
+    if (r.error) throw r.error;
+    inventarioCache = r.data || [];
     return inventarioCache;
   } catch(e) {
-    console.error('Error cargando inventario:', e);
+    console.error('Error inventario:', e);
     return [];
   }
 }
 
 async function cargarPersonal() {
   try {
-    const { data, error } = await db
-      .from('personal')
-      .select('*')
-      .eq('area', 'serig')
-      .eq('activo', true);
-    
-    if (error) throw error;
-    personalData = { serig: data || [] };
+    var r = await db.from('personal').select('*').eq('area','serig').eq('activo', true);
+    if (r.error) throw r.error;
+    personalData = { serig: r.data || [] };
     return personalData;
   } catch(e) {
-    console.error('Error cargando personal:', e);
-    return { serig: [] };
+    console.error('Error personal:', e);
+    personalData = { serig: [] };
+    return personalData;
   }
 }
 
 async function cargarSolicitudes() {
   try {
-    const { data, error } = await db
+    var r = await db
       .from('solicitudes')
       .select('*, solicitud_lineas(*)')
-      .eq('area', 'serig')
+      .eq('area','serig')
       .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    
-    solicitudes = (data || []).map(s => {
-      const lineasData = s.solicitud_lineas || [];
+    if (r.error) throw r.error;
+
+    solicitudes = (r.data || []).map(function(s) {
+      var ld = s.solicitud_lineas || [];
+      var descPrimera = ld[0] ? (ld[0].descripcion || '—') : '—';
+      var descExtra   = ld.length > 1 ? ' (+' + (ld.length - 1) + ')' : '';
       return {
-        id: s.id,
-        dbId: s.id,
-        id_display: s.codigo,
-        area: s.area,
-        cliente: s.cliente_nombre,
-        area_sol: s.area_solicitante,
-        sku: lineasData[0]?.sku || '—',
-        desc: lineasData.length === 1 ? (lineasData[0]?.descripcion || '—') : 
-              (lineasData[0]?.descripcion || '—') + (lineasData.length > 1 ? ` (+${lineasData.length-1})` : ''),
-        lineas: lineasData.map(l => ({
-          id: l.id,
-          sku: l.sku,
-          desc: l.descripcion,
-          cant: l.cantidad,
-          existencia: l.existencia_snap,
-          procs: l.procesos || [],
-          operadores: l.operadores_ids || []
-        })),
-        cant: lineasData.reduce((sum, l) => sum + (l.cantidad || 0), 0),
+        id: s.id, dbId: s.id,
+        id_display: s.codigo, area: s.area,
+        cliente: s.cliente_nombre, area_sol: s.area_solicitante,
+        sku: ld[0] ? (ld[0].sku || '—') : '—',
+        desc: (ld.length === 1 ? descPrimera : descPrimera + descExtra),
+        lineas: ld.map(function(l) {
+          return { id: l.id, sku: l.sku, desc: l.descripcion,
+                   cant: l.cantidad, existencia: l.existencia_snap,
+                   procs: l.procesos || [], operadores: l.operadores_ids || [] };
+        }),
+        cant: ld.reduce(function(sum, l) { return sum + (l.cantidad || 0); }, 0),
         fecha_lim: s.fecha_limite || '',
-        prio: s.prioridad,
-        estado: s.estado,
-        prog: s.progreso_pct || 0,
-        ops: [],
-        notas: s.notas || '',
+        prio: s.prioridad, estado: s.estado,
+        prog: s.progreso_pct || 0, ops: [],
+        notas: decodeMeta(s.notas || '').notas_usuario,
+        envase: decodeMeta(s.notas || '').envase,
+        cap_impresion: decodeMeta(s.notas || '').cap_impresion,
+        tiros: decodeMeta(s.notas || '').tiros,
         created: new Date(s.created_at).toLocaleString('es-GT')
       };
     });
-    
+
     renderListas();
     refreshKPIs();
+    renderInicio();
+    renderPipelineSerig();
   } catch(e) {
-    console.error('Error cargando solicitudes:', e);
+    console.error('Error solicitudes:', e);
     showToast('Error al cargar solicitudes', '#B83232');
   }
 }
 
-// ══ RENDER LISTS ════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// HUB — INICIO
+// ════════════════════════════════════════════════════════════
+
+function renderInicio() {
+  var enProceso  = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
+  var pendientes = solicitudes.filter(function(s) { return s.estado === 'nueva' || s.estado === 'programada'; });
+  var ops = personalData && personalData.serig
+    ? personalData.serig.filter(function(p) { return p.activo; }).length
+    : 0;
+
+  // KPIs
+  var el;
+  el = document.getElementById('ki-proc'); if (el) el.textContent = enProceso.length;
+  el = document.getElementById('ki-pend'); if (el) el.textContent = pendientes.length;
+  el = document.getElementById('ki-ops');  if (el) el.textContent = ops;
+
+  // Hub card subtitles
+  el = document.getElementById('hc-prog-sub');
+  if (el) el.textContent = enProceso.length + ' en proceso · ' + pendientes.length + ' pendientes';
+  el = document.getElementById('hc-personal-sub');
+  if (el) el.textContent = ops + ' operadores activos';
+
+  // Timestamp
+  el = document.getElementById('lastUpdate');
+  if (el) el.textContent = new Date().toLocaleTimeString('es-GT', {hour:'2-digit', minute:'2-digit'});
+
+  renderLineasProd();
+  renderProduccionActual();
+}
+
+// ════════════════════════════════════════════════════════════
+// PIPELINE DE LÍNEAS (view-serig)
+// ════════════════════════════════════════════════════════════
+
+function buildPscNode(proc, estado) {
+  return '<div class="psc-proc psc-' + estado + '">' + proc.ico + ' ' + proc.lbl + '</div>';
+}
+
+function buildPscPipeline(prog) {
+  var parts = [];
+  for (var i = 0; i < PROCESOS_SEQ.length; i++) {
+    if (i > 0) parts.push('<div class="psc-arr">›</div>');
+    parts.push(buildPscNode(PROCESOS_SEQ[i], getProcEstado(i, prog)));
+  }
+  return '<div class="psc-pipeline">' + parts.join('') + '</div>';
+}
+
+function buildPscMetaRow(sol) {
+  if (!sol) return '';
+  var envase = sol.envase || '—';
+  var cap    = sol.cap_impresion ? sol.cap_impresion.toLocaleString() + ' u/h' : '—';
+  var tiros  = sol.tiros ? sol.tiros + (sol.tiros === 1 ? ' tiro' : ' tiros') : '—';
+  return '<div class="psc-meta-row">' +
+    '<span class="psc-stat">📦 <strong>' + envase + '</strong></span>' +
+    '<span class="psc-stat">⚡ <strong>' + cap + '</strong></span>' +
+    '<span class="psc-stat">🖨️ <strong>' + tiros + '</strong></span>' +
+    '</div>';
+}
+
+function buildPscCard(linea, sol) {
+  var badge = linea.activa
+    ? '<span class="pill pill-lista" style="font-size:8px">ACTIVA</span>'
+    : '<span class="pill pill-entregada" style="font-size:8px">INACTIVA</span>';
+
+  var solLine = sol
+    ? '<div class="psc-sol" onclick="mostrarDetalle(\'' + sol.id + '\')">' + (sol.id_display || sol.id.slice(0,6)) + ' · ' + sol.cliente + '</div>'
+    : '<div class="psc-empty-lbl">Sin asignación</div>';
+
+  var metaRow  = sol ? buildPscMetaRow(sol) : '';
+  var pipeline = buildPscPipeline(sol ? sol.prog : 0);
+  var inactCls = linea.activa ? '' : ' psc-inactiva';
+
+  return '<div class="psc' + inactCls + '" id="psc-linea-' + linea.id + '">' +
+    '<div class="psc-hdr">' +
+      '<div class="psc-nombre">' + linea.nombre + '</div>' + badge +
+    '</div>' +
+    solLine +
+    metaRow +
+    pipeline +
+    '</div>';
+}
+
+function renderPipelineSerig() {
+  var g = document.getElementById('pipelineSerigGrid');
+  if (!g) return;
+  var enProceso = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
+  var html = '';
+  for (var i = 0; i < LINEAS_PRODUCCION.length; i++) {
+    var linea = LINEAS_PRODUCCION[i];
+    var sol   = linea.activa ? (enProceso[i] || null) : null;
+    html += buildPscCard(linea, sol);
+  }
+  g.innerHTML = html;
+}
+
+// ── Líneas de producción (HUB) ───────────────────────────────
+
+function getProcEstado(procIdx, prog) {
+  if (prog <= 0) return 'pending';
+  if (prog >= 100) return 'done';
+  var activeStep = Math.floor(prog / 25);
+  if (activeStep > procIdx) return 'done';
+  if (activeStep === procIdx) return 'active';
+  return 'pending';
+}
+
+function buildProcNode(proc, estado) {
+  return '<div class="proc-node proc-' + estado + '">' + proc.ico + ' ' + proc.lbl + '</div>';
+}
+
+function buildProcPipeline(prog) {
+  var parts = [];
+  for (var i = 0; i < PROCESOS_SEQ.length; i++) {
+    if (i > 0) parts.push('<div class="proc-arrow">›</div>');
+    parts.push(buildProcNode(PROCESOS_SEQ[i], getProcEstado(i, prog)));
+  }
+  return parts.join('');
+}
+
+function buildLineaSolInfo(linea, sol) {
+  if (!linea.activa) {
+    return '<span class="linea-sol">' + (linea.nota || 'Inactiva') + '</span>';
+  }
+  if (sol) {
+    return '<span class="linea-sol">' +
+      (sol.id_display || sol.id.slice(0,8)) + ' · ' + sol.cliente + ' · ' +
+      sol.cant.toLocaleString() + ' und' +
+      '</span>';
+  }
+  return '<span class="linea-sol" style="color:var(--gray-l)">Sin asignación</span>';
+}
+
+function buildLineaCard(linea, sol) {
+  var badge = linea.activa
+    ? '<span class="pill pill-lista">ACTIVA</span>'
+    : '<span class="pill pill-entregada">INACTIVA</span>';
+  var pipeline = buildProcPipeline(sol ? sol.prog : 0);
+
+  return '<div class="linea-card' + (linea.activa ? '' : ' linea-inactiva') + '">' +
+    '<div class="linea-header">' +
+      '<div class="linea-nombre">' + linea.nombre + ' ' + badge + '</div>' +
+      buildLineaSolInfo(linea, sol) +
+    '</div>' +
+    '<div class="proceso-pipeline">' + pipeline + '</div>' +
+    '</div>';
+}
+
+function renderLineasProd() {
+  var g = document.getElementById('lineasGrid');
+  if (!g) return;
+  var enProceso = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
+  var html = '';
+  for (var i = 0; i < LINEAS_PRODUCCION.length; i++) {
+    var linea = LINEAS_PRODUCCION[i];
+    var sol = linea.activa ? (enProceso[i] || null) : null;
+    html += buildLineaCard(linea, sol);
+  }
+  g.innerHTML = html;
+}
+
+// ── Producción actual ────────────────────────────────────────
+
+function buildProgBar(prog) {
+  return '<div class="prod-pr-row">' +
+    '<div class="prod-pr-wrap"><div class="prod-pr-bar" style="width:' + prog + '%"></div></div>' +
+    '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:32px">' + prog + '%</span>' +
+    '</div>';
+}
+
+function buildProdRow(s) {
+  return '<tr onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + s.id + '\')},100)" style="cursor:pointer">' +
+    '<td><span style="font-family:var(--mono);font-weight:700;color:var(--serig-m)">' + (s.id_display || s.id.slice(0,8)) + '</span></td>' +
+    '<td style="font-weight:600">' + s.cliente + '</td>' +
+    '<td style="font-family:var(--mono)">' + s.cant.toLocaleString() + '</td>' +
+    '<td>' + buildProgBar(s.prog) + '</td>' +
+    '<td>' + estadoPill(s.estado) + '</td>' +
+    '<td style="font-size:11px;color:var(--gray)">' + s.created + '</td>' +
+    '</tr>';
+}
+
+function renderProduccionActual() {
+  var el = document.getElementById('produccionActual');
+  if (!el) return;
+  var activas = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
+  if (activas.length === 0) {
+    el.innerHTML = '<div class="prod-empty">No hay solicitudes en proceso actualmente</div>';
+    return;
+  }
+  var rows = activas.map(buildProdRow).join('');
+  el.innerHTML = '<table class="prod-table">' +
+    '<thead><tr>' +
+      '<th>Código</th><th>Cliente</th><th>Unidades</th>' +
+      '<th style="min-width:120px">Progreso</th><th>Estado</th><th>Inicio</th>' +
+    '</tr></thead>' +
+    '<tbody>' + rows + '</tbody>' +
+    '</table>';
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER LISTAS (view-serig)
+// ════════════════════════════════════════════════════════════
+
 function renderListas() {
-  const filtro = document.getElementById('filtroSerig')?.value || '';
-  const filtradas = solicitudes.filter(s => !filtro || s.estado === filtro);
-  
-  const container = document.getElementById('listSerig');
+  var filtro = document.getElementById('filtroSerig') ? document.getElementById('filtroSerig').value : '';
+  var filtradas = solicitudes.filter(function(s) { return !filtro || s.estado === filtro; });
+  var container = document.getElementById('listSerig');
   if (!container) return;
-  
-  container.innerHTML = filtradas.map(s => `
-    <div class="sc ${selId === s.id ? 'sel-s' : ''}" onclick="mostrarDetalle('${s.id}')">
-      <div class="sc-top">
-        <div>
-          <div class="sc-id">${s.id_display || s.id.slice(0,8)}</div>
-          <div class="sc-cli">${s.cliente}</div>
-          <div class="sc-desc">${s.sku} — ${s.desc}</div>
-        </div>
-        <div>${estadoPill(s.estado)} ${prioridadPill(s.prio)}</div>
-      </div>
-      <div class="sc-meta">
-        <span class="sc-qty">${s.cant.toLocaleString()} und</span>
-        <span class="sc-date">🗓 ${s.fecha_lim || '—'}</span>
-        <span class="sc-date">⏱ ${calcularHoras(s.cant, 1, s.lineas.flatMap(l => l.procs || [])).toFixed(1)}h</span>
-      </div>
-      ${s.prog > 0 ? `<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-s" style="width:${s.prog}%"></div></div><div class="pr-pct">${s.prog}%</div></div>` : ''}
-    </div>
-  `).join('');
-  
-  document.getElementById('cnt-serig').textContent = solicitudes.length;
+
+  var html = filtradas.map(function(s) {
+    var sel = selId === s.id ? 'sel-s' : '';
+    var allProcs = s.lineas.reduce(function(acc, l) { return acc.concat(l.procs || []); }, []);
+    var horas = calcularHoras(s.cant, 1, allProcs);
+    var progRow = s.prog > 0
+      ? '<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-s" style="width:' + s.prog + '%"></div></div><div class="pr-pct">' + s.prog + '%</div></div>'
+      : '';
+    return '<div class="sc ' + sel + '" onclick="mostrarDetalle(\'' + s.id + '\')">' +
+      '<div class="sc-top">' +
+        '<div>' +
+          '<div class="sc-id">' + (s.id_display || s.id.slice(0,8)) + '</div>' +
+          '<div class="sc-cli">' + s.cliente + '</div>' +
+          '<div class="sc-desc">' + s.sku + ' — ' + s.desc + '</div>' +
+        '</div>' +
+        '<div>' + estadoPill(s.estado) + ' ' + prioridadPill(s.prio) + '</div>' +
+      '</div>' +
+      '<div class="sc-meta">' +
+        '<span class="sc-qty">' + s.cant.toLocaleString() + ' und</span>' +
+        '<span class="sc-date">🗓 ' + (s.fecha_lim || '—') + '</span>' +
+        '<span class="sc-date">⏱ ' + horas.toFixed(1) + 'h</span>' +
+      '</div>' +
+      (s.envase || s.tiros ? '<div class="sc-meta" style="margin-top:3px">' +
+        (s.envase ? '<span style="color:var(--serig-m);font-weight:600">📦 ' + s.envase + '</span>' : '') +
+        (s.tiros  ? '<span>🖨️ ' + s.tiros + ' tiro' + (s.tiros !== 1 ? 's' : '') + '</span>' : '') +
+        (s.cap_impresion ? '<span>' + s.cap_impresion.toLocaleString() + ' u/h</span>' : '') +
+      '</div>' : '') +
+      progRow +
+      '</div>';
+  }).join('');
+
+  container.innerHTML = html;
+  var cnt = document.getElementById('cnt-serig');
+  if (cnt) cnt.textContent = solicitudes.length;
 }
 
 function estadoPill(estado) {
-  const clases = {
-    'nueva': 'pill-nueva', 'programada': 'pill-programada',
-    'proceso': 'pill-proceso', 'lista': 'pill-lista', 'entregada': 'pill-entregada'
-  };
-  const textos = {
-    'nueva': '🟡 Nueva', 'programada': '📅 Programada',
-    'proceso': '🟢 En proceso', 'lista': '✅ Lista', 'entregada': '📦 Entregada'
-  };
-  return `<span class="pill ${clases[estado] || 'pill-nueva'}">${textos[estado] || estado}</span>`;
+  var clases = {nueva:'pill-nueva',programada:'pill-programada',proceso:'pill-proceso',lista:'pill-lista',entregada:'pill-entregada'};
+  var textos = {nueva:'🟡 Nueva',programada:'📅 Programada',proceso:'🟢 En proceso',lista:'✅ Lista',entregada:'📦 Entregada'};
+  return '<span class="pill ' + (clases[estado] || 'pill-nueva') + '">' + (textos[estado] || estado) + '</span>';
 }
 
 function prioridadPill(prioridad) {
-  const clases = {
-    'normal': 'pill-normal', 'urgente': 'pill-urgente',
-    'programada': 'pill-programada', 'vela': 'pill-vela'
-  };
-  const textos = {
-    'normal': '🟢 Normal', 'urgente': '🔴 Urgente',
-    'programada': '📅 Programada', 'vela': '🌙 Vela'
-  };
-  return `<span class="pill ${clases[prioridad] || 'pill-normal'}">${textos[prioridad] || prioridad}</span>`;
+  var textos = {normal:'🟢 Normal',urgente:'🔴 Urgente',programada:'📅 Programada',vela:'🌙 Vela'};
+  return '<span class="pill pill-entregada">' + (textos[prioridad] || prioridad) + '</span>';
 }
 
 function calcularHoras(cantidad, opsCount, procs) {
-  if (opsCount === undefined) opsCount = 1;
-  const meta = metaParaProcesos(procs);
-  return cantidad / (meta * opsCount);
+  var meta = metaParaProcesos(procs);
+  return cantidad / (meta * (opsCount || 1));
 }
 
 function fechaEst(turnos) {
-  const fecha = new Date();
+  var fecha = new Date();
   fecha.setDate(fecha.getDate() + turnos);
   return fecha.toLocaleDateString('es-GT');
 }
 
 async function generarCodigo(area) {
-  const prefix = area === 'serig' ? 'S' : 'T';
+  var prefix = area === 'serig' ? 'S' : 'T';
   try {
-    const { data, error } = await db
-      .from('solicitudes')
-      .select('codigo')
-      .eq('area', area)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    
-    if (error) throw error;
-    
-    let lastNum = 0;
-    if (data && data.length > 0 && data[0].codigo) {
-      const match = data[0].codigo.match(/\d+$/);
+    var r = await db.from('solicitudes').select('codigo').eq('area', area).order('created_at', {ascending:false}).limit(1);
+    if (r.error) throw r.error;
+    var lastNum = 0;
+    if (r.data && r.data.length > 0 && r.data[0].codigo) {
+      var match = r.data[0].codigo.match(/\d+$/);
       if (match) lastNum = parseInt(match[0]);
     }
-    return `${prefix}-${String(lastNum + 1).padStart(3, '0')}`;
+    return prefix + '-' + String(lastNum + 1).padStart(3, '0');
   } catch(e) {
-    return `${prefix}-001`;
+    return prefix + '-001';
   }
 }
 
 async function refreshKPIs() {
-  const activas = solicitudes.filter(s => s.estado === 'proceso').length;
-  const pendientes = solicitudes.filter(s => ['nueva', 'programada'].includes(s.estado)).length;
-  document.getElementById('ks-proc').textContent = activas;
-  document.getElementById('ks-pend').textContent = pendientes;
-  
+  var activas   = solicitudes.filter(function(s) { return s.estado === 'proceso'; }).length;
+  var pendientes = solicitudes.filter(function(s) { return s.estado === 'nueva' || s.estado === 'programada'; }).length;
+
+  var el;
+  el = document.getElementById('ks-proc'); if (el) el.textContent = activas;
+  el = document.getElementById('ks-pend'); if (el) el.textContent = pendientes;
+
   try {
-    const hoy = new Date().toISOString().split('T')[0];
-    const { data: fugasHoy } = await db
-      .from('movimientos_materiales')
-      .select('cantidad, tipo')
-      .gte('created_at', hoy);
-    
-    if (fugasHoy) {
-      const perdidas = fugasHoy.filter(f => f.tipo === 'perdida').reduce((s, f) => s + (f.cantidad || 0), 0);
-      document.getElementById('ks-fugas').textContent = perdidas.toLocaleString();
+    var hoy = new Date().toISOString().split('T')[0];
+    var r = await db.from('movimientos_materiales').select('cantidad,tipo').gte('created_at', hoy);
+    if (r.data) {
+      var perdidas = r.data.filter(function(f) { return f.tipo === 'perdida'; })
+        .reduce(function(s, f) { return s + (f.cantidad || 0); }, 0);
+      el = document.getElementById('ks-fugas'); if (el) el.textContent = perdidas.toLocaleString();
     }
   } catch(e) {}
-  
-  const opsLibres = personalData?.serig?.filter(p => p.rol !== 'supervisor' && p.activo).length || 0;
-  document.getElementById('ks-ops').textContent = opsLibres + ' libres';
-  document.getElementById('ks-cap').textContent = (opsLibres * 1200).toLocaleString();
+
+  var opsLibres = personalData && personalData.serig
+    ? personalData.serig.filter(function(p) { return p.activo; }).length
+    : 0;
+  el = document.getElementById('ks-ops'); if (el) el.textContent = opsLibres;
+  el = document.getElementById('ks-cap'); if (el) el.textContent = (opsLibres * 1200).toLocaleString();
 }
 
-// ══ TRAZABILIDAD ════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// TRAZABILIDAD
+// ════════════════════════════════════════════════════════════
+
 async function registrarPerdida(solicitudId, sku, cantidad, motivo, usuario, obs) {
   try {
-    const { error } = await db.from('movimientos_materiales').insert({
-      solicitud_id: solicitudId,
-      sku_original: sku,
-      cantidad: cantidad,
-      tipo: 'perdida',
-      operador_id: usuario,
-      motivo_perdida: motivo,
-      observaciones: obs
+    var r = await db.from('movimientos_materiales').insert({
+      solicitud_id: solicitudId, sku_original: sku, cantidad: cantidad,
+      tipo: 'perdida', operador_id: usuario, motivo_perdida: motivo, observaciones: obs
     });
-    return { ok: !error, error: error?.message };
-  } catch(e) {
-    return { ok: false, error: e.message };
-  }
+    return { ok: !r.error, error: r.error ? r.error.message : null };
+  } catch(e) { return { ok: false, error: e.message }; }
 }
 
 async function registrarEntradaPT(solicitudId, sku, cantidad, usuario, obs) {
   try {
-    const { error } = await db.from('movimientos_materiales').insert({
-      solicitud_id: solicitudId,
-      sku_original: sku,
-      cantidad: cantidad,
-      tipo: 'entrada_pt',
-      operador_id: usuario,
-      observaciones: obs
+    var r = await db.from('movimientos_materiales').insert({
+      solicitud_id: solicitudId, sku_original: sku, cantidad: cantidad,
+      tipo: 'entrada_pt', operador_id: usuario, observaciones: obs
     });
-    return { ok: !error, error: error?.message };
-  } catch(e) {
-    return { ok: false, error: e.message };
-  }
+    return { ok: !r.error, error: r.error ? r.error.message : null };
+  } catch(e) { return { ok: false, error: e.message }; }
 }
 
 async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
   try {
-    const { error } = await db.from('movimientos_materiales').insert({
-      solicitud_id: solicitudId,
-      sku_original: sku,
-      cantidad: cantidad,
-      tipo: 'salida_bodega',
-      operador_id: usuario,
-      observaciones: obs
+    var r = await db.from('movimientos_materiales').insert({
+      solicitud_id: solicitudId, sku_original: sku, cantidad: cantidad,
+      tipo: 'salida_bodega', operador_id: usuario, observaciones: obs
     });
-    return { ok: !error, error: error?.message };
-  } catch(e) {
-    return { ok: false, error: e.message };
-  }
+    return { ok: !r.error, error: r.error ? r.error.message : null };
+  } catch(e) { return { ok: false, error: e.message }; }
 }
 
 async function registrarParoMaquina(maquinaId, motivo, duracion, usuario, obs) {
   try {
-    const { error } = await db.from('paros_maquina').insert({
-      maquina_id: maquinaId,
-      motivo: motivo,
-      duracion_minutos: duracion,
-      usuario: usuario,
-      observaciones: obs
+    var r = await db.from('paros_maquina').insert({
+      maquina_id: maquinaId, motivo: motivo, duracion_minutos: duracion,
+      usuario: usuario, observaciones: obs
     });
-    return { ok: !error, error: error?.message };
-  } catch(e) {
-    return { ok: false, error: e.message };
-  }
+    return { ok: !r.error, error: r.error ? r.error.message : null };
+  } catch(e) { return { ok: false, error: e.message }; }
 }
 
-// ══ MOSTRAR DETALLE ═════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// DETALLE DE SOLICITUD
+// ════════════════════════════════════════════════════════════
+
 async function mostrarDetalle(id) {
-  const s = solicitudes.find(x => x.id === id);
+  var s = solicitudes.find(function(x) { return x.id === id; });
   if (!s) return;
   selId = s.id;
   renderListas();
-  
-  let fugas = { salidas: 0, entradas: 0, perdidas: 0, fugaTotal: 0 };
+
+  var fugas = { salidas: 0, entradas: 0, perdidas: 0, fugaTotal: 0 };
   try {
-    const { data } = await db
-      .from('movimientos_materiales')
-      .select('*')
-      .eq('solicitud_id', s.dbId);
-    
-    if (data) {
-      fugas.salidas = data.filter(m => m.tipo === 'salida_bodega').reduce((sum, m) => sum + (m.cantidad || 0), 0);
-      fugas.entradas = data.filter(m => m.tipo === 'entrada_pt').reduce((sum, m) => sum + (m.cantidad || 0), 0);
-      fugas.perdidas = data.filter(m => m.tipo === 'perdida').reduce((sum, m) => sum + (m.cantidad || 0), 0);
+    var r = await db.from('movimientos_materiales').select('*').eq('solicitud_id', s.dbId);
+    if (r.data) {
+      fugas.salidas  = r.data.filter(function(m){return m.tipo==='salida_bodega';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
+      fugas.entradas = r.data.filter(function(m){return m.tipo==='entrada_pt';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
+      fugas.perdidas = r.data.filter(function(m){return m.tipo==='perdida';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
       fugas.fugaTotal = fugas.salidas - fugas.entradas - fugas.perdidas;
     }
   } catch(e) {}
-  
-  const det = document.getElementById('detSerig');
-  const allProcs = s.lineas.flatMap(l => l.procs || []);
-  const metaSol  = metaParaProcesos(allProcs);
-  const horas = calcularHoras(s.cant, 1, allProcs);
-  
-  det.innerHTML = `
-    <div class="ph" style="flex-shrink:0">
-      <div>
-        <div class="ph-title">${s.id_display || s.id.slice(0,8)} — ${s.cliente}</div>
-        <div class="ph-sub">${s.sku} · ${s.cant.toLocaleString()} unidades</div>
-      </div>
-      <div class="ph-r">
-        ${s.estado === 'nueva' ? `<button class="btn btn-s btn-xs" onclick="cambiarEstado('${s.id}','proceso')">▶ Iniciar</button>` : ''}
-        ${s.estado === 'proceso' ? `<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista')">✓ Lista</button>` : ''}
-        ${s.estado === 'lista' ? `<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada')">📦 Entregar</button>` : ''}
-        <button class="btn btn-g btn-xs" style="background:var(--red-l);color:var(--red)" onclick="confirmarBorrar('${s.id}')">🗑</button>
-      </div>
-    </div>
-    <div class="det-scroll">
-      
-      <div class="tbox ts">
-        <div class="tbox-lbl">Tiempo estimado</div>
-        <div class="tbox-val sc">${horas.toFixed(1)} horas</div>
-        <div class="tbox-sub">${Math.ceil(horas/12)} turno(s) · Meta: ${metaSol.toLocaleString()} und/h · Entrega est.: ${fechaEst(Math.ceil(horas/12))}</div>
-      </div>
-      
-      <div class="dc" style="border-color:var(--amber)">
-        <div class="dc-h" style="background:var(--amber-l);color:var(--amber)">📉 Trazabilidad de fugas</div>
-        <div class="dc-b">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px">
-            <div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Salida bodega</div><div style="font-size:20px;font-weight:800;color:var(--teal)">${fugas.salidas.toLocaleString()}</div></div>
-            <div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Entrada PT</div><div style="font-size:20px;font-weight:800;color:var(--green)">${fugas.entradas.toLocaleString()}</div></div>
-            <div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Pérdidas</div><div style="font-size:20px;font-weight:800;color:var(--red)">${fugas.perdidas.toLocaleString()}</div></div>
-            <div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Fuga total</div><div style="font-size:20px;font-weight:800;color:${fugas.fugaTotal > 0 ? 'var(--red)' : 'var(--green)'}">${fugas.fugaTotal.toLocaleString()}</div></div>
-          </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-s btn-sm" onclick="abrirModalPerdida('${s.id}')">➕ Registrar pérdida</button>
-            <button class="btn btn-g btn-sm" onclick="registrarEntradaRapida('${s.id}')">📦 Registrar entrada PT</button>
-            <button class="btn btn-g btn-sm" onclick="registrarSalidaRapida('${s.id}')">📤 Registrar salida bodega</button>
-          </div>
-        </div>
-      </div>
-      
-      <div class="dc">
-        <div class="dc-h">Líneas del pedido</div>
-        <div class="dc-b">
-          <table class="dt">
-            <thead><tr><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock</th></tr></thead>
-            <tbody>
-              ${s.lineas.map(l => `
-                <tr>
-                  <td style="font-family:var(--mono)">${l.sku || '—'}</td>
-                  <td>${l.desc || '—'}</td>
-                  <td style="text-align:right">${(l.cant || 0).toLocaleString()}</td>
-                  <td style="text-align:right;color:${(l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)'}">${(l.existencia || 0).toLocaleString()}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      
-      <div class="dc">
-        <div class="dc-h">Procesos requeridos</div>
-        <div class="dc-b">
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            ${[...new Set(s.lineas.flatMap(l => l.procs || []))].map(p => {
-              const proc = ALL_PROCS_SERIG.find(pr => pr.val === p);
-              return `<span class="pill" style="background:var(--serig-l);color:var(--serig-m)">${proc?.lbl || p}</span>`;
-            }).join('') || '<span class="pill">Proceso no especificado</span>'}
-          </div>
-        </div>
-      </div>
-      
-      <div class="dc">
-        <div class="dc-h">Progreso</div>
-        <div class="dc-b">
-          <input type="range" id="sldr_${s.id}" min="0" max="100" value="${s.prog}" style="width:100%">
-          <div style="display:flex;justify-content:space-between;margin-top:6px">
-            <span id="sldrV_${s.id}">${s.prog}%</span>
-            <button class="btn btn-s btn-xs" onclick="actualizarProg('${s.id}')">Actualizar</button>
-          </div>
-        </div>
-      </div>
-      
-      ${s.notas ? `<div class="dc"><div class="dc-h">Notas</div><div class="dc-b">${s.notas}</div></div>` : ''}
-    </div>
-  `;
-  
-  const slider = document.getElementById(`sldr_${s.id}`);
+
+  var det = document.getElementById('detSerig');
+  var allProcs = s.lineas.reduce(function(acc,l){return acc.concat(l.procs||[]);}, []);
+  var metaSol  = metaParaProcesos(allProcs);
+  var horas    = calcularHoras(s.cant, 1, allProcs);
+
+  var btnEstado = '';
+  if (s.estado === 'nueva')    btnEstado = '<button class="btn btn-s btn-xs" onclick="cambiarEstado(\'' + s.id + '\',\'proceso\')">▶ Iniciar</button>';
+  if (s.estado === 'proceso')  btnEstado = '<button class="btn btn-g btn-xs" onclick="cambiarEstado(\'' + s.id + '\',\'lista\')">✓ Lista</button>';
+  if (s.estado === 'lista')    btnEstado = '<button class="btn btn-g btn-xs" onclick="cambiarEstado(\'' + s.id + '\',\'entregada\')">📦 Entregar</button>';
+
+  var fugaColor = fugas.fugaTotal > 0 ? 'var(--red)' : 'var(--green)';
+
+  var lineasRows = s.lineas.map(function(l) {
+    var stockColor = (l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)';
+    return '<tr>' +
+      '<td style="font-family:var(--mono)">' + (l.sku||'—') + '</td>' +
+      '<td>' + (l.desc||'—') + '</td>' +
+      '<td style="text-align:right">' + (l.cant||0).toLocaleString() + '</td>' +
+      '<td style="text-align:right;color:' + stockColor + '">' + (l.existencia||0).toLocaleString() + '</td>' +
+      '</tr>';
+  }).join('');
+
+  var procsUnicos = [];
+  s.lineas.forEach(function(l) { (l.procs||[]).forEach(function(p){ if(procsUnicos.indexOf(p)<0) procsUnicos.push(p); }); });
+  var procsPills = procsUnicos.map(function(p) {
+    var found = ALL_PROCS_SERIG.find(function(pr){return pr.val===p;});
+    return '<span class="pill" style="background:var(--serig-l);color:var(--serig-m)">' + (found ? found.lbl : p) + '</span>';
+  }).join('') || '<span class="pill">No especificado</span>';
+
+  det.innerHTML =
+    '<div class="ph" style="flex-shrink:0">' +
+      '<div>' +
+        '<div class="ph-title">' + (s.id_display||s.id.slice(0,8)) + ' — ' + s.cliente + '</div>' +
+        '<div class="ph-sub">' + s.sku + ' · ' + s.cant.toLocaleString() + ' unidades</div>' +
+      '</div>' +
+      '<div class="ph-r">' +
+        btnEstado +
+        '<button class="btn btn-g btn-xs" style="background:var(--red-l);color:var(--red)" onclick="confirmarBorrar(\'' + s.id + '\')">🗑</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="det-scroll">' +
+
+      '<div class="dc" style="border-color:var(--serig-m)">' +
+        '<div class="dc-h" style="background:var(--serig-l);color:var(--serig-m)">🖨️ Datos de Impresión</div>' +
+        '<div class="dc-b" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
+          '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Envase</div>' +
+            '<div style="font-size:15px;font-weight:700;color:var(--ink);margin-top:2px">' + (s.envase || '—') + '</div></div>' +
+          '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Cap. Impresión</div>' +
+            '<div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--serig-m);margin-top:2px">' + (s.cap_impresion ? s.cap_impresion.toLocaleString() + ' u/h' : '—') + '</div></div>' +
+          '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Tiros</div>' +
+            '<div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--ink);margin-top:2px">' + (s.tiros ? s.tiros + (s.tiros === 1 ? ' tiro' : ' tiros') : '—') + '</div></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="tbox">' +
+        '<div class="tbox-lbl">Tiempo estimado</div>' +
+        '<div class="tbox-val">' + horas.toFixed(1) + ' horas</div>' +
+        '<div class="tbox-sub">' + Math.ceil(horas/12) + ' turno(s) · Meta: ' + metaSol.toLocaleString() + ' und/h · Entrega est.: ' + fechaEst(Math.ceil(horas/12)) + '</div>' +
+      '</div>' +
+
+      '<div class="dc" style="border-color:var(--amber)">' +
+        '<div class="dc-h" style="background:var(--amber-l);color:var(--amber)">📉 Trazabilidad de fugas</div>' +
+        '<div class="dc-b">' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px">' +
+            '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Salida bodega</div><div style="font-size:20px;font-weight:800;color:var(--teal)">' + fugas.salidas.toLocaleString() + '</div></div>' +
+            '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Entrada PT</div><div style="font-size:20px;font-weight:800;color:var(--green)">' + fugas.entradas.toLocaleString() + '</div></div>' +
+            '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Pérdidas</div><div style="font-size:20px;font-weight:800;color:var(--red)">' + fugas.perdidas.toLocaleString() + '</div></div>' +
+            '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Fuga total</div><div style="font-size:20px;font-weight:800;color:' + fugaColor + '">' + fugas.fugaTotal.toLocaleString() + '</div></div>' +
+          '</div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+            '<button class="btn btn-s btn-sm" onclick="abrirModalPerdida(\'' + s.id + '\')">➕ Registrar pérdida</button>' +
+            '<button class="btn btn-g btn-sm" onclick="registrarEntradaRapida(\'' + s.id + '\')">📦 Registrar entrada PT</button>' +
+            '<button class="btn btn-g btn-sm" onclick="registrarSalidaRapida(\'' + s.id + '\')">📤 Registrar salida bodega</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="dc"><div class="dc-h">Líneas del pedido</div><div class="dc-b">' +
+        '<table class="dt"><thead><tr><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock</th></tr></thead>' +
+        '<tbody>' + lineasRows + '</tbody></table>' +
+      '</div></div>' +
+
+      '<div class="dc"><div class="dc-h">Procesos requeridos</div>' +
+        '<div class="dc-b" style="display:flex;gap:6px;flex-wrap:wrap">' + procsPills + '</div>' +
+      '</div>' +
+
+      '<div class="dc"><div class="dc-h">Progreso</div><div class="dc-b">' +
+        '<input type="range" id="sldr_' + s.id + '" min="0" max="100" value="' + s.prog + '" style="width:100%">' +
+        '<div style="display:flex;justify-content:space-between;margin-top:6px">' +
+          '<span id="sldrV_' + s.id + '">' + s.prog + '%</span>' +
+          '<button class="btn btn-s btn-xs" onclick="actualizarProg(\'' + s.id + '\')">Actualizar</button>' +
+        '</div>' +
+      '</div></div>' +
+
+      (s.notas ? '<div class="dc"><div class="dc-h">Notas</div><div class="dc-b">' + s.notas + '</div></div>' : '') +
+
+    '</div>';
+
+  var slider = document.getElementById('sldr_' + s.id);
   if (slider) {
-    slider.oninput = (e) => {
-      document.getElementById(`sldrV_${s.id}`).textContent = e.target.value + '%';
+    slider.oninput = function(e) {
+      var vEl = document.getElementById('sldrV_' + s.id);
+      if (vEl) vEl.textContent = e.target.value + '%';
     };
   }
 }
 
-// ══ ACCIONES ════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// ACCIONES DE SOLICITUD
+// ════════════════════════════════════════════════════════════
+
 function abrirModalPerdida(solicitudId) {
   perdidaSolicitudActual = solicitudId;
   document.getElementById('perdidaSku').value = '';
@@ -927,212 +1256,167 @@ function abrirModalPerdida(solicitudId) {
   document.getElementById('perdidaObs').value = '';
   document.getElementById('modalPerdida').classList.add('open');
 }
-
 function cerrarModalPerdida() {
   document.getElementById('modalPerdida').classList.remove('open');
   perdidaSolicitudActual = null;
 }
-
 async function confirmarPerdida() {
-  const sku = document.getElementById('perdidaSku').value.trim();
-  const cantidad = parseInt(document.getElementById('perdidaCant').value);
-  const motivo = document.getElementById('perdidaMotivo').value;
-  const obs = document.getElementById('perdidaObs').value;
-  
-  if (!sku || !cantidad || cantidad <= 0) {
-    showToast('⚠️ Completa SKU y cantidad válida', '#B83232');
-    return;
-  }
-  
-  const result = await registrarPerdida(perdidaSolicitudActual, sku, cantidad, motivo, 'operador', obs);
+  var sku      = document.getElementById('perdidaSku').value.trim();
+  var cantidad = parseInt(document.getElementById('perdidaCant').value);
+  var motivo   = document.getElementById('perdidaMotivo').value;
+  var obs      = document.getElementById('perdidaObs').value;
+  if (!sku || !cantidad || cantidad <= 0) { showToast('⚠️ Completa SKU y cantidad válida', '#B83232'); return; }
+  var result = await registrarPerdida(perdidaSolicitudActual, sku, cantidad, motivo, 'operador', obs);
   if (result.ok) {
-    showToast(`✅ Pérdida registrada: ${cantidad} und de ${sku}`);
+    showToast('✅ Pérdida registrada: ' + cantidad + ' und de ' + sku);
     cerrarModalPerdida();
     mostrarDetalle(perdidaSolicitudActual);
     refreshKPIs();
   } else {
-    showToast(`❌ Error: ${result.error}`, '#B83232');
+    showToast('❌ Error: ' + result.error, '#B83232');
   }
 }
 
 async function registrarEntradaRapida(solicitudId) {
-  const cant = prompt('¿Cuántas unidades de producto terminado se registran?');
+  var cant = prompt('¿Cuántas unidades de producto terminado se registran?');
   if (!cant || parseInt(cant) <= 0) return;
-  
-  const sku = prompt('SKU del producto terminado (ej: 10041):');
+  var sku = prompt('SKU del producto terminado (ej: 10041):');
   if (!sku) return;
-  
-  const result = await registrarEntradaPT(solicitudId, sku, parseInt(cant), 'operador', '');
-  if (result.ok) {
-    showToast(`✅ Entrada registrada: ${cant} und de ${sku}`);
-    mostrarDetalle(solicitudId);
-    refreshKPIs();
-  } else {
-    showToast(`❌ Error: ${result.error}`, '#B83232');
-  }
+  var result = await registrarEntradaPT(solicitudId, sku, parseInt(cant), 'operador', '');
+  if (result.ok) { showToast('✅ Entrada registrada: ' + cant + ' und de ' + sku); mostrarDetalle(solicitudId); refreshKPIs(); }
+  else showToast('❌ Error: ' + result.error, '#B83232');
 }
 
 async function registrarSalidaRapida(solicitudId) {
-  const cant = prompt('¿Cuántas unidades de materia prima salen de bodega?');
+  var cant = prompt('¿Cuántas unidades de materia prima salen de bodega?');
   if (!cant || parseInt(cant) <= 0) return;
-  
-  const sku = prompt('SKU del material que sale:');
+  var sku = prompt('SKU del material que sale:');
   if (!sku) return;
-  
-  const result = await registrarSalidaBodega(solicitudId, sku, parseInt(cant), 'operador', '');
-  if (result.ok) {
-    showToast(`✅ Salida registrada: ${cant} und de ${sku}`);
-    mostrarDetalle(solicitudId);
-    refreshKPIs();
-  } else {
-    showToast(`❌ Error: ${result.error}`, '#B83232');
-  }
+  var result = await registrarSalidaBodega(solicitudId, sku, parseInt(cant), 'operador', '');
+  if (result.ok) { showToast('✅ Salida registrada: ' + cant + ' und de ' + sku); mostrarDetalle(solicitudId); refreshKPIs(); }
+  else showToast('❌ Error: ' + result.error, '#B83232');
 }
 
 async function cambiarEstado(id, nuevoEstado) {
-  const s = solicitudes.find(x => x.id === id);
+  var s = solicitudes.find(function(x) { return x.id === id; });
   if (!s) return;
-  
   try {
     await db.from('solicitudes').update({ estado: nuevoEstado }).eq('id', s.dbId);
     s.estado = nuevoEstado;
     if (nuevoEstado === 'lista' || nuevoEstado === 'entregada') s.prog = 100;
     renderListas();
+    renderPipelineSerig();
     mostrarDetalle(id);
-    showToast(`✅ Solicitud ${nuevoEstado === 'lista' ? 'marcada como lista' : nuevoEstado === 'entregada' ? 'entregada' : 'en proceso'}`);
-  } catch(e) {
-    showToast('❌ Error al cambiar estado', '#B83232');
-  }
+    var msg = {lista:'marcada como lista', entregada:'entregada', proceso:'en proceso'};
+    showToast('✅ Solicitud ' + (msg[nuevoEstado] || nuevoEstado));
+  } catch(e) { showToast('❌ Error al cambiar estado', '#B83232'); }
 }
 
 async function actualizarProg(id) {
-  const s = solicitudes.find(x => x.id === id);
-  const slider = document.getElementById(`sldr_${id}`);
+  var s = solicitudes.find(function(x) { return x.id === id; });
+  var slider = document.getElementById('sldr_' + id);
   if (!s || !slider) return;
-  
-  const prog = parseInt(slider.value);
+  var prog = parseInt(slider.value);
   try {
     await db.from('solicitudes').update({ progreso_pct: prog }).eq('id', s.dbId);
     s.prog = prog;
+    renderPipelineSerig();
     mostrarDetalle(id);
-    showToast(`✅ Progreso actualizado a ${prog}%`);
-  } catch(e) {
-    showToast('❌ Error al actualizar progreso', '#B83232');
-  }
+    showToast('✅ Progreso actualizado a ' + prog + '%');
+  } catch(e) { showToast('❌ Error al actualizar progreso', '#B83232'); }
 }
 
 async function confirmarBorrar(id) {
   if (!confirm('¿Eliminar esta solicitud? Esta acción no se puede deshacer.')) return;
-  
-  const s = solicitudes.find(x => x.id === id);
-  if (s?.dbId) {
+  var s = solicitudes.find(function(x) { return x.id === id; });
+  if (s && s.dbId) {
     try {
       await db.from('solicitud_lineas').delete().eq('solicitud_id', s.dbId);
       await db.from('solicitudes').delete().eq('id', s.dbId);
-      solicitudes = solicitudes.filter(x => x.id !== id);
+      solicitudes = solicitudes.filter(function(x) { return x.id !== id; });
       renderListas();
       document.getElementById('detSerig').innerHTML = '<div class="det-empty"><div class="det-empty-ico">🗑️</div><div class="det-empty-txt">Solicitud eliminada</div></div>';
       showToast('🗑 Solicitud eliminada');
       selId = null;
-    } catch(e) {
-      showToast('❌ Error al eliminar', '#B83232');
-    }
+    } catch(e) { showToast('❌ Error al eliminar', '#B83232'); }
   }
 }
 
-function reportarParo() {
-  document.getElementById('modalParo').classList.add('open');
-}
-
-function cerrarModalParo() {
-  document.getElementById('modalParo').classList.remove('open');
-}
-
+function reportarParo() { document.getElementById('modalParo').classList.add('open'); }
+function cerrarModalParo() { document.getElementById('modalParo').classList.remove('open'); }
 async function confirmarParo() {
-  const maquina = document.getElementById('paroMaquina').value;
-  const motivo = document.getElementById('paroMotivo').value;
-  const duracion = parseInt(document.getElementById('paroDuracion').value);
-  const obs = document.getElementById('paroObs').value;
-  
-  if (!duracion || duracion <= 0) {
-    showToast('⚠️ Duración válida requerida', '#B83232');
-    return;
-  }
-  
-  const result = await registrarParoMaquina(maquina, motivo, duracion, 'supervisor', obs);
-  if (result.ok) {
-    showToast(`✅ Paro registrado: ${duracion} min por ${motivo}`);
-    cerrarModalParo();
-  } else {
-    showToast(`❌ Error: ${result.error}`, '#B83232');
-  }
+  var maquina  = document.getElementById('paroMaquina').value;
+  var motivo   = document.getElementById('paroMotivo').value;
+  var duracion = parseInt(document.getElementById('paroDuracion').value);
+  var obs      = document.getElementById('paroObs').value;
+  if (!duracion || duracion <= 0) { showToast('⚠️ Duración válida requerida', '#B83232'); return; }
+  var result = await registrarParoMaquina(maquina, motivo, duracion, 'supervisor', obs);
+  if (result.ok) { showToast('✅ Paro registrado: ' + duracion + ' min por ' + motivo); cerrarModalParo(); }
+  else showToast('❌ Error: ' + result.error, '#B83232');
 }
 
-// ══ FORMULARIO ══════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// FORMULARIO NUEVA SOLICITUD
+// ════════════════════════════════════════════════════════════
+
 function abrirForm() {
   lineas = [];
   addLinea();
   document.getElementById('fCli').value = '';
   document.getElementById('fNotas').value = '';
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
+  document.getElementById('fEnvase').value = '';
+  document.getElementById('fCapImpresion').value = '';
+  document.getElementById('fTiros').value = '';
+  var d = new Date(); d.setDate(d.getDate() + 3);
   document.getElementById('fFecha').value = d.toISOString().split('T')[0];
   document.getElementById('overlay').classList.add('open');
   calcular();
 }
-
-function cerrarForm() {
-  document.getElementById('overlay').classList.remove('open');
-}
+function cerrarForm() { document.getElementById('overlay').classList.remove('open'); }
 
 function addLinea() {
   if (lineas.length >= 5) return;
   lineas.push({ sku: '', desc: '', cant: 0, procs: [], existencia: undefined });
   renderLineas();
 }
-
-function removeLinea(idx) {
-  lineas.splice(idx, 1);
-  renderLineas();
-  calcular();
-}
+function removeLinea(idx) { lineas.splice(idx, 1); renderLineas(); calcular(); }
 
 function renderLineas() {
-  const cont = document.getElementById('lineasPedido');
+  var cont = document.getElementById('lineasPedido');
   if (!cont) return;
-  
-  cont.innerHTML = lineas.map((l, i) => `
-    <div style="border-bottom:1px solid var(--border);padding:8px 10px">
-      <div style="display:grid;grid-template-columns:110px 1fr 90px 80px 28px;gap:6px;margin-bottom:5px">
-        <input class="fi" placeholder="SKU" value="${l.sku}" onchange="lineas[${i}].sku=this.value;buscarExistencia(${i},this.value)">
-        <input class="fi" placeholder="Descripción" value="${l.desc}" onchange="lineas[${i}].desc=this.value">
-        <input class="fi" type="number" placeholder="Cant" value="${l.cant || ''}" onchange="lineas[${i}].cant=parseInt(this.value)||0;calcular()">
-        <div style="font-size:11px;text-align:right;color:${(l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)'}">${l.existencia !== undefined ? l.existencia.toLocaleString() : '—'}</div>
-        <button onclick="removeLinea(${i})" style="background:var(--red-l);border:none;border-radius:5px;cursor:pointer">✕</button>
-      </div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
-        ${ALL_PROCS_SERIG.map(p => `
-          <div class="op-chip ${l.procs.includes(p.val) ? 'sel-proc' : ''}" onclick="toggleLineaProc(${i},'${p.val}')" style="font-size:10px">${p.lbl}</div>
-        `).join('')}
-      </div>
-    </div>
-  `).join('');
+  var html = lineas.map(function(l, i) {
+    var exColor = (l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)';
+    var exVal   = l.existencia !== undefined ? l.existencia.toLocaleString() : '—';
+    var chipsHtml = ALL_PROCS_SERIG.map(function(p) {
+      var sel = l.procs.indexOf(p.val) >= 0 ? 'sel-proc' : '';
+      return '<div class="op-chip ' + sel + '" onclick="toggleLineaProc(' + i + ',\'' + p.val + '\')" style="font-size:10px">' + p.lbl + '</div>';
+    }).join('');
+    return '<div style="border-bottom:1px solid var(--border);padding:8px 10px">' +
+      '<div style="display:grid;grid-template-columns:110px 1fr 90px 80px 28px;gap:6px;margin-bottom:5px">' +
+        '<input class="fi" placeholder="SKU" value="' + l.sku + '" onchange="lineas[' + i + '].sku=this.value;buscarExistencia(' + i + ',this.value)">' +
+        '<input class="fi" placeholder="Descripción" value="' + l.desc + '" onchange="lineas[' + i + '].desc=this.value">' +
+        '<input class="fi" type="number" placeholder="Cant" value="' + (l.cant || '') + '" onchange="lineas[' + i + '].cant=parseInt(this.value)||0;calcular()">' +
+        '<div style="font-size:11px;text-align:right;color:' + exColor + '">' + exVal + '</div>' +
+        '<button onclick="removeLinea(' + i + ')" style="background:var(--red-l);border:none;border-radius:5px;cursor:pointer">✕</button>' +
+      '</div>' +
+      '<div style="display:flex;gap:5px;flex-wrap:wrap">' + chipsHtml + '</div>' +
+      '</div>';
+  }).join('');
+  cont.innerHTML = html;
   updateTotals();
 }
 
 function toggleLineaProc(idx, procVal) {
-  const arr = lineas[idx].procs;
-  const pos = arr.indexOf(procVal);
-  if (pos >= 0) arr.splice(pos, 1);
-  else arr.push(procVal);
-  renderLineas();
-  calcular();
+  var arr = lineas[idx].procs;
+  var pos = arr.indexOf(procVal);
+  if (pos >= 0) arr.splice(pos, 1); else arr.push(procVal);
+  renderLineas(); calcular();
 }
 
 async function buscarExistencia(idx, sku) {
   if (!sku) return;
   if (inventarioCache.length === 0) await cargarInventario();
-  const item = inventarioCache.find(i => i.sku === sku);
+  var item = inventarioCache.find(function(i) { return i.sku === sku; });
   if (item) {
     lineas[idx].existencia = item.existencia || 0;
     lineas[idx].desc = item.descripcion;
@@ -1142,103 +1426,82 @@ async function buscarExistencia(idx, sku) {
 }
 
 function updateTotals() {
-  const total = lineas.reduce((s, l) => s + (l.cant || 0), 0);
-  document.getElementById('totalUnid').textContent = total.toLocaleString();
+  var total = lineas.reduce(function(s, l) { return s + (l.cant || 0); }, 0);
+  var el = document.getElementById('totalUnid');
+  if (el) el.textContent = total.toLocaleString();
 }
 
 function calcular() {
-  const total    = lineas.reduce((s, l) => s + (l.cant || 0), 0);
-  const opsCount = 1;
-  const allProcs = [...new Set(lineas.flatMap(l => l.procs || []))];
-  const meta     = metaParaProcesos(allProcs);
-  const horas    = total / (meta * opsCount);
-  const turnos   = Math.ceil(horas / 12);
-
-  document.getElementById('cHoras').textContent  = horas.toFixed(1) + 'h';
-  document.getElementById('cTurnos').textContent = turnos + (turnos > 1 ? ' turnos' : ' turno');
-  document.getElementById('cCap').textContent    = meta.toLocaleString();
-  document.getElementById('cFecha').textContent  = fechaEst(turnos);
+  var total    = lineas.reduce(function(s, l) { return s + (l.cant || 0); }, 0);
+  var allProcs = [];
+  lineas.forEach(function(l) { (l.procs||[]).forEach(function(p){ if(allProcs.indexOf(p)<0) allProcs.push(p); }); });
+  var meta   = metaParaProcesos(allProcs);
+  var horas  = total / (meta * 1);
+  var turnos = Math.ceil(horas / 12);
+  var el;
+  el = document.getElementById('cHoras');  if(el) el.textContent = horas.toFixed(1) + 'h';
+  el = document.getElementById('cTurnos'); if(el) el.textContent = turnos + (turnos > 1 ? ' turnos' : ' turno');
+  el = document.getElementById('cCap');    if(el) el.textContent = meta.toLocaleString();
+  el = document.getElementById('cFecha');  if(el) el.textContent = fechaEst(turnos);
 }
 
 async function guardar() {
-  const cliente = document.getElementById('fCli').value;
+  var cliente = document.getElementById('fCli').value;
   if (!cliente) { alert('Selecciona un cliente'); return; }
-  
-  const lineasValidas = lineas.filter(l => l.cant > 0);
+  var lineasValidas = lineas.filter(function(l) { return l.cant > 0; });
   if (lineasValidas.length === 0) { alert('Agrega al menos una línea con cantidad'); return; }
-  
-  const codigo = await generarCodigo('serig');
-  
+
+  var codigo = await generarCodigo('serig');
+  var notasFinal = encodeMeta(
+    document.getElementById('fEnvase').value.trim(),
+    parseInt(document.getElementById('fCapImpresion').value) || 0,
+    parseInt(document.getElementById('fTiros').value) || 0,
+    document.getElementById('fNotas').value
+  );
   try {
-    const { data: sol, error: err1 } = await db
-      .from('solicitudes')
-      .insert({
-        codigo, area: 'serig',
-        cliente_nombre: cliente,
-        area_solicitante: document.getElementById('fArea').value,
-        fecha_limite: document.getElementById('fFecha').value,
-        prioridad: document.getElementById('fPrioSelect').value,
-        estado: 'nueva',
-        progreso_pct: 0,
-        notas: document.getElementById('fNotas').value
-      })
-      .select()
-      .single();
-    
-    if (err1) throw err1;
-    
-    if (lineasValidas.length > 0) {
-      const lineasInsert = lineasValidas.map((l, i) => ({
-        solicitud_id: sol.id, orden: i + 1,
+    var r = await db.from('solicitudes').insert({
+      codigo, area: 'serig',
+      cliente_nombre: cliente,
+      area_solicitante: document.getElementById('fArea').value,
+      fecha_limite: document.getElementById('fFecha').value,
+      prioridad: document.getElementById('fPrioSelect').value,
+      estado: 'nueva', progreso_pct: 0,
+      notas: notasFinal
+    }).select().single();
+    if (r.error) throw r.error;
+
+    var lineasInsert = lineasValidas.map(function(l, i) {
+      return {
+        solicitud_id: r.data.id, orden: i + 1,
         sku: l.sku, descripcion: l.desc,
         cantidad: l.cant, existencia_snap: l.existencia || 0,
         procesos: l.procs || [], operadores_ids: []
-      }));
-      await db.from('solicitud_lineas').insert(lineasInsert);
-    }
-    
+      };
+    });
+    await db.from('solicitud_lineas').insert(lineasInsert);
+
     cerrarForm();
     await cargarSolicitudes();
-    showToast(`✅ ${codigo} guardada`);
+    showToast('✅ ' + codigo + ' guardada');
   } catch(e) {
     console.error('Error guardando:', e);
     alert('Error al guardar: ' + e.message);
   }
 }
 
-// ══ NAVEGACIÓN ══════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// NAVEGACIÓN
+// ════════════════════════════════════════════════════════════
 
-// Configuración de vistas WIP (sin template literals anidados)
 var WIP_CONFIG = {
-  serig: {
-    icon: '🎨',
-    title: 'Solicitudes · Serigrafía',
-    sub: 'El módulo de solicitudes está siendo construido. Próximamente podrás crear órdenes, asignar operadores y hacer seguimiento por lote desde aquí.',
+  movimientos: {
+    icon: '⬇⬆',
+    title: 'Movimientos · Serigrafía',
+    sub: 'Registro unificado de Salidas de Bodega, Ingresos de Producto Terminado y Rechazos. En construcción.',
     chips: [
-      { text: '📋 Nueva solicitud', tag: 'Próximamente' },
-      { text: '👥 Asignar operadores', tag: 'Próximamente' },
-      { text: '📊 Trazabilidad por lote', tag: 'Próximamente' },
-      { text: '⚡ Serigrafía · Horno · Tampografía', tag: 'Próximamente' }
-    ]
-  },
-  salidas: {
-    icon: '📤',
-    title: 'Salidas de Bodega',
-    sub: 'Registro de salida de materiales y materia prima hacia el área de serigrafía. Se vinculará con cada solicitud de producción.',
-    chips: [
-      { text: '📦 Salida por SKU', tag: 'Próximamente' },
-      { text: '🔗 Vincular a solicitud', tag: 'Próximamente' },
-      { text: '📄 Número de documento', tag: 'Próximamente' }
-    ]
-  },
-  ingresos: {
-    icon: '📦',
-    title: 'Ingresos · Producto Terminado',
-    sub: 'Registro de entrada de producto terminado a bodega desde el área de serigrafía.',
-    chips: [
-      { text: '✅ Ingreso PT por SKU', tag: 'Próximamente' },
-      { text: '🔗 Vincular a solicitud', tag: 'Próximamente' },
-      { text: '📄 Número de documento', tag: 'Próximamente' }
+      { text: '📤 Salidas de Bodega', tag: 'Próximamente' },
+      { text: '📦 Ingresos PT', tag: 'Próximamente' },
+      { text: '⛔ Rechazos', tag: 'Próximamente' }
     ]
   }
 };
@@ -1260,107 +1523,73 @@ function showWipView(key) {
 }
 
 function switchTab(tab) {
-  // Ocultar todas las vistas y quitar active de todos los tabs
   document.querySelectorAll('.view').forEach(function(v) { v.style.display = 'none'; });
   document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
 
-  // Activar tab correspondiente
   var tabEl = document.getElementById('tab-' + tab);
   if (tabEl) tabEl.classList.add('active');
 
-  // Mostrar vista
-  var WIP_TABS = ['serig', 'salidas', 'ingresos'];
-  if (WIP_TABS.indexOf(tab) !== -1) {
-    showWipView(tab);
-  } else if (tab === 'personal') {
-    var vPersonal = document.getElementById('view-personal');
-    if (vPersonal) vPersonal.style.display = 'flex';
-    renderPersonal();
-  }
-}
+  var WIP_TABS = ['movimientos'];
 
-function renderDash() {
-  const g = document.getElementById('dashGrid');
-  if (!g) return;
-  const activas = solicitudes.filter(s => s.estado === 'proceso').length;
-  const pendientes = solicitudes.filter(s => ['nueva', 'programada'].includes(s.estado)).length;
-  g.innerHTML = `
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px">
-      <div style="font-family:var(--display);font-size:18px;font-weight:700;margin-bottom:12px">Resumen Serigrafía</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-        <div><div style="font-size:9px;color:var(--gray)">Activas</div><div style="font-size:24px;font-weight:700;color:var(--serig-m)">${activas}</div></div>
-        <div><div style="font-size:9px;color:var(--gray)">Pendientes</div><div style="font-size:24px;font-weight:700;color:var(--amber)">${pendientes}</div></div>
-        <div><div style="font-size:9px;color:var(--gray)">Completadas</div><div style="font-size:24px;font-weight:700;color:var(--green)">${solicitudes.filter(s => s.estado === 'entregada').length}</div></div>
-      </div>
-    </div>
-  `;
+  if (tab === 'inicio') {
+    var v = document.getElementById('view-inicio');
+    if (v) v.style.display = 'flex';
+    renderInicio();
+  } else if (tab === 'serig') {
+    var v = document.getElementById('view-serig');
+    if (v) v.style.display = 'flex';
+    renderPipelineSerig();
+  } else if (tab === 'personal') {
+    var v = document.getElementById('view-personal');
+    if (v) v.style.display = 'flex';
+    renderPersonal();
+  } else if (tab === 'dash') {
+    window.location.href = 'dashboard.html';
+  } else if (WIP_TABS.indexOf(tab) !== -1) {
+    showWipView(tab);
+  }
 }
 
 function renderPersonal() {
-  const g = document.getElementById('personalGrid');
-  if (!g || !personalData) return;
-  g.innerHTML = `
-    <div class="pg">
-      ${personalData.serig.map(p => `
-        <div class="op-card">
-          <div class="op-top">
-            <div class="op-avatar" style="background:${p.color_hex || '#5A2D9E'}">${p.iniciales || '?'}</div>
-            <div><div class="op-name">${p.nombre}</div><div class="op-proc">${p.proceso_hab || 'General'}</div></div>
-          </div>
-          <div class="pill ${p.activo ? 'p-lista' : 'p-urg'}">${p.activo ? 'Activo' : 'Inactivo'}</div>
-        </div>
-      `).join('')}
-    </div>
-  `;
+  var g = document.getElementById('personalGrid');
+  if (!g) return;
+  if (!personalData || !personalData.serig || personalData.serig.length === 0) {
+    g.innerHTML = '<div style="padding:32px;text-align:center;color:var(--gray-l)">No hay operadores registrados para esta área</div>';
+    return;
+  }
+  var cards = personalData.serig.map(function(p) {
+    var iniciales = p.iniciales || (p.nombre ? p.nombre.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase() : '?');
+    return '<div class="op-card">' +
+      '<div class="op-top">' +
+        '<div class="op-avatar" style="background:' + (p.color_hex || '#5A2D9E') + '">' + iniciales + '</div>' +
+        '<div><div class="op-name">' + p.nombre + '</div><div class="op-proc">' + (p.proceso_hab || 'General') + '</div></div>' +
+      '</div>' +
+      '<div style="margin-top:8px"><span class="pill ' + (p.activo ? 'pill-lista' : 'pill-entregada') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span></div>' +
+      '</div>';
+  }).join('');
+  g.innerHTML = '<div class="pg">' + cards + '</div>';
 }
+
+// ════════════════════════════════════════════════════════════
+// UTILIDADES
+// ════════════════════════════════════════════════════════════
 
 function tick() {
-  const el = document.getElementById('clk');
-  if (el) {
-    el.textContent = new Date().toLocaleString('es-GT', { hour: '2-digit', minute: '2-digit' });
-  }
+  var el = document.getElementById('clk');
+  if (el) el.textContent = new Date().toLocaleString('es-GT', {hour:'2-digit', minute:'2-digit'});
 }
 
-function showToast(msg, color = '#5A2D9E') {
-  const existing = document.querySelector('.toast-msg');
+function showToast(msg, color) {
+  color = color || '#5A2D9E';
+  var existing = document.querySelector('.toast-msg');
   if (existing) existing.remove();
-  const t = document.createElement('div');
+  var t = document.createElement('div');
   t.className = 'toast-msg';
   t.textContent = msg;
-  t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${color};color:#fff;padding:11px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);white-space:nowrap`;
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:' + color + ';color:#fff;padding:11px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);white-space:nowrap';
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3500);
+  setTimeout(function() { t.remove(); }, 3500);
 }
-
-// ══ INICIO ══════════════════════════════════════════════════
-async function init() {
-  console.log('🚀 Iniciando Serigrafía');
-  
-  const clientesSelect = document.getElementById('fCli');
-  if (clientesSelect) {
-    CLIENTES.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c;
-      opt.textContent = c;
-      clientesSelect.appendChild(opt);
-    });
-  }
-  
-  await cargarInventario();
-  await cargarPersonal();
-  await cargarSolicitudes();
-  
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
-  const fechaInput = document.getElementById('fFecha');
-  if (fechaInput) fechaInput.value = d.toISOString().split('T')[0];
-  
-  tick();
-  setInterval(tick, 30000);
-  setInterval(refreshKPIs, 30000);
-}
-
-init();
 
 function toggleLogoNav(e) {
   e.stopPropagation();
@@ -1373,6 +1602,39 @@ document.addEventListener('click', function() {
   if (n) n.classList.remove('open');
   if (c) c.classList.remove('open');
 });
+
+// ════════════════════════════════════════════════════════════
+// INICIO
+// ════════════════════════════════════════════════════════════
+
+async function init() {
+  // Poblar select de clientes
+  var clientesSelect = document.getElementById('fCli');
+  if (clientesSelect) {
+    CLIENTES.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      clientesSelect.appendChild(opt);
+    });
+  }
+
+  // Fecha por defecto en formulario
+  var d = new Date(); d.setDate(d.getDate() + 3);
+  var fi = document.getElementById('fFecha');
+  if (fi) fi.value = d.toISOString().split('T')[0];
+
+  // Carga paralela de datos
+  await Promise.all([cargarInventario(), cargarPersonal()]);
+  await cargarSolicitudes(); // llama renderInicio() internamente
+
+  switchTab('inicio');
+
+  tick();
+  setInterval(tick, 30000);
+  setInterval(refreshKPIs, 30000);
+}
+
+init();
 </script>
 
 </body>
