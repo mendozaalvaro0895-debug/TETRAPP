@@ -715,17 +715,17 @@ var ROLES_SERIG = ['Supervisor','Flameador','Impresión','Receptor','Calidad','E
 
 // Personal base — se upserta con "Sincronizar lista"
 var PERSONAL_SERIG_SEED = [
-  { codigo:'S0',  nombre:'Luis Cordova',       area:'serig', activo:true,  color_hex:'#5A2D9E', proceso_hab:'Supervisor' },
-  { codigo:'S1',  nombre:'Gabriela Gonzales',  area:'serig', activo:true,  color_hex:'#0E7490', proceso_hab:null },
-  { codigo:'S2',  nombre:'Suri Cabrera',        area:'serig', activo:true,  color_hex:'#065F46', proceso_hab:null },
-  { codigo:'S3',  nombre:'Jackeline Hernandez', area:'serig', activo:true,  color_hex:'#9D174D', proceso_hab:null },
-  { codigo:'S4',  nombre:'Nicolle Garcia',      area:'serig', activo:true,  color_hex:'#B45309', proceso_hab:null },
-  { codigo:'S5',  nombre:'Andy Lopez',          area:'serig', activo:true,  color_hex:'#1E40AF', proceso_hab:null },
-  { codigo:'S6',  nombre:'Esvin Xicay',         area:'serig', activo:true,  color_hex:'#6D28D9', proceso_hab:null },
-  { codigo:'S7',  nombre:'Angel',               area:'serig', activo:true,  color_hex:'#B07D2A', proceso_hab:null },
-  { codigo:'S8',  nombre:'Carlos',              area:'serig', activo:true,  color_hex:'#047857', proceso_hab:null },
-  { codigo:'S9',  nombre:'Angelica',            area:'serig', activo:true,  color_hex:'#BE185D', proceso_hab:null },
-  { codigo:'S10', nombre:'Heidy',               area:'serig', activo:false, color_hex:'#78716C', proceso_hab:'Apoyo' }
+  { codigo:'S0',  nombre:'Luis Cordova',       iniciales:'LC', area:'serig', activo:true,  color_hex:'#5A2D9E', proceso_hab:'Supervisor' },
+  { codigo:'S1',  nombre:'Gabriela Gonzales',  iniciales:'GG', area:'serig', activo:true,  color_hex:'#0E7490', proceso_hab:'' },
+  { codigo:'S2',  nombre:'Suri Cabrera',        iniciales:'SC', area:'serig', activo:true,  color_hex:'#065F46', proceso_hab:'' },
+  { codigo:'S3',  nombre:'Jackeline Hernandez', iniciales:'JH', area:'serig', activo:true,  color_hex:'#9D174D', proceso_hab:'' },
+  { codigo:'S4',  nombre:'Nicolle Garcia',      iniciales:'NG', area:'serig', activo:true,  color_hex:'#B45309', proceso_hab:'' },
+  { codigo:'S5',  nombre:'Andy Lopez',          iniciales:'AL', area:'serig', activo:true,  color_hex:'#1E40AF', proceso_hab:'' },
+  { codigo:'S6',  nombre:'Esvin Xicay',         iniciales:'EX', area:'serig', activo:true,  color_hex:'#6D28D9', proceso_hab:'' },
+  { codigo:'S7',  nombre:'Angel',               iniciales:'AN', area:'serig', activo:true,  color_hex:'#B07D2A', proceso_hab:'' },
+  { codigo:'S8',  nombre:'Carlos',              iniciales:'CA', area:'serig', activo:true,  color_hex:'#047857', proceso_hab:'' },
+  { codigo:'S9',  nombre:'Angelica',            iniciales:'AG', area:'serig', activo:true,  color_hex:'#BE185D', proceso_hab:'' },
+  { codigo:'S10', nombre:'Heidy',               iniciales:'HE', area:'serig', activo:false, color_hex:'#78716C', proceso_hab:'Apoyo' }
 ];
 
 // Clientes predefinidos
@@ -1754,8 +1754,8 @@ async function sincronizarPersonalSerig() {
     // 3. Upsert lista oficial (proceso_hab vacío en vez de null para evitar NOT NULL)
     var seed = PERSONAL_SERIG_SEED.map(function(p) {
       return {
-        codigo: p.codigo, nombre: p.nombre, area: p.area,
-        activo: p.activo, color_hex: p.color_hex,
+        codigo: p.codigo, nombre: p.nombre, iniciales: p.iniciales,
+        area: p.area, activo: p.activo, color_hex: p.color_hex,
         proceso_hab: p.proceso_hab || ''
       };
     });
