@@ -530,26 +530,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
         <div class="c-note" id="cNote"></div>
       </div>
-      <div class="fr" style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
-        <div class="fg">
-          <div class="fl">Capacidad de impresión (und/h)</div>
-          <input class="fi" id="fCapImpresion" type="number" placeholder="1200" min="1">
-        </div>
-        <div class="fg">
-          <div class="fl">Tiros de impresión</div>
-          <input class="fi" id="fTiros" type="number" placeholder="1" min="1" max="10">
-        </div>
-      </div>
-      <div class="fg full" style="margin-bottom:12px">
-        <div class="fl">Asignar línea de producción <span style="font-weight:400;color:var(--gray-l)">(opcional)</span></div>
-        <div class="linea-assign-btns">
-          <div class="lab sel-lab" data-linea="0" onclick="selectLineaAsig(0)">Sin asignar</div>
-          <div class="lab" data-linea="1" onclick="selectLineaAsig(1)">Línea 1</div>
-          <div class="lab" data-linea="2" onclick="selectLineaAsig(2)">Línea 2</div>
-          <div class="lab" data-linea="3" onclick="selectLineaAsig(3)">Línea 3</div>
-          <div class="lab" data-linea="4" onclick="selectLineaAsig(4)">Línea 4</div>
-        </div>
-      </div>
       <div class="fg full">
         <div class="fl">Notas</div>
         <textarea class="fta" id="fNotas" placeholder="Instrucciones especiales, colores pantone, arte…"></textarea>
@@ -1496,12 +1476,6 @@ function abrirForm() {
   addLinea();
   document.getElementById('fCli').value = '';
   document.getElementById('fNotas').value = '';
-  document.getElementById('fCapImpresion').value = '';
-  document.getElementById('fTiros').value = '';
-  lineaAsignadaForm = 0;
-  document.querySelectorAll('.lab').forEach(function(b) { b.classList.remove('sel-lab'); });
-  var firstLab = document.querySelector('.lab[data-linea="0"]');
-  if (firstLab) firstLab.classList.add('sel-lab');
   var d = new Date(); d.setDate(d.getDate() + 3);
   document.getElementById('fFecha').value = d.toISOString().split('T')[0];
   document.getElementById('overlay').classList.add('open');
@@ -1513,10 +1487,33 @@ function addLinea() {
   if (lineas.length >= 5) return;
   lineas.push({ sku: '', desc: '', cant: 0,
     procs: ['flameado', 'impresion', 'secado', 'empaque'],
-    existencia: undefined });
+    existencia: undefined, cap_impresion: 0, tiros: 1, linea_id: 0 });
   renderLineas();
 }
 function removeLinea(idx) { lineas.splice(idx, 1); renderLineas(); calcular(); }
+
+function buildLineaBtnsHtml(idx, lineaIdActual) {
+  var cur = lineaIdActual || 0;
+  var btns = '<button type="button" onclick="selectLineaLinea(' + idx + ',0)" style="' +
+    'padding:2px 8px;border:1.5px solid ' + (cur === 0 ? 'var(--serig-m)' : 'var(--border)') + ';' +
+    'border-radius:5px;font-size:9px;font-weight:700;cursor:pointer;background:' +
+    (cur === 0 ? 'var(--serig-l)' : 'var(--bg)') + ';color:' +
+    (cur === 0 ? 'var(--serig-m)' : 'var(--gray)') + '">—</button>';
+  LINEAS_PRODUCCION.forEach(function(ln) {
+    var sel = cur === ln.id;
+    btns += '<button type="button" onclick="selectLineaLinea(' + idx + ',' + ln.id + ')" style="' +
+      'padding:2px 8px;border:1.5px solid ' + (sel ? 'var(--serig-m)' : 'var(--border)') + ';' +
+      'border-radius:5px;font-size:9px;font-weight:700;cursor:pointer;background:' +
+      (sel ? 'var(--serig-m)' : (ln.activa ? 'var(--bg)' : 'var(--bg2)')) + ';color:' +
+      (sel ? '#fff' : (ln.activa ? 'var(--ink)' : 'var(--gray-l)')) + '">L' + ln.id + '</button>';
+  });
+  return btns;
+}
+
+function selectLineaLinea(idx, lineaId) {
+  lineas[idx].linea_id = lineaId;
+  renderLineas();
+}
 
 function renderLineas() {
   var cont = document.getElementById('lineasPedido');
@@ -1529,6 +1526,24 @@ function renderLineas() {
     var descRow = l.desc
       ? '<div style="font-size:11px;color:var(--gray);padding:3px 0 2px;font-weight:500">📦 ' + l.desc + '</div>'
       : '';
+    var lineaRow = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;padding-top:5px;border-top:1px dashed var(--border)">' +
+      '<div style="display:flex;align-items:center;gap:4px">' +
+        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Cap u/h</span>' +
+        '<input type="number" class="fi" placeholder="1200" value="' + (l.cap_impresion || '') + '" min="1"' +
+        ' style="width:70px;font-size:11px;padding:3px 6px"' +
+        ' onchange="lineas[' + i + '].cap_impresion=parseInt(this.value)||0;calcular()">' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:4px">' +
+        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Tiros</span>' +
+        '<input type="number" class="fi" placeholder="1" value="' + (l.tiros || '') + '" min="1" max="10"' +
+        ' style="width:50px;font-size:11px;padding:3px 6px"' +
+        ' onchange="lineas[' + i + '].tiros=parseInt(this.value)||1;calcular()">' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">' +
+        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Línea</span>' +
+        buildLineaBtnsHtml(i, l.linea_id || 0) +
+      '</div>' +
+      '</div>';
     return '<div style="border-bottom:1px solid var(--border);padding:8px 10px">' +
       '<div style="display:grid;grid-template-columns:1fr 88px 64px 28px;gap:6px;margin-bottom:2px">' +
         '<div class="sku-wrap-s">' +
@@ -1542,6 +1557,7 @@ function renderLineas() {
         '<button onclick="removeLinea(' + i + ')" style="background:var(--red-l);border:none;border-radius:5px;cursor:pointer;font-size:13px">✕</button>' +
       '</div>' +
       descRow +
+      lineaRow +
       '</div>';
   }).join('');
   cont.innerHTML = html;
@@ -1609,15 +1625,6 @@ async function buscarExistencia(idx, sku) {
   calcular();
 }
 
-var lineaAsignadaForm = 0;
-
-function selectLineaAsig(lineaId) {
-  lineaAsignadaForm = lineaId;
-  document.querySelectorAll('.lab').forEach(function(b) {
-    b.classList.toggle('sel-lab', parseInt(b.getAttribute('data-linea')) === lineaId);
-  });
-}
-
 function updateTotals() {
   var total = lineas.reduce(function(s, l) { return s + (l.cant || 0); }, 0);
   var el = document.getElementById('totalUnid');
@@ -1625,16 +1632,20 @@ function updateTotals() {
 }
 
 function calcular() {
-  var total    = lineas.reduce(function(s, l) { return s + (l.cant || 0); }, 0);
-  var allProcs = [];
-  lineas.forEach(function(l) { (l.procs||[]).forEach(function(p){ if(allProcs.indexOf(p)<0) allProcs.push(p); }); });
-  var meta   = metaParaProcesos(allProcs);
-  var horas  = total / (meta * 1);
+  var total = lineas.reduce(function(s, l) { return s + (l.cant || 0); }, 0);
+  var horas = lineas.reduce(function(s, l) {
+    if (!l.cant) return s;
+    var cap   = l.cap_impresion || 1200;
+    var tiros = l.tiros || 1;
+    return s + (l.cant * tiros) / cap;
+  }, 0);
+  var caps = lineas.filter(function(l) { return l.cap_impresion > 0; }).map(function(l) { return l.cap_impresion; });
+  var capDisplay = caps.length > 0 ? Math.min.apply(null, caps) : 1200;
   var turnos = Math.ceil(horas / 12);
   var el;
   el = document.getElementById('cHoras');  if(el) el.textContent = horas.toFixed(1) + 'h';
   el = document.getElementById('cTurnos'); if(el) el.textContent = turnos + (turnos > 1 ? ' turnos' : ' turno');
-  el = document.getElementById('cCap');    if(el) el.textContent = meta.toLocaleString();
+  el = document.getElementById('cCap');    if(el) el.textContent = capDisplay.toLocaleString();
   el = document.getElementById('cFecha');  if(el) el.textContent = fechaEst(turnos);
 }
 
@@ -1645,12 +1656,7 @@ async function guardar() {
   if (lineasValidas.length === 0) { alert('Agrega al menos una línea con cantidad'); return; }
 
   var codigo = await generarCodigo('serig');
-  var notasFinal = encodeMeta(
-    parseInt(document.getElementById('fCapImpresion').value) || 0,
-    parseInt(document.getElementById('fTiros').value) || 0,
-    lineaAsignadaForm,
-    document.getElementById('fNotas').value
-  );
+  var notasFinal = encodeMeta(0, 0, 0, document.getElementById('fNotas').value);
   try {
     var r = await db.from('solicitudes').insert({
       codigo, area: 'serig',
@@ -1668,7 +1674,10 @@ async function guardar() {
         solicitud_id: r.data.id, orden: i + 1,
         sku: l.sku, descripcion: l.desc,
         cantidad: l.cant, existencia_snap: l.existencia || 0,
-        procesos: l.procs || [], operadores_ids: []
+        procesos: l.procs || [], operadores_ids: [],
+        cap_impresion: l.cap_impresion || null,
+        tiros: l.tiros || 1,
+        linea_id: l.linea_id || null
       };
     });
     await db.from('solicitud_lineas').insert(lineasInsert);
