@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TETRAPLASTIC — Inventario</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0C0C0B;--inv:#0E7490;--inv-l:#CFFAFE;--inv-xl:#ECFEFF;
+  --bg:#F7F6F2;--card:#FFFFFF;--border:#E0DED8;
+  --gray:#6B6B6A;--gray-l:#A8A6A0;--red:#B83232;--red-l:#FEE2E2;
+  --green:#065F46;--green-l:#ECFDF5;
+  --font:'DM Sans',sans-serif;--display:'Playfair Display',serif;--mono:'DM Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:var(--ink);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;color:#fff;position:sticky;top:0;z-index:100}
+.logo{font-family:var(--display);font-size:18px;font-weight:900;color:#fff}
+.logo span{color:#7ECEC0}
+.logo-wrap{position:relative;cursor:pointer;user-select:none;display:flex;align-items:center}
+.logo-chevron{font-size:10px;color:rgba(255,255,255,.4);margin-left:6px;transition:transform .2s}
+.logo-chevron.open{transform:rotate(180deg);color:#7ECEC0}
+.logo-nav{display:none;position:absolute;top:calc(100% + 8px);left:0;background:#1A1A19;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:6px;min-width:214px;box-shadow:0 8px 28px rgba(0,0,0,.5);z-index:9999}
+.logo-nav.open{display:block}
+.logo-nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,.8);text-decoration:none;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;transition:background .12s}
+.logo-nav a:hover{background:rgba(255,255,255,.09);color:#fff}
+.logo-nav a.nav-active{background:var(--inv);color:#fff}
+.logo-nav a.nav-locked{color:rgba(255,255,255,.3);cursor:not-allowed;pointer-events:none}
+.logo-nav a.nav-locked::after{content:'🔒';font-size:10px;margin-left:auto}
+.logo-nav-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
+.user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:5px 12px;border-radius:20px;font-size:12px}
+.user-av{width:24px;height:24px;border-radius:50%;background:var(--inv);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+
+/* LAYOUT */
+.page{max-width:1100px;margin:0 auto;padding:24px}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.page-title{font-family:var(--display);font-size:26px;font-weight:700}
+.page-sub{font-size:13px;color:var(--gray);margin-top:2px}
+
+/* TOOLBAR */
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.search-wrap{position:relative;flex:1;min-width:240px}
+.search-wrap input{width:100%;padding:8px 12px 8px 34px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--card);outline:none;transition:border-color .15s}
+.search-wrap input:focus{border-color:var(--inv)}
+.search-wrap::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none}
+.btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;border:none;transition:all .15s}
+.btn-inv{background:var(--inv);color:#fff}
+.btn-inv:hover{background:#0C6478}
+.btn-ghost{background:var(--card);color:var(--ink);border:1.5px solid var(--border)}
+.btn-ghost:hover{border-color:var(--inv);color:var(--inv)}
+.btn-sm{padding:4px 10px;font-size:11px;border-radius:6px}
+
+/* STATS STRIP */
+.stats-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.stat-chip{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--gray)}
+.stat-chip strong{display:block;font-family:var(--mono);font-size:20px;color:var(--ink);font-weight:700;line-height:1.2}
+
+/* TABLE */
+.tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg);text-align:left;white-space:nowrap}
+.tbl td{padding:10px 14px;font-size:12px;border-bottom:1px solid var(--bg);vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover td{background:var(--inv-xl)}
+.sku-cell{font-family:var(--mono);font-weight:700;color:var(--inv);font-size:11px}
+.desc-cell{color:var(--ink);max-width:360px}
+.exist-cell{font-family:var(--mono);font-weight:600;text-align:right}
+.exist-input{font-family:var(--mono);font-size:12px;font-weight:600;width:80px;padding:4px 8px;border:1.5px solid var(--inv);border-radius:6px;text-align:right;outline:none;background:var(--inv-xl)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-active{background:var(--green-l);color:var(--green)}
+.badge-inactive{background:var(--red-l);color:var(--red)}
+.act-btns{display:flex;gap:6px;align-items:center}
+.empty-row td{text-align:center;padding:40px;color:var(--gray);font-size:13px}
+
+/* PAGINATION */
+.pagination{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--gray)}
+.pag-btns{display:flex;gap:6px}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--card);border-radius:16px;width:440px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2);display:flex;flex-direction:column;max-height:90vh}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid var(--border)}
+.mh-title{font-family:var(--display);font-size:18px;font-weight:700}
+.m-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray)}
+.mb{padding:20px;overflow-y:auto;flex:1}
+.mf{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--border)}
+.fg{margin-bottom:14px}
+.fl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray);margin-bottom:5px}
+.fi{width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font);outline:none;transition:border-color .15s}
+.fi:focus{border-color:var(--inv)}
+.fi-hint{font-size:11px;color:var(--gray-l);margin-top:4px}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{background:var(--green)}
+.toast.err{background:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo-wrap" onclick="toggleLogoNav(event)">
+    <div class="logo">TETRA<span>PLASTIC</span><span class="logo-chevron" id="logoChev">▾</span></div>
+    <div class="logo-nav" id="logoNav">
+      <a href="index.html">🏠 Inicio</a>
+      <div class="logo-nav-sep"></div>
+      <a href="tapas.html">🏷 Tapas</a>
+      <a href="serigrafia.html">🎨 Serigrafía</a>
+      <a href="dashboard.html">📊 Dashboard</a>
+      <div class="logo-nav-sep"></div>
+      <a href="inventario.html" class="nav-active">📦 Inventario</a>
+      <div class="logo-nav-sep"></div>
+      <a href="produccion.html">🏭 Producción</a>
+      <a class="nav-locked">💼 Ventas</a>
+      <a class="nav-locked">📦 Bodega</a>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <button class="btn btn-inv" onclick="abrirNuevo()">+ Nuevo producto</button>
+    <div class="user-pill"><div class="user-av">AM</div>Alvaro Mendoza</div>
+  </div>
+</div>
+
+<!-- PAGE -->
+<div class="page">
+
+  <div class="page-header">
+    <div>
+      <div class="page-title">📦 Inventario · Catálogo General</div>
+      <div class="page-sub">Administra SKUs, descripciones y existencias de todos los productos activos</div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-strip" id="statsStrip">
+    <div class="stat-chip"><strong id="statTotal">—</strong>Total SKUs</div>
+    <div class="stat-chip"><strong id="statActivos">—</strong>Activos</div>
+    <div class="stat-chip"><strong id="statCeroStock">—</strong>Stock en cero</div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <input id="searchInput" type="text" placeholder="Buscar por SKU o descripción…" oninput="filtrarTabla(this.value)">
+    </div>
+    <button class="btn btn-ghost" onclick="toggleMostrarInactivos()" id="btnInactivos">Mostrar inactivos</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Descripción</th>
+          <th style="text-align:right">Existencia</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tblBody">
+        <tr class="empty-row"><td colspan="5">Cargando inventario…</td></tr>
+      </tbody>
+    </table>
+    <div class="pagination" id="pagination" style="display:none">
+      <span id="pagInfo"></span>
+      <div class="pag-btns">
+        <button class="btn btn-ghost btn-sm" id="btnPrev" onclick="cambiarPag(-1)">← Anterior</button>
+        <button class="btn btn-ghost btn-sm" id="btnNext" onclick="cambiarPag(1)">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL NUEVO PRODUCTO -->
+<div class="overlay" id="modalNuevo" onclick="cerrarSiOverlay(event)">
+  <div class="modal">
+    <div class="mh">
+      <div class="mh-title">Nuevo producto</div>
+      <button class="m-close" onclick="cerrarNuevo()">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fl">SKU <span style="color:var(--red)">*</span></div>
+        <input class="fi" id="nSku" placeholder="Ej. 2146541" autocomplete="off">
+        <div class="fi-hint">Código único del producto. Se guardará en mayúsculas.</div>
+      </div>
+      <div class="fg">
+        <div class="fl">Descripción <span style="color:var(--red)">*</span></div>
+        <input class="fi" id="nDesc" placeholder="Ej. ENVASE LUNA 400ML SERIGRAFIA CREMA…">
+      </div>
+      <div class="fg">
+        <div class="fl">Existencia inicial</div>
+        <input class="fi" id="nExist" type="number" min="0" placeholder="0" value="0">
+        <div class="fi-hint">Unidades disponibles al momento del registro.</div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="cerrarNuevo()">Cancelar</button>
+      <button class="btn btn-inv" onclick="guardarNuevo()">Guardar producto</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+var SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
+var SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
+var db = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+var todosLosItems = [];
+var filtrados    = [];
+var mostrarInactivos = false;
+var pag = 0;
+var POR_PAG = 50;
+
+// ── INIT ────────────────────────────────────────────────────
+window.addEventListener('click', function(e) {
+  var nav = document.getElementById('logoNav');
+  if (nav && nav.classList.contains('open') && !nav.parentElement.contains(e.target)) {
+    nav.classList.remove('open');
+    document.getElementById('logoChev').classList.remove('open');
+  }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+  cargarTodo();
+});
+
+// ── CARGA ───────────────────────────────────────────────────
+async function cargarTodo() {
+  document.getElementById('tblBody').innerHTML = '<tr class="empty-row"><td colspan="5">Cargando…</td></tr>';
+  try {
+    var todos = [];
+    var desde = 0;
+    var BATCH = 1000;
+    while (true) {
+      var r = await db.from('inventario')
+        .select('sku,descripcion,existencia,facturable,activo')
+        .order('sku', { ascending: true })
+        .range(desde, desde + BATCH - 1);
+      if (r.error) throw r.error;
+      todos = todos.concat(r.data || []);
+      if (!r.data || r.data.length < BATCH) break;
+      desde += BATCH;
+    }
+    todosLosItems = todos;
+    actualizarStats();
+    aplicarFiltro();
+  } catch(e) {
+    document.getElementById('tblBody').innerHTML = '<tr class="empty-row"><td colspan="5">Error al cargar: ' + e.message + '</td></tr>';
+  }
+}
+
+function actualizarStats() {
+  var activos = todosLosItems.filter(function(i) { return i.activo; });
+  document.getElementById('statTotal').textContent   = todosLosItems.length;
+  document.getElementById('statActivos').textContent = activos.length;
+  document.getElementById('statCeroStock').textContent = activos.filter(function(i) { return (i.existencia || 0) === 0; }).length;
+}
+
+// ── FILTRO ──────────────────────────────────────────────────
+function filtrarTabla(q) {
+  pag = 0;
+  aplicarFiltro(q || document.getElementById('searchInput').value);
+}
+
+function aplicarFiltro(q) {
+  var query = (q || document.getElementById('searchInput').value || '').toLowerCase().trim();
+  filtrados = todosLosItems.filter(function(i) {
+    if (!mostrarInactivos && !i.activo) return false;
+    if (!query) return true;
+    return (i.sku || '').toLowerCase().includes(query) ||
+           (i.descripcion || '').toLowerCase().includes(query);
+  });
+  renderTabla();
+}
+
+function toggleMostrarInactivos() {
+  mostrarInactivos = !mostrarInactivos;
+  pag = 0;
+  document.getElementById('btnInactivos').textContent = mostrarInactivos ? 'Ocultar inactivos' : 'Mostrar inactivos';
+  aplicarFiltro();
+}
+
+// ── RENDER ──────────────────────────────────────────────────
+function renderTabla() {
+  var tbody = document.getElementById('tblBody');
+  if (filtrados.length === 0) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Sin resultados</td></tr>';
+    document.getElementById('pagination').style.display = 'none';
+    return;
+  }
+
+  var inicio = pag * POR_PAG;
+  var fin    = Math.min(inicio + POR_PAG, filtrados.length);
+  var pagina = filtrados.slice(inicio, fin);
+
+  tbody.innerHTML = pagina.map(function(item) {
+    return buildFila(item);
+  }).join('');
+
+  var paginacion = document.getElementById('pagination');
+  if (filtrados.length > POR_PAG) {
+    paginacion.style.display = 'flex';
+    document.getElementById('pagInfo').textContent = 'Mostrando ' + (inicio + 1) + '–' + fin + ' de ' + filtrados.length;
+    document.getElementById('btnPrev').disabled = pag === 0;
+    document.getElementById('btnNext').disabled = fin >= filtrados.length;
+  } else {
+    paginacion.style.display = 'none';
+  }
+}
+
+function buildFila(item) {
+  var badge = item.activo
+    ? '<span class="badge badge-active">● Activo</span>'
+    : '<span class="badge badge-inactive">● Inactivo</span>';
+  var exist = (item.existencia || 0).toLocaleString();
+  var toggleLabel = item.activo ? 'Desactivar' : 'Activar';
+  var skuEsc = item.sku.replace(/'/g, "\\'");
+  return '<tr>' +
+    '<td class="sku-cell">' + item.sku + '</td>' +
+    '<td class="desc-cell">' + (item.descripcion || '—') + '</td>' +
+    '<td class="exist-cell">' +
+      '<span id="ev-' + item.sku + '" ondblclick="editarExist(\'' + skuEsc + '\')" title="Doble clic para editar">' + exist + '</span>' +
+    '</td>' +
+    '<td>' + badge + '</td>' +
+    '<td><div class="act-btns">' +
+      '<button class="btn btn-ghost btn-sm" onclick="editarExist(\'' + skuEsc + '\')" title="Actualizar existencia">📝</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="toggleActivo(\'' + skuEsc + '\',' + item.activo + ')">' + toggleLabel + '</button>' +
+    '</div></td>' +
+  '</tr>';
+}
+
+// ── EDITAR EXISTENCIA INLINE ────────────────────────────────
+function editarExist(sku) {
+  var span = document.getElementById('ev-' + sku);
+  if (!span) return;
+  var item = todosLosItems.find(function(i) { return i.sku === sku; });
+  if (!item) return;
+  var actual = item.existencia || 0;
+  span.innerHTML = '<input class="exist-input" id="ei-' + sku + '" type="number" value="' + actual + '"' +
+    ' onblur="guardarExist(\'' + sku + '\')" onkeydown="existKeydown(event,\'' + sku + '\')" autofocus>';
+  var inp = document.getElementById('ei-' + sku);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function existKeydown(e, sku) {
+  if (e.key === 'Enter') { e.target.blur(); }
+  if (e.key === 'Escape') { cancelarExist(sku); }
+}
+
+function cancelarExist(sku) {
+  var item = todosLosItems.find(function(i) { return i.sku === sku; });
+  var span = document.getElementById('ev-' + sku);
+  if (span && item) span.innerHTML = (item.existencia || 0).toLocaleString();
+}
+
+async function guardarExist(sku) {
+  var inp = document.getElementById('ei-' + sku);
+  if (!inp) return;
+  var val = parseInt(inp.value) || 0;
+  var span = document.getElementById('ev-' + sku);
+  if (span) span.innerHTML = val.toLocaleString();
+  try {
+    var r = await db.from('inventario').update({ existencia: val }).eq('sku', sku);
+    if (r.error) throw r.error;
+    var item = todosLosItems.find(function(i) { return i.sku === sku; });
+    if (item) item.existencia = val;
+    actualizarStats();
+    toast('Existencia actualizada', 'ok');
+  } catch(e) {
+    toast('Error al guardar: ' + e.message, 'err');
+    cancelarExist(sku);
+  }
+}
+
+// ── TOGGLE ACTIVO ───────────────────────────────────────────
+async function toggleActivo(sku, activo) {
+  var nuevo = !activo;
+  try {
+    var r = await db.from('inventario').update({ activo: nuevo }).eq('sku', sku);
+    if (r.error) throw r.error;
+    var item = todosLosItems.find(function(i) { return i.sku === sku; });
+    if (item) item.activo = nuevo;
+    actualizarStats();
+    aplicarFiltro();
+    toast(nuevo ? 'Producto activado' : 'Producto desactivado', 'ok');
+  } catch(e) {
+    toast('Error: ' + e.message, 'err');
+  }
+}
+
+// ── NUEVO PRODUCTO ──────────────────────────────────────────
+function abrirNuevo() {
+  document.getElementById('nSku').value   = '';
+  document.getElementById('nDesc').value  = '';
+  document.getElementById('nExist').value = '0';
+  document.getElementById('modalNuevo').classList.add('open');
+  setTimeout(function() { document.getElementById('nSku').focus(); }, 50);
+}
+
+function cerrarNuevo() {
+  document.getElementById('modalNuevo').classList.remove('open');
+}
+
+function cerrarSiOverlay(e) {
+  if (e.target === document.getElementById('modalNuevo')) cerrarNuevo();
+}
+
+async function guardarNuevo() {
+  var sku   = (document.getElementById('nSku').value || '').trim().toUpperCase();
+  var desc  = (document.getElementById('nDesc').value || '').trim().toUpperCase();
+  var exist = parseInt(document.getElementById('nExist').value) || 0;
+
+  if (!sku)  { toast('Ingresa un SKU', 'err'); return; }
+  if (!desc) { toast('Ingresa una descripción', 'err'); return; }
+
+  var existe = todosLosItems.find(function(i) { return i.sku === sku; });
+  if (existe) { toast('El SKU ' + sku + ' ya existe en el catálogo', 'err'); return; }
+
+  try {
+    var r = await db.from('inventario').insert({
+      sku: sku, descripcion: desc, existencia: exist,
+      facturable: true, activo: true
+    });
+    if (r.error) throw r.error;
+    cerrarNuevo();
+    toast('Producto ' + sku + ' agregado al catálogo', 'ok');
+    await cargarTodo();
+  } catch(e) {
+    toast('Error al guardar: ' + e.message, 'err');
+  }
+}
+
+// ── PAGINACIÓN ──────────────────────────────────────────────
+function cambiarPag(dir) {
+  pag = Math.max(0, pag + dir);
+  renderTabla();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── UI HELPERS ──────────────────────────────────────────────
+var toastTimer;
+function toast(msg, tipo) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + (tipo || '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { el.className = 'toast'; }, 2800);
+}
+
+function toggleLogoNav(e) {
+  e.stopPropagation();
+  var n = document.getElementById('logoNav'), c = document.getElementById('logoChev');
+  n.classList.toggle('open');
+  c.classList.toggle('open');
+}
+</script>
+</body>
+</html>

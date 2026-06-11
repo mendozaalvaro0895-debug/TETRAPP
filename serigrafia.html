@@ -270,6 +270,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <a href="serigrafia.html" class="nav-active">🎨 Serigrafía</a>
       <a href="dashboard.html">📊 Dashboard</a>
       <div class="logo-nav-sep"></div>
+      <a href="inventario.html">📦 Inventario</a>
+      <div class="logo-nav-sep"></div>
       <a href="produccion.html">🏭 Producción</a>
       <a class="nav-locked">💼 Ventas</a>
       <a class="nav-locked">📦 Bodega</a>
@@ -723,9 +725,18 @@ var CLIENTES = [
 
 async function cargarInventario() {
   try {
-    var r = await db.from('inventario').select('sku,descripcion,existencia').eq('activo', true);
-    if (r.error) throw r.error;
-    inventarioCache = r.data || [];
+    var todos = [];
+    var desde = 0;
+    var BATCH = 1000;
+    while (true) {
+      var r = await db.from('inventario').select('sku,descripcion,existencia')
+        .eq('activo', true).range(desde, desde + BATCH - 1);
+      if (r.error) throw r.error;
+      todos = todos.concat(r.data || []);
+      if (!r.data || r.data.length < BATCH) break;
+      desde += BATCH;
+    }
+    inventarioCache = todos;
     return inventarioCache;
   } catch(e) {
     console.error('Error inventario:', e);

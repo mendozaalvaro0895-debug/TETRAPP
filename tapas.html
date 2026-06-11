@@ -262,6 +262,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <a href="serigrafia.html">🎨 Serigrafía</a>
       <a href="dashboard.html">📊 Dashboard</a>
       <div class="logo-nav-sep"></div>
+      <a href="inventario.html">📦 Inventario</a>
+      <div class="logo-nav-sep"></div>
       <a href="produccion.html">🏭 Producción</a>
       <a class="nav-locked">💼 Ventas</a>
       <a class="nav-locked">📦 Bodega</a>
@@ -902,13 +904,19 @@ const CLIENTES = [
 // ══ FUNCIONES DE CARGA ══════════════════════════════════════
 async function cargarInventario() {
   try {
-    const { data, error } = await db
-      .from('inventario')
-      .select('sku, descripcion, existencia')
-      .eq('activo', true);
-    
-    if (error) throw error;
-    inventarioCache = data || [];
+    var todos = [];
+    var desde = 0;
+    var BATCH = 1000;
+    while (true) {
+      const { data, error } = await db.from('inventario')
+        .select('sku, descripcion, existencia')
+        .eq('activo', true).range(desde, desde + BATCH - 1);
+      if (error) throw error;
+      todos = todos.concat(data || []);
+      if (!data || data.length < BATCH) break;
+      desde += BATCH;
+    }
+    inventarioCache = todos;
     return inventarioCache;
   } catch(e) {
     console.error('Error cargando inventario:', e);
