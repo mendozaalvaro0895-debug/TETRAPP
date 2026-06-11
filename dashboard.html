@@ -23,6 +23,8 @@ body { font-family: 'DM Sans', sans-serif; background: #F7F6F2; color: #0C0C0B; 
 .logo-nav a:hover{background:rgba(255,255,255,.09);color:#fff}
 .logo-nav a.nav-active{background:#1A6B5B;color:#fff}
 .logo-nav-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
+.inv-dot{display:inline-flex;align-items:center;background:#F59E0B;color:#fff;border-radius:10px;font-size:8px;font-weight:800;padding:1px 5px;margin-left:6px;letter-spacing:.3px;animation:invp 1.8s ease-in-out infinite}
+@keyframes invp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.95)}}
 .nav-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .nav-btn { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #fff; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; text-decoration: none; }
 .nav-btn:hover { background: rgba(255,255,255,.22); }
@@ -143,7 +145,7 @@ body { font-family: 'DM Sans', sans-serif; background: #F7F6F2; color: #0C0C0B; 
       <a href="serigrafia.html">🎨 Serigrafía</a>
       <a href="dashboard.html" class="nav-active">📊 Dashboard</a>
       <div class="logo-nav-sep"></div>
-      <a href="inventario.html">📦 Inventario</a>
+      <a href="inventario.html">📦 Inventario <span class="inv-dot" id="invNavBadge" style="display:none"></span></a>
       <div class="logo-nav-sep"></div>
       <a href="produccion.html">🏭 Producción</a>
       <a class="nav-locked">💼 Ventas</a>
@@ -599,6 +601,17 @@ function toggleHistorial() { historialOpen = !historialOpen; const body = docume
 function cargarMasHistorial() { historialLimit = comandas.length; renderHistorial(); }
 
 document.addEventListener('DOMContentLoaded', () => { sincPicker(); cargarComandas(); });
+
+// ── BADGE INVENTARIO ────────────────────────────────────────
+(function() {
+  var hoy = new Date().toISOString().split('T')[0];
+  var d = JSON.parse(localStorage.getItem('tetra_inv_' + hoy) || '{"count":0}');
+  var c = d.count || 0;
+  if (c < 2) {
+    var b = document.getElementById('invNavBadge');
+    if (b) { b.textContent = c === 0 ? 'AM · PM' : 'PM'; b.style.display = 'inline-flex'; }
+  }
+})();
 
 function toggleLogoNav(e) {
   e.stopPropagation();

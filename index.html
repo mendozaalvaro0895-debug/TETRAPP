@@ -42,6 +42,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .logo-nav a:hover{background:rgba(255,255,255,.09);color:#fff}
 .logo-nav a.nav-active{background:#1A6B5B;color:#fff}
 .logo-nav-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
+.inv-dot{display:inline-flex;align-items:center;background:#F59E0B;color:#fff;border-radius:10px;font-size:8px;font-weight:800;padding:1px 5px;margin-left:6px;letter-spacing:.3px;animation:invp 1.8s ease-in-out infinite}
+@keyframes invp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.95)}}
+.inv-chip{display:none;align-items:center;gap:8px;background:#FFFBEB;border:1.5px solid #F59E0B;border-radius:40px;padding:6px 14px;font-size:12px;font-weight:600;color:#92400E;cursor:pointer;text-decoration:none;animation:invp 1.8s ease-in-out infinite}
 .user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:5px 12px;border-radius:20px;font-size:12px}
 .user-av{width:24px;height:24px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
 
@@ -99,7 +102,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <a href="serigrafia.html">🎨 Serigrafía</a>
       <a href="dashboard.html">📊 Dashboard</a>
       <div class="logo-nav-sep"></div>
-      <a href="inventario.html">📦 Inventario</a>
+      <a href="inventario.html">📦 Inventario <span class="inv-dot" id="invNavBadge" style="display:none"></span></a>
       <div class="logo-nav-sep"></div>
       <a href="produccion.html">🏭 Producción</a>
       <a class="nav-locked">💼 Ventas</a>
@@ -119,6 +122,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 </div>
 
 <div class="kpi-extra" id="kpiExtra">
+  <a href="inventario.html" class="inv-chip" id="invChip">📦 <span id="invChipTxt">Actualizar inventario · AM y PM pendientes</span></a>
   <div class="kpi-badge">📊 <span id="totalActivas">—</span> solicitudes activas</div>
   <div class="kpi-badge">⏱ <span id="horasTotales">—</span> horas de producción</div>
   <div class="kpi-badge warning" id="urgentesBadge">🔴 0 urgentes</div>
@@ -261,6 +265,23 @@ async function cargarKPIs() {
 
 cargarKPIs();
 setInterval(cargarKPIs, 30000);
+
+// ── BADGE INVENTARIO ────────────────────────────────────────
+(function() {
+  var hoy = new Date().toISOString().split('T')[0];
+  var d = JSON.parse(localStorage.getItem('tetra_inv_' + hoy) || '{"count":0}');
+  var cnt = d.count || 0;
+  if (cnt < 2) {
+    var b = document.getElementById('invNavBadge');
+    if (b) { b.textContent = cnt === 0 ? 'AM · PM' : 'PM'; b.style.display = 'inline-flex'; }
+    var chip = document.getElementById('invChip');
+    if (chip) {
+      chip.style.display = 'inline-flex';
+      var txt = document.getElementById('invChipTxt');
+      if (txt) txt.textContent = cnt === 0 ? 'Actualizar inventario · AM y PM pendientes' : 'Actualizar inventario · PM pendiente';
+    }
+  }
+})();
 
 function toggleLogoNav(e) {
   e.stopPropagation();

@@ -33,6 +33,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .logo-nav a.nav-locked{color:rgba(255,255,255,.3);cursor:not-allowed;pointer-events:none}
 .logo-nav a.nav-locked::after{content:'🔒';font-size:10px;margin-left:auto}
 .logo-nav-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
+.inv-dot{display:inline-flex;align-items:center;background:#F59E0B;color:#fff;border-radius:10px;font-size:8px;font-weight:800;padding:1px 5px;margin-left:6px;letter-spacing:.3px;animation:invp 1.8s ease-in-out infinite}
+@keyframes invp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.95)}}
 .user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:5px 12px;border-radius:20px;font-size:12px}
 .user-av{width:24px;height:24px;border-radius:50%;background:var(--inv);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
 
@@ -148,7 +150,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <a href="serigrafia.html">🎨 Serigrafía</a>
       <a href="dashboard.html">📊 Dashboard</a>
       <div class="logo-nav-sep"></div>
-      <a href="inventario.html" class="nav-active">📦 Inventario</a>
+      <a href="inventario.html" class="nav-active">📦 Inventario <span class="inv-dot" id="invNavBadge" style="display:none"></span></a>
       <div class="logo-nav-sep"></div>
       <a href="produccion.html">🏭 Producción</a>
       <a class="nav-locked">💼 Ventas</a>
@@ -299,6 +301,7 @@ window.addEventListener('click', function(e) {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
+  actualizarBadgeInv();
   cargarTodo();
 });
 
@@ -574,6 +577,31 @@ function toast(msg, tipo) {
   toastTimer = setTimeout(function() { el.className = 'toast'; }, 2800);
 }
 
+// ── BADGE INVENTARIO ────────────────────────────────────────
+function invKey() { return 'tetra_inv_' + new Date().toISOString().split('T')[0]; }
+
+function invCount() {
+  var d = JSON.parse(localStorage.getItem(invKey()) || '{"count":0}');
+  return d.count || 0;
+}
+
+function registrarImportDiario() {
+  var d = JSON.parse(localStorage.getItem(invKey()) || '{"count":0}');
+  d.count = Math.min((d.count || 0) + 1, 2);
+  d.last  = new Date().toISOString();
+  localStorage.setItem(invKey(), JSON.stringify(d));
+  actualizarBadgeInv();
+}
+
+function actualizarBadgeInv() {
+  var c = invCount();
+  var badge = document.getElementById('invNavBadge');
+  if (badge) {
+    if (c >= 2) { badge.style.display = 'none'; }
+    else { badge.textContent = c === 0 ? 'AM · PM' : 'PM'; badge.style.display = 'inline-flex'; }
+  }
+}
+
 function toggleLogoNav(e) {
   e.stopPropagation();
   var n = document.getElementById('logoNav'), c = document.getElementById('logoChev');
@@ -782,6 +810,7 @@ async function confirmarImport() {
     if (nuevos.length) msg += ' · ' + nuevos.length + ' nuevos agregados';
     if (errores) msg += ' · ' + errores + ' errores';
     toast(msg, errores ? 'err' : 'ok');
+    if (!errores) registrarImportDiario();
     await cargarTodo();
 
   } catch(err) {
