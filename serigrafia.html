@@ -1740,8 +1740,13 @@ async function cambiarRolOperador(codigo, rol) {
 
 async function sincronizarPersonalSerig() {
   try {
-    var r = await db.from('personal').upsert(PERSONAL_SERIG_SEED, { onConflict: 'codigo' });
-    if (r.error) throw r.error;
+    // Eliminar registros de serig que no están en la lista oficial
+    var codigosValidos = PERSONAL_SERIG_SEED.map(function(p) { return p.codigo; });
+    var rd = await db.from('personal').delete().eq('area', 'serig').not('codigo', 'in', '(' + codigosValidos.map(function(c){ return '"' + c + '"'; }).join(',') + ')');
+    if (rd.error) throw rd.error;
+    // Upsert de la lista oficial
+    var ru = await db.from('personal').upsert(PERSONAL_SERIG_SEED, { onConflict: 'codigo' });
+    if (ru.error) throw ru.error;
     await cargarPersonal();
     renderPersonal();
     showToast('✅ Personal sincronizado · ' + PERSONAL_SERIG_SEED.length + ' operadores');
