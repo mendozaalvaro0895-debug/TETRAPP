@@ -430,9 +430,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <!-- ══ PERSONAL ══════════════════════════════════════════ -->
     <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
       <div class="ph">
-        <div><div class="ph-title">Personal · Serigrafía</div><div class="ph-sub">Asistencia y asignación del día</div></div>
+        <div><div class="ph-title">Personal · Serigrafía</div><div class="ph-sub">11 operadores · roles por persona</div></div>
         <div class="ph-r">
-          <button class="btn btn-g btn-sm" onclick="alert('Exportar registro')">⬇ Exportar</button>
+          <button class="btn btn-g btn-sm" onclick="sincronizarPersonalSerig()">🔄 Sincronizar lista</button>
         </div>
       </div>
       <div id="personalGrid" style="flex:1;overflow-y:auto"></div>
@@ -709,6 +709,24 @@ function metaParaProcesos(procs) {
   var vals = procs.map(function(p) { return METAS[p] || METAS[p.toLowerCase()] || META_DEFAULT; });
   return Math.min.apply(null, vals);
 }
+
+// Roles de Serigrafía
+var ROLES_SERIG = ['Supervisor','Flameador','Impresión','Receptor','Calidad','Empaque','Apoyo'];
+
+// Personal base — se upserta con "Sincronizar lista"
+var PERSONAL_SERIG_SEED = [
+  { codigo:'S0',  nombre:'Luis Cordova',       area:'serig', activo:true,  color_hex:'#5A2D9E', proceso_hab:'Supervisor' },
+  { codigo:'S1',  nombre:'Gabriela Gonzales',  area:'serig', activo:true,  color_hex:'#0E7490', proceso_hab:null },
+  { codigo:'S2',  nombre:'Suri Cabrera',        area:'serig', activo:true,  color_hex:'#065F46', proceso_hab:null },
+  { codigo:'S3',  nombre:'Jackeline Hernandez', area:'serig', activo:true,  color_hex:'#9D174D', proceso_hab:null },
+  { codigo:'S4',  nombre:'Nicolle Garcia',      area:'serig', activo:true,  color_hex:'#B45309', proceso_hab:null },
+  { codigo:'S5',  nombre:'Andy Lopez',          area:'serig', activo:true,  color_hex:'#1E40AF', proceso_hab:null },
+  { codigo:'S6',  nombre:'Esvin Xicay',         area:'serig', activo:true,  color_hex:'#6D28D9', proceso_hab:null },
+  { codigo:'S7',  nombre:'Angel',               area:'serig', activo:true,  color_hex:'#B07D2A', proceso_hab:null },
+  { codigo:'S8',  nombre:'Carlos',              area:'serig', activo:true,  color_hex:'#047857', proceso_hab:null },
+  { codigo:'S9',  nombre:'Angelica',            area:'serig', activo:true,  color_hex:'#BE185D', proceso_hab:null },
+  { codigo:'S10', nombre:'Heidy',               area:'serig', activo:false, color_hex:'#78716C', proceso_hab:'Apoyo' }
+];
 
 // Clientes predefinidos
 var CLIENTES = [
@@ -1668,24 +1686,85 @@ function switchTab(tab) {
   }
 }
 
+function buildRoleOptions(actual) {
+  var opts = '<option value="">— Sin rol —</option>';
+  ROLES_SERIG.forEach(function(r) {
+    opts += '<option value="' + r + '"' + (actual === r ? ' selected' : '') + '>' + r + '</option>';
+  });
+  return opts;
+}
+
+function buildPersonalCard(p) {
+  var iniciales = p.iniciales || (p.nombre ? p.nombre.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase() : '?');
+  var rolColor = {
+    'Supervisor':'#5A2D9E','Flameador':'#B45309','Impresión':'#1E40AF',
+    'Receptor':'#065F46','Calidad':'#9D174D','Empaque':'#0E7490','Apoyo':'#78716C'
+  };
+  var rolActual = p.proceso_hab || '';
+  var rolBadge = rolActual
+    ? '<span style="background:' + (rolColor[rolActual] || '#666') + '22;color:' + (rolColor[rolActual] || '#666') + ';font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">' + rolActual + '</span>'
+    : '<span style="font-size:10px;color:var(--gray-l)">Sin rol</span>';
+  var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-lista' : 'pill-entregada') + '">' + (p.activo ? 'Activo' : 'Apoyo') + '</span>';
+  var codEsc = String(p.codigo).replace(/'/g, "\\'");
+  var roleSelect = '<select onchange="cambiarRolOperador(\'' + codEsc + '\',this.value)" ' +
+    'style="width:100%;margin-top:10px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--bg);cursor:pointer">' +
+    buildRoleOptions(rolActual) +
+    '</select>';
+  return '<div class="op-card">' +
+    '<div class="op-top">' +
+      '<div class="op-avatar" style="background:' + (p.color_hex || '#5A2D9E') + '">' + iniciales + '</div>' +
+      '<div style="flex:1">' +
+        '<div class="op-name">' + p.nombre + '</div>' +
+        '<div style="margin-top:3px">' + rolBadge + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="margin-top:8px;display:flex;gap:6px;align-items:center">' + estadoBadge + '</div>' +
+    roleSelect +
+    '</div>';
+}
+
+async function cambiarRolOperador(codigo, rol) {
+  try {
+    var r = await db.from('personal').update({ proceso_hab: rol || null }).eq('codigo', codigo).eq('area', 'serig');
+    if (r.error) throw r.error;
+    if (personalData && personalData.serig) {
+      var p = personalData.serig.find(function(x) { return x.codigo === codigo; });
+      if (p) p.proceso_hab = rol || null;
+    }
+    renderPersonal();
+    showToast('✅ Rol actualizado');
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+async function sincronizarPersonalSerig() {
+  try {
+    var r = await db.from('personal').upsert(PERSONAL_SERIG_SEED, { onConflict: 'codigo' });
+    if (r.error) throw r.error;
+    await cargarPersonal();
+    renderPersonal();
+    showToast('✅ Personal sincronizado · ' + PERSONAL_SERIG_SEED.length + ' operadores');
+  } catch(e) {
+    showToast('❌ Error al sincronizar: ' + e.message, '#B83232');
+  }
+}
+
 function renderPersonal() {
   var g = document.getElementById('personalGrid');
   if (!g) return;
   if (!personalData || !personalData.serig || personalData.serig.length === 0) {
-    g.innerHTML = '<div style="padding:32px;text-align:center;color:var(--gray-l)">No hay operadores registrados para esta área</div>';
+    g.innerHTML = '<div style="padding:40px;text-align:center;color:var(--gray-l)">' +
+      '<div style="font-size:32px;margin-bottom:8px">👥</div>' +
+      'No hay operadores registrados.<br>' +
+      '<button class="btn btn-s btn-sm" style="margin-top:12px" onclick="sincronizarPersonalSerig()">🔄 Cargar personal ahora</button>' +
+      '</div>';
     return;
   }
-  var cards = personalData.serig.map(function(p) {
-    var iniciales = p.iniciales || (p.nombre ? p.nombre.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase() : '?');
-    return '<div class="op-card">' +
-      '<div class="op-top">' +
-        '<div class="op-avatar" style="background:' + (p.color_hex || '#5A2D9E') + '">' + iniciales + '</div>' +
-        '<div><div class="op-name">' + p.nombre + '</div><div class="op-proc">' + (p.proceso_hab || 'General') + '</div></div>' +
-      '</div>' +
-      '<div style="margin-top:8px"><span class="pill ' + (p.activo ? 'pill-lista' : 'pill-entregada') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span></div>' +
-      '</div>';
-  }).join('');
-  g.innerHTML = '<div class="pg">' + cards + '</div>';
+  var activos  = personalData.serig.filter(function(p) { return p.activo; });
+  var inactivos = personalData.serig.filter(function(p) { return !p.activo; });
+  var ordered  = activos.concat(inactivos);
+  g.innerHTML = '<div class="pg">' + ordered.map(buildPersonalCard).join('') + '</div>';
 }
 
 // ════════════════════════════════════════════════════════════
