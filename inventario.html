@@ -194,8 +194,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="import-drop-item" onclick="triggerImport('bodega7','🧪 Bodega 7 · Insumos')">🧪 Bodega 7 · Insumos</div>
         <div class="import-drop-item" onclick="triggerImport('bodega5','⚠️ Bodega 5 · Rechazos')">⚠️ Bodega 5 · Rechazos</div>
         <div class="import-drop-sep"></div>
-        <div class="import-drop-lbl">Próximamente</div>
-        <div class="import-drop-item disabled">💰 Ventas · Facturación diaria</div>
+        <div class="import-drop-lbl">Facturación</div>
+        <div class="import-drop-item" onclick="triggerImport('ventas','💰 Ventas · Facturación diaria','ventas')">💰 Ventas · Facturación diaria</div>
       </div>
     </div>
     <input type="file" id="xlsxInput" accept=".xlsx" style="display:none" onchange="onXlsxChange(event)">
@@ -612,6 +612,8 @@ function toggleLogoNav(e) {
 // ── IMPORTAR EXCEL ──────────────────────────────────────────
 var importPendiente   = [];
 var importBodegaLabel = '';
+var importTipo        = 'inventario';
+var ventasPendientes  = [];
 
 function toggleImportDrop(e) {
   e.stopPropagation();
@@ -625,8 +627,9 @@ window.addEventListener('click', function(e) {
   }
 });
 
-function triggerImport(bodega, label) {
+function triggerImport(bodega, label, tipo) {
   importBodegaLabel = label;
+  importTipo = tipo || 'inventario';
   document.getElementById('importDrop').classList.remove('open');
   var inp = document.getElementById('xlsxInput');
   inp.value = '';
@@ -640,9 +643,15 @@ function onXlsxChange(e) {
   reader.onload = function(ev) {
     try {
       var wb = XLSX.read(ev.target.result, { type: 'array' });
-      var parsed = parseExcelInventory(wb);
-      if (parsed.length === 0) { toast('No se encontraron productos en el archivo', 'err'); return; }
-      mostrarPreviewImport(parsed, file.name);
+      if (importTipo === 'ventas') {
+        var rows = parseVentasExcel(wb);
+        if (rows.length === 0) { toast('No se encontraron líneas de venta en el archivo', 'err'); return; }
+        mostrarPreviewVentas(rows, file.name);
+      } else {
+        var parsed = parseExcelInventory(wb);
+        if (parsed.length === 0) { toast('No se encontraron productos en el archivo', 'err'); return; }
+        mostrarPreviewImport(parsed, file.name);
+      }
     } catch(err) {
       toast('Error al leer el archivo: ' + err.message, 'err');
     }
@@ -748,9 +757,140 @@ function mostrarPreviewImport(productos, filename) {
   document.getElementById('modalImport').classList.add('open');
 }
 
+// ── VENTAS: PARSER ──────────────────────────────────────────
+function parseVentasExcel(wb) {
+  var sheet = wb.Sheets[wb.SheetNames[0]];
+  var aoa   = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+  var rows  = [];
+  for (var i = 0; i < aoa.length; i++) {
+    var r = aoa[i];
+    var serie = String(r[0] || '').trim();
+    if (!serie || serie === 'Serie' || !/^[A-Z]/.test(serie)) continue;
+    var skuRaw = String(r[10] || '').trim().replace(/\.0$/, '');
+    if (!/^\d+$/.test(skuRaw)) continue;
+    var fechaStr = String(r[2] || '').trim().split(' ')[0];
+    if (!fechaStr || fechaStr.length < 8) continue;
+    rows.push({
+      fecha:           fechaStr,
+      serie:           serie,
+      docu:            parseInt(r[1])  || 0,
+      nit:             String(r[4]  || '').trim(),
+      cliente:         String(r[5]  || '').trim(),
+      sku:             skuRaw,
+      descripcion:     String(r[11] || '').trim().toUpperCase(),
+      precio_unidad:   parseFloat(r[13]) || 0,
+      total_unidades:  parseInt(r[15])   || 0,
+      total_quetzales: parseFloat(r[14]) || 0,
+      costo:           parseFloat(r[16]) || 0,
+      utilidad:        parseFloat(r[17]) || 0
+    });
+  }
+  return rows;
+}
+
+// ── VENTAS: PREVIEW ─────────────────────────────────────────
+function mostrarPreviewVentas(rows, filename) {
+  ventasPendientes = rows;
+  var fechas = rows.map(function(r) { return r.fecha; }).filter(Boolean);
+  var fechaMin = fechas.reduce(function(a,b){ return a < b ? a : b; });
+  var fechaMax = fechas.reduce(function(a,b){ return a > b ? a : b; });
+  var docuSet = {};
+  rows.forEach(function(r){ docuSet[r.fecha + '_' + r.docu] = 1; });
+  var nFacturas = Object.keys(docuSet).length;
+  var totalUnid = rows.reduce(function(s,r){ return s + (r.total_unidades || 0); }, 0);
+  var totalQ    = rows.reduce(function(s,r){ return s + (r.total_quetzales || 0); }, 0);
+  var clienteSet = {};
+  rows.forEach(function(r){ clienteSet[r.cliente] = 1; });
+  var nClientes = Object.keys(clienteSet).length;
+  var fechasUnicas = Object.keys(fechas.reduce(function(o,f){ o[f]=1; return o; }, {}));
+  var sample = rows.slice(0, 6);
+  var filas = sample.map(function(r) {
+    return '<tr>' +
+      '<td style="white-space:nowrap">' + r.fecha + '</td>' +
+      '<td style="font-family:var(--mono);font-weight:700">' + r.docu + '</td>' +
+      '<td style="font-family:var(--mono);color:var(--inv)">' + r.sku + '</td>' +
+      '<td>' + r.descripcion.substring(0, 28) + '</td>' +
+      '<td>' + r.cliente.substring(0, 18) + '</td>' +
+      '<td style="text-align:right;font-family:var(--mono)">' + r.total_unidades.toLocaleString() + '</td>' +
+      '<td style="text-align:right;font-family:var(--mono)">Q ' + r.total_quetzales.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) + '</td>' +
+      '</tr>';
+  }).join('');
+  document.getElementById('importBody').innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
+      '<span style="font-size:13px;font-weight:700">💰 Ventas · Facturación diaria</span>' +
+      '<span style="font-size:11px;color:var(--gray-l)">·</span>' +
+      '<span style="font-size:11px;color:var(--gray)">' + filename + '</span>' +
+    '</div>' +
+    '<div style="font-size:11px;background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:7px;padding:7px 12px;margin-bottom:12px">' +
+      '📅 ' + fechaMin + (fechaMin !== fechaMax ? ' — ' + fechaMax : '') +
+      ' · Los registros existentes para ' + fechasUnicas.length + ' día(s) serán reemplazados.' +
+    '</div>' +
+    '<div class="imp-summary">' +
+      '<div class="imp-stat"><strong>' + nFacturas + '</strong><span>Facturas</span></div>' +
+      '<div class="imp-stat"><strong>' + rows.length + '</strong><span>Líneas</span></div>' +
+      '<div class="imp-stat new"><strong>' + totalUnid.toLocaleString() + '</strong><span>Unidades</span></div>' +
+      '<div class="imp-stat"><strong>Q ' + Math.round(totalQ).toLocaleString() + '</strong><span>' + nClientes + ' clientes</span></div>' +
+    '</div>' +
+    '<div class="imp-table-wrap">' +
+      '<table class="imp-table"><thead><tr>' +
+        '<th>Fecha</th><th>Factura</th><th>SKU</th><th>Producto</th><th>Cliente</th>' +
+        '<th style="text-align:right">Unidades</th><th style="text-align:right">Total Q.</th>' +
+      '</tr></thead><tbody>' + filas + '</tbody></table>' +
+    '</div>' +
+    (rows.length > 6 ? '<div style="font-size:11px;color:var(--gray-l);text-align:center;margin-bottom:8px">Mostrando 6 de ' + rows.length + ' líneas</div>' : '') +
+    '<div class="progress-bar-wrap" id="importProgress" style="display:none"><div class="progress-bar" id="importBar"></div></div>' +
+    '<div id="importStatus" style="font-size:12px;color:var(--gray);text-align:center;min-height:18px"></div>';
+  document.getElementById('btnConfirmImport').disabled = false;
+  document.getElementById('btnConfirmImport').textContent = 'Importar ventas';
+  document.getElementById('modalImport').classList.add('open');
+}
+
+// ── VENTAS: CONFIRMAR ────────────────────────────────────────
+async function confirmarImportVentas() {
+  var rows = ventasPendientes;
+  if (!rows.length) return;
+  var btn = document.getElementById('btnConfirmImport');
+  btn.disabled = true;
+  btn.textContent = 'Procesando…';
+  document.getElementById('importProgress').style.display = 'block';
+  var fechasUnicas = Object.keys(rows.reduce(function(o,r){ o[r.fecha]=1; return o; }, {}));
+  try {
+    document.getElementById('importStatus').textContent = 'Limpiando registros previos…';
+    for (var fi = 0; fi < fechasUnicas.length; fi++) {
+      var rd = await db.from('ventas').delete().eq('fecha', fechasUnicas[fi]);
+      if (rd.error) throw rd.error;
+    }
+    var BATCH = 200;
+    var total  = rows.length;
+    var hecho  = 0;
+    var errores = 0;
+    for (var i = 0; i < rows.length; i += BATCH) {
+      var lote = rows.slice(i, i + BATCH);
+      var rv = await db.from('ventas').insert(lote);
+      if (rv.error) { errores += lote.length; }
+      hecho += lote.length;
+      document.getElementById('importBar').style.width = Math.round((hecho / total) * 100) + '%';
+      document.getElementById('importStatus').textContent = 'Insertando ' + hecho + ' / ' + total + '…';
+    }
+    document.getElementById('importProgress').style.display = 'none';
+    document.getElementById('importStatus').textContent = '';
+    cerrarImport();
+    var msg = total + ' líneas de ventas · ' + fechasUnicas.length + ' día(s)';
+    if (errores) msg += ' · ' + errores + ' errores';
+    toast(msg, errores ? 'err' : 'ok');
+    if (!errores) registrarImportDiario();
+  } catch(err) {
+    document.getElementById('importStatus').textContent = 'Error: ' + err.message;
+    btn.disabled = false;
+    btn.textContent = 'Reintentar';
+    toast('Error al importar ventas', 'err');
+  }
+}
+
 function cerrarImport() {
   document.getElementById('modalImport').classList.remove('open');
   importPendiente = [];
+  ventasPendientes = [];
 }
 
 function cerrarSiOverlayImport(e) {
@@ -758,6 +898,7 @@ function cerrarSiOverlayImport(e) {
 }
 
 async function confirmarImport() {
+  if (importTipo === 'ventas') { confirmarImportVentas(); return; }
   if (importPendiente.length === 0) return;
   var btn = document.getElementById('btnConfirmImport');
   btn.disabled = true;
