@@ -433,6 +433,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div><div class="ph-title">Personal · Serigrafía</div><div class="ph-sub">11 operadores · roles por persona</div></div>
         <div class="ph-r">
           <button class="btn btn-g btn-sm" onclick="sincronizarPersonalSerig()">🔄 Sincronizar lista</button>
+          <button class="btn btn-s btn-sm" onclick="abrirModalNuevoOperario()">+ Nuevo operario</button>
         </div>
       </div>
       <div id="personalGrid" style="flex:1;overflow-y:auto"></div>
@@ -546,6 +547,52 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="mf">
       <button class="btn btn-g" onclick="cerrarForm()">Cancelar</button>
       <button class="btn btn-s" id="btnSave" onclick="guardar()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL OPERARIO ═════════════════════ -->
+<div class="overlay" id="modalPersonal" onclick="cerrarSiOverlayPersonal(event)">
+  <div class="modal" style="max-width:440px">
+    <div class="mh">
+      <div class="mh-title" id="mpTitle">Nuevo operario</div>
+      <button class="m-close" onclick="cerrarModalPersonal()">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Nombre completo *</div>
+          <input class="fi" id="mpNombre" placeholder="Ej: Gabriela Gonzales">
+        </div>
+        <div class="fg">
+          <div class="fl">Iniciales *</div>
+          <input class="fi" id="mpIniciales" placeholder="GG" maxlength="3" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+        </div>
+      </div>
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Código único *</div>
+          <input class="fi" id="mpCodigo" placeholder="Ej: S11">
+        </div>
+        <div class="fg">
+          <div class="fl">Color de avatar</div>
+          <input type="color" id="mpColor" value="#5A2D9E" style="width:100%;height:36px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;padding:2px 4px">
+        </div>
+      </div>
+      <div class="fg full" style="margin-bottom:12px">
+        <div class="fl">Rol</div>
+        <select class="fs" id="mpRol" style="width:100%"></select>
+      </div>
+      <div class="fg full">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:500">
+          <input type="checkbox" id="mpActivo" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--serig-m)">
+          Operario activo
+        </label>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cerrarModalPersonal()">Cancelar</button>
+      <button class="btn btn-s" onclick="guardarOperario()">Guardar</button>
     </div>
   </div>
 </div>
@@ -1720,6 +1767,10 @@ function buildPersonalCard(p) {
     '</div>' +
     '<div style="margin-top:8px;display:flex;gap:6px;align-items:center">' + estadoBadge + '</div>' +
     roleSelect +
+    '<div style="display:flex;gap:6px;margin-top:8px">' +
+      '<button class="btn btn-g btn-xs" style="flex:1" onclick="abrirModalEditarOperario(\'' + codEsc + '\')">✏️ Editar</button>' +
+      '<button class="btn btn-xs" style="flex:1;background:var(--red-l);color:var(--red);border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600" onclick="eliminarOperario(\'' + codEsc + '\')">🗑 Eliminar</button>' +
+    '</div>' +
     '</div>';
 }
 
@@ -1764,6 +1815,108 @@ async function sincronizarPersonalSerig() {
     await cargarPersonal();
     renderPersonal();
     showToast('✅ Personal sincronizado · ' + seed.length + ' operadores');
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+var mpEditCodigo = null;
+
+function poblarRolesModal(seleccionado) {
+  var sel = document.getElementById('mpRol');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Sin rol —</option>';
+  ROLES_SERIG.forEach(function(r) {
+    var opt = document.createElement('option');
+    opt.value = r; opt.textContent = r;
+    if (r === seleccionado) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function abrirModalNuevoOperario() {
+  mpEditCodigo = null;
+  document.getElementById('mpTitle').textContent = 'Nuevo operario';
+  document.getElementById('mpNombre').value = '';
+  document.getElementById('mpIniciales').value = '';
+  document.getElementById('mpCodigo').value = '';
+  document.getElementById('mpCodigo').disabled = false;
+  document.getElementById('mpColor').value = '#5A2D9E';
+  document.getElementById('mpActivo').checked = true;
+  poblarRolesModal('');
+  document.getElementById('modalPersonal').classList.add('open');
+  setTimeout(function() { document.getElementById('mpNombre').focus(); }, 50);
+}
+
+function abrirModalEditarOperario(codigo) {
+  var lista = personalData && personalData.serig ? personalData.serig : [];
+  var p = lista.find(function(x) { return x.codigo === codigo; });
+  if (!p) return;
+  mpEditCodigo = codigo;
+  document.getElementById('mpTitle').textContent = 'Editar operario';
+  document.getElementById('mpNombre').value = p.nombre || '';
+  document.getElementById('mpIniciales').value = p.iniciales || '';
+  document.getElementById('mpCodigo').value = p.codigo || '';
+  document.getElementById('mpCodigo').disabled = true;
+  document.getElementById('mpColor').value = p.color_hex || '#5A2D9E';
+  document.getElementById('mpActivo').checked = !!p.activo;
+  poblarRolesModal(p.proceso_hab || '');
+  document.getElementById('modalPersonal').classList.add('open');
+  setTimeout(function() { document.getElementById('mpNombre').focus(); }, 50);
+}
+
+function cerrarModalPersonal() {
+  document.getElementById('modalPersonal').classList.remove('open');
+  mpEditCodigo = null;
+}
+
+function cerrarSiOverlayPersonal(e) {
+  if (e.target === document.getElementById('modalPersonal')) cerrarModalPersonal();
+}
+
+async function guardarOperario() {
+  var nombre    = (document.getElementById('mpNombre').value    || '').trim();
+  var iniciales = (document.getElementById('mpIniciales').value || '').trim().toUpperCase();
+  var codigo    = (document.getElementById('mpCodigo').value    || '').trim();
+  var color     = document.getElementById('mpColor').value;
+  var rol       = document.getElementById('mpRol').value;
+  var activo    = document.getElementById('mpActivo').checked;
+
+  if (!nombre)    { showToast('⚠️ Nombre requerido', '#B83232'); return; }
+  if (!iniciales) { showToast('⚠️ Iniciales requeridas', '#B83232'); return; }
+  if (!codigo)    { showToast('⚠️ Código requerido', '#B83232'); return; }
+
+  var payload = {
+    nombre: nombre, iniciales: iniciales, area: 'serig',
+    activo: activo, color_hex: color, proceso_hab: rol || ''
+  };
+
+  try {
+    var r;
+    if (mpEditCodigo) {
+      r = await db.from('personal').update(payload).eq('codigo', mpEditCodigo).eq('area', 'serig');
+    } else {
+      payload.codigo = codigo;
+      r = await db.from('personal').insert(payload);
+    }
+    if (r.error) throw r.error;
+    cerrarModalPersonal();
+    await cargarPersonal();
+    renderPersonal();
+    showToast(mpEditCodigo ? '✅ Operario actualizado' : '✅ Operario creado');
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+async function eliminarOperario(codigo) {
+  if (!confirm('¿Eliminar a este operario? La acción no se puede deshacer.')) return;
+  try {
+    var r = await db.from('personal').delete().eq('codigo', codigo).eq('area', 'serig');
+    if (r.error) throw r.error;
+    await cargarPersonal();
+    renderPersonal();
+    showToast('🗑 Operario eliminado');
   } catch(e) {
     showToast('❌ Error: ' + e.message, '#B83232');
   }
