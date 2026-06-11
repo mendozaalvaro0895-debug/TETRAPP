@@ -105,11 +105,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 /* IMPORT DROPDOWN */
 .import-btn-wrap{position:relative}
-.import-drop{display:none;position:absolute;top:calc(100% + 4px);right:0;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:5px;min-width:230px;box-shadow:0 4px 20px rgba(0,0,0,.12);z-index:200}
+.import-drop{display:none;position:absolute;top:calc(100% + 4px);right:0;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:5px;min-width:250px;box-shadow:0 4px 20px rgba(0,0,0,.12);z-index:200}
 .import-drop.open{display:block}
-.import-drop-item{padding:9px 12px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;transition:background .12s}
+.import-drop-item{padding:8px 12px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;display:flex;flex-direction:column;align-items:flex-start;gap:2px;transition:background .12s}
 .import-drop-item:hover{background:var(--inv-xl);color:var(--inv)}
+.import-drop-item:hover .imp-last-ts{color:var(--inv)}
 .import-drop-item.disabled{color:var(--gray-l);cursor:not-allowed;pointer-events:none;font-style:italic}
+.imp-item-name{display:flex;align-items:center;gap:8px}
+.imp-last-ts{font-size:10px;color:var(--gray-l);font-weight:400;padding-left:2px;transition:color .12s}
+.imp-last-ts.ok{color:#059669}
 .import-drop-sep{height:1px;background:var(--border);margin:4px 0}
 .import-drop-lbl{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray-l);padding:6px 12px 2px}
 
@@ -190,12 +194,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <button class="btn btn-inv" onclick="toggleImportDrop(event)">📥 Importar Excel ▾</button>
       <div class="import-drop" id="importDrop">
         <div class="import-drop-lbl">Diario</div>
-        <div class="import-drop-item" onclick="triggerImport('bodega2','📦 Bodega 2 · Productos completos')">📦 Bodega 2 · Productos</div>
-        <div class="import-drop-item" onclick="triggerImport('bodega7','🧪 Bodega 7 · Insumos')">🧪 Bodega 7 · Insumos</div>
-        <div class="import-drop-item" onclick="triggerImport('bodega5','⚠️ Bodega 5 · Rechazos')">⚠️ Bodega 5 · Rechazos</div>
+        <div class="import-drop-item" onclick="triggerImport('bodega2','📦 Bodega 2 · Productos completos')"><div class="imp-item-name">📦 Bodega 2 · Productos</div><div class="imp-last-ts" id="last-bodega2">—</div></div>
+        <div class="import-drop-item" onclick="triggerImport('bodega7','🧪 Bodega 7 · Insumos')"><div class="imp-item-name">🧪 Bodega 7 · Insumos</div><div class="imp-last-ts" id="last-bodega7">—</div></div>
+        <div class="import-drop-item" onclick="triggerImport('bodega5','⚠️ Bodega 5 · Rechazos')"><div class="imp-item-name">⚠️ Bodega 5 · Rechazos</div><div class="imp-last-ts" id="last-bodega5">—</div></div>
         <div class="import-drop-sep"></div>
         <div class="import-drop-lbl">Facturación</div>
-        <div class="import-drop-item" onclick="triggerImport('ventas','💰 Ventas · Facturación diaria','ventas')">💰 Ventas · Facturación diaria</div>
+        <div class="import-drop-item" onclick="triggerImport('ventas','💰 Ventas · Facturación diaria','ventas')"><div class="imp-item-name">💰 Ventas · Facturación diaria</div><div class="imp-last-ts" id="last-ventas">—</div></div>
       </div>
     </div>
     <input type="file" id="xlsxInput" accept=".xlsx" style="display:none" onchange="onXlsxChange(event)">
@@ -302,6 +306,7 @@ window.addEventListener('click', function(e) {
 
 document.addEventListener('DOMContentLoaded', function() {
   actualizarBadgeInv();
+  actualizarTimestampsDropdown();
   cargarTodo();
 });
 
@@ -612,12 +617,51 @@ function toggleLogoNav(e) {
 // ── IMPORTAR EXCEL ──────────────────────────────────────────
 var importPendiente   = [];
 var importBodegaLabel = '';
+var importBodega      = '';
 var importTipo        = 'inventario';
 var ventasPendientes  = [];
 
+var IMPORT_KEYS = { bodega2:'tetra_last_B2', bodega7:'tetra_last_B7', bodega5:'tetra_last_B5', ventas:'tetra_last_ventas' };
+
+function getLastImport(bodega) {
+  try { return JSON.parse(localStorage.getItem(IMPORT_KEYS[bodega] || '') || 'null'); } catch(e) { return null; }
+}
+
+function saveLastImport(bodega, rows) {
+  var key = IMPORT_KEYS[bodega];
+  if (!key) return;
+  localStorage.setItem(key, JSON.stringify({ ts: new Date().toISOString(), rows: rows }));
+}
+
+function fmtLastImport(bodega) {
+  var d = getLastImport(bodega);
+  if (!d || !d.ts) return 'Nunca importado';
+  var dt = new Date(d.ts);
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+  var ayer = new Date(hoy.getTime() - 86400000);
+  var dtDay = new Date(dt); dtDay.setHours(0,0,0,0);
+  var prefix = dtDay.getTime() === hoy.getTime()  ? 'Hoy'
+             : dtDay.getTime() === ayer.getTime() ? 'Ayer'
+             : dt.toLocaleDateString('es-GT', {day:'2-digit', month:'short', year:'numeric'});
+  var hora = dt.toLocaleTimeString('es-GT', {hour:'2-digit', minute:'2-digit'});
+  return 'Actualizado · ' + prefix + ' ' + hora + (d.rows ? ' · ' + d.rows.toLocaleString() + ' reg.' : '');
+}
+
+function actualizarTimestampsDropdown() {
+  ['bodega2','bodega7','bodega5','ventas'].forEach(function(b) {
+    var el = document.getElementById('last-' + b);
+    if (!el) return;
+    var d = getLastImport(b);
+    el.textContent = fmtLastImport(b);
+    el.className = 'imp-last-ts' + (d && d.ts ? ' ok' : '');
+  });
+}
+
 function toggleImportDrop(e) {
   e.stopPropagation();
-  document.getElementById('importDrop').classList.toggle('open');
+  var drop = document.getElementById('importDrop');
+  drop.classList.toggle('open');
+  if (drop.classList.contains('open')) actualizarTimestampsDropdown();
 }
 
 window.addEventListener('click', function(e) {
@@ -628,6 +672,7 @@ window.addEventListener('click', function(e) {
 });
 
 function triggerImport(bodega, label, tipo) {
+  importBodega = bodega;
   importBodegaLabel = label;
   importTipo = tipo || 'inventario';
   document.getElementById('importDrop').classList.remove('open');
@@ -878,7 +923,10 @@ async function confirmarImportVentas() {
     var msg = total + ' líneas de ventas · ' + fechasUnicas.length + ' día(s)';
     if (errores) msg += ' · ' + errores + ' errores';
     toast(msg, errores ? 'err' : 'ok');
-    if (!errores) registrarImportDiario();
+    if (!errores) {
+      registrarImportDiario();
+      saveLastImport('ventas', total);
+    }
   } catch(err) {
     document.getElementById('importStatus').textContent = 'Error: ' + err.message;
     btn.disabled = false;
@@ -951,7 +999,10 @@ async function confirmarImport() {
     if (nuevos.length) msg += ' · ' + nuevos.length + ' nuevos agregados';
     if (errores) msg += ' · ' + errores + ' errores';
     toast(msg, errores ? 'err' : 'ok');
-    if (!errores) registrarImportDiario();
+    if (!errores) {
+      registrarImportDiario();
+      saveLastImport(importBodega, total);
+    }
     await cargarTodo();
 
   } catch(err) {
