@@ -64,6 +64,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
 .tbl{width:100%;border-collapse:collapse}
 .tbl th{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg);text-align:left;white-space:nowrap}
+.tbl th.sortable{cursor:pointer;user-select:none}
+.tbl th.sortable:hover{color:var(--inv);background:var(--inv-xl)}
+.tbl th.sort-asc,.tbl th.sort-desc{color:var(--inv)}
+.sort-ico{margin-left:4px;font-size:10px;opacity:.4}
+.tbl th.sort-asc .sort-ico,.tbl th.sort-desc .sort-ico{opacity:1}
 .tbl td{padding:10px 14px;font-size:12px;border-bottom:1px solid var(--bg);vertical-align:middle}
 .tbl tbody tr:last-child td{border-bottom:none}
 .tbl tbody tr:hover td{background:var(--inv-xl)}
@@ -178,10 +183,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <table class="tbl">
       <thead>
         <tr>
-          <th>SKU</th>
-          <th>Descripción</th>
-          <th style="text-align:right">Existencia</th>
-          <th>Estado</th>
+          <th class="sortable" onclick="ordenar('sku')" id="th-sku">SKU<span class="sort-ico">↕</span></th>
+          <th class="sortable" onclick="ordenar('descripcion')" id="th-descripcion">Descripción<span class="sort-ico">↕</span></th>
+          <th class="sortable" onclick="ordenar('existencia')" id="th-existencia" style="text-align:right">Existencia<span class="sort-ico">↕</span></th>
+          <th class="sortable" onclick="ordenar('activo')" id="th-activo">Estado<span class="sort-ico">↕</span></th>
           <th></th>
         </tr>
       </thead>
@@ -260,6 +265,8 @@ var filtrados    = [];
 var mostrarInactivos = false;
 var pag = 0;
 var POR_PAG = 50;
+var sortCol = 'sku';
+var sortDir = 1;
 
 // ── INIT ────────────────────────────────────────────────────
 window.addEventListener('click', function(e) {
@@ -330,6 +337,53 @@ function toggleMostrarInactivos() {
   aplicarFiltro();
 }
 
+// ── ORDENAR ─────────────────────────────────────────────────
+function ordenar(col) {
+  if (sortCol === col) {
+    sortDir = -sortDir;
+  } else {
+    sortCol = col;
+    sortDir = col === 'existencia' ? -1 : 1;
+  }
+  pag = 0;
+  actualizarIconosSort();
+  renderTabla();
+}
+
+function actualizarIconosSort() {
+  ['sku','descripcion','existencia','activo'].forEach(function(col) {
+    var th = document.getElementById('th-' + col);
+    if (!th) return;
+    th.classList.remove('sort-asc','sort-desc');
+    var ico = th.querySelector('.sort-ico');
+    if (sortCol === col) {
+      th.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+      ico.textContent = sortDir === 1 ? '↑' : '↓';
+    } else {
+      ico.textContent = '↕';
+    }
+  });
+}
+
+function sortFiltrados() {
+  filtrados.sort(function(a, b) {
+    var va, vb;
+    if (sortCol === 'existencia') {
+      va = a.existencia || 0;
+      vb = b.existencia || 0;
+      return sortDir * (va - vb);
+    }
+    if (sortCol === 'activo') {
+      va = a.activo ? 1 : 0;
+      vb = b.activo ? 1 : 0;
+      return sortDir * (vb - va);
+    }
+    va = (a[sortCol] || '').toLowerCase();
+    vb = (b[sortCol] || '').toLowerCase();
+    return sortDir * va.localeCompare(vb);
+  });
+}
+
 // ── RENDER ──────────────────────────────────────────────────
 function renderTabla() {
   var tbody = document.getElementById('tblBody');
@@ -338,6 +392,8 @@ function renderTabla() {
     document.getElementById('pagination').style.display = 'none';
     return;
   }
+
+  sortFiltrados();
 
   var inicio = pag * POR_PAG;
   var fin    = Math.min(inicio + POR_PAG, filtrados.length);
