@@ -101,6 +101,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .fi:focus{border-color:var(--inv)}
 .fi-hint{font-size:11px;color:var(--gray-l);margin-top:4px}
 
+/* IMPORT DROPDOWN */
+.import-btn-wrap{position:relative}
+.import-drop{display:none;position:absolute;top:calc(100% + 4px);right:0;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:5px;min-width:230px;box-shadow:0 4px 20px rgba(0,0,0,.12);z-index:200}
+.import-drop.open{display:block}
+.import-drop-item{padding:9px 12px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;transition:background .12s}
+.import-drop-item:hover{background:var(--inv-xl);color:var(--inv)}
+.import-drop-item.disabled{color:var(--gray-l);cursor:not-allowed;pointer-events:none;font-style:italic}
+.import-drop-sep{height:1px;background:var(--border);margin:4px 0}
+.import-drop-lbl{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray-l);padding:6px 12px 2px}
+
 /* IMPORT PREVIEW */
 .imp-summary{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
 .imp-stat{flex:1;min-width:100px;background:var(--bg);border-radius:10px;padding:12px 14px;text-align:center}
@@ -174,7 +184,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <input id="searchInput" type="text" placeholder="Buscar por SKU o descripción…" oninput="filtrarTabla(this.value)">
     </div>
     <button class="btn btn-ghost" onclick="toggleMostrarInactivos()" id="btnInactivos">Mostrar inactivos</button>
-    <button class="btn btn-inv" onclick="triggerImport()" title="Actualiza existencias desde el reporte diario de tu sistema">📥 Importar Excel</button>
+    <div class="import-btn-wrap" id="importBtnWrap">
+      <button class="btn btn-inv" onclick="toggleImportDrop(event)">📥 Importar Excel ▾</button>
+      <div class="import-drop" id="importDrop">
+        <div class="import-drop-lbl">Diario</div>
+        <div class="import-drop-item" onclick="triggerImport('bodega2','📦 Bodega 2 · Productos completos')">📦 Bodega 2 · Productos</div>
+        <div class="import-drop-item" onclick="triggerImport('bodega7','🧪 Bodega 7 · Insumos')">🧪 Bodega 7 · Insumos</div>
+        <div class="import-drop-item" onclick="triggerImport('bodega5','⚠️ Bodega 5 · Rechazos')">⚠️ Bodega 5 · Rechazos</div>
+        <div class="import-drop-sep"></div>
+        <div class="import-drop-lbl">Próximamente</div>
+        <div class="import-drop-item disabled">💰 Ventas · Facturación diaria</div>
+      </div>
+    </div>
     <input type="file" id="xlsxInput" accept=".xlsx" style="display:none" onchange="onXlsxChange(event)">
   </div>
 
@@ -418,7 +439,7 @@ function buildFila(item) {
   var badge = item.activo
     ? '<span class="badge badge-active">● Activo</span>'
     : '<span class="badge badge-inactive">● Inactivo</span>';
-  var exist = (item.existencia || 0).toLocaleString();
+  var exist = fmtExist(item.existencia || 0);
   var toggleLabel = item.activo ? 'Desactivar' : 'Activar';
   var skuEsc = item.sku.replace(/'/g, "\\'");
   return '<tr>' +
@@ -442,7 +463,7 @@ function editarExist(sku) {
   var item = todosLosItems.find(function(i) { return i.sku === sku; });
   if (!item) return;
   var actual = item.existencia || 0;
-  span.innerHTML = '<input class="exist-input" id="ei-' + sku + '" type="number" value="' + actual + '"' +
+  span.innerHTML = '<input class="exist-input" id="ei-' + sku + '" type="number" step="0.001" value="' + actual + '"' +
     ' onblur="guardarExist(\'' + sku + '\')" onkeydown="existKeydown(event,\'' + sku + '\')" autofocus>';
   var inp = document.getElementById('ei-' + sku);
   if (inp) { inp.focus(); inp.select(); }
@@ -462,9 +483,9 @@ function cancelarExist(sku) {
 async function guardarExist(sku) {
   var inp = document.getElementById('ei-' + sku);
   if (!inp) return;
-  var val = parseInt(inp.value) || 0;
+  var val = parseFloat(inp.value) || 0;
   var span = document.getElementById('ev-' + sku);
-  if (span) span.innerHTML = val.toLocaleString();
+  if (span) span.innerHTML = fmtExist(val);
   try {
     var r = await db.from('inventario').update({ existencia: val }).eq('sku', sku);
     if (r.error) throw r.error;
@@ -561,9 +582,24 @@ function toggleLogoNav(e) {
 }
 
 // ── IMPORTAR EXCEL ──────────────────────────────────────────
-var importPendiente = [];
+var importPendiente   = [];
+var importBodegaLabel = '';
 
-function triggerImport() {
+function toggleImportDrop(e) {
+  e.stopPropagation();
+  document.getElementById('importDrop').classList.toggle('open');
+}
+
+window.addEventListener('click', function(e) {
+  var wrap = document.getElementById('importBtnWrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('importDrop').classList.remove('open');
+  }
+});
+
+function triggerImport(bodega, label) {
+  importBodegaLabel = label;
+  document.getElementById('importDrop').classList.remove('open');
   var inp = document.getElementById('xlsxInput');
   inp.value = '';
   inp.click();
@@ -588,21 +624,38 @@ function onXlsxChange(e) {
 
 function parseExcelInventory(wb) {
   var sheet = wb.Sheets[wb.SheetNames[0]];
-  var aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  var aoa   = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+  // Auto-detectar columna de existencia según encabezado
+  var existCol = 3;
+  for (var h = 0; h < aoa.length; h++) {
+    var r0 = String(aoa[h][0] || '').trim();
+    if (r0 === 'Codigo') {
+      var numCols = aoa[h].filter(function(c) { return String(c).trim() !== ''; }).length;
+      existCol = numCols <= 3 ? 2 : 3;
+      break;
+    }
+  }
+
   var productos = [];
   for (var i = 0; i < aoa.length; i++) {
     var row = aoa[i];
     var cod = String(row[0] || '').trim();
     if (!/^\d+$/.test(cod)) continue;
-    var exist = parseInt(row[3]) || 0;
+    var exist = parseFloat(row[existCol]) || 0;
     if (exist < 0) exist = 0;
     productos.push({
-      sku:         cod,
+      sku:        cod,
       descripcion: String(row[1] || '').trim().toUpperCase(),
-      existencia:  exist
+      existencia: exist
     });
   }
   return productos;
+}
+
+function fmtExist(v) {
+  var n = parseFloat(v) || 0;
+  return n % 1 === 0 ? n.toLocaleString() : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 });
 }
 
 function mostrarPreviewImport(productos, filename) {
@@ -624,18 +677,30 @@ function mostrarPreviewImport(productos, filename) {
   var preview5 = actualizados.slice(0, 5).concat(nuevos.slice(0, 3));
   var filasSample = preview5.map(function(r) {
     if (r.existAntes !== undefined) {
-      var diff = r.existDespues - r.existAntes;
-      var diffStr = diff > 0 ? '<span style="color:var(--green)">+' + diff + '</span>' : diff < 0 ? '<span style="color:var(--red)">' + diff + '</span>' : '<span style="color:var(--gray)">±0</span>';
-      return '<tr><td><span class="tag-upd">ACT</span></td><td style="font-family:var(--mono);font-weight:700">' + r.sku + '</td><td>' + r.desc.substring(0,45) + '</td><td style="text-align:right;font-family:var(--mono)">' + r.existAntes.toLocaleString() + ' → ' + r.existDespues.toLocaleString() + ' ' + diffStr + '</td></tr>';
+      var diff = Math.round((r.existDespues - r.existAntes) * 1000) / 1000;
+      var diffStr = diff > 0 ? '<span style="color:var(--green)">+' + fmtExist(diff) + '</span>'
+                 : diff < 0 ? '<span style="color:var(--red)">'  + fmtExist(diff) + '</span>'
+                 : '<span style="color:var(--gray)">±0</span>';
+      return '<tr><td><span class="tag-upd">ACT</span></td>' +
+        '<td style="font-family:var(--mono);font-weight:700">' + r.sku + '</td>' +
+        '<td>' + r.desc.substring(0,45) + '</td>' +
+        '<td style="text-align:right;font-family:var(--mono)">' + fmtExist(r.existAntes) + ' → ' + fmtExist(r.existDespues) + ' ' + diffStr + '</td></tr>';
     } else {
-      return '<tr><td><span class="tag-new">NUEVO</span></td><td style="font-family:var(--mono);font-weight:700">' + r.sku + '</td><td>' + r.descripcion.substring(0,45) + '</td><td style="text-align:right;font-family:var(--mono)">' + r.existencia.toLocaleString() + '</td></tr>';
+      return '<tr><td><span class="tag-new">NUEVO</span></td>' +
+        '<td style="font-family:var(--mono);font-weight:700">' + r.sku + '</td>' +
+        '<td>' + r.descripcion.substring(0,45) + '</td>' +
+        '<td style="text-align:right;font-family:var(--mono)">' + fmtExist(r.existencia) + '</td></tr>';
     }
   }).join('');
 
   var totalConCambio = actualizados.filter(function(r) { return r.existDespues !== r.existAntes; }).length;
 
   document.getElementById('importBody').innerHTML =
-    '<div style="font-size:12px;color:var(--gray);margin-bottom:12px">Archivo: <strong>' + filename + '</strong></div>' +
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
+      '<span style="font-size:13px;font-weight:700">' + importBodegaLabel + '</span>' +
+      '<span style="font-size:11px;color:var(--gray-l)">·</span>' +
+      '<span style="font-size:11px;color:var(--gray)">' + filename + '</span>' +
+    '</div>' +
     '<div class="imp-summary">' +
       '<div class="imp-stat"><strong>' + productos.length + '</strong><span>En el Excel</span></div>' +
       '<div class="imp-stat"><strong>' + totalConCambio + '</strong><span>Existencias cambian</span></div>' +
