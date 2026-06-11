@@ -209,6 +209,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .op-name{font-size:13px;font-weight:700}
 .op-proc{font-size:10px;color:var(--gray)}
 
+/* ── SKU AUTOCOMPLETE (líneas de pedido) ─────────────────── */
+.sku-wrap-s{position:relative}
+.sku-drop-s{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--serig-m);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:999;max-height:180px;overflow-y:auto;margin-top:2px}
+.sku-drop-s.open{display:block}
+.sku-item-s{padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--bg)}
+.sku-item-s:last-child{border-bottom:none}
+.sku-item-s:hover{background:var(--serig-l)}
+.sku-code-s{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--serig-m)}
+.sku-desc-s{font-size:11px;color:var(--gray)}
+
+/* ── ASIGNACIÓN DE LÍNEA ─────────────────────────────────── */
+.linea-assign-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.lab{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);transition:all .15s;user-select:none}
+.lab:hover{border-color:var(--serig-m);background:var(--serig-l)}
+.lab.sel-lab{border-color:var(--serig-m);background:var(--serig-l);color:var(--serig-m)}
+.lab.lab-inactiva{opacity:.45;cursor:not-allowed}
+.lab.lab-inactiva:hover{border-color:var(--border);background:transparent}
+
 /* ── PIPELINE SERIG (view-serig) ──────────────────────────── */
 .pipeline-serig{flex-shrink:0;background:var(--card);border-bottom:1px solid var(--border);padding:10px 16px}
 .pipeline-serig-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px}
@@ -498,12 +516,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="c-note" id="cNote"></div>
       </div>
       <div class="fr" style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
-        <div class="fg full">
-          <div class="fl">Envase solicitado</div>
-          <input class="fi" id="fEnvase" placeholder="Ej: Tapa 28mm, Tapa 38mm Sport, Tapa 53mm…">
-        </div>
-      </div>
-      <div class="fr">
         <div class="fg">
           <div class="fl">Capacidad de impresión (und/h)</div>
           <input class="fi" id="fCapImpresion" type="number" placeholder="1200" min="1">
@@ -511,6 +523,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="fg">
           <div class="fl">Tiros de impresión</div>
           <input class="fi" id="fTiros" type="number" placeholder="1" min="1" max="10">
+        </div>
+      </div>
+      <div class="fg full" style="margin-bottom:12px">
+        <div class="fl">Asignar línea de producción <span style="font-weight:400;color:var(--gray-l)">(opcional)</span></div>
+        <div class="linea-assign-btns">
+          <div class="lab sel-lab" data-linea="0" onclick="selectLineaAsig(0)">Sin asignar</div>
+          <div class="lab" data-linea="1" onclick="selectLineaAsig(1)">Línea 1</div>
+          <div class="lab" data-linea="2" onclick="selectLineaAsig(2)">Línea 2</div>
+          <div class="lab" data-linea="3" onclick="selectLineaAsig(3)">Línea 3</div>
+          <div class="lab lab-inactiva" data-linea="4" onclick="selectLineaAsig(4)">Línea 4 · Inactiva</div>
         </div>
       </div>
       <div class="fg full">
@@ -611,23 +633,28 @@ const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 // ── Meta-encoding (envase/cap/tiros en campo notas) ──────────
 var META_SEP = '__M__';
 
-function encodeMeta(envase, cap, tiros, notasUsuario) {
-  var m = META_SEP + envase + '|' + cap + '|' + tiros + META_SEP;
+function encodeMeta(cap, tiros, lineaId, notasUsuario) {
+  var m = META_SEP + cap + '|' + tiros + '|' + (lineaId || 0) + META_SEP;
   return notasUsuario ? m + '\n' + notasUsuario : m;
 }
 
 function decodeMeta(notas) {
-  var dflt = { envase: '', cap_impresion: 0, tiros: 0, notas_usuario: notas || '' };
+  var dflt = { cap_impresion: 0, tiros: 0, linea_id: 0, notas_usuario: notas || '' };
   if (!notas) return dflt;
   var start = notas.indexOf(META_SEP);
   var end   = notas.indexOf(META_SEP, start + META_SEP.length);
   if (start !== 0 || end < 0) return dflt;
   var inner = notas.slice(META_SEP.length, end);
   var parts = inner.split('|');
-  if (parts.length < 3) return dflt;
+  if (parts.length < 2) return dflt;
   var rest = notas.slice(end + META_SEP.length);
   if (rest.charAt(0) === '\n') rest = rest.slice(1);
-  return { envase: parts[0] || '', cap_impresion: parseInt(parts[1]) || 0, tiros: parseInt(parts[2]) || 0, notas_usuario: rest };
+  return {
+    cap_impresion: parseInt(parts[0]) || 0,
+    tiros:         parseInt(parts[1]) || 0,
+    linea_id:      parseInt(parts[2]) || 0,
+    notas_usuario: rest
+  };
 }
 
 // ── Estado global ────────────────────────────────────────────
@@ -747,10 +774,11 @@ async function cargarSolicitudes() {
         fecha_lim: s.fecha_limite || '',
         prio: s.prioridad, estado: s.estado,
         prog: s.progreso_pct || 0, ops: [],
+        _meta: decodeMeta(s.notas || ''),
         notas: decodeMeta(s.notas || '').notas_usuario,
-        envase: decodeMeta(s.notas || '').envase,
         cap_impresion: decodeMeta(s.notas || '').cap_impresion,
         tiros: decodeMeta(s.notas || '').tiros,
+        linea_id: decodeMeta(s.notas || '').linea_id,
         created: new Date(s.created_at).toLocaleString('es-GT')
       };
     });
@@ -815,7 +843,7 @@ function buildPscPipeline(prog) {
 
 function buildPscMetaRow(sol) {
   if (!sol) return '';
-  var envase = sol.envase || '—';
+  var envase = (sol.lineas && sol.lineas[0] && sol.lineas[0].desc) ? sol.lineas[0].desc : '—';
   var cap    = sol.cap_impresion ? sol.cap_impresion.toLocaleString() + ' u/h' : '—';
   var tiros  = sol.tiros ? sol.tiros + (sol.tiros === 1 ? ' tiro' : ' tiros') : '—';
   return '<div class="psc-meta-row">' +
@@ -851,11 +879,15 @@ function buildPscCard(linea, sol) {
 function renderPipelineSerig() {
   var g = document.getElementById('pipelineSerigGrid');
   if (!g) return;
-  var enProceso = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
   var html = '';
   for (var i = 0; i < LINEAS_PRODUCCION.length; i++) {
     var linea = LINEAS_PRODUCCION[i];
-    var sol   = linea.activa ? (enProceso[i] || null) : null;
+    var sol = null;
+    if (linea.activa) {
+      sol = solicitudes.find(function(s) {
+        return s.linea_id === linea.id && s.estado === 'proceso';
+      }) || null;
+    }
     html += buildPscCard(linea, sol);
   }
   g.innerHTML = html;
@@ -916,11 +948,15 @@ function buildLineaCard(linea, sol) {
 function renderLineasProd() {
   var g = document.getElementById('lineasGrid');
   if (!g) return;
-  var enProceso = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
   var html = '';
   for (var i = 0; i < LINEAS_PRODUCCION.length; i++) {
     var linea = LINEAS_PRODUCCION[i];
-    var sol = linea.activa ? (enProceso[i] || null) : null;
+    var sol = null;
+    if (linea.activa) {
+      sol = solicitudes.find(function(s) {
+        return s.linea_id === linea.id && s.estado === 'proceso';
+      }) || null;
+    }
     html += buildLineaCard(linea, sol);
   }
   g.innerHTML = html;
@@ -1179,17 +1215,25 @@ async function mostrarDetalle(id) {
     '</div>' +
     '<div class="det-scroll">' +
 
-      '<div class="dc" style="border-color:var(--serig-m)">' +
-        '<div class="dc-h" style="background:var(--serig-l);color:var(--serig-m)">🖨️ Datos de Impresión</div>' +
-        '<div class="dc-b" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
-          '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Envase</div>' +
-            '<div style="font-size:15px;font-weight:700;color:var(--ink);margin-top:2px">' + (s.envase || '—') + '</div></div>' +
-          '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Cap. Impresión</div>' +
-            '<div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--serig-m);margin-top:2px">' + (s.cap_impresion ? s.cap_impresion.toLocaleString() + ' u/h' : '—') + '</div></div>' +
-          '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Tiros</div>' +
-            '<div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--ink);margin-top:2px">' + (s.tiros ? s.tiros + (s.tiros === 1 ? ' tiro' : ' tiros') : '—') + '</div></div>' +
-        '</div>' +
-      '</div>' +
+      (function() {
+        var envase   = (s.lineas && s.lineas[0] && s.lineas[0].desc) ? s.lineas[0].desc : '—';
+        var capStr   = s.cap_impresion ? s.cap_impresion.toLocaleString() + ' u/h' : '—';
+        var tirosStr = s.tiros ? s.tiros + (s.tiros === 1 ? ' tiro' : ' tiros') : '—';
+        var lineaStr = s.linea_id ? 'Línea ' + s.linea_id : 'Sin asignar';
+        return '<div class="dc" style="border-color:var(--serig-m)">' +
+          '<div class="dc-h" style="background:var(--serig-l);color:var(--serig-m)">🖨️ Datos de Impresión</div>' +
+          '<div class="dc-b" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">' +
+            '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Envase</div>' +
+              '<div style="font-size:14px;font-weight:700;color:var(--ink);margin-top:2px">' + envase + '</div></div>' +
+            '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Cap. Impresión</div>' +
+              '<div style="font-size:14px;font-weight:700;font-family:var(--mono);color:var(--serig-m);margin-top:2px">' + capStr + '</div></div>' +
+            '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Tiros</div>' +
+              '<div style="font-size:14px;font-weight:700;font-family:var(--mono);color:var(--ink);margin-top:2px">' + tirosStr + '</div></div>' +
+            '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Línea</div>' +
+              '<div style="font-size:14px;font-weight:700;color:' + (s.linea_id ? 'var(--serig-m)' : 'var(--gray-l)') + ';margin-top:2px">' + lineaStr + '</div></div>' +
+          '</div>' +
+        '</div>';
+      })() +
 
       '<div class="tbox">' +
         '<div class="tbox-lbl">Tiempo estimado</div>' +
@@ -1364,9 +1408,12 @@ function abrirForm() {
   addLinea();
   document.getElementById('fCli').value = '';
   document.getElementById('fNotas').value = '';
-  document.getElementById('fEnvase').value = '';
   document.getElementById('fCapImpresion').value = '';
   document.getElementById('fTiros').value = '';
+  lineaAsignadaForm = 0;
+  document.querySelectorAll('.lab').forEach(function(b) { b.classList.remove('sel-lab'); });
+  var firstLab = document.querySelector('.lab[data-linea="0"]');
+  if (firstLab) firstLab.classList.add('sel-lab');
   var d = new Date(); d.setDate(d.getDate() + 3);
   document.getElementById('fFecha').value = d.toISOString().split('T')[0];
   document.getElementById('overlay').classList.add('open');
@@ -1376,7 +1423,9 @@ function cerrarForm() { document.getElementById('overlay').classList.remove('ope
 
 function addLinea() {
   if (lineas.length >= 5) return;
-  lineas.push({ sku: '', desc: '', cant: 0, procs: [], existencia: undefined });
+  lineas.push({ sku: '', desc: '', cant: 0,
+    procs: ['flameado', 'impresion', 'secado', 'empaque'],
+    existencia: undefined });
   renderLineas();
 }
 function removeLinea(idx) { lineas.splice(idx, 1); renderLineas(); calcular(); }
@@ -1385,25 +1434,70 @@ function renderLineas() {
   var cont = document.getElementById('lineasPedido');
   if (!cont) return;
   var html = lineas.map(function(l, i) {
-    var exColor = (l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)';
-    var exVal   = l.existencia !== undefined ? l.existencia.toLocaleString() : '—';
+    var exColor = (l.existencia !== undefined)
+      ? ((l.existencia >= (l.cant || 0)) ? 'var(--green)' : 'var(--amber)')
+      : 'var(--gray-l)';
+    var exVal = l.existencia !== undefined ? l.existencia.toLocaleString() : '—';
     var chipsHtml = ALL_PROCS_SERIG.map(function(p) {
       var sel = l.procs.indexOf(p.val) >= 0 ? 'sel-proc' : '';
       return '<div class="op-chip ' + sel + '" onclick="toggleLineaProc(' + i + ',\'' + p.val + '\')" style="font-size:10px">' + p.lbl + '</div>';
     }).join('');
+    var descRow = l.desc
+      ? '<div style="font-size:11px;color:var(--gray);padding:3px 0 5px;font-weight:500">📦 ' + l.desc + '</div>'
+      : '';
     return '<div style="border-bottom:1px solid var(--border);padding:8px 10px">' +
-      '<div style="display:grid;grid-template-columns:110px 1fr 90px 80px 28px;gap:6px;margin-bottom:5px">' +
-        '<input class="fi" placeholder="SKU" value="' + l.sku + '" onchange="lineas[' + i + '].sku=this.value;buscarExistencia(' + i + ',this.value)">' +
-        '<input class="fi" placeholder="Descripción" value="' + l.desc + '" onchange="lineas[' + i + '].desc=this.value">' +
+      '<div style="display:grid;grid-template-columns:1fr 88px 64px 28px;gap:6px;margin-bottom:4px">' +
+        '<div class="sku-wrap-s">' +
+          '<input class="fi" placeholder="🔍 SKU o nombre del envase…" value="' + l.sku + '" autocomplete="off"' +
+            ' oninput="lineaSkuInput(' + i + ',this.value)"' +
+            ' onblur="setTimeout(function(){cerrarLineaSkuDrop(' + i + ')},200)">' +
+          '<div class="sku-drop-s" id="linea-drop-' + i + '"></div>' +
+        '</div>' +
         '<input class="fi" type="number" placeholder="Cant" value="' + (l.cant || '') + '" onchange="lineas[' + i + '].cant=parseInt(this.value)||0;calcular()">' +
-        '<div style="font-size:11px;text-align:right;color:' + exColor + '">' + exVal + '</div>' +
-        '<button onclick="removeLinea(' + i + ')" style="background:var(--red-l);border:none;border-radius:5px;cursor:pointer">✕</button>' +
+        '<div style="font-size:11px;text-align:right;padding:6px 4px;color:' + exColor + '">' + exVal + '</div>' +
+        '<button onclick="removeLinea(' + i + ')" style="background:var(--red-l);border:none;border-radius:5px;cursor:pointer;font-size:13px">✕</button>' +
       '</div>' +
+      descRow +
       '<div style="display:flex;gap:5px;flex-wrap:wrap">' + chipsHtml + '</div>' +
       '</div>';
   }).join('');
   cont.innerHTML = html;
   updateTotals();
+}
+
+function lineaSkuInput(idx, val) {
+  var drop = document.getElementById('linea-drop-' + idx);
+  if (!drop) return;
+  var v = val.trim().toLowerCase();
+  if (v.length < 2) { drop.classList.remove('open'); return; }
+  var matches = inventarioCache.filter(function(item) {
+    return item.sku.toLowerCase().includes(v) || (item.descripcion || '').toLowerCase().includes(v);
+  }).slice(0, 8);
+  if (matches.length === 0) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(function(item) {
+    var esc = item.sku.replace(/'/g, "\\'");
+    return '<div class="sku-item-s" onmousedown="seleccionarLineaSku(' + idx + ',\'' + esc + '\')">' +
+      '<div class="sku-code-s">' + item.sku + '</div>' +
+      '<div class="sku-desc-s">' + (item.descripcion || '') + '</div>' +
+      '</div>';
+  }).join('');
+  drop.classList.add('open');
+}
+
+function seleccionarLineaSku(idx, sku) {
+  var item = inventarioCache.find(function(i) { return i.sku === sku; });
+  if (!item) return;
+  lineas[idx].sku        = sku;
+  lineas[idx].desc       = item.descripcion || '';
+  lineas[idx].existencia = item.existencia  || 0;
+  cerrarLineaSkuDrop(idx);
+  renderLineas();
+  calcular();
+}
+
+function cerrarLineaSkuDrop(idx) {
+  var d = document.getElementById('linea-drop-' + idx);
+  if (d) d.classList.remove('open');
 }
 
 function toggleLineaProc(idx, procVal) {
@@ -1423,6 +1517,15 @@ async function buscarExistencia(idx, sku) {
     renderLineas();
   }
   calcular();
+}
+
+var lineaAsignadaForm = 0;
+
+function selectLineaAsig(lineaId) {
+  lineaAsignadaForm = lineaId;
+  document.querySelectorAll('.lab').forEach(function(b) {
+    b.classList.toggle('sel-lab', parseInt(b.getAttribute('data-linea')) === lineaId);
+  });
 }
 
 function updateTotals() {
@@ -1453,9 +1556,9 @@ async function guardar() {
 
   var codigo = await generarCodigo('serig');
   var notasFinal = encodeMeta(
-    document.getElementById('fEnvase').value.trim(),
     parseInt(document.getElementById('fCapImpresion').value) || 0,
     parseInt(document.getElementById('fTiros').value) || 0,
+    lineaAsignadaForm,
     document.getElementById('fNotas').value
   );
   try {
