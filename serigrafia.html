@@ -1725,7 +1725,7 @@ function buildPersonalCard(p) {
 
 async function cambiarRolOperador(codigo, rol) {
   try {
-    var r = await db.from('personal').update({ proceso_hab: rol || null }).eq('codigo', codigo).eq('area', 'serig');
+    var r = await db.from('personal').update({ proceso_hab: rol || '' }).eq('codigo', codigo).eq('area', 'serig');
     if (r.error) throw r.error;
     if (personalData && personalData.serig) {
       var p = personalData.serig.find(function(x) { return x.codigo === codigo; });
@@ -1740,18 +1740,32 @@ async function cambiarRolOperador(codigo, rol) {
 
 async function sincronizarPersonalSerig() {
   try {
-    // Eliminar registros de serig que no están en la lista oficial
+    // 1. Obtener todos los registros serig actuales
+    var rGet = await db.from('personal').select('id,codigo').eq('area', 'serig');
+    if (rGet.error) throw rGet.error;
+    // 2. Eliminar los que no están en la lista oficial (por id — evita problemas de filtro)
     var codigosValidos = PERSONAL_SERIG_SEED.map(function(p) { return p.codigo; });
-    var rd = await db.from('personal').delete().eq('area', 'serig').not('codigo', 'in', '(' + codigosValidos.map(function(c){ return '"' + c + '"'; }).join(',') + ')');
-    if (rd.error) throw rd.error;
-    // Upsert de la lista oficial
-    var ru = await db.from('personal').upsert(PERSONAL_SERIG_SEED, { onConflict: 'codigo' });
+    var huerfanos = (rGet.data || []).filter(function(p) {
+      return codigosValidos.indexOf(p.codigo) === -1;
+    });
+    for (var i = 0; i < huerfanos.length; i++) {
+      await db.from('personal').delete().eq('id', huerfanos[i].id);
+    }
+    // 3. Upsert lista oficial (proceso_hab vacío en vez de null para evitar NOT NULL)
+    var seed = PERSONAL_SERIG_SEED.map(function(p) {
+      return {
+        codigo: p.codigo, nombre: p.nombre, area: p.area,
+        activo: p.activo, color_hex: p.color_hex,
+        proceso_hab: p.proceso_hab || ''
+      };
+    });
+    var ru = await db.from('personal').upsert(seed, { onConflict: 'codigo' });
     if (ru.error) throw ru.error;
     await cargarPersonal();
     renderPersonal();
-    showToast('✅ Personal sincronizado · ' + PERSONAL_SERIG_SEED.length + ' operadores');
+    showToast('✅ Personal sincronizado · ' + seed.length + ' operadores');
   } catch(e) {
-    showToast('❌ Error al sincronizar: ' + e.message, '#B83232');
+    showToast('❌ Error: ' + e.message, '#B83232');
   }
 }
 
