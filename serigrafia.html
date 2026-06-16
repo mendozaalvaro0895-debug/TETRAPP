@@ -892,6 +892,7 @@ async function cargarSolicitudes() {
 // ════════════════════════════════════════════════════════════
 
 var boardDragId = null;
+var boardDragSolId = null;
 
 function boardBuildCard(item) {
   var progColor = item.prog >= 80 ? 'var(--green)' : item.prog >= 40 ? 'var(--amber)' : 'var(--serig-m)';
@@ -904,9 +905,8 @@ function boardBuildCard(item) {
       '<div style="background:' + progColor + ';height:3px;border-radius:3px;width:' + item.prog + '%"></div></div>'
     : '';
   var descTxt = (item.sku || '') + (item.desc ? ' · ' + (item.desc.length > 28 ? item.desc.slice(0,26)+'…' : item.desc) : '');
-  var draggable = item.lineaDbId !== null;
-  return '<div class="board-card" draggable="' + draggable + '"' +
-    (draggable ? ' ondragstart="boardDragStart(event,\'' + item.lineaDbId + '\')"' : '') +
+  return '<div class="board-card" draggable="true"' +
+    ' ondragstart="boardDragStart(event,' + JSON.stringify(item.lineaDbId) + ',' + JSON.stringify(item.solId) + ')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
     ' onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + item.solId + '\')},100)">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;margin-bottom:3px">' +
@@ -1005,9 +1005,10 @@ function renderBoard() {
   cont.innerHTML = html;
 }
 
-function boardDragStart(e, id) {
-  boardDragId = id;
-  e.dataTransfer.setData('text/plain', String(id));
+function boardDragStart(e, lineaDbId, solId) {
+  boardDragId = lineaDbId;
+  boardDragSolId = solId;
+  e.dataTransfer.setData('text/plain', String(lineaDbId));
   var card = e.currentTarget || e.target;
   if (card) setTimeout(function(){ card.classList.add('dragging'); }, 0);
 }
@@ -1016,18 +1017,27 @@ async function boardDrop(e, targetLaneId) {
   e.preventDefault();
   var lane = document.getElementById('bl-' + targetLaneId);
   if (lane) lane.classList.remove('drag-over');
-  if (!boardDragId) return;
   var newLinea = targetLaneId === 0 ? null : targetLaneId;
+
+  if (!boardDragId) {
+    // Solicitud sin líneas guardadas — no hay rows que actualizar
+    showToast('⚠️ Este pedido no tiene líneas. Elimínalo y créalo de nuevo.', '#B45309');
+    boardDragSolId = null;
+    return;
+  }
+
   try {
     var r = await db.from('solicitud_lineas').update({ linea_id: newLinea }).eq('id', boardDragId);
     if (r.error) throw r.error;
     boardDragId = null;
+    boardDragSolId = null;
     await cargarSolicitudes();
     showToast('✅ Asignado a ' + (newLinea ? 'Línea ' + newLinea : 'Sin asignar'));
   } catch(err) {
     console.error('boardDrop:', err);
     showToast('Error al asignar: ' + err.message, '#B83232');
     boardDragId = null;
+    boardDragSolId = null;
   }
 }
 
