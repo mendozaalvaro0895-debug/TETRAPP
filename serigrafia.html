@@ -400,19 +400,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <!-- Board: bloque principal "Sin asignar" -->
         <div id="boardSin"></div>
 
-        <!-- Board: carriles línea 1-4 -->
-        <div class="sec-hdr">
-          <div class="sec-title">Asignar a Línea</div>
-          <div class="sec-sub">Arrastra los pedidos desde "Sin asignar"</div>
-        </div>
-        <div class="board-lines-row" id="boardLines"></div>
-
-        <!-- Líneas de producción -->
+        <!-- Board: carriles línea 1-4 (con pipeline de procesos integrado) -->
         <div class="sec-hdr">
           <div class="sec-title">Líneas de Producción</div>
-          <div class="sec-sub" id="sec-lineas-sub">4 líneas · 3 activas</div>
+          <div class="sec-sub">Arrastra los pedidos desde "Sin asignar" · 🔥 Flameado › 🖨️ Impresión › 💨 Secado › 📦 Empaque</div>
         </div>
-        <div class="lineas-grid" id="lineasGrid"></div>
+        <div class="board-lines-row" id="boardLines"></div>
 
         <!-- Producción actual -->
         <div class="sec-hdr">
@@ -952,24 +945,40 @@ function boardBuildSinBlock(items) {
     '</div>';
 }
 
+function buildLaneProcPipeline(prog) {
+  var parts = [];
+  for (var i = 0; i < PROCESOS_SEQ.length; i++) {
+    if (i > 0) parts.push('<div class="proc-arrow">›</div>');
+    var estado = getProcEstado(i, prog);
+    parts.push('<div class="proc-node proc-' + estado + '" title="' + PROCESOS_SEQ[i].lbl + '" ' +
+      'style="padding:3px 6px;font-size:12px;gap:0">' + PROCESOS_SEQ[i].ico + '</div>');
+  }
+  return '<div class="proceso-pipeline" style="justify-content:center;gap:3px;padding:8px 7px;border-top:1px solid var(--border)">' +
+    parts.join('') + '</div>';
+}
+
 function boardBuildLane(laneId, items, label, active) {
-  var total  = items.reduce(function(s,i){ return s + (i.cant||0); }, 0);
-  var progs  = items.filter(function(i){ return i.prog > 0; });
-  var avg    = progs.length > 0 ? Math.round(progs.reduce(function(s,i){ return s+i.prog; },0)/progs.length) : 0;
+  var total   = items.reduce(function(s,i){ return s + (i.cant||0); }, 0);
+  var procIts = items.filter(function(i){ return i.estado === 'proceso'; });
+  var avg     = procIts.length > 0
+    ? Math.round(procIts.reduce(function(s,i){ return s+i.prog; },0)/procIts.length)
+    : 0;
   var hdrBg  = active ? 'var(--serig-l)' : '#f8f8f8';
   var hdrClr = active ? 'var(--serig-m)' : 'var(--gray-l)';
-  var therm  = items.length > 0
+  var therm  = procIts.length > 0
     ? '<div class="board-therm-wrap"><div class="board-therm-bar" style="width:' + avg + '%"></div></div>' +
       '<div style="font-size:9px;font-weight:700;color:' + hdrClr + ';margin-top:2px">' + avg + '% avance</div>'
     : '';
   var cards  = items.map(boardBuildCard).join('');
-  return '<div class="board-lane" id="bl-' + laneId + '"' +
+  var footer = active ? buildLaneProcPipeline(avg) : '';
+  return '<div class="board-lane' + (active ? '' : ' linea-inactiva') + '" id="bl-' + laneId + '"' +
     ' ondragover="event.preventDefault();document.getElementById(\'bl-' + laneId + '\').classList.add(\'drag-over\')"' +
     ' ondragleave="document.getElementById(\'bl-' + laneId + '\').classList.remove(\'drag-over\')"' +
     ' ondrop="boardDrop(event,' + laneId + ')">' +
     '<div class="board-lane-hdr" style="background:' + hdrBg + '">' +
       '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<span style="font-size:12px;font-weight:800;color:' + hdrClr + '">' + label + '</span>' +
+        '<span style="font-size:12px;font-weight:800;color:' + hdrClr + '">' + label +
+          (active ? '' : ' <span style="font-size:9px;font-weight:700;color:var(--gray-l)">(inactiva)</span>') + '</span>' +
         '<span style="font-size:10px;background:white;color:var(--gray);border-radius:10px;padding:1px 7px;font-weight:600">' + items.length + '</span>' +
       '</div>' +
       (total > 0 ? '<div style="font-size:10px;color:' + hdrClr + ';margin-top:1px">' + total.toLocaleString() + ' und</div>' : '') +
@@ -978,6 +987,7 @@ function boardBuildLane(laneId, items, label, active) {
     '<div class="board-cards-wrap" id="bc-' + laneId + '">' +
       (cards || '<div class="board-empty-lane">— vacía —</div>') +
     '</div>' +
+    footer +
     '</div>';
 }
 
@@ -1098,7 +1108,6 @@ function renderInicio() {
   if (el) el.textContent = new Date().toLocaleTimeString('es-GT', {hour:'2-digit', minute:'2-digit'});
 
   renderBoard();
-  renderLineasProd();
   renderProduccionActual();
 }
 
@@ -1186,59 +1195,6 @@ function buildProcNode(proc, estado) {
   return '<div class="proc-node proc-' + estado + '">' + proc.ico + ' ' + proc.lbl + '</div>';
 }
 
-function buildProcPipeline(prog) {
-  var parts = [];
-  for (var i = 0; i < PROCESOS_SEQ.length; i++) {
-    if (i > 0) parts.push('<div class="proc-arrow">›</div>');
-    parts.push(buildProcNode(PROCESOS_SEQ[i], getProcEstado(i, prog)));
-  }
-  return parts.join('');
-}
-
-function buildLineaSolInfo(linea, sol) {
-  if (!linea.activa) {
-    return '<span class="linea-sol">' + (linea.nota || 'Inactiva') + '</span>';
-  }
-  if (sol) {
-    return '<span class="linea-sol">' +
-      (sol.id_display || sol.id.slice(0,8)) + ' · ' + sol.cliente + ' · ' +
-      sol.cant.toLocaleString() + ' und' +
-      '</span>';
-  }
-  return '<span class="linea-sol" style="color:var(--gray-l)">Sin asignación</span>';
-}
-
-function buildLineaCard(linea, sol) {
-  var badge = linea.activa
-    ? '<span class="pill pill-lista">ACTIVA</span>'
-    : '<span class="pill pill-entregada">INACTIVA</span>';
-  var pipeline = buildProcPipeline(sol ? sol.prog : 0);
-
-  return '<div class="linea-card' + (linea.activa ? '' : ' linea-inactiva') + '">' +
-    '<div class="linea-header">' +
-      '<div class="linea-nombre">' + linea.nombre + ' ' + badge + '</div>' +
-      buildLineaSolInfo(linea, sol) +
-    '</div>' +
-    '<div class="proceso-pipeline">' + pipeline + '</div>' +
-    '</div>';
-}
-
-function renderLineasProd() {
-  var g = document.getElementById('lineasGrid');
-  if (!g) return;
-  var html = '';
-  for (var i = 0; i < LINEAS_PRODUCCION.length; i++) {
-    var linea = LINEAS_PRODUCCION[i];
-    var sol = null;
-    if (linea.activa) {
-      sol = solicitudes.find(function(s) {
-        return s.linea_id === linea.id && s.estado === 'proceso';
-      }) || null;
-    }
-    html += buildLineaCard(linea, sol);
-  }
-  g.innerHTML = html;
-}
 
 // ── Producción actual ────────────────────────────────────────
 
