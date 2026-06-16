@@ -904,8 +904,9 @@ function boardBuildCard(item) {
       '<div style="background:' + progColor + ';height:3px;border-radius:3px;width:' + item.prog + '%"></div></div>'
     : '';
   var descTxt = (item.sku || '') + (item.desc ? ' · ' + (item.desc.length > 28 ? item.desc.slice(0,26)+'…' : item.desc) : '');
-  return '<div class="board-card" draggable="true"' +
-    ' ondragstart="boardDragStart(event,\'' + item.lineaDbId + '\')"' +
+  var draggable = item.lineaDbId !== null;
+  return '<div class="board-card" draggable="' + draggable + '"' +
+    (draggable ? ' ondragstart="boardDragStart(event,\'' + item.lineaDbId + '\')"' : '') +
     ' ondragend="this.classList.remove(\'dragging\')"' +
     ' onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + item.solId + '\')},100)">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;margin-bottom:3px">' +
@@ -959,20 +960,35 @@ function renderBoard() {
   var items = [];
   solicitudes.forEach(function(s) {
     if (['nueva','programada','proceso'].indexOf(s.estado) < 0) return;
-    s.lineas.forEach(function(l) {
+    if (s.lineas.length === 0) {
       items.push({
-        lineaDbId: l.id,
+        lineaDbId: null,
         solId:     s.id,
         solCodigo: s.id_display || s.id.slice(0,8),
         cliente:   s.cliente,
-        sku:       l.sku  || '',
-        desc:      l.desc || '',
-        cant:      l.cant || 0,
-        linea_id:  l.linea_id || 0,
+        sku:       '',
+        desc:      '(sin líneas registradas)',
+        cant:      s.cant || 0,
+        linea_id:  0,
         prog:      s.prog || 0,
         estado:    s.estado
       });
-    });
+    } else {
+      s.lineas.forEach(function(l) {
+        items.push({
+          lineaDbId: l.id,
+          solId:     s.id,
+          solCodigo: s.id_display || s.id.slice(0,8),
+          cliente:   s.cliente,
+          sku:       l.sku  || '',
+          desc:      l.desc || '',
+          cant:      l.cant || 0,
+          linea_id:  l.linea_id || 0,
+          prog:      s.prog || 0,
+          estado:    s.estado
+        });
+      });
+    }
   });
   var lanes = {};
   lanes[0] = [];
@@ -1825,17 +1841,19 @@ async function guardar() {
     if (r.error) throw r.error;
 
     var lineasInsert = lineasValidas.map(function(l, i) {
-      return {
+      var row = {
         solicitud_id: r.data.id, orden: i + 1,
         sku: l.sku, descripcion: l.desc,
         cantidad: l.cant, existencia_snap: l.existencia || 0,
-        procesos: l.procs || [], operadores_ids: [],
-        cap_impresion: l.cap_impresion || null,
-        tiros: l.tiros || 1,
-        linea_id: l.linea_id || null
+        procesos: l.procs || [], operadores_ids: []
       };
+      if (l.cap_impresion) row.cap_impresion = l.cap_impresion;
+      if (l.tiros && l.tiros !== 1) row.tiros = l.tiros;
+      if (l.linea_id) row.linea_id = l.linea_id;
+      return row;
     });
-    await db.from('solicitud_lineas').insert(lineasInsert);
+    var r2 = await db.from('solicitud_lineas').insert(lineasInsert);
+    if (r2.error) throw r2.error;
 
     registrarUsoCliente(cliente);
     cerrarForm();
