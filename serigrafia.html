@@ -90,12 +90,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .kpi-s{font-size:9px;color:var(--gray-l);margin-top:2px}
 
 /* ── HUB CARDS ────────────────────────────────────────────── */
-.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
-.hub-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:18px 16px;cursor:pointer;transition:all .16s;display:flex;flex-direction:column;gap:5px}
+.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.hub-card{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;transition:all .16s;display:flex;flex-direction:row;align-items:center;gap:10px}
 .hub-card:hover{border-color:var(--serig-m);box-shadow:0 4px 18px rgba(90,45,158,.13);transform:translateY(-2px)}
-.hub-card-ico{font-size:30px;margin-bottom:2px}
-.hub-card-title{font-family:var(--display);font-size:15px;font-weight:700;color:var(--ink)}
-.hub-card-sub{font-size:11px;color:var(--gray);line-height:1.45}
+.hub-card-ico{font-size:20px;margin-bottom:0}
+.hub-card-title{font-family:var(--display);font-size:13px;font-weight:700;color:var(--ink)}
+.hub-card-sub{font-size:10px;color:var(--gray);line-height:1.3}
 
 /* ── SECTION HEADERS ──────────────────────────────────────── */
 .sec-hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
@@ -129,16 +129,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .prod-empty{text-align:center;padding:32px;color:var(--gray-l);font-size:13px;background:var(--card);border:1px solid var(--border);border-radius:12px}
 
 /* ── BOARD DE ASIGNACIÓN ──────────────────────────────────── */
-.board-wrap{overflow-x:auto;padding-bottom:8px;margin-bottom:24px}
-.board-lanes{display:flex;gap:12px;min-width:max-content}
-.board-lane{flex:0 0 210px;border-radius:10px;border:2px solid var(--border);overflow:hidden;background:var(--bg2);transition:border-color .15s,box-shadow .15s}
+/* Bloque principal "Sin asignar" */
+.board-sin{border-radius:12px;border:2px solid var(--serig-m);overflow:hidden;background:var(--card);margin-bottom:18px;transition:box-shadow .15s}
+.board-sin.drag-over{box-shadow:0 0 0 4px rgba(108,46,163,.18)}
+.board-sin-hdr{padding:12px 16px;border-bottom:1px solid var(--border);background:var(--serig-l);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.board-sin-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--serig-m);display:flex;align-items:center;gap:8px}
+.board-sin-count{font-size:11px;background:#fff;color:var(--serig-m);border-radius:12px;padding:2px 10px;font-weight:700}
+.board-sin-cards{padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:8px;min-height:96px}
+/* Carriles línea 1-4 */
+.board-lines-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
+.board-lane{border-radius:10px;border:2px solid var(--border);overflow:hidden;background:var(--bg2);transition:border-color .15s,box-shadow .15s;display:flex;flex-direction:column}
 .board-lane.drag-over{border-color:var(--serig-m);box-shadow:0 0 0 3px rgba(108,46,163,.15)}
 .board-lane-hdr{padding:10px 12px;border-bottom:1px solid var(--border)}
-.board-cards-wrap{padding:7px;display:flex;flex-direction:column;gap:6px;min-height:64px}
+.board-cards-wrap{padding:7px;display:flex;flex-direction:column;gap:6px;min-height:96px;flex:1}
 .board-card{background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:9px 10px;cursor:grab;user-select:none;transition:box-shadow .15s,transform .12s,opacity .15s}
 .board-card:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px);border-color:var(--serig-m)}
 .board-card.dragging{opacity:.4;transform:scale(.97)}
-.board-empty-lane{text-align:center;padding:18px 0;font-size:11px;color:var(--gray-l)}
+.board-empty-lane{text-align:center;padding:18px 0;font-size:11px;color:var(--gray-l);grid-column:1/-1}
 .board-therm-wrap{background:rgba(0,0,0,.08);border-radius:3px;height:5px;margin-top:6px}
 .board-therm-bar{height:5px;border-radius:3px;background:var(--serig-m);transition:width .3s}
 
@@ -280,8 +287,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 /* ── RESPONSIVE ───────────────────────────────────────────── */
 @media(max-width:1200px){.pipeline-serig-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:1100px){.hub-grid{grid-template-columns:repeat(2,1fr)}.lineas-grid{grid-template-columns:1fr}}
-@media(max-width:768px){.tabs{gap:0;padding:0 8px}.tab{font-size:12px;padding:10px 7px}.hub-grid{grid-template-columns:1fr 1fr}.lineas-grid{grid-template-columns:1fr}.proceso-pipeline{gap:3px}.proc-node{font-size:10px;padding:4px 7px}.pipeline-serig-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:1100px){.hub-grid{grid-template-columns:repeat(2,1fr)}.lineas-grid{grid-template-columns:1fr}.board-lines-row{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.tabs{gap:0;padding:0 8px}.tab{font-size:12px;padding:10px 7px}.hub-grid{grid-template-columns:1fr 1fr}.lineas-grid{grid-template-columns:1fr}.board-lines-row{grid-template-columns:repeat(2,1fr)}.proceso-pipeline{gap:3px}.proc-node{font-size:10px;padding:4px 7px}.pipeline-serig-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -318,8 +325,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 <div class="app">
 <div class="main">
 
-  <!-- TABS (encabezado — única navegación) -->
-  <div class="tabs">
+  <!-- TABS (navegación — oculta en Inicio, visible en otras vistas) -->
+  <div class="tabs" id="mainTabs" style="display:none">
     <div class="tab active" id="tab-inicio" onclick="switchTab('inicio')">🏠 Inicio</div>
     <div class="tab" id="tab-serig" onclick="switchTab('serig')">
       <div class="tdot" style="background:var(--serig-m)"></div>
@@ -370,34 +377,35 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="hub-grid">
           <div class="hub-card" onclick="switchTab('serig')">
             <div class="hub-card-ico">🎨</div>
-            <div class="hub-card-title">Programación</div>
-            <div class="hub-card-sub" id="hc-prog-sub">Cargando solicitudes…</div>
+            <div><div class="hub-card-title">Programación</div>
+            <div class="hub-card-sub" id="hc-prog-sub">Cargando solicitudes…</div></div>
           </div>
           <div class="hub-card" onclick="switchTab('movimientos')">
             <div class="hub-card-ico">⬇⬆</div>
-            <div class="hub-card-title">Movimientos</div>
-            <div class="hub-card-sub">Salidas de bodega · Ingresos PT</div>
+            <div><div class="hub-card-title">Movimientos</div>
+            <div class="hub-card-sub">Salidas de bodega · Ingresos PT</div></div>
           </div>
           <div class="hub-card" onclick="switchTab('personal')">
             <div class="hub-card-ico">👥</div>
-            <div class="hub-card-title">Personal</div>
-            <div class="hub-card-sub" id="hc-personal-sub">Cargando…</div>
+            <div><div class="hub-card-title">Personal</div>
+            <div class="hub-card-sub" id="hc-personal-sub">Cargando…</div></div>
           </div>
           <div class="hub-card" onclick="window.location.href='dashboard.html'">
             <div class="hub-card-ico">📊</div>
-            <div class="hub-card-title">Dashboard</div>
-            <div class="hub-card-sub">KPIs ejecutivos →</div>
+            <div><div class="hub-card-title">Dashboard</div>
+            <div class="hub-card-sub">KPIs ejecutivos →</div></div>
           </div>
         </div>
 
-        <!-- Board de asignación de líneas -->
-        <div class="sec-hdr" style="margin-top:4px">
-          <div class="sec-title">Asignación de Líneas</div>
-          <div class="sec-sub">Arrastra los pedidos hacia la línea de producción</div>
+        <!-- Board: bloque principal "Sin asignar" -->
+        <div id="boardSin"></div>
+
+        <!-- Board: carriles línea 1-4 -->
+        <div class="sec-hdr">
+          <div class="sec-title">Asignar a Línea</div>
+          <div class="sec-sub">Arrastra los pedidos desde "Sin asignar"</div>
         </div>
-        <div class="board-wrap">
-          <div class="board-lanes" id="boardLanes"></div>
-        </div>
+        <div class="board-lines-row" id="boardLines"></div>
 
         <!-- Líneas de producción -->
         <div class="sec-hdr">
@@ -924,14 +932,33 @@ function boardBuildCard(item) {
     '</div>';
 }
 
+function boardBuildSinBlock(items) {
+  var total = items.reduce(function(s,i){ return s + (i.cant||0); }, 0);
+  var cards = items.map(boardBuildCard).join('');
+  var countTxt = items.length + (total > 0 ? ' · ' + total.toLocaleString() + ' und' : '');
+  return '<div class="board-sin" id="bl-0"' +
+    ' ondragover="event.preventDefault();document.getElementById(\'bl-0\').classList.add(\'drag-over\')"' +
+    ' ondragleave="document.getElementById(\'bl-0\').classList.remove(\'drag-over\')"' +
+    ' ondrop="boardDrop(event,0)">' +
+    '<div class="board-sin-hdr">' +
+      '<div class="board-sin-title">📥 Sin asignar' +
+        '<span class="board-sin-count">' + countTxt + '</span>' +
+      '</div>' +
+      '<button class="btn btn-s btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>' +
+    '</div>' +
+    '<div class="board-sin-cards" id="bc-0">' +
+      (cards || '<div class="board-empty-lane">No hay pedidos sin asignar</div>') +
+    '</div>' +
+    '</div>';
+}
+
 function boardBuildLane(laneId, items, label, active) {
   var total  = items.reduce(function(s,i){ return s + (i.cant||0); }, 0);
   var progs  = items.filter(function(i){ return i.prog > 0; });
   var avg    = progs.length > 0 ? Math.round(progs.reduce(function(s,i){ return s+i.prog; },0)/progs.length) : 0;
-  var isSin  = laneId === 0;
-  var hdrBg  = isSin ? 'var(--bg2)'    : (active ? 'var(--serig-l)' : '#f8f8f8');
-  var hdrClr = isSin ? 'var(--gray)'   : (active ? 'var(--serig-m)' : 'var(--gray-l)');
-  var therm  = (!isSin && items.length > 0)
+  var hdrBg  = active ? 'var(--serig-l)' : '#f8f8f8';
+  var hdrClr = active ? 'var(--serig-m)' : 'var(--gray-l)';
+  var therm  = items.length > 0
     ? '<div class="board-therm-wrap"><div class="board-therm-bar" style="width:' + avg + '%"></div></div>' +
       '<div style="font-size:9px;font-weight:700;color:' + hdrClr + ';margin-top:2px">' + avg + '% avance</div>'
     : '';
@@ -955,8 +982,9 @@ function boardBuildLane(laneId, items, label, active) {
 }
 
 function renderBoard() {
-  var cont = document.getElementById('boardLanes');
-  if (!cont) return;
+  var contSin   = document.getElementById('boardSin');
+  var contLines = document.getElementById('boardLines');
+  if (!contSin || !contLines) return;
   var items = [];
   solicitudes.forEach(function(s) {
     if (['nueva','programada','proceso'].indexOf(s.estado) < 0) return;
@@ -998,11 +1026,12 @@ function renderBoard() {
     if (!lanes[k]) k = 0;
     lanes[k].push(item);
   });
-  var html = boardBuildLane(0, lanes[0], 'Sin asignar', false);
+  contSin.innerHTML = boardBuildSinBlock(lanes[0]);
+  var html = '';
   LINEAS_PRODUCCION.forEach(function(ln) {
     html += boardBuildLane(ln.id, lanes[ln.id] || [], ln.nombre, ln.activa);
   });
-  cont.innerHTML = html;
+  contLines.innerHTML = html;
 }
 
 function boardDragStart(e, lineaDbId, solId) {
@@ -1911,6 +1940,10 @@ function showWipView(key) {
 function switchTab(tab) {
   document.querySelectorAll('.view').forEach(function(v) { v.style.display = 'none'; });
   document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+
+  // Barra de tabs oculta en Inicio (la navegación está en las hub-cards), visible en otras vistas
+  var mt = document.getElementById('mainTabs');
+  if (mt) mt.style.display = (tab === 'inicio') ? 'none' : 'flex';
 
   var tabEl = document.getElementById('tab-' + tab);
   if (tabEl) tabEl.classList.add('active');
