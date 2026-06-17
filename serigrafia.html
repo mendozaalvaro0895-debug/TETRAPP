@@ -258,6 +258,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sku-item-s{padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--bg)}
 .sku-item-s:last-child{border-bottom:none}
 .sku-item-s:hover{background:var(--serig-l)}
+.sku-item-nuevo{background:rgba(22,163,74,.06);border-top:1.5px solid var(--border)}
+.sku-item-nuevo:hover{background:rgba(22,163,74,.14)}
 .sku-code-s{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--serig-m)}
 .sku-desc-s{font-size:11px;color:var(--gray)}
 
@@ -1855,11 +1857,16 @@ function abrirForm() {
 }
 function cerrarForm() { document.getElementById('overlay').classList.remove('open'); }
 
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function addLinea() {
   if (lineas.length >= 5) return;
   lineas.push({ sku: '', desc: '', cant: 0,
     procs: ['flameado', 'impresion', 'secado', 'empaque'],
-    existencia: undefined, cap_impresion: 0, tiros: 1, linea_id: 0 });
+    existencia: undefined, cap_impresion: 0, tiros: 1, linea_id: 0, es_nuevo: false });
   renderLineas();
 }
 function removeLinea(idx) { lineas.splice(idx, 1); renderLineas(); calcular(); }
@@ -1891,13 +1898,16 @@ function renderLineas() {
   var cont = document.getElementById('lineasPedido');
   if (!cont) return;
   var html = lineas.map(function(l, i) {
-    var exColor = (l.existencia !== undefined)
-      ? ((l.existencia >= (l.cant || 0)) ? 'var(--green)' : 'var(--amber)')
-      : 'var(--gray-l)';
-    var exVal = l.existencia !== undefined ? l.existencia.toLocaleString() : '—';
-    var descRow = l.desc
-      ? '<div style="font-size:11px;color:var(--gray);padding:3px 0 2px;font-weight:500">📦 ' + l.desc + '</div>'
-      : '';
+    var exColor = l.es_nuevo ? 'var(--serig-m)'
+      : (l.existencia !== undefined)
+        ? ((l.existencia >= (l.cant || 0)) ? 'var(--green)' : 'var(--amber)')
+        : 'var(--gray-l)';
+    var exVal = l.es_nuevo ? '🆕' : (l.existencia !== undefined ? l.existencia.toLocaleString() : '—');
+    var descRow = l.es_nuevo
+      ? '<div style="font-size:11px;color:var(--serig-m);padding:3px 0 2px;font-weight:600">🆕 Producto nuevo (sin SKU en inventario)</div>'
+      : (l.desc
+        ? '<div style="font-size:11px;color:var(--gray);padding:3px 0 2px;font-weight:500">📦 ' + l.desc + '</div>'
+        : '');
     var lineaRow = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;padding-top:5px;border-top:1px dashed var(--border)">' +
       '<div style="display:flex;align-items:center;gap:4px">' +
         '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Cap u/h</span>' +
@@ -1919,7 +1929,7 @@ function renderLineas() {
     return '<div style="border-bottom:1px solid var(--border);padding:8px 10px">' +
       '<div style="display:grid;grid-template-columns:1fr 88px 64px 28px;gap:6px;margin-bottom:2px">' +
         '<div class="sku-wrap-s">' +
-          '<input class="fi" placeholder="🔍 SKU o nombre del envase…" value="' + l.sku + '" autocomplete="off"' +
+          '<input class="fi" placeholder="🔍 SKU, nombre o producto nuevo…" value="' + escHtml(l.sku) + '" autocomplete="off"' +
             ' oninput="lineaSkuInput(' + i + ',this.value)"' +
             ' onblur="setTimeout(function(){cerrarLineaSkuDrop(' + i + ')},200)">' +
           '<div class="sku-drop-s" id="linea-drop-' + i + '"></div>' +
@@ -1937,6 +1947,8 @@ function renderLineas() {
 }
 
 function lineaSkuInput(idx, val) {
+  lineas[idx].sku = val;          // persistir lo escrito (permite productos sin SKU)
+  lineas[idx].es_nuevo = false;   // al editar deja de ser un item seleccionado
   var drop = document.getElementById('linea-drop-' + idx);
   if (!drop) return;
   var v = val.trim().toLowerCase();
@@ -1944,14 +1956,19 @@ function lineaSkuInput(idx, val) {
   var matches = inventarioCache.filter(function(item) {
     return item.sku.toLowerCase().includes(v) || (item.descripcion || '').toLowerCase().includes(v);
   }).slice(0, 8);
-  if (matches.length === 0) { drop.classList.remove('open'); return; }
-  drop.innerHTML = matches.map(function(item) {
+  var itemsHtml = matches.map(function(item) {
     var esc = item.sku.replace(/'/g, "\\'");
     return '<div class="sku-item-s" onmousedown="seleccionarLineaSku(' + idx + ',\'' + esc + '\')">' +
       '<div class="sku-code-s">' + item.sku + '</div>' +
       '<div class="sku-desc-s">' + (item.descripcion || '') + '</div>' +
       '</div>';
   }).join('');
+  // Opción para crear un producto que aún no existe en inventario
+  itemsHtml += '<div class="sku-item-s sku-item-nuevo" onmousedown="seleccionarLineaNuevo(' + idx + ')">' +
+    '<div class="sku-code-s" style="color:var(--green)">➕ Crear producto nuevo</div>' +
+    '<div class="sku-desc-s">Usar “' + escHtml(val.trim()) + '” como producto sin SKU</div>' +
+    '</div>';
+  drop.innerHTML = itemsHtml;
   var inp = drop.previousElementSibling;
   if (inp) {
     var r = inp.getBoundingClientRect();
@@ -1968,6 +1985,21 @@ function seleccionarLineaSku(idx, sku) {
   lineas[idx].sku        = sku;
   lineas[idx].desc       = item.descripcion || '';
   lineas[idx].existencia = item.existencia  || 0;
+  lineas[idx].es_nuevo   = false;
+  cerrarLineaSkuDrop(idx);
+  renderLineas();
+  calcular();
+}
+
+function seleccionarLineaNuevo(idx) {
+  var inp = document.getElementById('linea-drop-' + idx);
+  inp = inp ? inp.previousElementSibling : null;
+  var val = (inp ? inp.value : (lineas[idx].sku || '')).trim();
+  if (!val) return;
+  lineas[idx].sku        = val;
+  lineas[idx].desc       = val;
+  lineas[idx].existencia = undefined;
+  lineas[idx].es_nuevo   = true;
   cerrarLineaSkuDrop(idx);
   renderLineas();
   calcular();
