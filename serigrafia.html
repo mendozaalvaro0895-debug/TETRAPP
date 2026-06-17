@@ -906,8 +906,9 @@ function boardBuildCard(item) {
       '<div style="background:' + progColor + ';height:3px;border-radius:3px;width:' + item.prog + '%"></div></div>'
     : '';
   var descTxt = (item.sku || '') + (item.desc ? ' · ' + (item.desc.length > 28 ? item.desc.slice(0,26)+'…' : item.desc) : '');
+  var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   return '<div class="board-card" draggable="true"' +
-    ' ondragstart="boardDragStart(event,' + JSON.stringify(item.lineaDbId) + ',' + JSON.stringify(item.solId) + ')"' +
+    ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
     ' onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + item.solId + '\')},100)">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;margin-bottom:3px">' +
