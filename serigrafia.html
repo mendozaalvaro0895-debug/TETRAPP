@@ -1272,13 +1272,28 @@ async function boardDrop(e, targetLaneId) {
     return;
   }
 
+  var solId = boardDragSolId;
   try {
     var r = await db.from('solicitud_lineas').update({ linea_id: newLinea }).eq('id', boardDragId);
     if (r.error) throw r.error;
+
+    // Al asignar a una línea, iniciar automáticamente (estado -> proceso)
+    var iniciada = false;
+    if (newLinea) {
+      var s = solicitudes.find(function(x) { return x.id === solId; });
+      if (s && (s.estado === 'nueva' || s.estado === 'programada')) {
+        var ru = await db.from('solicitudes').update({ estado: 'proceso' }).eq('id', s.dbId);
+        if (ru.error) throw ru.error;
+        iniciada = true;
+      }
+    }
+
     boardDragId = null;
     boardDragSolId = null;
     await cargarSolicitudes();
-    showToast('✅ Asignado a ' + (newLinea ? 'Línea ' + newLinea : 'Sin asignar'));
+    showToast(newLinea
+      ? '✅ Asignado a Línea ' + newLinea + (iniciada ? ' · iniciado ▶' : '')
+      : '✅ Movido a Sin asignar');
   } catch(err) {
     console.error('boardDrop:', err);
     showToast('Error al asignar: ' + err.message, '#B83232');
