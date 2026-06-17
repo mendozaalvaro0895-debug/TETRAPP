@@ -932,6 +932,14 @@ var MATRIZ_ROLES_GLOBAL = [
   { key: 'supervisor', lbl: 'Supervisor', ico: '⭐' },
   { key: 'auxiliar',   lbl: 'Auxiliar',   ico: '🤝' }
 ];
+// Equivalencia matriz → rol en la página Personal (proceso_hab / ROLES_SERIG)
+var MATRIZ_TO_PROCESO = {
+  flameador:  'Flameador',
+  imprime:    'Impresión',
+  recibe:     'Receptor',
+  supervisor: 'Supervisor',
+  auxiliar:   'Apoyo'
+};
 var MATRIZ_KEY = 'tetra_matriz_serig';
 var matrizDragCodigo = null;
 var matrizDbDisponible = null;   // null = aún no se sabe; true/false una vez detectado
@@ -1055,22 +1063,27 @@ async function matrizDrop(e, targetKey) {
     if (esRolGlobal(targetKey)) { rol = targetKey; }
     else { var p = targetKey.split('-'); rol = p[0]; linea = parseInt(p[1]) || null; }
   }
+  // Rol equivalente para la página Personal (proceso_hab)
+  var procHab = rol ? (MATRIZ_TO_PROCESO[rol] || '') : '';
+  var lista = personalData && personalData.serig ? personalData.serig : [];
+  var op = lista.find(function(x) { return x.codigo === codigo; });
 
   // Guardar en Supabase para que sincronice entre equipos (un operador = una celda)
   if (matrizDbDisponible !== false) {
     try {
-      var r = await db.from('personal').update({ mtx_rol: rol, mtx_linea: linea }).eq('codigo', codigo);
+      var r = await db.from('personal')
+        .update({ mtx_rol: rol, mtx_linea: linea, proceso_hab: procHab })
+        .eq('codigo', codigo);
       if (r.error) throw r.error;
       matrizDbDisponible = true;
-      var lista = personalData && personalData.serig ? personalData.serig : [];
-      var op = lista.find(function(x) { return x.codigo === codigo; });
-      if (op) { op.mtx_rol = rol; op.mtx_linea = linea; }
+      if (op) { op.mtx_rol = rol; op.mtx_linea = linea; op.proceso_hab = procHab; }
       renderMatriz();
+      renderPersonal();
       return;
     } catch(err) {
       if (/mtx_rol|mtx_linea|column|schema cache/i.test((err.message || '') + (err.details || ''))) {
-        matrizDbDisponible = false;   // columnas aún no existen → usar respaldo local
-        showToast('⚠️ Roles guardados solo en este equipo · ejecuta el SQL para sincronizar', '#B45309');
+        matrizDbDisponible = false;   // columnas mtx_* aún no existen → respaldo local
+        showToast('⚠️ Posiciones guardadas solo en este equipo · ejecuta el SQL para sincronizar', '#B45309');
       } else {
         showToast('Error al asignar rol: ' + err.message, '#B83232');
         renderMatriz();
@@ -1079,7 +1092,12 @@ async function matrizDrop(e, targetKey) {
     }
   }
 
-  // Respaldo localStorage (solo en este equipo)
+  // Respaldo: posiciones en localStorage, pero el ROL sí se sincroniza vía proceso_hab
+  try {
+    var rp = await db.from('personal').update({ proceso_hab: procHab }).eq('codigo', codigo);
+    if (!rp.error && op) op.proceso_hab = procHab;
+  } catch(e2) { /* sin conexión: se queda local */ }
+
   var m = getMatrizLocal();
   Object.keys(m).forEach(function(k) {
     m[k] = (m[k] || []).filter(function(c) { return c !== codigo; });
@@ -1091,6 +1109,7 @@ async function matrizDrop(e, targetKey) {
   }
   saveMatrizLocal(m);
   renderMatriz();
+  renderPersonal();
 }
 
 // ════════════════════════════════════════════════════════════
