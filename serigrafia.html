@@ -150,18 +150,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-therm-bar{height:5px;border-radius:3px;background:var(--serig-m);transition:width .3s}
 
 /* ── MATRIZ PERSONAL Y ROLES ──────────────────────────────── */
-.mtx-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:18px;overflow-x:auto}
-.mtx-pool{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;padding:8px;border:1.5px dashed var(--border);border-radius:8px;margin-bottom:12px;background:var(--bg2);transition:border-color .15s,background .15s}
+.mtx-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:18px;overflow-x:auto;width:fit-content;max-width:100%}
+.mtx-pool{display:flex;flex-wrap:wrap;gap:5px;min-height:34px;padding:6px;border:1.5px dashed var(--border);border-radius:8px;margin-bottom:10px;background:var(--bg2);transition:border-color .15s,background .15s}
 .mtx-pool.drag-over{border-color:var(--serig-m);background:var(--serig-l)}
-.mtx-chip{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:3px 11px 3px 3px;cursor:grab;user-select:none;font-size:12px;font-weight:600;transition:box-shadow .15s,transform .12s,opacity .15s}
+.mtx-chip{display:inline-flex;align-items:center;gap:5px;background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:2px 9px 2px 2px;cursor:grab;user-select:none;font-size:11px;font-weight:600;transition:box-shadow .15s,transform .12s,opacity .15s}
 .mtx-chip:hover{box-shadow:0 2px 8px rgba(0,0,0,.14);transform:translateY(-1px);border-color:var(--serig-m)}
 .mtx-chip.dragging{opacity:.4}
-.mtx-ava{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:800;flex-shrink:0}
-.mtx-grid{display:grid;grid-template-columns:104px repeat(4,minmax(110px,1fr));gap:6px;min-width:560px}
-.mtx-hcell{font-size:10px;font-weight:800;color:var(--serig-m);text-transform:uppercase;letter-spacing:.4px;padding:4px;display:flex;align-items:center;justify-content:center}
+.mtx-ava{width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:8px;font-weight:800;flex-shrink:0}
+.mtx-grid{display:grid;grid-template-columns:84px repeat(4,148px);gap:5px}
+.mtx-hcell{font-size:10px;font-weight:800;color:var(--serig-m);text-transform:uppercase;letter-spacing:.4px;padding:2px;display:flex;align-items:center;justify-content:center}
 .mtx-hcell.left{justify-content:flex-start}
-.mtx-rolcell{font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
-.mtx-cell{border:1.5px dashed var(--border);border-radius:8px;min-height:46px;padding:5px;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;background:var(--bg2);transition:border-color .15s,background .15s}
+.mtx-rolcell{font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.mtx-cell{border:1.5px dashed var(--border);border-radius:8px;min-height:32px;padding:3px;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;background:var(--bg2);transition:border-color .15s,background .15s}
 .mtx-cell.drag-over{border-color:var(--serig-m);background:var(--serig-l)}
 
 /* ── SPLIT LAYOUT ─────────────────────────────────────────── */
@@ -987,7 +987,7 @@ function renderMatriz() {
   MATRIZ_ROLES_GLOBAL.forEach(function(rol) {
     var chips = (m[rol.key] || []).map(function(c) { return matrizChip(c); }).join('');
     html += '<div class="mtx-rolcell">' + rol.ico + ' ' + rol.lbl + '</div>';
-    html += '<div class="mtx-cell" id="mtx-' + rol.key + '" style="grid-column:span 4"' +
+    html += '<div class="mtx-cell" id="mtx-' + rol.key + '" style="grid-column:span 2"' +
       ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
       ' ondragleave="this.classList.remove(\'drag-over\')"' +
       ' ondrop="matrizDrop(event,\'' + rol.key + '\')">' + chips + '</div>';
