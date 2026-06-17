@@ -149,6 +149,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-therm-wrap{background:rgba(0,0,0,.08);border-radius:3px;height:5px;margin-top:6px}
 .board-therm-bar{height:5px;border-radius:3px;background:var(--serig-m);transition:width .3s}
 
+/* ── MATRIZ PERSONAL Y ROLES ──────────────────────────────── */
+.mtx-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:18px;overflow-x:auto}
+.mtx-pool{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;padding:8px;border:1.5px dashed var(--border);border-radius:8px;margin-bottom:12px;background:var(--bg2);transition:border-color .15s,background .15s}
+.mtx-pool.drag-over{border-color:var(--serig-m);background:var(--serig-l)}
+.mtx-chip{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:3px 11px 3px 3px;cursor:grab;user-select:none;font-size:12px;font-weight:600;transition:box-shadow .15s,transform .12s,opacity .15s}
+.mtx-chip:hover{box-shadow:0 2px 8px rgba(0,0,0,.14);transform:translateY(-1px);border-color:var(--serig-m)}
+.mtx-chip.dragging{opacity:.4}
+.mtx-ava{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:800;flex-shrink:0}
+.mtx-grid{display:grid;grid-template-columns:104px repeat(4,minmax(110px,1fr));gap:6px;min-width:560px}
+.mtx-hcell{font-size:10px;font-weight:800;color:var(--serig-m);text-transform:uppercase;letter-spacing:.4px;padding:4px;display:flex;align-items:center;justify-content:center}
+.mtx-hcell.left{justify-content:flex-start}
+.mtx-rolcell{font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
+.mtx-cell{border:1.5px dashed var(--border);border-radius:8px;min-height:46px;padding:5px;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;background:var(--bg2);transition:border-color .15s,background .15s}
+.mtx-cell.drag-over{border-color:var(--serig-m);background:var(--serig-l)}
+
 /* ── SPLIT LAYOUT ─────────────────────────────────────────── */
 .split{display:flex;flex:1;overflow:hidden;gap:1px;background:var(--border)}
 .pane-l{width:380px;background:var(--card);display:flex;flex-direction:column;overflow:hidden}
@@ -396,6 +411,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
             <div class="hub-card-sub">KPIs ejecutivos →</div></div>
           </div>
         </div>
+
+        <!-- Matriz de personal y roles -->
+        <div class="sec-hdr">
+          <div class="sec-title">Personal y Roles</div>
+          <div class="sec-sub">Arrastra cada operador a su rol y línea · reasigna en cualquier momento</div>
+        </div>
+        <div class="mtx-wrap" id="matrizPersonal"></div>
 
         <!-- Board: bloque principal "Sin asignar" -->
         <div id="boardSin"></div>
@@ -891,6 +913,103 @@ async function cargarSolicitudes() {
 }
 
 // ════════════════════════════════════════════════════════════
+// MATRIZ DE PERSONAL Y ROLES
+// ════════════════════════════════════════════════════════════
+
+var MATRIZ_ROLES = [
+  { key: 'flameador', lbl: 'Flameador', ico: '🔥' },
+  { key: 'imprime',   lbl: 'Imprime',   ico: '🖨️' },
+  { key: 'recibe',    lbl: 'Recibe',    ico: '📥' }
+];
+var MATRIZ_KEY = 'tetra_matriz_serig';
+var matrizDragCodigo = null;
+
+function getMatriz() {
+  try { return JSON.parse(localStorage.getItem(MATRIZ_KEY)) || {}; } catch(e) { return {}; }
+}
+function saveMatriz(m) { localStorage.setItem(MATRIZ_KEY, JSON.stringify(m)); }
+
+function matrizOpByCodigo(codigo) {
+  var lista = personalData && personalData.serig ? personalData.serig : [];
+  return lista.find(function(p) { return p.codigo === codigo; });
+}
+
+function matrizChip(codigo) {
+  var p = matrizOpByCodigo(codigo);
+  if (!p) return '';
+  var ini    = p.iniciales || (p.nombre ? p.nombre.charAt(0) : '?');
+  var color  = p.color_hex || '#666';
+  var nombre = (p.nombre || '').split(' ')[0];
+  return '<div class="mtx-chip" draggable="true"' +
+    ' ondragstart="matrizDragStart(event,\'' + codigo + '\')"' +
+    ' ondragend="this.classList.remove(\'dragging\')"' +
+    ' title="' + (p.nombre || '') + (p.proceso_hab ? ' · ' + p.proceso_hab : '') + '">' +
+    '<span class="mtx-ava" style="background:' + color + '">' + ini + '</span>' + nombre + '</div>';
+}
+
+function renderMatriz() {
+  var cont = document.getElementById('matrizPersonal');
+  if (!cont) return;
+  var m = getMatriz();
+  var asignados = {};
+  Object.keys(m).forEach(function(k) { (m[k] || []).forEach(function(c) { asignados[c] = true; }); });
+  var lista = (personalData && personalData.serig ? personalData.serig : []).filter(function(p) { return p.activo; });
+
+  var poolChips = lista.filter(function(p) { return !asignados[p.codigo]; })
+                       .map(function(p) { return matrizChip(p.codigo); }).join('');
+  var pool = '<div class="mtx-pool" id="mtx-pool"' +
+    ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
+    ' ondragleave="this.classList.remove(\'drag-over\')"' +
+    ' ondrop="matrizDrop(event,\'pool\')">' +
+    (poolChips || '<span style="font-size:11px;color:var(--gray-l)">Todos los operadores están asignados</span>') +
+    '</div>';
+
+  var html = '<div class="mtx-grid">';
+  html += '<div class="mtx-hcell left">Tarea</div>';
+  for (var h = 1; h <= 4; h++) html += '<div class="mtx-hcell">Línea ' + h + '</div>';
+  MATRIZ_ROLES.forEach(function(rol) {
+    html += '<div class="mtx-rolcell">' + rol.ico + ' ' + rol.lbl + '</div>';
+    for (var li = 1; li <= 4; li++) {
+      var key = rol.key + '-' + li;
+      var chips = (m[key] || []).map(function(c) { return matrizChip(c); }).join('');
+      html += '<div class="mtx-cell" id="mtx-' + key + '"' +
+        ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
+        ' ondragleave="this.classList.remove(\'drag-over\')"' +
+        ' ondrop="matrizDrop(event,\'' + key + '\')">' + chips + '</div>';
+    }
+  });
+  html += '</div>';
+  cont.innerHTML = pool + html;
+}
+
+function matrizDragStart(e, codigo) {
+  matrizDragCodigo = codigo;
+  boardDragId = null;           // evita cruces con el drag del board
+  e.dataTransfer.setData('text/plain', codigo);
+  var el = e.currentTarget || e.target;
+  if (el) setTimeout(function() { el.classList.add('dragging'); }, 0);
+}
+
+function matrizDrop(e, targetKey) {
+  e.preventDefault();
+  if (e.currentTarget) e.currentTarget.classList.remove('drag-over');
+  if (!matrizDragCodigo) return;
+  var m = getMatriz();
+  // Un operador solo puede estar en una celda: lo quitamos de todas primero
+  Object.keys(m).forEach(function(k) {
+    m[k] = (m[k] || []).filter(function(c) { return c !== matrizDragCodigo; });
+    if (m[k].length === 0) delete m[k];
+  });
+  if (targetKey !== 'pool') {
+    if (!m[targetKey]) m[targetKey] = [];
+    m[targetKey].push(matrizDragCodigo);
+  }
+  saveMatriz(m);
+  matrizDragCodigo = null;
+  renderMatriz();
+}
+
+// ════════════════════════════════════════════════════════════
 // BOARD DE ASIGNACIÓN DE LÍNEAS
 // ════════════════════════════════════════════════════════════
 
@@ -1110,6 +1229,7 @@ function renderBoard() {
 function boardDragStart(e, lineaDbId, solId) {
   boardDragId = lineaDbId;
   boardDragSolId = solId;
+  matrizDragCodigo = null;       // evita cruces con el drag de la matriz
   e.dataTransfer.setData('text/plain', String(lineaDbId));
   var card = e.currentTarget || e.target;
   if (card) setTimeout(function(){ card.classList.add('dragging'); }, 0);
@@ -1170,6 +1290,7 @@ function renderInicio() {
   el = document.getElementById('lastUpdate');
   if (el) el.textContent = new Date().toLocaleTimeString('es-GT', {hour:'2-digit', minute:'2-digit'});
 
+  renderMatriz();
   renderBoard();
   renderProduccionActual();
 }
