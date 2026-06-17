@@ -940,6 +940,14 @@ var MATRIZ_TO_PROCESO = {
   supervisor: 'Supervisor',
   auxiliar:   'Apoyo'
 };
+// Inverso: rol de Personal (proceso_hab) → fila de la matriz
+var PROCESO_TO_MATRIZ = {
+  'Flameador':  'flameador',
+  'Impresión':  'imprime',
+  'Receptor':   'recibe',
+  'Supervisor': 'supervisor',
+  'Apoyo':      'auxiliar'
+};
 var MATRIZ_KEY = 'tetra_matriz_serig';
 var matrizDragCodigo = null;
 var matrizDbDisponible = null;   // null = aún no se sabe; true/false una vez detectado
@@ -947,33 +955,32 @@ var matrizDbDisponible = null;   // null = aún no se sabe; true/false una vez d
 function esRolGlobal(rol) {
   return MATRIZ_ROLES_GLOBAL.some(function(g) { return g.key === rol; });
 }
-function matrizCellKey(rol, linea) {
-  return esRolGlobal(rol) ? rol : rol + '-' + (linea || 0);
-}
 
-// Lee de localStorage (respaldo cuando la BD no tiene las columnas mtx_*)
-function getMatrizLocal() {
+// Línea asignada de un operador: de la BD (mtx_linea) o de localStorage como respaldo
+function getMatrizLines() {
   try { return JSON.parse(localStorage.getItem(MATRIZ_KEY)) || {}; } catch(e) { return {}; }
 }
-function saveMatrizLocal(m) { localStorage.setItem(MATRIZ_KEY, JSON.stringify(m)); }
+function saveMatrizLines(m) { localStorage.setItem(MATRIZ_KEY, JSON.stringify(m)); }
+function lineaDeOperador(p) {
+  if (p.mtx_linea !== undefined) return p.mtx_linea;   // columna existe (valor o null)
+  var loc = getMatrizLines();
+  return loc[p.codigo] || null;                        // respaldo localStorage
+}
 
-// Construye la matriz para renderizar: desde la BD (personal.mtx_*) si existe,
-// o desde localStorage como respaldo.
+// La matriz se DERIVA del rol (proceso_hab) — fuente única — más la línea.
+// Así matriz y página Personal siempre coinciden.
 function getMatriz() {
-  var lista = personalData && personalData.serig ? personalData.serig : [];
-  var hayCols = lista.some(function(p) { return p.mtx_rol !== undefined; });
-  if (hayCols) {
-    matrizDbDisponible = true;
-    var m = {};
-    lista.forEach(function(p) {
-      if (!p.mtx_rol) return;
-      var key = matrizCellKey(p.mtx_rol, p.mtx_linea);
-      if (!m[key]) m[key] = [];
-      m[key].push(p.codigo);
-    });
-    return m;
-  }
-  return getMatrizLocal();
+  var m = {};
+  var lista = (personalData && personalData.serig ? personalData.serig : [])
+    .filter(function(p) { return p.activo; });
+  lista.forEach(function(p) {
+    var mr = PROCESO_TO_MATRIZ[(p.proceso_hab || '').trim()];
+    if (!mr) return;   // rol que no está en la matriz (o sin rol) → queda en el pool
+    var key = esRolGlobal(mr) ? mr : mr + '-' + (lineaDeOperador(p) || 1);
+    if (!m[key]) m[key] = [];
+    m[key].push(p.codigo);
+  });
+  return m;
 }
 
 function matrizOpByCodigo(codigo) {
@@ -1092,22 +1099,15 @@ async function matrizDrop(e, targetKey) {
     }
   }
 
-  // Respaldo: posiciones en localStorage, pero el ROL sí se sincroniza vía proceso_hab
+  // Respaldo: el ROL se sincroniza vía proceso_hab (BD); la LÍNEA en localStorage
   try {
     var rp = await db.from('personal').update({ proceso_hab: procHab }).eq('codigo', codigo);
     if (!rp.error && op) op.proceso_hab = procHab;
   } catch(e2) { /* sin conexión: se queda local */ }
 
-  var m = getMatrizLocal();
-  Object.keys(m).forEach(function(k) {
-    m[k] = (m[k] || []).filter(function(c) { return c !== codigo; });
-    if (m[k].length === 0) delete m[k];
-  });
-  if (targetKey !== 'pool') {
-    if (!m[targetKey]) m[targetKey] = [];
-    m[targetKey].push(codigo);
-  }
-  saveMatrizLocal(m);
+  var lines = getMatrizLines();
+  if (linea) lines[codigo] = linea; else delete lines[codigo];
+  saveMatrizLines(lines);
   renderMatriz();
   renderPersonal();
 }
@@ -2315,17 +2315,46 @@ function buildPersonalCard(p) {
 }
 
 async function cambiarRolOperador(codigo, rol) {
+  var matrixRol = PROCESO_TO_MATRIZ[(rol || '').trim()] || null;
+  var op = (personalData && personalData.serig ? personalData.serig : [])
+    .find(function(x) { return x.codigo === codigo; });
+
+  // Construir update: proceso_hab es la fuente del rol; mtx_* mantiene la matriz en sync
+  var update = { proceso_hab: rol || '' };
+  if (matrizDbDisponible !== false) {
+    update.mtx_rol = matrixRol;
+    // rol global o sin rol de matriz → sin línea; rol por línea → conserva la línea actual
+    if (!matrixRol || esRolGlobal(matrixRol)) update.mtx_linea = null;
+  }
+
   try {
-    var r = await db.from('personal').update({ proceso_hab: rol || '' }).eq('codigo', codigo).eq('area', 'serig');
+    var r = await db.from('personal').update(update).eq('codigo', codigo).eq('area', 'serig');
     if (r.error) throw r.error;
-    if (personalData && personalData.serig) {
-      var p = personalData.serig.find(function(x) { return x.codigo === codigo; });
-      if (p) p.proceso_hab = rol || null;
+    matrizDbDisponible = true;
+    if (op) {
+      op.proceso_hab = rol || null;
+      if ('mtx_rol' in update)   op.mtx_rol = update.mtx_rol;
+      if ('mtx_linea' in update) op.mtx_linea = update.mtx_linea;
     }
     renderPersonal();
+    renderMatriz();
     showToast('✅ Rol actualizado');
   } catch(e) {
-    showToast('❌ Error: ' + e.message, '#B83232');
+    // Columnas mtx_* no existen aún → guardar solo el rol (proceso_hab)
+    if (/mtx_rol|mtx_linea|column|schema cache/i.test((e.message || '') + (e.details || ''))) {
+      matrizDbDisponible = false;
+      try {
+        var r2 = await db.from('personal').update({ proceso_hab: rol || '' }).eq('codigo', codigo).eq('area', 'serig');
+        if (r2.error) throw r2.error;
+        if (op) op.proceso_hab = rol || null;
+        if (!matrixRol) { var ln = getMatrizLines(); delete ln[codigo]; saveMatrizLines(ln); }
+        renderPersonal();
+        renderMatriz();
+        showToast('✅ Rol actualizado');
+      } catch(e3) { showToast('❌ Error: ' + e3.message, '#B83232'); }
+    } else {
+      showToast('❌ Error: ' + e.message, '#B83232');
+    }
   }
 }
 
