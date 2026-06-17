@@ -934,11 +934,39 @@ var MATRIZ_ROLES_GLOBAL = [
 ];
 var MATRIZ_KEY = 'tetra_matriz_serig';
 var matrizDragCodigo = null;
+var matrizDbDisponible = null;   // null = aún no se sabe; true/false una vez detectado
 
-function getMatriz() {
+function esRolGlobal(rol) {
+  return MATRIZ_ROLES_GLOBAL.some(function(g) { return g.key === rol; });
+}
+function matrizCellKey(rol, linea) {
+  return esRolGlobal(rol) ? rol : rol + '-' + (linea || 0);
+}
+
+// Lee de localStorage (respaldo cuando la BD no tiene las columnas mtx_*)
+function getMatrizLocal() {
   try { return JSON.parse(localStorage.getItem(MATRIZ_KEY)) || {}; } catch(e) { return {}; }
 }
-function saveMatriz(m) { localStorage.setItem(MATRIZ_KEY, JSON.stringify(m)); }
+function saveMatrizLocal(m) { localStorage.setItem(MATRIZ_KEY, JSON.stringify(m)); }
+
+// Construye la matriz para renderizar: desde la BD (personal.mtx_*) si existe,
+// o desde localStorage como respaldo.
+function getMatriz() {
+  var lista = personalData && personalData.serig ? personalData.serig : [];
+  var hayCols = lista.some(function(p) { return p.mtx_rol !== undefined; });
+  if (hayCols) {
+    matrizDbDisponible = true;
+    var m = {};
+    lista.forEach(function(p) {
+      if (!p.mtx_rol) return;
+      var key = matrizCellKey(p.mtx_rol, p.mtx_linea);
+      if (!m[key]) m[key] = [];
+      m[key].push(p.codigo);
+    });
+    return m;
+  }
+  return getMatrizLocal();
+}
 
 function matrizOpByCodigo(codigo) {
   var lista = personalData && personalData.serig ? personalData.serig : [];
@@ -1014,22 +1042,54 @@ function matrizDragStart(e, codigo) {
   if (el) setTimeout(function() { el.classList.add('dragging'); }, 0);
 }
 
-function matrizDrop(e, targetKey) {
+async function matrizDrop(e, targetKey) {
   e.preventDefault();
   if (e.currentTarget) e.currentTarget.classList.remove('drag-over');
   if (!matrizDragCodigo) return;
-  var m = getMatriz();
-  // Un operador solo puede estar en una celda: lo quitamos de todas primero
+  var codigo = matrizDragCodigo;
+  matrizDragCodigo = null;
+
+  // Resolver rol/línea destino
+  var rol = null, linea = null;
+  if (targetKey !== 'pool') {
+    if (esRolGlobal(targetKey)) { rol = targetKey; }
+    else { var p = targetKey.split('-'); rol = p[0]; linea = parseInt(p[1]) || null; }
+  }
+
+  // Guardar en Supabase para que sincronice entre equipos (un operador = una celda)
+  if (matrizDbDisponible !== false) {
+    try {
+      var r = await db.from('personal').update({ mtx_rol: rol, mtx_linea: linea }).eq('codigo', codigo);
+      if (r.error) throw r.error;
+      matrizDbDisponible = true;
+      var lista = personalData && personalData.serig ? personalData.serig : [];
+      var op = lista.find(function(x) { return x.codigo === codigo; });
+      if (op) { op.mtx_rol = rol; op.mtx_linea = linea; }
+      renderMatriz();
+      return;
+    } catch(err) {
+      if (/mtx_rol|mtx_linea|column|schema cache/i.test((err.message || '') + (err.details || ''))) {
+        matrizDbDisponible = false;   // columnas aún no existen → usar respaldo local
+        showToast('⚠️ Roles guardados solo en este equipo · ejecuta el SQL para sincronizar', '#B45309');
+      } else {
+        showToast('Error al asignar rol: ' + err.message, '#B83232');
+        renderMatriz();
+        return;
+      }
+    }
+  }
+
+  // Respaldo localStorage (solo en este equipo)
+  var m = getMatrizLocal();
   Object.keys(m).forEach(function(k) {
-    m[k] = (m[k] || []).filter(function(c) { return c !== matrizDragCodigo; });
+    m[k] = (m[k] || []).filter(function(c) { return c !== codigo; });
     if (m[k].length === 0) delete m[k];
   });
   if (targetKey !== 'pool') {
     if (!m[targetKey]) m[targetKey] = [];
-    m[targetKey].push(matrizDragCodigo);
+    m[targetKey].push(codigo);
   }
-  saveMatriz(m);
-  matrizDragCodigo = null;
+  saveMatrizLocal(m);
   renderMatriz();
 }
 
