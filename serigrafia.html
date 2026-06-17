@@ -163,6 +163,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-rolcell{font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .mtx-cell{border:1.5px dashed var(--border);border-radius:8px;min-height:32px;padding:3px;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;background:var(--bg2);transition:border-color .15s,background .15s}
 .mtx-cell.drag-over{border-color:var(--serig-m);background:var(--serig-l)}
+.mtx-global-row{display:flex;gap:8px;margin-top:5px}
+.mtx-grow-item{display:flex;align-items:center;gap:5px}
+.mtx-grow-item .mtx-rolcell{width:84px;flex-shrink:0}
+.mtx-cell-g{width:148px}
 
 /* ── SPLIT LAYOUT ─────────────────────────────────────────── */
 .split{display:flex;flex:1;overflow:hidden;gap:1px;background:var(--border)}
@@ -983,14 +987,18 @@ function renderMatriz() {
         ' ondrop="matrizDrop(event,\'' + key + '\')">' + chips + '</div>';
     }
   });
-  // Roles generales: una sola celda que abarca las 4 columnas de línea
+  html += '</div>';
+  // Roles generales (no por línea): fila propia, lado a lado
+  html += '<div class="mtx-global-row">';
   MATRIZ_ROLES_GLOBAL.forEach(function(rol) {
     var chips = (m[rol.key] || []).map(function(c) { return matrizChip(c); }).join('');
-    html += '<div class="mtx-rolcell">' + rol.ico + ' ' + rol.lbl + '</div>';
-    html += '<div class="mtx-cell" id="mtx-' + rol.key + '" style="grid-column:span 2"' +
+    html += '<div class="mtx-grow-item">' +
+      '<div class="mtx-rolcell">' + rol.ico + ' ' + rol.lbl + '</div>' +
+      '<div class="mtx-cell mtx-cell-g" id="mtx-' + rol.key + '"' +
       ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
       ' ondragleave="this.classList.remove(\'drag-over\')"' +
-      ' ondrop="matrizDrop(event,\'' + rol.key + '\')">' + chips + '</div>';
+      ' ondrop="matrizDrop(event,\'' + rol.key + '\')">' + chips + '</div>' +
+      '</div>';
   });
   html += '</div>';
   cont.innerHTML = pool + html;
