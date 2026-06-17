@@ -907,6 +907,7 @@ function boardBuildCard(item) {
     : '';
   var descTxt = (item.sku || '') + (item.desc ? ' · ' + (item.desc.length > 28 ? item.desc.slice(0,26)+'…' : item.desc) : '');
   var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
+  var procRow = item.linea_id ? buildCardProcRow(item) : '';
   return '<div class="board-card" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
@@ -923,7 +924,46 @@ function boardBuildCard(item) {
       (item.prog > 0 ? '<span style="font-size:10px;font-weight:700;color:' + progColor + '">' + item.prog + '%</span>' : '') +
     '</div>' +
     progRow +
+    procRow +
     '</div>';
+}
+
+// Fila de procesos clicable por pedido (solo cuando está asignado a una línea)
+function buildCardProcRow(item) {
+  var parts = [];
+  for (var i = 0; i < PROCESOS_SEQ.length; i++) {
+    var estado = getProcEstado(i, item.prog);
+    parts.push('<div class="proc-node proc-' + estado + '" title="' + PROCESOS_SEQ[i].lbl + '"' +
+      ' onclick="event.stopPropagation();setProcesoPedido(\'' + item.solId + '\',' + i + ')"' +
+      ' style="padding:3px 0;flex:1;justify-content:center;font-size:13px;gap:0;cursor:pointer">' +
+      PROCESOS_SEQ[i].ico + '</div>');
+  }
+  return '<div class="proceso-pipeline" style="gap:3px;margin-top:7px;padding-top:7px;border-top:1px dashed var(--border)">' +
+    parts.join('') + '</div>';
+}
+
+async function setProcesoPedido(solId, procIdx) {
+  var s = solicitudes.find(function(x){ return x.id === solId; });
+  if (!s) return;
+  var prog = procIdx * 25 + 13;                 // valor que deja ese proceso "activo"
+  // Si vuelves a tocar el proceso actual, lo marcas como completado (avanza a 100%)
+  if (getProcEstado(procIdx, s.prog) === 'active' && procIdx === PROCESOS_SEQ.length - 1) prog = 100;
+  var nuevoEstado = (s.estado === 'nueva' || s.estado === 'programada') ? 'proceso'
+                  : (prog >= 100 ? 'lista' : s.estado);
+  try {
+    var r = await db.from('solicitudes').update({ estado: nuevoEstado, progreso_pct: prog }).eq('id', s.dbId);
+    if (r.error) throw r.error;
+    s.prog = prog; s.estado = nuevoEstado;
+    renderInicio();
+    renderPipelineSerig();
+    renderListas();
+    refreshKPIs();
+    var lbl = prog >= 100 ? 'Empaque · completado' : PROCESOS_SEQ[procIdx].lbl;
+    showToast('✅ ' + (s.id_display || '') + ' → ' + lbl);
+  } catch(e) {
+    console.error('setProcesoPedido:', e);
+    showToast('❌ Error al marcar proceso', '#B83232');
+  }
 }
 
 function boardBuildSinBlock(items) {
@@ -946,18 +986,6 @@ function boardBuildSinBlock(items) {
     '</div>';
 }
 
-function buildLaneProcPipeline(prog) {
-  var parts = [];
-  for (var i = 0; i < PROCESOS_SEQ.length; i++) {
-    if (i > 0) parts.push('<div class="proc-arrow">›</div>');
-    var estado = getProcEstado(i, prog);
-    parts.push('<div class="proc-node proc-' + estado + '" title="' + PROCESOS_SEQ[i].lbl + '" ' +
-      'style="padding:3px 6px;font-size:12px;gap:0">' + PROCESOS_SEQ[i].ico + '</div>');
-  }
-  return '<div class="proceso-pipeline" style="justify-content:center;gap:3px;padding:8px 7px;border-top:1px solid var(--border)">' +
-    parts.join('') + '</div>';
-}
-
 function boardBuildLane(laneId, items, label, active) {
   var total   = items.reduce(function(s,i){ return s + (i.cant||0); }, 0);
   var procIts = items.filter(function(i){ return i.estado === 'proceso'; });
@@ -971,7 +999,6 @@ function boardBuildLane(laneId, items, label, active) {
       '<div style="font-size:9px;font-weight:700;color:' + hdrClr + ';margin-top:2px">' + avg + '% avance</div>'
     : '';
   var cards  = items.map(boardBuildCard).join('');
-  var footer = active ? buildLaneProcPipeline(avg) : '';
   return '<div class="board-lane' + (active ? '' : ' linea-inactiva') + '" id="bl-' + laneId + '"' +
     ' ondragover="event.preventDefault();document.getElementById(\'bl-' + laneId + '\').classList.add(\'drag-over\')"' +
     ' ondragleave="document.getElementById(\'bl-' + laneId + '\').classList.remove(\'drag-over\')"' +
@@ -988,7 +1015,6 @@ function boardBuildLane(laneId, items, label, active) {
     '<div class="board-cards-wrap" id="bc-' + laneId + '">' +
       (cards || '<div class="board-empty-lane">— vacía —</div>') +
     '</div>' +
-    footer +
     '</div>';
 }
 
