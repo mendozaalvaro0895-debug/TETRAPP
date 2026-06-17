@@ -921,6 +921,11 @@ var MATRIZ_ROLES = [
   { key: 'imprime',   lbl: 'Imprime',   ico: '🖨️' },
   { key: 'recibe',    lbl: 'Recibe',    ico: '📥' }
 ];
+// Roles generales (no son por línea): un solo espacio de ancho completo
+var MATRIZ_ROLES_GLOBAL = [
+  { key: 'supervisor', lbl: 'Supervisor', ico: '⭐' },
+  { key: 'auxiliar',   lbl: 'Auxiliar',   ico: '🤝' }
+];
 var MATRIZ_KEY = 'tetra_matriz_serig';
 var matrizDragCodigo = null;
 
@@ -977,6 +982,15 @@ function renderMatriz() {
         ' ondragleave="this.classList.remove(\'drag-over\')"' +
         ' ondrop="matrizDrop(event,\'' + key + '\')">' + chips + '</div>';
     }
+  });
+  // Roles generales: una sola celda que abarca las 4 columnas de línea
+  MATRIZ_ROLES_GLOBAL.forEach(function(rol) {
+    var chips = (m[rol.key] || []).map(function(c) { return matrizChip(c); }).join('');
+    html += '<div class="mtx-rolcell">' + rol.ico + ' ' + rol.lbl + '</div>';
+    html += '<div class="mtx-cell" id="mtx-' + rol.key + '" style="grid-column:span 4"' +
+      ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
+      ' ondragleave="this.classList.remove(\'drag-over\')"' +
+      ' ondrop="matrizDrop(event,\'' + rol.key + '\')">' + chips + '</div>';
   });
   html += '</div>';
   cont.innerHTML = pool + html;
