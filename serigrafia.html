@@ -163,6 +163,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-rolcell{font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .mtx-cell{border:1.5px dashed var(--border);border-radius:8px;min-height:32px;padding:3px;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;background:var(--bg2);transition:border-color .15s,background .15s}
 .mtx-cell.drag-over{border-color:var(--serig-m);background:var(--serig-l)}
+.top-asignacion{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.ta-personal{flex:0 0 auto;max-width:100%}
+.ta-sin{flex:1 1 360px;min-width:300px}
+/* Botón Nueva Solicitud destacado */
+.btn-nueva-sol{background:linear-gradient(135deg,#6D28D9,#5A2D9E);color:#fff;border:none;border-radius:11px;padding:11px 22px;font-size:15px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(90,45,158,.38);transition:transform .12s,box-shadow .18s;animation:pulseNueva 2.4s ease-in-out infinite}
+.btn-nueva-sol:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 8px 24px rgba(90,45,158,.5)}
+.btn-nueva-sol:active{transform:translateY(0) scale(1)}
+.btn-nueva-sol .bns-ico{font-size:18px;line-height:1}
+@keyframes pulseNueva{0%,100%{box-shadow:0 4px 16px rgba(90,45,158,.38)}50%{box-shadow:0 4px 22px rgba(90,45,158,.62)}}
 .mtx-global-row{display:flex;gap:8px;margin-top:5px}
 .mtx-grow-item{display:flex;align-items:center;gap:5px}
 .mtx-grow-item .mtx-rolcell{width:84px;flex-shrink:0}
@@ -418,12 +427,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
         </div>
 
-        <!-- Matriz de personal y roles -->
-        <div class="sec-hdr">
-          <div class="sec-title">Personal y Roles</div>
-          <div class="sec-sub">Arrastra cada operador a su rol y línea · reasigna en cualquier momento</div>
+        <!-- Fila superior: Personal y Roles (izq) + Sin asignar (der) -->
+        <div class="top-asignacion">
+          <div class="ta-personal">
+            <div class="sec-hdr">
+              <div class="sec-title">Personal y Roles</div>
+              <div class="sec-sub">Arrastra cada operador a su rol y línea</div>
+            </div>
+            <div class="mtx-wrap" id="matrizPersonal"></div>
+          </div>
+          <div class="ta-sin">
+            <div id="boardSin"></div>
+          </div>
         </div>
-        <div class="mtx-wrap" id="matrizPersonal"></div>
 
         <!-- Board: carriles línea 1-4 (con pipeline de procesos integrado) -->
         <div class="sec-hdr">
@@ -431,9 +447,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="sec-sub">Arrastra los pedidos desde "Sin asignar" · 🔥 Flameado › 🖨️ Impresión › 💨 Secado › 📦 Empaque</div>
         </div>
         <div class="board-lines-row" id="boardLines"></div>
-
-        <!-- Board: bloque principal "Sin asignar" -->
-        <div id="boardSin"></div>
 
         <!-- Producción actual -->
         <div class="sec-hdr">
@@ -1234,7 +1247,7 @@ function boardBuildSinBlock(items) {
       '<div class="board-sin-title">📥 Sin asignar' +
         '<span class="board-sin-count">' + countTxt + '</span>' +
       '</div>' +
-      '<button class="btn btn-s btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>' +
+      '<button class="btn-nueva-sol" onclick="abrirForm()"><span class="bns-ico">＋</span> Nueva Solicitud</button>' +
     '</div>' +
     '<div class="board-sin-cards" id="bc-0">' +
       (cards || '<div class="board-empty-lane">No hay pedidos sin asignar</div>') +
