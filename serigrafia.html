@@ -163,10 +163,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-rolcell{font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .mtx-cell{border:1.5px dashed var(--border);border-radius:8px;min-height:32px;padding:3px;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;background:var(--bg2);transition:border-color .15s,background .15s}
 .mtx-cell.drag-over{border-color:var(--serig-m);background:var(--serig-l)}
-.top-asignacion{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;margin-bottom:6px}
+.top-asignacion{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:6px}
 .ta-personal{flex:1 1 0;min-width:340px}
-.ta-sin{flex:1 1 0;min-width:340px;display:flex;flex-direction:column}
-.ta-sin .board-sin{flex:1;margin-bottom:0}
+.ta-sin{flex:1 1 0;min-width:340px}
+.ta-sin .board-sin{margin-bottom:0}
+.mtx-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+.mtx-hdr-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--serig-m)}
+.mtx-hdr-sub{font-size:11px;color:var(--gray-l)}
 /* Botón Nueva Solicitud destacado (compacto) */
 .btn-nueva-sol{background:linear-gradient(135deg,#6D28D9,#5A2D9E);color:#fff;border:none;border-radius:9px;padding:8px 15px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 11px rgba(90,45,158,.32);transition:transform .12s,box-shadow .18s;white-space:nowrap}
 .btn-nueva-sol:hover{transform:translateY(-1px) scale(1.02);box-shadow:0 6px 18px rgba(90,45,158,.45)}
@@ -430,11 +433,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <!-- Fila superior: Personal y Roles (izq) + Sin asignar (der) -->
         <div class="top-asignacion">
           <div class="ta-personal">
-            <div class="sec-hdr">
-              <div class="sec-title">Personal y Roles</div>
-              <div class="sec-sub">Arrastra cada operador a su rol y línea</div>
+            <div class="mtx-wrap">
+              <div class="mtx-hdr">
+                <span class="mtx-hdr-title">👥 Personal y Roles</span>
+                <span class="mtx-hdr-sub">Arrastra cada operador a su rol y línea</span>
+              </div>
+              <div id="matrizPersonal"></div>
             </div>
-            <div class="mtx-wrap" id="matrizPersonal"></div>
           </div>
           <div class="ta-sin">
             <div id="boardSin"></div>
