@@ -875,7 +875,7 @@ async function cargarInventario() {
 
 async function cargarPersonal() {
   try {
-    var r = await db.from('personal').select('*').eq('area','serig').eq('activo', true);
+    var r = await db.from('personal').select('*').eq('area','serig').order('activo', { ascending: false }).order('codigo');
     if (r.error) throw r.error;
     personalData = { serig: r.data || [] };
     return personalData;
@@ -923,7 +923,8 @@ async function cargarSolicitudes() {
         tiros: decodeMeta(s.notas || '').tiros,
         linea_id: decodeMeta(s.notas || '').linea_id,
         proc_estado: decodeMeta(s.notas || '').proc_estado,
-        created: new Date(s.created_at).toLocaleString('es-GT')
+        created: new Date(s.created_at).toLocaleString('es-GT'),
+        created_at: s.created_at
       };
     });
 
@@ -1312,7 +1313,8 @@ function renderBoard() {
         linea_id:  0,
         prog:      s.prog || 0,
         estado:    s.estado,
-        procEstado: procEstadoEfectivo(s)
+        procEstado: procEstadoEfectivo(s),
+        createdAt: s.created_at || ''
       });
     } else {
       s.lineas.forEach(function(l) {
@@ -1327,7 +1329,8 @@ function renderBoard() {
           linea_id:  l.linea_id || 0,
           prog:      s.prog || 0,
           estado:    s.estado,
-          procEstado: procEstadoEfectivo(s)
+          procEstado: procEstadoEfectivo(s),
+          createdAt: s.created_at || ''
         });
       });
     }
@@ -1339,6 +1342,14 @@ function renderBoard() {
     var k = item.linea_id || 0;
     if (!lanes[k]) k = 0;
     lanes[k].push(item);
+  });
+  // Ordenar Sin asignar: por cliente A→Z, luego por ingreso más antiguo primero (FIFO)
+  lanes[0].sort(function(a, b) {
+    var ca = (a.cliente || '').toLowerCase();
+    var cb = (b.cliente || '').toLowerCase();
+    if (ca < cb) return -1;
+    if (ca > cb) return 1;
+    return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
   });
   contSin.innerHTML = boardBuildSinBlock(lanes[0]);
   var html = '';
@@ -2308,14 +2319,14 @@ function buildPersonalCard(p) {
   var rolBadge = rolActual
     ? '<span style="background:' + (rolColor[rolActual] || '#666') + '22;color:' + (rolColor[rolActual] || '#666') + ';font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">' + rolActual + '</span>'
     : '<span style="font-size:10px;color:var(--gray-l)">Sin rol</span>';
-  var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-lista' : 'pill-entregada') + '">' + (p.activo ? 'Activo' : 'Apoyo') + '</span>';
+  var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-lista' : 'pill-entregada') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>';
   var codEsc = String(p.codigo).replace(/'/g, "\\'");
   var roleSelect = '<select onchange="cambiarRolOperador(\'' + codEsc + '\',this.value)" ' +
     'style="width:100%;margin-top:10px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--bg);cursor:pointer">' +
     buildRoleOptions(rolActual) +
     '</select>';
   var menuId = 'op-menu-' + codEsc;
-  return '<div class="op-card">' +
+  return '<div class="op-card" style="' + (p.activo ? '' : 'opacity:.5') + '">' +
     '<button class="op-menu-btn" onclick="toggleOpMenu(event,\'' + codEsc + '\')">···</button>' +
     '<div class="op-menu-drop" id="' + menuId + '">' +
       '<div class="op-menu-item" onclick="cerrarTodosOpMenus();abrirModalEditarOperario(\'' + codEsc + '\')">✏️ Editar</div>' +
@@ -2379,30 +2390,10 @@ async function cambiarRolOperador(codigo, rol) {
 
 async function sincronizarPersonalSerig() {
   try {
-    // 1. Obtener todos los registros serig actuales
-    var rGet = await db.from('personal').select('id,codigo').eq('area', 'serig');
-    if (rGet.error) throw rGet.error;
-    // 2. Eliminar los que no están en la lista oficial (por id — evita problemas de filtro)
-    var codigosValidos = PERSONAL_SERIG_SEED.map(function(p) { return p.codigo; });
-    var huerfanos = (rGet.data || []).filter(function(p) {
-      return codigosValidos.indexOf(p.codigo) === -1;
-    });
-    for (var i = 0; i < huerfanos.length; i++) {
-      await db.from('personal').delete().eq('id', huerfanos[i].id);
-    }
-    // 3. Upsert lista oficial (proceso_hab vacío en vez de null para evitar NOT NULL)
-    var seed = PERSONAL_SERIG_SEED.map(function(p) {
-      return {
-        codigo: p.codigo, nombre: p.nombre, iniciales: p.iniciales,
-        area: p.area, activo: p.activo, color_hex: p.color_hex,
-        proceso_hab: p.proceso_hab || ''
-      };
-    });
-    var ru = await db.from('personal').upsert(seed, { onConflict: 'codigo' });
-    if (ru.error) throw ru.error;
     await cargarPersonal();
     renderPersonal();
-    showToast('✅ Personal sincronizado · ' + seed.length + ' operadores');
+    renderMatriz();
+    showToast('✅ Lista de personal actualizada · ' + (personalData.serig || []).length + ' operadores');
   } catch(e) {
     showToast('❌ Error: ' + e.message, '#B83232');
   }
