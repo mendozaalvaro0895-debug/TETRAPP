@@ -1285,9 +1285,21 @@ function buildComentarioRow(item) {
     '💬 ' + display + '</div>';
 }
 
+function cerrarComPopover() {
+  var old = document.getElementById('com-popover');
+  if (!old) return;
+  if (old._closePop) document.removeEventListener('click', old._closePop);
+  old.remove();
+}
+
 function editarComentario(solId, el) {
   var old = document.getElementById('com-popover');
-  if (old) { var wasMe = old._solId === solId; old.remove(); if (wasMe) return; }
+  if (old) {
+    if (old._closePop) document.removeEventListener('click', old._closePop);
+    var wasMe = old._solId === solId;
+    old.remove();
+    if (wasMe) return;
+  }
   var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!s) return;
   var pop = document.createElement('div');
@@ -1301,7 +1313,7 @@ function editarComentario(solId, el) {
       (s.notas || '').replace(/</g,'&lt;') +
     '</textarea>' +
     '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:7px">' +
-      '<button onclick="document.getElementById(\'com-popover\').remove()" ' +
+      '<button onclick="cerrarComPopover()" ' +
         'style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px">Cancelar</button>' +
       '<button onclick="guardarComentario(\'' + solId + '\',document.getElementById(\'com-inp\').value)" ' +
         'style="padding:4px 12px;background:var(--serig-m);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700">Guardar</button>' +
@@ -1312,15 +1324,19 @@ function editarComentario(solId, el) {
   pop.style.left = Math.min(rect.left, window.innerWidth - 276) + 'px';
   document.body.appendChild(pop);
   setTimeout(function() { var t = document.getElementById('com-inp'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }, 50);
-  setTimeout(function() {
-    function closePop(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click', closePop); } }
-    document.addEventListener('click', closePop);
-  }, 100);
+  function closePop(e) {
+    if (!pop.contains(e.target)) {
+      document.removeEventListener('click', closePop);
+      pop._closePop = null;
+      pop.remove();
+    }
+  }
+  pop._closePop = closePop;
+  setTimeout(function() { document.addEventListener('click', closePop); }, 150);
 }
 
 async function guardarComentario(solId, texto) {
-  var pop = document.getElementById('com-popover');
-  if (pop) pop.remove();
+  cerrarComPopover();
   var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!s) return;
   var nuevasNotas = encodeMeta(0, s.tiros || 1, 0, texto.trim(), s.proc_estado || '', s.tiro_actual || 1);
