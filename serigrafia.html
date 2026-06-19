@@ -1184,6 +1184,7 @@ function boardBuildCard(item) {
     cantAndProg +
     tiroRow +
     procRow +
+    (item.linea_id ? buildComentarioRow(item) : '') +
     '</div>';
 }
 
@@ -1270,6 +1271,65 @@ async function editarTirosSolicitud(solId, totalTiros) {
     renderBoard();
     mostrarDetalle(solId);
     showToast('✅ Tiros actualizados: ' + totalTiros);
+  } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
+}
+
+function buildComentarioRow(item) {
+  var texto = (item.notas || '').trim();
+  var display = texto
+    ? '<span style="color:var(--ink)">' + texto.replace(/</g,'&lt;') + '</span>'
+    : '<span style="color:var(--gray-l);font-style:italic">＋ Añadir comentario…</span>';
+  return '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);' +
+    'font-size:10px;line-height:1.4;cursor:pointer;word-break:break-word"' +
+    ' onclick="event.stopPropagation();editarComentario(\'' + item.solId + '\',this)">' +
+    '💬 ' + display + '</div>';
+}
+
+function editarComentario(solId, el) {
+  var old = document.getElementById('com-popover');
+  if (old) { var wasMe = old._solId === solId; old.remove(); if (wasMe) return; }
+  var s = solicitudes.find(function(x) { return x.id === solId; });
+  if (!s) return;
+  var pop = document.createElement('div');
+  pop.id = 'com-popover';
+  pop._solId = solId;
+  pop.innerHTML =
+    '<div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:6px">💬 Comentario</div>' +
+    '<textarea id="com-inp" rows="3" placeholder="Entrega parcial, instrucción especial…" ' +
+      'style="width:100%;box-sizing:border-box;padding:6px 8px;border:1.5px solid var(--border);border-radius:7px;' +
+      'font-size:12px;font-family:var(--font);resize:vertical;outline:none">' +
+      (s.notas || '').replace(/</g,'&lt;') +
+    '</textarea>' +
+    '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:7px">' +
+      '<button onclick="document.getElementById(\'com-popover\').remove()" ' +
+        'style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px">Cancelar</button>' +
+      '<button onclick="guardarComentario(\'' + solId + '\',document.getElementById(\'com-inp\').value)" ' +
+        'style="padding:4px 12px;background:var(--serig-m);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700">Guardar</button>' +
+    '</div>';
+  pop.style.cssText = 'position:fixed;background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:12px;z-index:9000;box-shadow:0 6px 20px rgba(0,0,0,.18);width:260px';
+  var rect = el.getBoundingClientRect();
+  pop.style.top  = Math.min(rect.bottom + 6, window.innerHeight - 180) + 'px';
+  pop.style.left = Math.min(rect.left, window.innerWidth - 276) + 'px';
+  document.body.appendChild(pop);
+  setTimeout(function() { var t = document.getElementById('com-inp'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }, 50);
+  setTimeout(function() {
+    function closePop(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click', closePop); } }
+    document.addEventListener('click', closePop);
+  }, 100);
+}
+
+async function guardarComentario(solId, texto) {
+  var pop = document.getElementById('com-popover');
+  if (pop) pop.remove();
+  var s = solicitudes.find(function(x) { return x.id === solId; });
+  if (!s) return;
+  var nuevasNotas = encodeMeta(0, s.tiros || 1, 0, texto.trim(), s.proc_estado || '', s.tiro_actual || 1);
+  try {
+    var r = await db.from('solicitudes').update({ notas: nuevasNotas }).eq('id', s.dbId);
+    if (r.error) throw r.error;
+    s.notas = texto.trim();
+    renderBoard();
+    showToast('✅ Comentario guardado');
   } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
 }
 
@@ -1428,6 +1488,7 @@ function renderBoard() {
         procEstado:  procEstadoEfectivo(s),
         tiros:       sTiros,
         tiro_actual: s.tiro_actual || 1,
+        notas:       s.notas || '',
         createdAt: s.created_at || ''
       });
     } else {
@@ -1446,6 +1507,7 @@ function renderBoard() {
           procEstado:  procEstadoEfectivo(s),
           tiros:       sTiros,
           tiro_actual: s.tiro_actual || 1,
+          notas:       s.notas || '',
           createdAt: s.created_at || ''
         });
       });
