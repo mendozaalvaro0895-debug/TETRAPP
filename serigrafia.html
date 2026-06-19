@@ -1147,7 +1147,8 @@ function boardBuildCard(item) {
   var badgeClr  = item.estado === 'proceso'    ? 'var(--serig-m)' : item.estado === 'programada' ? '#92400e' : '#64748b';
   var badgeTxt  = item.estado === 'proceso'    ? 'EN PROCESO'     : item.estado === 'programada' ? 'PROG'    : 'NUEVA';
   var badge = '<span style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:4px;padding:1px 5px;font-size:8px;font-weight:800">' + badgeTxt + '</span>';
-  var descTxt = (item.sku || '') + (item.desc ? ' · ' + (item.desc.length > 28 ? item.desc.slice(0,26)+'…' : item.desc) : '');
+  var skuTxt  = item.sku  ? '<span style="font-weight:700;color:var(--ink);font-family:var(--mono)">' + item.sku + '</span> · ' : '';
+  var descTxt = skuTxt + '<span style="color:var(--gray)">' + (item.desc || '—') + '</span>';
   var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var procRow = item.linea_id ? buildCardProcRow(item) : '';
   var tiroRow = (item.linea_id && item.tiros > 1) ? buildTiroRow(item) : '';
@@ -1178,7 +1179,7 @@ function boardBuildCard(item) {
       badge +
     '</div>' +
     '<div style="font-size:12px;font-weight:700;color:var(--ink);line-height:1.2;margin-bottom:2px">' + item.cliente + '</div>' +
-    '<div style="font-size:10px;color:var(--gray);margin-bottom:4px">' + descTxt + '</div>' +
+    '<div style="font-size:11px;line-height:1.4;margin-bottom:4px;word-break:break-word">' + descTxt + '</div>' +
     cantAndProg +
     tiroRow +
     procRow +
