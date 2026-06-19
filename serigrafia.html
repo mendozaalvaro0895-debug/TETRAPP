@@ -1256,6 +1256,23 @@ async function guardarProgreso(solId, prog) {
   } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
 }
 
+async function editarTirosSolicitud(solId, totalTiros) {
+  var s = solicitudes.find(function(x) { return x.id === solId; });
+  if (!s) return;
+  try {
+    // Actualizar todas las líneas de esta solicitud
+    for (var i = 0; i < s.lineas.length; i++) {
+      var r = await db.from('solicitud_lineas').update({ tiros: totalTiros }).eq('id', s.lineas[i].id);
+      if (r.error) throw r.error;
+      s.lineas[i].tiros = totalTiros;
+    }
+    s.tiros = totalTiros;
+    renderBoard();
+    mostrarDetalle(solId);
+    showToast('✅ Tiros actualizados: ' + totalTiros);
+  } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
+}
+
 async function cambiarTiroActual(solId, tiroNum) {
   var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!s) return;
@@ -1893,7 +1910,16 @@ async function mostrarDetalle(id) {
             '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Cap. Impresión</div>' +
               '<div style="font-size:14px;font-weight:700;font-family:var(--mono);color:var(--serig-m);margin-top:2px">' + capStr + '</div></div>' +
             '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Tiros</div>' +
-              '<div style="font-size:14px;font-weight:700;font-family:var(--mono);color:var(--ink);margin-top:2px">' + tirosStr + '</div></div>' +
+              '<div style="display:flex;gap:5px;margin-top:4px">' +
+                [1,2,3].map(function(n) {
+                  var cur = s.tiros || 1;
+                  var act = n === cur;
+                  return '<span onclick="editarTirosSolicitud(\'' + s.id + '\',' + n + ')" ' +
+                    'style="padding:3px 10px;border-radius:5px;font-size:12px;font-weight:800;cursor:pointer;' +
+                    (act ? 'background:var(--serig-m);color:#fff' : 'background:var(--bg);color:var(--gray-l);border:1px solid var(--border)') + '">' +
+                    'T' + n + '</span>';
+                }).join('') +
+              '</div></div>' +
             '<div><div style="font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Línea</div>' +
               '<div style="font-size:14px;font-weight:700;color:' + (s.linea_id ? 'var(--serig-m)' : 'var(--gray-l)') + ';margin-top:2px">' + lineaStr + '</div></div>' +
           '</div>' +
