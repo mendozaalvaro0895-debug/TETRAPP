@@ -745,13 +745,13 @@ const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 // ── Meta-encoding (envase/cap/tiros en campo notas) ──────────
 var META_SEP = '__M__';
 
-function encodeMeta(cap, tiros, lineaId, notasUsuario, procEstado) {
-  var m = META_SEP + cap + '|' + tiros + '|' + (lineaId || 0) + '|' + (procEstado || '') + META_SEP;
+function encodeMeta(cap, tiros, lineaId, notasUsuario, procEstado, tiroActual) {
+  var m = META_SEP + cap + '|' + tiros + '|' + (lineaId || 0) + '|' + (procEstado || '') + '|' + (tiroActual || 1) + META_SEP;
   return notasUsuario ? m + '\n' + notasUsuario : m;
 }
 
 function decodeMeta(notas) {
-  var dflt = { cap_impresion: 0, tiros: 0, linea_id: 0, proc_estado: '', notas_usuario: notas || '' };
+  var dflt = { cap_impresion: 0, tiros: 0, linea_id: 0, proc_estado: '', tiro_actual: 1, notas_usuario: notas || '' };
   if (!notas) return dflt;
   var start = notas.indexOf(META_SEP);
   var end   = notas.indexOf(META_SEP, start + META_SEP.length);
@@ -766,6 +766,7 @@ function decodeMeta(notas) {
     tiros:         parseInt(parts[1]) || 0,
     linea_id:      parseInt(parts[2]) || 0,
     proc_estado:   (parts[3] || '').replace(/[^0-2]/g, ''),
+    tiro_actual:   parseInt(parts[4]) || 1,
     notas_usuario: rest
   };
 }
@@ -923,6 +924,7 @@ async function cargarSolicitudes() {
         tiros: decodeMeta(s.notas || '').tiros,
         linea_id: decodeMeta(s.notas || '').linea_id,
         proc_estado: decodeMeta(s.notas || '').proc_estado,
+        tiro_actual: decodeMeta(s.notas || '').tiro_actual,
         created: new Date(s.created_at).toLocaleString('es-GT'),
         created_at: s.created_at
       };
@@ -1145,13 +1147,20 @@ function boardBuildCard(item) {
   var badgeClr  = item.estado === 'proceso'    ? 'var(--serig-m)' : item.estado === 'programada' ? '#92400e' : '#64748b';
   var badgeTxt  = item.estado === 'proceso'    ? 'EN PROCESO'     : item.estado === 'programada' ? 'PROG'    : 'NUEVA';
   var badge = '<span style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:4px;padding:1px 5px;font-size:8px;font-weight:800">' + badgeTxt + '</span>';
-  var progRow = item.prog > 0
-    ? '<div style="margin-top:5px;background:var(--border);border-radius:3px;height:3px">' +
-      '<div style="background:' + progColor + ';height:3px;border-radius:3px;width:' + item.prog + '%"></div></div>'
-    : '';
+  var progRow = item.linea_id
+    ? '<div style="margin-top:5px;cursor:pointer" title="Clic para editar progreso"' +
+      ' onclick="event.stopPropagation();editarProgreso(\'' + item.solId + '\',' + item.prog + ',this)">' +
+      '<div style="background:var(--border);border-radius:3px;height:4px;position:relative">' +
+      '<div style="background:' + progColor + ';height:4px;border-radius:3px;width:' + item.prog + '%"></div></div>' +
+      '</div>'
+    : (item.prog > 0
+      ? '<div style="margin-top:5px;background:var(--border);border-radius:3px;height:3px">' +
+        '<div style="background:' + progColor + ';height:3px;border-radius:3px;width:' + item.prog + '%"></div></div>'
+      : '');
   var descTxt = (item.sku || '') + (item.desc ? ' · ' + (item.desc.length > 28 ? item.desc.slice(0,26)+'…' : item.desc) : '');
   var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var procRow = item.linea_id ? buildCardProcRow(item) : '';
+  var tiroRow = (item.linea_id && item.tiros > 1) ? buildTiroRow(item) : '';
   return '<div class="board-card" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
@@ -1165,11 +1174,97 @@ function boardBuildCard(item) {
     '<div style="display:flex;justify-content:space-between;align-items:center">' +
       '<span style="font-size:12px;font-weight:700">' + (item.cant||0).toLocaleString() + '</span>' +
       '<span style="font-size:10px;color:var(--gray)">und</span>' +
-      (item.prog > 0 ? '<span style="font-size:10px;font-weight:700;color:' + progColor + '">' + item.prog + '%</span>' : '') +
+      (item.linea_id
+        ? '<span style="font-size:10px;font-weight:700;color:' + progColor + ';cursor:pointer" onclick="event.stopPropagation();editarProgreso(\'' + item.solId + '\',' + item.prog + ',this)">' + item.prog + '%</span>'
+        : (item.prog > 0 ? '<span style="font-size:10px;font-weight:700;color:' + progColor + '">' + item.prog + '%</span>' : '')) +
     '</div>' +
     progRow +
+    tiroRow +
     procRow +
     '</div>';
+}
+
+function buildTiroRow(item) {
+  var total  = item.tiros || 1;
+  var actual = item.tiro_actual || 1;
+  var btns = '';
+  for (var t = 1; t <= total; t++) {
+    var isActive = t === actual;
+    btns += '<div onclick="event.stopPropagation();cambiarTiroActual(\'' + item.solId + '\',' + t + ')" ' +
+      'style="padding:2px 9px;border-radius:4px;font-size:10px;font-weight:800;cursor:pointer;' +
+      (isActive ? 'background:var(--serig-m);color:#fff' : 'background:var(--bg);color:var(--gray-l);border:1px solid var(--border)') + '">' +
+      'T' + t + '</div>';
+  }
+  return '<div style="display:flex;gap:4px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border)">' +
+    '<span style="font-size:9px;color:var(--gray-l);font-weight:700;margin-right:2px">TIRO</span>' +
+    btns + '</div>';
+}
+
+function editarProgreso(solId, currentProg, el) {
+  var old = document.getElementById('prog-popover');
+  if (old) { var wasMe = old._solId === solId; old.remove(); if (wasMe) return; }
+  var pop = document.createElement('div');
+  pop.id = 'prog-popover';
+  pop._solId = solId;
+  var presets = [0, 25, 50, 75, 100];
+  var btnsHtml = presets.map(function(p) {
+    var active = p === currentProg;
+    return '<button onclick="guardarProgreso(\'' + solId + '\',' + p + ')" ' +
+      'style="flex:1;padding:5px 2px;border:none;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;' +
+      (active ? 'background:var(--serig-m);color:#fff' : 'background:var(--bg);color:var(--ink);border:1px solid var(--border)') + '">' +
+      p + '%</button>';
+  }).join('');
+  pop.innerHTML =
+    '<div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:7px">✏️ Progreso manual</div>' +
+    '<div style="display:flex;gap:3px;margin-bottom:8px">' + btnsHtml + '</div>' +
+    '<div style="display:flex;gap:6px;align-items:center">' +
+      '<input type="number" id="prog-inp" min="0" max="100" value="' + currentProg + '" ' +
+        'style="flex:1;padding:5px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;text-align:center;width:50px" ' +
+        'onkeydown="if(event.key===\'Enter\')guardarProgreso(\'' + solId + '\',parseInt(this.value)||0)">' +
+      '<span style="font-size:11px;color:var(--gray)">%</span>' +
+      '<button onclick="guardarProgreso(\'' + solId + '\',parseInt(document.getElementById(\'prog-inp\').value)||0)" ' +
+        'style="padding:5px 12px;background:var(--serig-m);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700">OK</button>' +
+    '</div>';
+  pop.style.cssText = 'position:fixed;background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:12px;z-index:9000;box-shadow:0 6px 20px rgba(0,0,0,.18);width:220px';
+  var rect = el.getBoundingClientRect();
+  pop.style.top  = Math.min(rect.bottom + 6, window.innerHeight - 160) + 'px';
+  pop.style.left = Math.min(rect.left, window.innerWidth - 236) + 'px';
+  document.body.appendChild(pop);
+  setTimeout(function() { var inp = document.getElementById('prog-inp'); if (inp) { inp.focus(); inp.select(); } }, 50);
+  setTimeout(function() {
+    function closePop(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click', closePop); } }
+    document.addEventListener('click', closePop);
+  }, 100);
+}
+
+async function guardarProgreso(solId, prog) {
+  var pop = document.getElementById('prog-popover');
+  if (pop) pop.remove();
+  prog = Math.max(0, Math.min(100, prog || 0));
+  var s = solicitudes.find(function(x) { return x.id === solId; });
+  if (!s) return;
+  var nuevoEstado = prog >= 100 ? 'lista' : prog > 0 ? 'proceso' : s.estado;
+  try {
+    var r = await db.from('solicitudes').update({ progreso_pct: prog, estado: nuevoEstado }).eq('id', s.dbId);
+    if (r.error) throw r.error;
+    s.prog = prog; s.estado = nuevoEstado;
+    renderBoard();
+    refreshKPIs();
+    showToast('✅ Progreso: ' + prog + '%');
+  } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
+}
+
+async function cambiarTiroActual(solId, tiroNum) {
+  var s = solicitudes.find(function(x) { return x.id === solId; });
+  if (!s) return;
+  var nuevasNotas = encodeMeta(0, s.tiros || 1, 0, s.notas || '', s.proc_estado || '', tiroNum);
+  try {
+    var r = await db.from('solicitudes').update({ notas: nuevasNotas }).eq('id', s.dbId);
+    if (r.error) throw r.error;
+    s.tiro_actual = tiroNum;
+    renderBoard();
+    showToast('✅ Tiro ' + tiroNum + ' activo');
+  } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
 }
 
 // Estado por proceso: cadena de 4 dígitos (0=pendiente, 1=activo, 2=completado)
@@ -1223,7 +1318,7 @@ async function toggleProcesoPedido(solId, procIdx) {
                   : anyMarked ? 'proceso'
                   : (s.estado === 'lista' || s.estado === 'entregada' ? s.estado : 'nueva');
 
-  var nuevasNotas = encodeMeta(0, 0, 0, s.notas || '', nuevoProc);
+  var nuevasNotas = encodeMeta(0, s.tiros || 1, 0, s.notas || '', nuevoProc, s.tiro_actual || 1);
   try {
     var r = await db.from('solicitudes')
       .update({ notas: nuevasNotas, estado: nuevoEstado, progreso_pct: prog })
@@ -1301,6 +1396,7 @@ function renderBoard() {
   var items = [];
   solicitudes.forEach(function(s) {
     if (['nueva','programada','proceso'].indexOf(s.estado) < 0) return;
+    var sTiros = s.tiros || Math.max.apply(null, (s.lineas.length ? s.lineas.map(function(l){ return l.tiros || 1; }) : [1]));
     if (s.lineas.length === 0) {
       items.push({
         lineaDbId: null,
@@ -1313,7 +1409,9 @@ function renderBoard() {
         linea_id:  0,
         prog:      s.prog || 0,
         estado:    s.estado,
-        procEstado: procEstadoEfectivo(s),
+        procEstado:  procEstadoEfectivo(s),
+        tiros:       sTiros,
+        tiro_actual: s.tiro_actual || 1,
         createdAt: s.created_at || ''
       });
     } else {
@@ -1329,7 +1427,9 @@ function renderBoard() {
           linea_id:  l.linea_id || 0,
           prog:      s.prog || 0,
           estado:    s.estado,
-          procEstado: procEstadoEfectivo(s),
+          procEstado:  procEstadoEfectivo(s),
+          tiros:       sTiros,
+          tiro_actual: s.tiro_actual || 1,
           createdAt: s.created_at || ''
         });
       });
