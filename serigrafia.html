@@ -1151,7 +1151,8 @@ function boardBuildCard(item) {
   var descTxt = skuTxt + '<span style="font-weight:700;color:var(--ink)">' + (item.desc || '—') + '</span>';
   var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var procRow = item.linea_id ? buildCardProcRow(item) : '';
-  var tiroRow = item.linea_id ? buildTiroRow(item) : '';
+  var tiroMax = Math.max(item.tiros || 1, item.tiro_actual || 1);
+  var tiroRow = (item.linea_id && tiroMax > 1) ? buildTiroRow(item, tiroMax) : '';
   var cantAndProg = item.linea_id
     ? '<div style="margin-top:4px;padding:7px 8px;background:var(--bg);border-radius:7px;cursor:pointer;border:1.5px solid var(--border)"' +
       ' title="Clic para editar progreso"' +
@@ -1186,10 +1187,10 @@ function boardBuildCard(item) {
     '</div>';
 }
 
-function buildTiroRow(item) {
+function buildTiroRow(item, total) {
   var actual = item.tiro_actual || 1;
   var btns = '';
-  for (var t = 1; t <= 3; t++) {
+  for (var t = 1; t <= (total || 3); t++) {
     var isActive = t === actual;
     btns += '<div onclick="event.stopPropagation();cambiarTiroActual(\'' + item.solId + '\',' + t + ')" ' +
       'style="padding:3px 11px;border-radius:4px;font-size:10px;font-weight:800;cursor:pointer;' +
