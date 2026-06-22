@@ -146,9 +146,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sin-grupo-meta{display:flex;flex-direction:column;gap:1px}
 .sin-grupo-meta span{font-size:10px;color:rgba(255,255,255,.8);font-weight:600;line-height:1.4}
 .sin-grupo-cards{display:flex;flex-direction:column;gap:6px;padding:8px}
-.sin-card-wrap{border-radius:8px;transition:border .1s}
+.sin-card-wrap{border-radius:8px;transition:box-shadow .1s}
 .sin-card-wrap.drop-before{box-shadow:0 -3px 0 0 var(--serig-m)}
 .sin-card-wrap.drop-after{box-shadow:0 3px 0 0 var(--serig-m)}
+.sin-reorder-handle{display:flex;align-items:center;justify-content:center;height:16px;background:var(--serig-l);border-radius:6px 6px 0 0;cursor:grab;font-size:11px;color:var(--serig-m);letter-spacing:3px;user-select:none;opacity:.85}
+.sin-reorder-handle:hover{opacity:1;background:var(--serig-ll,#ede9fe)}
+.sin-reorder-handle:active{cursor:grabbing}
 /* Carriles línea 1-4 */
 .board-lines-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
 .board-lane{border-radius:10px;border:2px solid var(--border);overflow:hidden;background:var(--bg2);transition:border-color .15s,box-shadow .15s;display:flex;flex-direction:column}
@@ -1446,6 +1449,7 @@ async function toggleProcesoPedido(solId, procIdx) {
 }
 
 var sinGrupoArrastre = null;
+var sinHandleDrag = null; // { solId, cliente } — reorder independiente del board drag
 
 function getSinCardOrden() {
   try { return JSON.parse(localStorage.getItem('tetra_sin_cards_s') || '{}'); } catch(e) { return {}; }
@@ -1454,15 +1458,19 @@ function saveSinCardOrden(obj) {
   localStorage.setItem('tetra_sin_cards_s', JSON.stringify(obj));
 }
 
+function sinHandleDragStart(e, solId, cliente) {
+  sinHandleDrag = { solId: solId, cliente: cliente };
+  e.dataTransfer.setData('text/plain', 'reorder:' + solId);
+  e.stopPropagation();
+}
+
 function sinCardDragOver(e, targetSolId) {
-  if (boardDragId !== null) return; // viene de una línea de producción, no reordenar
-  if (!boardDragSolId || boardDragSolId === targetSolId) return;
+  if (!sinHandleDrag || sinHandleDrag.solId === targetSolId) return;
   e.preventDefault();
   e.stopPropagation();
-  var wrap = e.currentTarget;
   document.querySelectorAll('.sin-card-wrap').forEach(function(el){ el.classList.remove('drop-before','drop-after'); });
-  var rect = wrap.getBoundingClientRect();
-  wrap.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drop-before' : 'drop-after');
+  var rect = e.currentTarget.getBoundingClientRect();
+  e.currentTarget.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drop-before' : 'drop-after');
 }
 
 function sinCardDragLeave(e) {
@@ -1473,12 +1481,14 @@ function sinCardDrop(e, targetSolId, cliente) {
   e.preventDefault();
   e.stopPropagation();
   document.querySelectorAll('.sin-card-wrap').forEach(function(el){ el.classList.remove('drop-before','drop-after'); });
-  if (boardDragId !== null || !boardDragSolId || boardDragSolId === targetSolId) return;
+  if (!sinHandleDrag || sinHandleDrag.solId === targetSolId) { sinHandleDrag = null; return; }
 
-  var dragId = boardDragSolId;
+  var dragId = sinHandleDrag.solId;
+  var dragCli = sinHandleDrag.cliente;
+  sinHandleDrag = null;
+
   var allOrden = getSinCardOrden();
-  var cliOrden = (allOrden[cliente] || []).filter(function(id){ return id !== dragId; });
-
+  var cliOrden = (allOrden[dragCli] || []).filter(function(id){ return id !== dragId; });
   var rect = e.currentTarget.getBoundingClientRect();
   var insertBefore = e.clientY < rect.top + rect.height / 2;
   var idx = cliOrden.indexOf(targetSolId);
@@ -1486,10 +1496,8 @@ function sinCardDrop(e, targetSolId, cliente) {
   else if (!insertBefore) idx++;
   cliOrden.splice(idx, 0, dragId);
 
-  allOrden[cliente] = cliOrden;
+  allOrden[dragCli] = cliOrden;
   saveSinCardOrden(allOrden);
-  boardDragId = null;
-  boardDragSolId = null;
   renderBoard();
 }
 
@@ -1588,6 +1596,9 @@ function boardBuildSinBlock(items) {
             ' ondragover="sinCardDragOver(event,\'' + solEsc + '\')"' +
             ' ondragleave="sinCardDragLeave(event)"' +
             ' ondrop="sinCardDrop(event,\'' + solEsc + '\',\'' + cliEsc + '\')">' +
+            '<div class="sin-reorder-handle" draggable="true"' +
+              ' ondragstart="sinHandleDragStart(event,\'' + solEsc + '\',\'' + cliEsc + '\')"' +
+              ' onclick="event.stopPropagation()">· · ·</div>' +
             boardBuildCard(item) +
           '</div>';
         }).join('');
