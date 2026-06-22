@@ -470,11 +470,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
         <div class="board-lines-row" id="boardLines"></div>
 
-        <!-- Producción actual -->
-        <div class="sec-hdr">
-          <div class="sec-title">Producción Actual</div>
-          <div class="sec-sub">Solicitudes en proceso · actualizado <span id="lastUpdate">—</span></div>
+        <!-- Entregados -->
+        <div class="sec-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div>
+            <div class="sec-title">Entregados</div>
+            <div class="sec-sub">Solicitudes entregadas del sistema + registros manuales · <span id="lastUpdate">—</span></div>
+          </div>
+          <button class="btn btn-s" style="background:var(--serig-m);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="abrirFormEntregado()">+ Registrar entregado</button>
         </div>
+        <div id="formEntregadoInline" style="display:none;margin-bottom:12px"></div>
         <div id="produccionActual"></div>
 
       </div>
@@ -1905,41 +1909,117 @@ function buildProcNode(proc, estado) {
 }
 
 
-// ── Producción actual ────────────────────────────────────────
+// ── Entregados ────────────────────────────────────────────────
 
-function buildProgBar(prog) {
-  return '<div class="prod-pr-row">' +
-    '<div class="prod-pr-wrap"><div class="prod-pr-bar" style="width:' + prog + '%"></div></div>' +
-    '<span style="font-family:var(--mono);font-size:10px;color:var(--gray);min-width:32px">' + prog + '%</span>' +
+function getEntregasManuales() {
+  try { return JSON.parse(localStorage.getItem('tetra_entregas_s') || '[]'); } catch(e) { return []; }
+}
+function saveEntregasManuales(arr) {
+  localStorage.setItem('tetra_entregas_s', JSON.stringify(arr));
+}
+
+function abrirFormEntregado() {
+  var el = document.getElementById('formEntregadoInline');
+  if (!el) return;
+  if (el.style.display !== 'none') { cerrarFormEntregado(); return; }
+  var hoy = new Date().toISOString().slice(0,10);
+  el.style.display = 'block';
+  el.innerHTML =
+    '<div style="background:var(--card);border:1.5px solid var(--serig-m);border-radius:10px;padding:14px 16px">' +
+      '<div style="font-size:12px;font-weight:800;color:var(--serig-m);margin-bottom:10px">📦 Registrar entregado manual</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
+        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">CLIENTE *</div>' +
+          '<input id="eCliente" placeholder="Nombre del cliente" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">PRODUCTO / DESCRIPCIÓN</div>' +
+          '<input id="eDesc" placeholder="Descripción del producto" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">CANTIDAD *</div>' +
+          '<input id="eCant" type="number" min="1" placeholder="0" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">FECHA ENTREGA</div>' +
+          '<input id="eFecha" type="date" value="' + hoy + '" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+      '</div>' +
+      '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">NOTA (opcional)</div>' +
+        '<input id="eNota" placeholder="Observaciones, No. de remisión, etc." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button onclick="guardarEntregadoManual()" style="background:var(--serig-m);color:#fff;border:none;border-radius:7px;padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>' +
+        '<button onclick="cerrarFormEntregado()" style="background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer">Cancelar</button>' +
+      '</div>' +
     '</div>';
 }
 
-function buildProdRow(s) {
-  return '<tr onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + s.id + '\')},100)" style="cursor:pointer">' +
-    '<td><span style="font-family:var(--mono);font-weight:700;color:var(--serig-m)">' + (s.id_display || s.id.slice(0,8)) + '</span></td>' +
-    '<td style="font-weight:600">' + s.cliente + '</td>' +
-    '<td style="font-family:var(--mono)">' + s.cant.toLocaleString() + '</td>' +
-    '<td>' + buildProgBar(s.prog) + '</td>' +
-    '<td>' + estadoPill(s.estado) + '</td>' +
-    '<td style="font-size:11px;color:var(--gray)">' + s.created + '</td>' +
-    '</tr>';
+function cerrarFormEntregado() {
+  var el = document.getElementById('formEntregadoInline');
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+}
+
+function guardarEntregadoManual() {
+  var cliente = (document.getElementById('eCliente') || {}).value || '';
+  var desc    = (document.getElementById('eDesc')    || {}).value || '';
+  var cant    = parseInt((document.getElementById('eCant')  || {}).value || '0');
+  var fecha   = (document.getElementById('eFecha')  || {}).value || new Date().toISOString().slice(0,10);
+  var nota    = (document.getElementById('eNota')   || {}).value || '';
+  if (!cliente.trim()) { showToast('⚠️ Ingresá el nombre del cliente', '#92400e'); return; }
+  if (!cant || cant < 1) { showToast('⚠️ Ingresá una cantidad válida', '#92400e'); return; }
+  var arr = getEntregasManuales();
+  arr.unshift({ id: 'm-' + Date.now(), cliente: cliente.trim(), desc: desc.trim(), cant: cant, fecha: fecha, nota: nota.trim() });
+  saveEntregasManuales(arr);
+  cerrarFormEntregado();
+  renderProduccionActual();
+  showToast('✅ Entregado registrado');
+}
+
+function eliminarEntregadoManual(id) {
+  if (!confirm('¿Eliminar este registro manual?')) return;
+  var arr = getEntregasManuales().filter(function(e){ return e.id !== id; });
+  saveEntregasManuales(arr);
+  renderProduccionActual();
 }
 
 function renderProduccionActual() {
   var el = document.getElementById('produccionActual');
   if (!el) return;
-  var activas = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
-  if (activas.length === 0) {
-    el.innerHTML = '<div class="prod-empty">No hay solicitudes en proceso actualmente</div>';
+
+  // Solicitudes entregadas del sistema
+  var entregadasSistema = solicitudes.filter(function(s){ return s.estado === 'entregada'; });
+  // Registros manuales
+  var manuales = getEntregasManuales();
+
+  if (entregadasSistema.length === 0 && manuales.length === 0) {
+    el.innerHTML = '<div class="prod-empty">No hay entregados registrados aún</div>';
     return;
   }
-  var rows = activas.map(buildProdRow).join('');
+
+  // Filas del sistema
+  var rowsSistema = entregadasSistema.map(function(s) {
+    return '<tr onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + s.id + '\')},100)" style="cursor:pointer">' +
+      '<td><span style="font-family:var(--mono);font-weight:700;color:var(--serig-m)">' + (s.id_display || s.id.slice(0,8)) + '</span></td>' +
+      '<td style="font-weight:600">' + (s.cliente || '—') + '</td>' +
+      '<td style="color:var(--gray-l);font-size:11px">' + (s.desc || s.sku || '—') + '</td>' +
+      '<td style="font-family:var(--mono);font-weight:600">' + (s.cant||0).toLocaleString() + '</td>' +
+      '<td style="font-size:11px;color:var(--gray)">' + (s.created || '—') + '</td>' +
+      '<td><span style="font-size:9px;background:#E0E7FF;color:#3730a3;border-radius:4px;padding:2px 6px;font-weight:700">SISTEMA</span></td>' +
+      '<td></td>' +
+    '</tr>';
+  }).join('');
+
+  // Filas manuales
+  var rowsManuales = manuales.map(function(m) {
+    return '<tr>' +
+      '<td><span style="font-family:var(--mono);font-weight:700;color:var(--gray)">MANUAL</span></td>' +
+      '<td style="font-weight:600">' + m.cliente + '</td>' +
+      '<td style="color:var(--gray-l);font-size:11px">' + (m.desc || '—') + (m.nota ? ' · <em>' + m.nota + '</em>' : '') + '</td>' +
+      '<td style="font-family:var(--mono);font-weight:600">' + (m.cant||0).toLocaleString() + '</td>' +
+      '<td style="font-size:11px;color:var(--gray)">' + (m.fecha || '—') + '</td>' +
+      '<td><span style="font-size:9px;background:#FEF3C7;color:#92400e;border-radius:4px;padding:2px 6px;font-weight:700">MANUAL</span></td>' +
+      '<td><button onclick="event.stopPropagation();eliminarEntregadoManual(\'' + m.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 4px" title="Eliminar">✕</button></td>' +
+    '</tr>';
+  }).join('');
+
   el.innerHTML = '<table class="prod-table">' +
     '<thead><tr>' +
-      '<th>Código</th><th>Cliente</th><th>Unidades</th>' +
-      '<th style="min-width:120px">Progreso</th><th>Estado</th><th>Inicio</th>' +
+      '<th>Código</th><th>Cliente</th><th>Producto</th>' +
+      '<th>Unidades</th><th>Fecha</th><th>Origen</th><th></th>' +
     '</tr></thead>' +
-    '<tbody>' + rows + '</tbody>' +
+    '<tbody>' + rowsManuales + rowsSistema + '</tbody>' +
     '</table>';
 }
 
