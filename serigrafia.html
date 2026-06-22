@@ -141,9 +141,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sin-grupo-hdr{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--serig-m);cursor:grab;user-select:none}
 .sin-grupo-hdr:active{cursor:grabbing}
 .sin-grupo-handle{font-size:13px;color:#fff;opacity:.6;flex-shrink:0}
-.sin-grupo-nombre{font-size:12px;font-weight:900;color:#fff;letter-spacing:.4px;text-transform:uppercase;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sin-grupo-nombre{font-size:12px;font-weight:900;color:#fff;letter-spacing:.4px;text-transform:uppercase;flex:1;word-break:break-word;line-height:1.3}
 .sin-grupo-badge{font-size:10px;background:rgba(255,255,255,.22);color:#fff;border-radius:10px;padding:2px 7px;font-weight:700;flex-shrink:0}
 .sin-grupo-cards{display:flex;flex-direction:column;gap:6px;padding:8px}
+.sin-card-wrap{border-radius:8px;transition:border .1s}
+.sin-card-wrap.drop-before{box-shadow:0 -3px 0 0 var(--serig-m)}
+.sin-card-wrap.drop-after{box-shadow:0 3px 0 0 var(--serig-m)}
 /* Carriles línea 1-4 */
 .board-lines-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
 .board-lane{border-radius:10px;border:2px solid var(--border);overflow:hidden;background:var(--bg2);transition:border-color .15s,box-shadow .15s;display:flex;flex-direction:column}
@@ -1442,6 +1445,52 @@ async function toggleProcesoPedido(solId, procIdx) {
 
 var sinGrupoArrastre = null;
 
+function getSinCardOrden() {
+  try { return JSON.parse(localStorage.getItem('tetra_sin_cards_s') || '{}'); } catch(e) { return {}; }
+}
+function saveSinCardOrden(obj) {
+  localStorage.setItem('tetra_sin_cards_s', JSON.stringify(obj));
+}
+
+function sinCardDragOver(e, targetSolId) {
+  if (boardDragId !== null) return; // viene de una línea de producción, no reordenar
+  if (!boardDragSolId || boardDragSolId === targetSolId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var wrap = e.currentTarget;
+  document.querySelectorAll('.sin-card-wrap').forEach(function(el){ el.classList.remove('drop-before','drop-after'); });
+  var rect = wrap.getBoundingClientRect();
+  wrap.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drop-before' : 'drop-after');
+}
+
+function sinCardDragLeave(e) {
+  e.currentTarget.classList.remove('drop-before','drop-after');
+}
+
+function sinCardDrop(e, targetSolId, cliente) {
+  e.preventDefault();
+  e.stopPropagation();
+  document.querySelectorAll('.sin-card-wrap').forEach(function(el){ el.classList.remove('drop-before','drop-after'); });
+  if (boardDragId !== null || !boardDragSolId || boardDragSolId === targetSolId) return;
+
+  var dragId = boardDragSolId;
+  var allOrden = getSinCardOrden();
+  var cliOrden = (allOrden[cliente] || []).filter(function(id){ return id !== dragId; });
+
+  var rect = e.currentTarget.getBoundingClientRect();
+  var insertBefore = e.clientY < rect.top + rect.height / 2;
+  var idx = cliOrden.indexOf(targetSolId);
+  if (idx === -1) idx = cliOrden.length;
+  else if (!insertBefore) idx++;
+  cliOrden.splice(idx, 0, dragId);
+
+  allOrden[cliente] = cliOrden;
+  saveSinCardOrden(allOrden);
+  boardDragId = null;
+  boardDragSolId = null;
+  renderBoard();
+}
+
 function getSinGrupoOrden() {
   try { return JSON.parse(localStorage.getItem('tetra_sin_grupos_s') || '[]'); } catch(e) { return []; }
 }
@@ -1511,14 +1560,35 @@ function boardBuildSinBlock(items) {
     });
   }
 
+  var allCardOrden = getSinCardOrden();
+
   var gruposHtml = grupoKeys.length === 0
     ? '<div class="board-empty-lane">No hay pedidos sin asignar</div>'
     : grupoKeys.map(function(cli) {
-        var gItems = grupoMap[cli];
+        var gItems = grupoMap[cli].slice();
+        // Aplicar orden guardado de tarjetas para este cliente
+        var cliOrden = allCardOrden[cli] || [];
+        if (cliOrden.length > 0) {
+          gItems.sort(function(a, b) {
+            var ia = cliOrden.indexOf(a.solId); var ib = cliOrden.indexOf(b.solId);
+            ia = ia === -1 ? 9999 : ia; ib = ib === -1 ? 9999 : ib;
+            if (ia !== ib) return ia - ib;
+            return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
+          });
+        }
         var totalG = gItems.reduce(function(s,i){ return s+(i.cant||0); }, 0);
         var badgeTxt = gItems.length + ' pedido' + (gItems.length !== 1 ? 's' : '') +
                        (totalG > 0 ? ' · ' + totalG.toLocaleString() + ' und' : '');
         var cliEsc = cli.replace(/'/g, "\\'");
+        var cardsHtml = gItems.map(function(item) {
+          var solEsc = item.solId.replace(/'/g, "\\'");
+          return '<div class="sin-card-wrap"' +
+            ' ondragover="sinCardDragOver(event,\'' + solEsc + '\')"' +
+            ' ondragleave="sinCardDragLeave(event)"' +
+            ' ondrop="sinCardDrop(event,\'' + solEsc + '\',\'' + cliEsc + '\')">' +
+            boardBuildCard(item) +
+          '</div>';
+        }).join('');
         return '<div class="sin-grupo"' +
           ' ondragover="sinGrupoDragOver(event,\'' + cliEsc + '\')"' +
           ' ondragleave="this.classList.remove(\'drag-grupo-over\')"' +
@@ -1529,7 +1599,7 @@ function boardBuildSinBlock(items) {
             '<span class="sin-grupo-nombre">' + cli + '</span>' +
             '<span class="sin-grupo-badge">' + badgeTxt + '</span>' +
           '</div>' +
-          '<div class="sin-grupo-cards">' + gItems.map(boardBuildCard).join('') + '</div>' +
+          '<div class="sin-grupo-cards">' + cardsHtml + '</div>' +
         '</div>';
       }).join('');
 
