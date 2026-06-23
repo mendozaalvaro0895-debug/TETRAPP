@@ -136,7 +136,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-sin-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--serig-m);display:flex;align-items:center;gap:8px;white-space:nowrap}
 .board-sin-count{font-size:11px;background:#fff;color:var(--serig-m);border-radius:12px;padding:2px 10px;font-weight:700}
 .board-sin-cards{padding:8px 12px 12px;min-height:96px;display:flex;flex-direction:row;gap:10px;overflow-x:auto;align-items:flex-start}
-.sin-grupo{flex:0 0 220px;background:var(--bg2);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;transition:box-shadow .15s}
+.sin-grupo{flex:0 0 255px;background:var(--bg2);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;transition:box-shadow .15s}
 .sin-grupo.drag-grupo-over{box-shadow:inset 0 0 0 2px var(--serig-m)}
 .sin-grupo-hdr{display:flex;align-items:flex-start;gap:6px;padding:8px 10px;background:var(--serig-m);cursor:grab;user-select:none}
 .sin-grupo-hdr:active{cursor:grabbing}
@@ -149,7 +149,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sin-card-wrap{border-radius:8px;transition:box-shadow .1s}
 .sin-card-wrap.drop-before{box-shadow:0 -3px 0 0 var(--serig-m)}
 .sin-card-wrap.drop-after{box-shadow:0 3px 0 0 var(--serig-m)}
-.sin-reorder-handle{display:flex;align-items:center;justify-content:center;height:16px;background:var(--serig-l);border-radius:6px 6px 0 0;cursor:grab;font-size:11px;color:var(--serig-m);letter-spacing:3px;user-select:none;opacity:.85}
+.sin-reorder-handle{display:flex;align-items:center;justify-content:center;height:12px;background:var(--serig-l);border-radius:6px 6px 0 0;cursor:grab;font-size:9px;color:var(--serig-m);letter-spacing:3px;user-select:none;opacity:.85}
 .sin-reorder-handle:hover{opacity:1;background:var(--serig-ll,#ede9fe)}
 .sin-reorder-handle:active{cursor:grabbing}
 /* Carriles línea 1-4 */
@@ -1208,6 +1208,30 @@ function boardBuildCard(item) {
     '</div>';
 }
 
+function boardBuildCardCompact(item) {
+  var badgeBg  = item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
+  var badgeClr = item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'programada' ? '#92400e' : '#64748b';
+  var badgeTxt = item.estado === 'proceso' ? 'PROC' : item.estado === 'programada' ? 'PROG' : 'NEW';
+  var badge = '<span style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:3px;padding:1px 4px;font-size:8px;font-weight:800;flex-shrink:0">' + badgeTxt + '</span>';
+  var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
+  var descFull = (item.sku ? item.sku + ' · ' : '') + (item.desc || '—');
+  return '<div class="board-card" style="padding:6px 8px" draggable="true"' +
+    ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
+    ' ondragend="this.classList.remove(\'dragging\')"' +
+    ' onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + item.solId + '\')},100)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;margin-bottom:2px">' +
+      '<span style="font-size:10px;font-weight:700;color:var(--serig-m);font-family:var(--mono)">' + item.solCodigo + '</span>' +
+      badge +
+    '</div>' +
+    '<div style="font-size:11px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px">' + (item.cliente || '—') + '</div>' +
+    '<div style="font-size:10px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px" title="' + descFull.replace(/"/g, '&quot;') + '">' + descFull + '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center">' +
+      '<span style="font-size:11px;font-weight:700;color:var(--ink)">' + (item.cant||0).toLocaleString() + '</span>' +
+      '<span style="font-size:9px;color:var(--gray-l)">und</span>' +
+    '</div>' +
+  '</div>';
+}
+
 function buildTiroRow(item, total) {
   var actual = item.tiro_actual || 1;
   var btns = '';
@@ -1603,7 +1627,7 @@ function boardBuildSinBlock(items) {
             '<div class="sin-reorder-handle" draggable="true"' +
               ' ondragstart="sinHandleDragStart(event,\'' + solEsc + '\',\'' + cliEsc + '\')"' +
               ' onclick="event.stopPropagation()">· · ·</div>' +
-            boardBuildCard(item) +
+            boardBuildCardCompact(item) +
           '</div>';
         }).join('');
         return '<div class="sin-grupo"' +
