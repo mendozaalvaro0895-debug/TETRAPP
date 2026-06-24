@@ -3379,8 +3379,7 @@ var SQL_ASIST_CREATE =
 async function renderAsistencia() {
   var el = document.getElementById('personalAsist');
   if (!el) return;
-  el.innerHTML = '<div style="color:var(--gray-l);padding:20px">Cargando desde Supabase…</div>';
-  await cargarAsistencia(asistFecha);
+  // Renderizar estructura primero (con banner oculto), luego cargar datos
   el.innerHTML =
     // Banner de error SQL (oculto hasta que se detecte el problema)
     '<div id="asist-error-sql" style="display:none;margin-bottom:12px;padding:14px 16px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px">' +
@@ -3402,6 +3401,8 @@ async function renderAsistencia() {
         '<tbody id="asist-tbody"></tbody>' +
       '</table>' +
     '</div>';
+  // Cargar datos DESPUÉS de que el HTML ya existe (para que el banner se pueda mostrar)
+  await cargarAsistencia(asistFecha);
   renderAsistRows();
 }
 
