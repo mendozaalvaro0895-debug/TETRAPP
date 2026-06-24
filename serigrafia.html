@@ -1033,6 +1033,30 @@ var PROCESO_TO_MATRIZ = {
 var MATRIZ_KEY = 'tetra_matriz_serig';
 var matrizDragCodigo = null;
 var matrizDbDisponible = null;   // null = aún no se sabe; true/false una vez detectado
+var ausentesHoy = {};            // { codigo: true } — se carga al init y al marcar asistencia
+
+async function cargarAusentesHoy() {
+  var hoy = new Date().toISOString().slice(0,10);
+  ausentesHoy = {};
+  // Caché local primero
+  var local = getAsistLocal ? getAsistLocal() : {};
+  if (local[hoy]) {
+    Object.keys(local[hoy]).forEach(function(cod) {
+      if (local[hoy][cod] === 'ausente') ausentesHoy[cod] = true;
+    });
+  }
+  // Supabase como fuente de verdad
+  try {
+    var r = await db.from('asistencia_diaria')
+      .select('operador_codigo')
+      .eq('fecha', hoy).eq('area','serig').eq('turno','dia').eq('estado','ausente');
+    if (r.data && !r.error) {
+      ausentesHoy = {};
+      r.data.forEach(function(row){ ausentesHoy[row.operador_codigo] = true; });
+    }
+  } catch(e) { /* usa caché local */ }
+  renderMatriz();
+}
 
 function esRolGlobal(rol) {
   return MATRIZ_ROLES_GLOBAL.some(function(g) { return g.key === rol; });
@@ -1051,13 +1075,14 @@ function lineaDeOperador(p) {
 
 // La matriz se DERIVA del rol (proceso_hab) — fuente única — más la línea.
 // Así matriz y página Personal siempre coinciden.
+// Los ausentes de hoy (ausentesHoy) quedan fuera de sus celdas de rol.
 function getMatriz() {
   var m = {};
   var lista = (personalData && personalData.serig ? personalData.serig : [])
-    .filter(function(p) { return p.activo; });
+    .filter(function(p) { return p.activo && !ausentesHoy[p.codigo]; });
   lista.forEach(function(p) {
     var mr = PROCESO_TO_MATRIZ[(p.proceso_hab || '').trim()];
-    if (!mr) return;   // rol que no está en la matriz (o sin rol) → queda en el pool
+    if (!mr) return;
     var key = esRolGlobal(mr) ? mr : mr + '-' + (lineaDeOperador(p) || 1);
     if (!m[key]) m[key] = [];
     m[key].push(p.codigo);
@@ -1091,13 +1116,25 @@ function renderMatriz() {
   Object.keys(m).forEach(function(k) { (m[k] || []).forEach(function(c) { asignados[c] = true; }); });
   var lista = (personalData && personalData.serig ? personalData.serig : []).filter(function(p) { return p.activo; });
 
-  var poolChips = lista.filter(function(p) { return !asignados[p.codigo]; })
+  var poolChips = lista.filter(function(p) { return !asignados[p.codigo] && !ausentesHoy[p.codigo]; })
                        .map(function(p) { return matrizChip(p.codigo); }).join('');
+  var ausenteChips = lista.filter(function(p) { return !!ausentesHoy[p.codigo]; })
+                          .map(function(p) {
+                            var ini = (p.nombre || '?')[0].toUpperCase();
+                            var nombre = (p.nombre || '').split(' ')[0];
+                            return '<div class="mtx-chip" draggable="false" title="' + (p.nombre||'') + ' · Ausente hoy"' +
+                              ' style="opacity:.55;cursor:default;background:var(--bg3)">' +
+                              '<span class="mtx-ava" style="background:#dc2626">' + ini + '</span>' + nombre +
+                              '<span style="font-size:9px;color:#dc2626;font-weight:700;margin-left:4px">AUSENTE</span>' +
+                              '</div>';
+                          }).join('');
+  var poolEmpty = !poolChips && !ausenteChips
+    ? '<span style="font-size:11px;color:var(--gray-l)">Todos los operadores están asignados</span>' : '';
   var pool = '<div class="mtx-pool" id="mtx-pool"' +
     ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
     ' ondragleave="this.classList.remove(\'drag-over\')"' +
     ' ondrop="matrizDrop(event,\'pool\')">' +
-    (poolChips || '<span style="font-size:11px;color:var(--gray-l)">Todos los operadores están asignados</span>') +
+    poolEmpty + poolChips + ausenteChips +
     '</div>';
 
   var html = '<div class="mtx-grid">';
@@ -3315,6 +3352,13 @@ async function toggleAsistencia(codigo, estado) {
     if (!local[asistFecha]) local[asistFecha] = {};
     local[asistFecha][codigo] = nuevoEstado;
     saveAsistLocal(local);
+    // Sincronizar ausentesHoy y refrescar matriz si es hoy
+    var hoy = new Date().toISOString().slice(0,10);
+    if (asistFecha === hoy) {
+      if (nuevoEstado === 'ausente') ausentesHoy[codigo] = true;
+      else delete ausentesHoy[codigo];
+      renderMatriz();
+    }
     showToast('✅ Guardado');
   } catch(e) {
     showToast('❌ Error al guardar: ' + (e.message || e), '#B83232');
@@ -3564,6 +3608,7 @@ async function init() {
 
   // Carga paralela de datos
   await Promise.all([cargarInventario(), cargarPersonal()]);
+  await cargarAusentesHoy(); // filtra ausentes de la matriz (llama renderMatriz internamente)
   await cargarSolicitudes(); // llama renderInicio() internamente
 
   switchTab('inicio');
