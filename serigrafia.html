@@ -3222,8 +3222,9 @@ var asistFecha = new Date().toISOString().slice(0,10);
 var velFecha   = new Date().toISOString().slice(0,10);
 var asistCache = {}; // { codigo: estado }
 var velCache   = {}; // { codigo: { activo, horas } }
+var ASIST_TABLE = 'asistencia_diaria';
 
-// localStorage helpers (almacenamiento primario)
+// localStorage — caché de sesión para velocidad (no es almacenamiento permanente)
 function getAsistLocal() {
   try { return JSON.parse(localStorage.getItem('tetra_asist_s') || '{}'); } catch(e) { return {}; }
 }
@@ -3232,6 +3233,22 @@ function getVelLocal() {
   try { return JSON.parse(localStorage.getItem('tetra_vel_s') || '{}'); } catch(e) { return {}; }
 }
 function saveVelLocal(obj) { localStorage.setItem('tetra_vel_s', JSON.stringify(obj)); }
+
+function asistErrorTabla(err) {
+  var msg = (err && (err.message || err.details || '')).toLowerCase();
+  if (msg.indexOf('does not exist') >= 0 || msg.indexOf('42p01') >= 0 || msg.indexOf('relation') >= 0) {
+    var el = document.getElementById('asist-error-sql');
+    if (el) el.style.display = '';
+    return true;
+  }
+  return false;
+}
+
+function getNombreOperario(codigo) {
+  var lista = (personalData && personalData.serig) ? personalData.serig : [];
+  var op = lista.find(function(p){ return p.codigo === codigo; });
+  return op ? op.nombre : codigo;
+}
 
 function switchPersonalTab(tab) {
   ['ops','asist','vel'].forEach(function(t) {
@@ -3255,42 +3272,55 @@ function formatFechaLarga(iso) {
 
 async function cargarAsistencia(fecha) {
   asistCache = {};
-  // 1. Cargar desde localStorage (instantáneo)
+  // Caché local para mostrar algo rápido mientras carga Supabase
   var local = getAsistLocal();
   if (local[fecha]) asistCache = Object.assign({}, local[fecha]);
-  // 2. Intentar Supabase y sobreescribir si hay datos
+  // Supabase es la fuente de verdad
   try {
-    var r = await db.from('asistencia')
+    var r = await db.from(ASIST_TABLE)
       .select('operador_codigo,estado')
       .eq('fecha', fecha).eq('area','serig').eq('turno','dia');
-    if (r.data && r.data.length > 0) {
-      asistCache = {};
-      r.data.forEach(function(row){ asistCache[row.operador_codigo] = row.estado; });
-      // sincronizar local con lo que vino de Supabase
-      var loc2 = getAsistLocal();
-      loc2[fecha] = Object.assign({}, asistCache);
-      saveAsistLocal(loc2);
-    }
-  } catch(e) { console.warn('asistencia supabase:', e.message); }
+    if (r.error) { asistErrorTabla(r.error); return; }
+    asistCache = {};
+    (r.data || []).forEach(function(row){ asistCache[row.operador_codigo] = row.estado; });
+    // Actualizar caché local
+    var loc2 = getAsistLocal();
+    loc2[fecha] = Object.assign({}, asistCache);
+    saveAsistLocal(loc2);
+  } catch(e) { asistErrorTabla(e); }
 }
 
 async function toggleAsistencia(codigo, estado) {
   var prev = asistCache[codigo];
   var nuevoEstado = (prev === estado) ? 'presente' : estado;
   asistCache[codigo] = nuevoEstado;
-  // Guardar en localStorage inmediatamente
-  var local = getAsistLocal();
-  if (!local[asistFecha]) local[asistFecha] = {};
-  local[asistFecha][codigo] = nuevoEstado;
-  saveAsistLocal(local);
   renderAsistRows();
-  // Intentar Supabase en segundo plano
+  // Guardar en Supabase (fuente de verdad)
   try {
-    await db.from('asistencia').upsert({
-      fecha: asistFecha, operador_codigo: codigo, area: 'serig',
-      turno: 'dia', estado: nuevoEstado
+    var r = await db.from(ASIST_TABLE).upsert({
+      fecha: asistFecha,
+      operador_codigo: codigo,
+      operador_nombre: getNombreOperario(codigo),
+      area: 'serig',
+      turno: 'dia',
+      estado: nuevoEstado,
+      updated_at: new Date().toISOString()
     }, { onConflict: 'fecha,operador_codigo,area,turno' });
-  } catch(e) { console.warn('asistencia supabase save:', e.message); }
+    if (r.error) {
+      if (asistErrorTabla(r.error)) { asistCache[codigo] = prev; renderAsistRows(); return; }
+      throw r.error;
+    }
+    // Actualizar caché local si Supabase respondió bien
+    var local = getAsistLocal();
+    if (!local[asistFecha]) local[asistFecha] = {};
+    local[asistFecha][codigo] = nuevoEstado;
+    saveAsistLocal(local);
+    showToast('✅ Guardado');
+  } catch(e) {
+    showToast('❌ Error al guardar: ' + (e.message || e), '#B83232');
+    asistCache[codigo] = prev;
+    renderAsistRows();
+  }
 }
 
 function renderAsistRows() {
@@ -3328,13 +3358,37 @@ function renderAsistRows() {
   }).join('');
 }
 
+var SQL_ASIST_CREATE =
+  'CREATE TABLE IF NOT EXISTS asistencia_diaria (\n' +
+  '  id               uuid DEFAULT gen_random_uuid() PRIMARY KEY,\n' +
+  '  fecha            date NOT NULL,\n' +
+  '  operador_codigo  text NOT NULL,\n' +
+  '  operador_nombre  text,\n' +
+  '  area             text DEFAULT \'serig\',\n' +
+  '  turno            text DEFAULT \'dia\',\n' +
+  '  estado           text DEFAULT \'presente\',\n' +
+  '  horas            numeric,\n' +
+  '  notas            text,\n' +
+  '  created_at       timestamptz DEFAULT now(),\n' +
+  '  updated_at       timestamptz DEFAULT now(),\n' +
+  '  UNIQUE(fecha, operador_codigo, area, turno)\n' +
+  ');\n' +
+  'CREATE INDEX IF NOT EXISTS idx_asist_fecha ON asistencia_diaria(fecha);\n' +
+  'CREATE INDEX IF NOT EXISTS idx_asist_area  ON asistencia_diaria(area);';
+
 async function renderAsistencia() {
   var el = document.getElementById('personalAsist');
   if (!el) return;
-  el.innerHTML = '<div style="color:var(--gray-l);padding:20px">Cargando…</div>';
+  el.innerHTML = '<div style="color:var(--gray-l);padding:20px">Cargando desde Supabase…</div>';
   await cargarAsistencia(asistFecha);
-  var lista = (personalData && personalData.serig) ? personalData.serig : [];
   el.innerHTML =
+    // Banner de error SQL (oculto hasta que se detecte el problema)
+    '<div id="asist-error-sql" style="display:none;margin-bottom:12px;padding:14px 16px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px">' +
+      '<div style="font-size:13px;font-weight:800;color:#b91c1c;margin-bottom:6px">⚠️ La tabla <code>asistencia_diaria</code> no existe en Supabase</div>' +
+      '<div style="font-size:12px;color:#7f1d1d;margin-bottom:8px">Ejecutá este SQL en el <strong>SQL Editor</strong> de tu proyecto Supabase:</div>' +
+      '<pre style="background:#fff;border:1px solid #fca5a5;border-radius:6px;padding:10px;font-size:10px;overflow-x:auto;white-space:pre;color:#111">' + SQL_ASIST_CREATE + '</pre>' +
+      '<button onclick="renderAsistencia()" style="margin-top:8px;background:#b91c1c;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer">🔄 Reintentar después de crear la tabla</button>' +
+    '</div>' +
     '<div class="asist-nav">' +
       '<button onclick="asistCambiarFecha(-1)">◀</button>' +
       '<span class="asist-fecha-txt">' + formatFechaLarga(asistFecha) + '</span>' +
@@ -3366,67 +3420,75 @@ async function asistCambiarFecha(delta) {
 
 async function cargarVeladas(fecha) {
   velCache = {};
-  // 1. localStorage primero
   var local = getVelLocal();
   if (local[fecha]) {
     Object.keys(local[fecha]).forEach(function(cod){ velCache[cod] = Object.assign({}, local[fecha][cod]); });
   }
-  // 2. Supabase
   try {
-    var r = await db.from('asistencia')
+    var r = await db.from(ASIST_TABLE)
       .select('operador_codigo,horas')
       .eq('fecha', fecha).eq('area','serig').eq('turno','noche').eq('estado','presente');
-    if (r.data && r.data.length > 0) {
-      velCache = {};
-      r.data.forEach(function(row){ velCache[row.operador_codigo] = { activo: true, horas: row.horas || '' }; });
-      var loc2 = getVelLocal();
-      loc2[fecha] = Object.assign({}, velCache);
-      saveVelLocal(loc2);
-    }
-  } catch(e) { console.warn('veladas supabase:', e.message); }
+    if (r.error) { asistErrorTabla(r.error); return; }
+    velCache = {};
+    (r.data || []).forEach(function(row){ velCache[row.operador_codigo] = { activo: true, horas: row.horas || '' }; });
+    var loc2 = getVelLocal();
+    loc2[fecha] = Object.assign({}, velCache);
+    saveVelLocal(loc2);
+  } catch(e) { asistErrorTabla(e); }
 }
 
 async function toggleVelada(codigo) {
   var prev = velCache[codigo];
-  if (prev && prev.activo) {
-    delete velCache[codigo];
-  } else {
-    velCache[codigo] = { activo: true, horas: '' };
-  }
-  // Guardar en localStorage
-  var local = getVelLocal();
-  if (!local[velFecha]) local[velFecha] = {};
-  if (velCache[codigo]) local[velFecha][codigo] = Object.assign({}, velCache[codigo]);
-  else delete local[velFecha][codigo];
-  saveVelLocal(local);
+  var adding = !(prev && prev.activo);
+  if (adding) velCache[codigo] = { activo: true, horas: '' };
+  else delete velCache[codigo];
   renderVeladasRows();
-  // Supabase en fondo
   try {
-    if (velCache[codigo]) {
-      await db.from('asistencia').upsert({
-        fecha: velFecha, operador_codigo: codigo, area: 'serig',
-        turno: 'noche', estado: 'presente', horas: null
+    var r;
+    if (adding) {
+      r = await db.from(ASIST_TABLE).upsert({
+        fecha: velFecha,
+        operador_codigo: codigo,
+        operador_nombre: getNombreOperario(codigo),
+        area: 'serig', turno: 'noche', estado: 'presente', horas: null,
+        updated_at: new Date().toISOString()
       }, { onConflict: 'fecha,operador_codigo,area,turno' });
     } else {
-      await db.from('asistencia').delete()
-        .eq('fecha', velFecha).eq('operador_codigo', codigo).eq('area','serig').eq('turno','noche');
+      r = await db.from(ASIST_TABLE).delete()
+        .eq('fecha', velFecha).eq('operador_codigo', codigo)
+        .eq('area','serig').eq('turno','noche');
     }
-  } catch(e) { console.warn('veladas supabase save:', e.message); }
+    if (r.error) { asistErrorTabla(r.error); if (adding) delete velCache[codigo]; else velCache[codigo] = prev; renderVeladasRows(); return; }
+    var local = getVelLocal();
+    if (!local[velFecha]) local[velFecha] = {};
+    if (adding) local[velFecha][codigo] = Object.assign({}, velCache[codigo]);
+    else delete local[velFecha][codigo];
+    saveVelLocal(local);
+    showToast('✅ Guardado');
+  } catch(e) {
+    showToast('❌ ' + (e.message || e), '#B83232');
+    if (adding) delete velCache[codigo]; else velCache[codigo] = prev;
+    renderVeladasRows();
+  }
 }
 
 async function guardarHorasVelada(codigo, horas) {
   var h = parseFloat(horas) || null;
   if (velCache[codigo]) velCache[codigo].horas = h;
-  var local = getVelLocal();
-  if (!local[velFecha]) local[velFecha] = {};
-  if (local[velFecha][codigo]) local[velFecha][codigo].horas = h;
-  saveVelLocal(local);
   try {
-    await db.from('asistencia').upsert({
-      fecha: velFecha, operador_codigo: codigo, area: 'serig',
-      turno: 'noche', estado: 'presente', horas: h
+    var r = await db.from(ASIST_TABLE).upsert({
+      fecha: velFecha,
+      operador_codigo: codigo,
+      operador_nombre: getNombreOperario(codigo),
+      area: 'serig', turno: 'noche', estado: 'presente', horas: h,
+      updated_at: new Date().toISOString()
     }, { onConflict: 'fecha,operador_codigo,area,turno' });
-  } catch(e) { console.warn('veladas horas supabase:', e.message); }
+    if (r.error) { showToast('❌ ' + r.error.message, '#B83232'); return; }
+    var local = getVelLocal();
+    if (!local[velFecha]) local[velFecha] = {};
+    if (local[velFecha][codigo]) local[velFecha][codigo].horas = h;
+    saveVelLocal(local);
+  } catch(e) { showToast('❌ ' + (e.message || e), '#B83232'); }
 }
 
 function renderVeladasRows() {
