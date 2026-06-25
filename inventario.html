@@ -971,13 +971,15 @@ async function confirmarImport() {
     var existentes = importPendiente.filter(function(p) { return skuActuales[p.sku]; });
     var nuevos     = importPendiente.filter(function(p) { return !skuActuales[p.sku]; });
 
-    // Actualizar existencias en batches (solo sku + existencia)
-    for (var i = 0; i < existentes.length; i += BATCH) {
-      var lote = existentes.slice(i, i + BATCH);
-      var payload = lote.map(function(p) { return { sku: p.sku, existencia: p.existencia }; });
-      var r = await db.from('inventario').upsert(payload, { onConflict: 'sku' });
-      if (r.error) { errores += lote.length; }
-      hecho += lote.length;
+    // Actualizar existencias en paralelo (20 a la vez) usando update individual
+    var PARALLEL = 20;
+    for (var i = 0; i < existentes.length; i += PARALLEL) {
+      var chunk = existentes.slice(i, i + PARALLEL);
+      var results = await Promise.all(chunk.map(function(p) {
+        return db.from('inventario').update({ existencia: p.existencia }).eq('sku', p.sku);
+      }));
+      results.forEach(function(r) { if (r.error) errores++; });
+      hecho += chunk.length;
       setProgress(hecho);
     }
 
