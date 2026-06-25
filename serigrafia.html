@@ -221,9 +221,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .asist-stat.p{background:#dcfce7;color:#15803d}
 .asist-stat.a{background:#fee2e2;color:#b91c1c}
 .asist-stat.t{background:#fef3c7;color:#92400e}
-.asist-hoy-list{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px}
-.asist-hoy-op{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text)}
+.asist-hoy-list{display:flex;flex-direction:column;gap:0;padding:4px 0}
+.asist-hoy-row{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;border-bottom:1px solid var(--border)}
+.asist-hoy-row:last-child{border-bottom:none}
+.asist-hoy-op{display:flex;align-items:center;gap:6px}
 .asist-hoy-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.asist-hoy-btns{display:flex;gap:3px}
+.asist-hoy-btns .asist-btn{padding:3px 7px;font-size:11px;min-width:28px}
 /* Gráfico faltas del mes */
 .faltas-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
 .faltas-hdr{padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:8px}
@@ -1061,29 +1065,78 @@ var PROCESO_TO_MATRIZ = {
 var MATRIZ_KEY = 'tetra_matriz_serig';
 var matrizDragCodigo = null;
 var matrizDbDisponible = null;   // null = aún no se sabe; true/false una vez detectado
-var ausentesHoy = {};            // { codigo: true } — se carga al init y al marcar asistencia
+var ausentesHoy   = {};          // { codigo: true } — se carga al init y al marcar asistencia
+var asistHoyCache = {};          // { codigo: estado } — siempre refleja HOY, independiente de asistFecha
 
 async function cargarAusentesHoy() {
   var hoy = new Date().toISOString().slice(0,10);
-  ausentesHoy = {};
-  // Caché local primero
+  ausentesHoy   = {};
+  asistHoyCache = {};
+  // Caché local primero (velocidad)
   var local = getAsistLocal ? getAsistLocal() : {};
   if (local[hoy]) {
     Object.keys(local[hoy]).forEach(function(cod) {
+      asistHoyCache[cod] = local[hoy][cod];
       if (local[hoy][cod] === 'ausente') ausentesHoy[cod] = true;
     });
   }
-  // Supabase como fuente de verdad
+  // Supabase como fuente de verdad (todos los estados, no solo ausentes)
   try {
     var r = await db.from('asistencia_diaria')
-      .select('operador_codigo')
-      .eq('fecha', hoy).eq('area','serig').eq('turno','dia').eq('estado','ausente');
+      .select('operador_codigo,estado')
+      .eq('fecha', hoy).eq('area','serig').eq('turno','dia');
     if (r.data && !r.error) {
-      ausentesHoy = {};
-      r.data.forEach(function(row){ ausentesHoy[row.operador_codigo] = true; });
+      ausentesHoy   = {};
+      asistHoyCache = {};
+      r.data.forEach(function(row) {
+        asistHoyCache[row.operador_codigo] = row.estado;
+        if (row.estado === 'ausente') ausentesHoy[row.operador_codigo] = true;
+      });
     }
   } catch(e) { /* usa caché local */ }
   renderMatriz();
+  renderAsistHoy();
+}
+
+async function toggleAsistHoy(codigo, estado) {
+  var hoy = new Date().toISOString().slice(0,10);
+  var prev = asistHoyCache[codigo];
+  var nuevoEstado = (prev === estado) ? 'presente' : estado;
+  // Actualización optimista
+  asistHoyCache[codigo] = nuevoEstado;
+  renderAsistHoy();
+  try {
+    var r = await db.from(ASIST_TABLE).upsert({
+      fecha: hoy,
+      operador_codigo: codigo,
+      operador_nombre: getNombreOperario(codigo),
+      area: 'serig', turno: 'dia',
+      estado: nuevoEstado,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'fecha,operador_codigo,area,turno' });
+    if (r.error) throw r.error;
+    // Actualizar localStorage
+    var local = getAsistLocal();
+    if (!local[hoy]) local[hoy] = {};
+    local[hoy][codigo] = nuevoEstado;
+    saveAsistLocal(local);
+    // Sincronizar ausentesHoy y matriz
+    if (nuevoEstado === 'ausente') ausentesHoy[codigo] = true;
+    else delete ausentesHoy[codigo];
+    faltasMesCache = null;
+    renderMatriz();
+    renderFaltasChart();
+    // Sincronizar pestaña Asistencia si muestra hoy
+    if (asistFecha === hoy) {
+      asistCache[codigo] = nuevoEstado;
+      renderAsistRows();
+    }
+    showToast('✅ Guardado');
+  } catch(e) {
+    showToast('❌ Error al guardar: ' + (e.message || e), '#B83232');
+    asistHoyCache[codigo] = prev;
+    renderAsistHoy();
+  }
 }
 
 function esRolGlobal(rol) {
@@ -1964,32 +2017,40 @@ function renderAsistHoy() {
   if (!lista.length) { el.innerHTML = ''; return; }
   var presentes = 0, ausentes = 0, tardes = 0;
   lista.forEach(function(p) {
-    var est = asistCache[p.codigo] || 'presente';
+    var est = asistHoyCache[p.codigo] || 'presente';
     if (est === 'presente') presentes++;
     else if (est === 'ausente') ausentes++;
     else tardes++;
   });
-  var hoy = new Date().toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long' });
-  var ops = lista.map(function(p) {
-    var est = asistCache[p.codigo] || 'presente';
+  var fechaLbl = new Date().toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long' });
+  var rows = lista.map(function(p) {
+    var est = asistHoyCache[p.codigo] || 'presente';
     var dot = est === 'ausente' ? '#dc2626' : est === 'tarde' ? '#d97706' : '#16a34a';
-    var nombre = (p.nombre || p.codigo).split(' ')[0];
-    return '<div class="asist-hoy-op">' +
-      '<div class="asist-hoy-dot" style="background:' + dot + '"></div>' +
-      '<span style="' + (est === 'ausente' ? 'color:var(--gray-l);text-decoration:line-through' : '') + '">' + escHtml(nombre) + '</span>' +
-      '</div>';
+    var tachado = est === 'ausente' ? 'color:var(--gray-l);text-decoration:line-through' : '';
+    var cod = p.codigo.replace(/'/g, "\\'");
+    return '<div class="asist-hoy-row">' +
+      '<div class="asist-hoy-op">' +
+        '<div class="asist-hoy-dot" style="background:' + dot + '"></div>' +
+        '<span style="font-size:11px;font-weight:600;' + tachado + '">' + escHtml(p.nombre || p.codigo) + '</span>' +
+      '</div>' +
+      '<div class="asist-hoy-btns">' +
+        '<button class="asist-btn ab-p' + (est==='presente'?' active':'') + '" onclick="toggleAsistHoy(\'' + cod + '\',\'presente\')" title="Presente">✓</button>' +
+        '<button class="asist-btn ab-a' + (est==='ausente'?' active':'') + '" onclick="toggleAsistHoy(\'' + cod + '\',\'ausente\')" title="Ausente">✗</button>' +
+        '<button class="asist-btn ab-t' + (est==='tarde'  ?' active':'') + '" onclick="toggleAsistHoy(\'' + cod + '\',\'tarde\')"   title="Tarde">⚠</button>' +
+      '</div>' +
+    '</div>';
   }).join('');
   el.innerHTML =
     '<div class="asist-hoy-wrap">' +
       '<div class="asist-hoy-hdr">' +
-        '<span class="asist-hoy-title">📋 Asistencia · <span style="font-weight:500;font-size:12px;text-transform:capitalize">' + hoy + '</span></span>' +
+        '<span class="asist-hoy-title">📋 Asistencia · <span style="font-weight:500;font-size:12px;text-transform:capitalize">' + fechaLbl + '</span></span>' +
         '<div class="asist-hoy-chips">' +
           '<span class="asist-stat p">' + presentes + ' presentes</span>' +
           (ausentes ? '<span class="asist-stat a">' + ausentes + ' ausentes</span>' : '') +
-          (tardes   ? '<span class="asist-stat t">' + tardes   + ' tarde' + (tardes > 1 ? 's' : '') + '</span>' : '') +
+          (tardes   ? '<span class="asist-stat t">' + tardes + ' tarde' + (tardes > 1 ? 's' : '') + '</span>' : '') +
         '</div>' +
       '</div>' +
-      '<div class="asist-hoy-list">' + ops + '</div>' +
+      '<div class="asist-hoy-list">' + rows + '</div>' +
     '</div>';
 }
 
@@ -3556,9 +3617,10 @@ async function toggleAsistencia(codigo, estado) {
     // Sincronizar ausentesHoy y refrescar widgets si es hoy
     var hoy = new Date().toISOString().slice(0,10);
     if (asistFecha === hoy) {
+      asistHoyCache[codigo] = nuevoEstado;
       if (nuevoEstado === 'ausente') ausentesHoy[codigo] = true;
       else delete ausentesHoy[codigo];
-      faltasMesCache = null; // invalidar caché del gráfico
+      faltasMesCache = null;
       renderMatriz();
       renderAsistHoy();
       renderFaltasChart();
