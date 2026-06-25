@@ -236,19 +236,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .asist-nav-arr:hover:not([disabled]){background:var(--serig-l)}
 /* Gráfico faltas del mes */
 .faltas-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
-.faltas-hdr{padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:8px}
-.faltas-title{font-size:13px;font-weight:800;color:var(--text)}
-.faltas-sub{font-size:10px;color:var(--gray-l)}
-.faltas-chart{padding:12px 14px 8px;display:flex;align-items:flex-end;gap:3px;height:80px;overflow-x:auto}
-.faltas-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:14px}
-.faltas-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:18px}
+.faltas-hdr{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.faltas-title{font-size:12px;font-weight:800;color:var(--ink)}
+.faltas-sub{font-size:11px;color:var(--gray-l)}
+.faltas-chart{padding:10px 14px 0;display:flex;align-items:flex-end;gap:3px;height:68px;overflow-x:auto}
+.faltas-bar-wrap{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:0;flex:1;min-width:14px;height:100%}
 .faltas-bars-grp{display:flex;align-items:flex-end;gap:1px;width:100%}
 .faltas-bar{flex:1;border-radius:3px 3px 0 0;min-height:2px;transition:height .3s;background:var(--serig-m)}
 .faltas-bar.hoy{background:#dc2626}
 .faltas-bar.cero{background:var(--bg3);min-height:4px}
 .faltas-bar.prestado{background:#16a34a}
 .faltas-bar.prestado.hoy{background:#15803d}
-.faltas-day{font-size:8px;color:var(--gray-l);text-align:center;line-height:1}
+.faltas-day{font-size:8px;color:var(--gray-l);text-align:center;line-height:1;margin-top:3px}
+.faltas-legend{display:flex;gap:12px;padding:6px 14px 10px;border-top:1px solid var(--border);margin-top:4px}
 .mtx-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;flex-wrap:wrap}
 .mtx-hdr-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--serig-m)}
 .mtx-hdr-sub{font-size:11px;color:var(--gray-l)}
@@ -266,6 +266,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 /* ── PRODUCCIÓN MENSUAL ───────────────────────────────────── */
 .prod-mens-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px}
 .prod-mens-hdr{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.prod-mens-hdr span:first-child{font-size:12px;font-weight:800;color:var(--ink)}
 .prod-mens-chart{padding:10px 14px 8px}
 .prod-mens-bars{display:flex;align-items:flex-end;gap:3px;height:80px;width:100%}
 .prod-bar-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1;min-width:0;height:100%}
@@ -2303,7 +2304,7 @@ async function renderFaltasChart() {
     if (v > maxVal) maxVal = v;
   });
 
-  var CHART_H = 56;
+  var CHART_H = 62;
   var barras = dias.map(function(f) {
     var va = ausMap[f] || 0;
     var vp = preMap[f] || 0;
@@ -2339,7 +2340,7 @@ async function renderFaltasChart() {
         '<span class="faltas-sub" style="text-transform:capitalize">' + mesNombre + '</span>' +
       '</div>' +
       '<div class="faltas-chart">' + barras + '</div>' +
-      '<div style="padding:4px 14px 8px;display:flex;gap:12px">' + leyenda + '</div>' +
+      '<div class="faltas-legend">' + leyenda + '</div>' +
     '</div>';
 }
 
