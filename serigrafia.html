@@ -1197,7 +1197,7 @@ function matrizChip(codigo) {
   var p = matrizOpByCodigo(codigo);
   if (!p) return '';
   var ini    = p.iniciales || (p.nombre ? p.nombre.charAt(0) : '?');
-  var color  = p.color_hex || '#666';
+  var color  = (p.proceso_hab === 'Prestado') ? '#b45309' : (p.color_hex || '#166534');
   var nombre = (p.nombre || '').split(' ')[0];
   return '<div class="mtx-chip" draggable="true"' +
     ' ondragstart="matrizDragStart(event,\'' + codigo + '\')"' +
