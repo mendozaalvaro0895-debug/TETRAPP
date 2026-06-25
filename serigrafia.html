@@ -1361,6 +1361,9 @@ var boardDragId = null;
 var boardDragSolId = null;
 
 function boardBuildCard(item) {
+  // Entregas parciales vinculadas a este pedido (localStorage)
+  var requis = (getEntregasManuales() || []).filter(function(m) { return m.solId === item.solId; });
+  var entregado = requis.reduce(function(s, m) { return s + (m.cant || 0); }, 0);
   var progColor = item.prog >= 80 ? 'var(--green)' : item.prog >= 40 ? 'var(--amber)' : 'var(--serig-m)';
   var badgeBg   = item.estado === 'proceso'    ? 'var(--serig-l)' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
   var badgeClr  = item.estado === 'proceso'    ? 'var(--serig-m)' : item.estado === 'programada' ? '#92400e' : '#64748b';
@@ -1372,24 +1375,40 @@ function boardBuildCard(item) {
   var procRow = item.linea_id ? buildCardProcRow(item) : '';
   var tiroMax = Math.max(item.tiros || 1, item.tiro_actual || 1);
   var tiroRow = (item.linea_id && tiroMax > 1) ? buildTiroRow(item, tiroMax) : '';
+  var cantLabel = entregado > 0
+    ? '<span style="color:#16a34a;font-weight:800">' + entregado.toLocaleString() + '</span>' +
+      '<span style="font-weight:400;color:var(--gray-l)"> / </span>' + (item.cant||0).toLocaleString() +
+      ' <span style="font-size:10px;font-weight:400;color:var(--gray)">und</span>'
+    : (item.cant||0).toLocaleString() + ' <span style="font-size:10px;font-weight:400;color:var(--gray)">und</span>';
+  var requiRow = requis.length
+    ? '<div style="margin-top:5px;padding-top:5px;border-top:1px dashed var(--border);font-size:10px;color:var(--gray-l);line-height:1.5">' +
+        requis.map(function(m) {
+          return '<span style="white-space:nowrap">' +
+            (m.cant||0).toLocaleString() + ' und · ' + (m.fecha || '—') +
+            (m.requi ? ' <em>(' + escHtml(m.requi) + ')</em>' : '') +
+            '</span>';
+        }).join('<span style="color:var(--border)"> / </span>') +
+      '</div>'
+    : '';
   var cantAndProg = item.linea_id
     ? '<div style="margin-top:4px;padding:7px 8px;background:var(--bg);border-radius:7px;cursor:pointer;border:1.5px solid var(--border)"' +
       ' title="Clic para editar progreso"' +
       ' onclick="event.stopPropagation();editarProgreso(\'' + item.solId + '\',' + item.prog + ',this)">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">' +
-        '<span style="font-size:12px;font-weight:700">' + (item.cant||0).toLocaleString() + ' <span style="font-size:10px;font-weight:400;color:var(--gray)">und</span></span>' +
+        '<span style="font-size:12px;font-weight:700">' + cantLabel + '</span>' +
         '<span style="font-size:12px;font-weight:800;color:' + progColor + '">' + item.prog + '%</span>' +
       '</div>' +
       '<div style="background:var(--border);border-radius:3px;height:5px">' +
         '<div style="background:' + progColor + ';height:5px;border-radius:3px;width:' + item.prog + '%"></div>' +
       '</div>' +
+      requiRow +
       '</div>'
     : '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">' +
-        '<span style="font-size:12px;font-weight:700">' + (item.cant||0).toLocaleString() + '</span>' +
-        '<span style="font-size:10px;color:var(--gray)">und</span>' +
+        '<span style="font-size:12px;font-weight:700">' + cantLabel + '</span>' +
         (item.prog > 0 ? '<span style="font-size:10px;font-weight:700;color:' + progColor + '">' + item.prog + '%</span>' : '') +
       '</div>' +
-      (item.prog > 0 ? '<div style="margin-top:5px;background:var(--border);border-radius:3px;height:3px"><div style="background:' + progColor + ';height:3px;border-radius:3px;width:' + item.prog + '%"></div></div>' : '');
+      (item.prog > 0 ? '<div style="margin-top:5px;background:var(--border);border-radius:3px;height:3px"><div style="background:' + progColor + ';height:3px;border-radius:3px;width:' + item.prog + '%"></div></div>' : '') +
+      requiRow;
   return '<div class="board-card" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
