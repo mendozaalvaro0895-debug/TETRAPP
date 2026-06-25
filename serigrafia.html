@@ -1488,21 +1488,22 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
   var isComplete = entregado > 0 && entregado >= total;
   var isPartial  = entregado > 0 && entregado < total;
   // isEmpty = entregado === 0
-  var cardBg     = isComplete ? '#dcfce7' : '#fee2e2';
-  var descClr    = isComplete ? 'var(--gray)'  : '#111';
-  var descWt     = isComplete ? '400'           : '700';
-  var cantClr1   = isComplete ? '#16a34a'       : '#111';   // número entregado
-  var cantClr2   = isComplete ? '#16a34a'       : '#374151'; // " / total und"
+  var cardBg   = isComplete ? '#dcfce7' : isPartial ? '#fef9c3' : '#fee2e2';
+  var cardBdr  = isComplete ? '#86efac' : isPartial ? '#fde68a' : '#fca5a5';
+  var descClr  = isComplete ? 'var(--gray)' : '#111';
+  var descWt   = isComplete ? '400' : '700';
+  var cantClr1 = isComplete ? '#16a34a' : isPartial ? '#92400e' : '#111';
+  var cantClr2 = isComplete ? '#16a34a' : isPartial ? '#92400e' : '#374151';
   var desc = (item.sku ? item.sku + ' · ' : '') + (item.desc || '—');
   var cantHtml =
     '<span style="color:' + cantClr1 + ';font-weight:800;font-size:11px">' + entregado.toLocaleString() + '</span>' +
     '<span style="color:' + cantClr2 + ';font-size:10px;font-weight:' + (isComplete ? '400' : '700') + '"> / ' + total.toLocaleString() + ' und</span>';
-  var requiChipBg  = isComplete ? 'rgba(255,255,255,.6)' : 'rgba(255,255,255,.5)';
+  var requiAccent = isComplete ? '#16a34a' : isPartial ? '#92400e' : '#b91c1c';
   var requiRow = requis.length
-    ? '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed ' + (isComplete ? '#86efac' : '#fca5a5') + ';display:flex;flex-wrap:wrap;gap:4px">' +
+    ? '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed ' + cardBdr + ';display:flex;flex-wrap:wrap;gap:4px">' +
         requis.map(function(r) {
-          return '<span style="font-size:9px;background:' + requiChipBg + ';border:1px solid ' + (isComplete ? '#86efac' : '#fca5a5') + ';border-radius:4px;padding:1px 5px;color:' + (isComplete ? 'var(--gray)' : '#111') + ';white-space:nowrap">' +
-            (r.requi ? '<span style="font-family:var(--mono);font-weight:700;color:' + (isComplete ? '#16a34a' : '#b91c1c') + '">REQUI ' + escHtml(r.requi) + '</span> · ' : '') +
+          return '<span style="font-size:9px;background:rgba(255,255,255,.55);border:1px solid ' + cardBdr + ';border-radius:4px;padding:1px 5px;color:' + (isComplete ? 'var(--gray)' : '#111') + ';white-space:nowrap">' +
+            (r.requi ? '<span style="font-family:var(--mono);font-weight:700;color:' + requiAccent + '">REQUI ' + escHtml(r.requi) + '</span> · ' : '') +
             (r.cant||0).toLocaleString() + ' und' +
             (r.fecha ? ' · ' + r.fecha.slice(5) : '') +
           '</span>';
@@ -1511,13 +1512,13 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     : '';
   var grip = solEsc
     ? '<span draggable="true" ondragstart="event.stopPropagation();sinHandleDragStart(event,\'' + solEsc + '\',\'' + (cliEsc||'') + '\')" onclick="event.stopPropagation()"' +
-      ' style="flex-shrink:0;cursor:grab;color:' + (isComplete ? '#16a34a' : '#b91c1c') + ';opacity:.4;font-size:13px;line-height:1;padding:0 3px 0 0;user-select:none" title="Arrastrar para reordenar">⠿</span>'
+      ' style="flex-shrink:0;cursor:grab;color:' + requiAccent + ';opacity:.4;font-size:13px;line-height:1;padding:0 3px 0 0;user-select:none" title="Arrastrar para reordenar">⠿</span>'
     : '';
   return '<div class="board-card" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
     ' onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + item.solId + '\')},100)"' +
-    ' style="padding:7px 9px;background:' + cardBg + ';border-color:' + (isComplete ? '#86efac' : '#fca5a5') + '">' +
+    ' style="padding:7px 9px;background:' + cardBg + ';border-color:' + cardBdr + '">' +
     '<div style="display:flex;align-items:center;gap:6px">' +
       grip +
       '<span style="font-family:var(--mono);font-size:10px;font-weight:800;color:' + (isComplete ? '#15803d' : 'var(--serig-m)') + ';flex-shrink:0">' + escHtml(item.solCodigo) + '</span>' +
