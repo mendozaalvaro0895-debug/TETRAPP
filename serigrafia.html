@@ -1179,7 +1179,8 @@ function getMatriz() {
   var lista = (personalData && personalData.serig ? personalData.serig : [])
     .filter(function(p) { return p.activo && !ausentesHoy[p.codigo]; });
   lista.forEach(function(p) {
-    var mr = PROCESO_TO_MATRIZ[(p.proceso_hab || '').trim()];
+    // mtx_rol tiene precedencia: permite a Prestados tener rol de matriz sin perder su estado
+    var mr = p.mtx_rol || PROCESO_TO_MATRIZ[(p.proceso_hab || '').trim()];
     if (!mr) return;
     var key = esRolGlobal(mr) ? mr : mr + '-' + (lineaDeOperador(p) || 1);
     if (!m[key]) m[key] = [];
@@ -1293,20 +1294,23 @@ async function matrizDrop(e, targetKey) {
   var procHab = rol ? (MATRIZ_TO_PROCESO[rol] || '') : '';
   var lista = personalData && personalData.serig ? personalData.serig : [];
   var op = lista.find(function(x) { return x.codigo === codigo; });
+  // Los Prestados conservan su proceso_hab='Prestado'; solo cambia mtx_rol/mtx_linea
+  var esPrestado = op && (op.proceso_hab || '') === 'Prestado';
+  var procHabFinal = esPrestado ? 'Prestado' : procHab;
 
   // Guardar en Supabase para que sincronice entre equipos (un operador = una celda)
   if (matrizDbDisponible !== false) {
     try {
       var r = await db.from('personal')
-        .update({ mtx_rol: rol, mtx_linea: linea, proceso_hab: procHab })
+        .update({ mtx_rol: rol, mtx_linea: linea, proceso_hab: procHabFinal })
         .eq('codigo', codigo);
       if (r.error) throw r.error;
       matrizDbDisponible = true;
-      if (op) { op.mtx_rol = rol; op.mtx_linea = linea; op.proceso_hab = procHab; }
+      if (op) { op.mtx_rol = rol; op.mtx_linea = linea; op.proceso_hab = procHabFinal; }
       renderMatriz();
       renderPersonal();
       renderAsistHoy();
-      guardarRolDiario(codigo, procHab);
+      guardarRolDiario(codigo, procHabFinal);
       return;
     } catch(err) {
       if (/mtx_rol|mtx_linea|column|schema cache/i.test((err.message || '') + (err.details || ''))) {
@@ -1322,8 +1326,8 @@ async function matrizDrop(e, targetKey) {
 
   // Respaldo: el ROL se sincroniza vía proceso_hab (BD); la LÍNEA en localStorage
   try {
-    var rp = await db.from('personal').update({ proceso_hab: procHab }).eq('codigo', codigo);
-    if (!rp.error && op) op.proceso_hab = procHab;
+    var rp = await db.from('personal').update({ proceso_hab: procHabFinal }).eq('codigo', codigo);
+    if (!rp.error && op) op.proceso_hab = procHabFinal;
   } catch(e2) { /* sin conexión: se queda local */ }
 
   var lines = getMatrizLines();
@@ -1332,7 +1336,7 @@ async function matrizDrop(e, targetKey) {
   renderMatriz();
   renderPersonal();
   renderAsistHoy();
-  guardarRolDiario(codigo, procHab);
+  guardarRolDiario(codigo, procHabFinal);
 }
 
 // ════════════════════════════════════════════════════════════
