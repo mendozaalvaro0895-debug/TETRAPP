@@ -717,6 +717,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="c-item"><div class="c-val" id="cCap">—</div><div class="c-lbl2">Und/hora</div></div>
           <div class="c-item"><div class="c-val" id="cFecha">—</div><div class="c-lbl2">Entrega est.</div></div>
         </div>
+        <div id="cDesglose" style="margin-top:6px;font-size:10px;color:var(--gray-l);line-height:1.7;min-height:14px"></div>
         <div class="c-note" id="cNote"></div>
       </div>
       <div class="fg full">
@@ -924,8 +925,8 @@ var LINEAS_PRODUCCION = [
 // ── Metas de producción por proceso (und/hora) ───────────────
 var METAS = {
   armado: 1500, 'armado_pushpull': 700, liner: 1500,
-  flameado: 2000, impresion: 1200, encajado: 3000,
-  banda: 1000, serigrafia: 1200, tampografia: 1200,
+  flameado: 1000, impresion: 1000, encajado: 3000,
+  banda: 1000, serigrafia: 1000, tampografia: 1000,
   horno: 2000, secado: 2000, empaque: 2500,
   'separar cavidad': 2500, 'limpiar grasa': 2000,
   'limpiar pestana': 1000, 'otra tarea': 1000,
@@ -3475,7 +3476,7 @@ function renderLineas() {
     var lineaRow = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;padding-top:5px;border-top:1px dashed var(--border)">' +
       '<div style="display:flex;align-items:center;gap:4px">' +
         '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Cap u/h</span>' +
-        '<input type="number" class="fi" placeholder="1200" value="' + (l.cap_impresion || '') + '" min="1"' +
+        '<input type="number" class="fi" placeholder="1000" value="' + (l.cap_impresion || '') + '" min="1"' +
         ' style="width:70px;font-size:11px;padding:3px 6px"' +
         ' onchange="lineas[' + i + '].cap_impresion=parseInt(this.value)||0;calcular()">' +
       '</div>' +
@@ -3600,21 +3601,52 @@ function updateTotals() {
 }
 
 function calcular() {
+  var IMPRESION_PROCS = ['impresion', 'serigrafia', 'tampografia'];
   var total = lineas.reduce(function(s, l) { return s + (l.cant || 0); }, 0);
-  var horas = lineas.reduce(function(s, l) {
-    if (!l.cant) return s;
-    var cap   = l.cap_impresion || 1200;
+  var horasTotal = 0;
+  var desgloseItems = [];
+
+  lineas.forEach(function(l) {
+    if (!l.cant) return;
+    var cap   = l.cap_impresion || 1000;
     var tiros = l.tiros || 1;
-    return s + (l.cant * tiros) / cap;
-  }, 0);
+    var procs = (l.procs || []).map(function(p){ return (p||'').toLowerCase().trim(); });
+    var seen  = {};
+
+    procs.forEach(function(p) {
+      if (!p || seen[p]) return;
+      seen[p] = true;
+      var meta = METAS[p] || META_DEFAULT;
+      if (IMPRESION_PROCS.indexOf(p) >= 0) {
+        // Usar cap_impresion si fue ingresado, si no usar METAS
+        var tasaImp = cap > 0 ? cap : meta;
+        var hImp = (l.cant / tasaImp) * tiros;
+        horasTotal += hImp;
+        desgloseItems.push((p.charAt(0).toUpperCase()+p.slice(1)) + ' ×' + tiros + ': ' + hImp.toFixed(1) + 'h');
+        if (tiros > 1) {
+          var hSec = 3 * (tiros - 1);
+          horasTotal += hSec;
+          desgloseItems.push('Secado entre tiros: ' + hSec + 'h');
+        }
+      } else {
+        var h = l.cant / meta;
+        horasTotal += h;
+        desgloseItems.push((p.charAt(0).toUpperCase()+p.slice(1)) + ': ' + h.toFixed(1) + 'h');
+      }
+    });
+    if (procs.length === 0) horasTotal += l.cant / (cap > 0 ? cap : META_DEFAULT);
+  });
+
+  var turnos = Math.ceil(horasTotal / 12);
   var caps = lineas.filter(function(l) { return l.cap_impresion > 0; }).map(function(l) { return l.cap_impresion; });
-  var capDisplay = caps.length > 0 ? Math.min.apply(null, caps) : 1200;
-  var turnos = Math.ceil(horas / 12);
+  var capDisplay = caps.length > 0 ? Math.min.apply(null, caps) : 1000;
   var el;
-  el = document.getElementById('cHoras');  if(el) el.textContent = horas.toFixed(1) + 'h';
+  el = document.getElementById('cHoras');  if(el) el.textContent = horasTotal.toFixed(1) + 'h';
   el = document.getElementById('cTurnos'); if(el) el.textContent = turnos + (turnos > 1 ? ' turnos' : ' turno');
   el = document.getElementById('cCap');    if(el) el.textContent = capDisplay.toLocaleString();
   el = document.getElementById('cFecha');  if(el) el.textContent = fechaEst(turnos);
+  el = document.getElementById('cDesglose');
+  if (el) el.textContent = desgloseItems.length ? desgloseItems.join('  +  ') : '';
 }
 
 async function guardar() {
