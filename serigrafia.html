@@ -228,6 +228,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .asist-hoy-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .asist-hoy-btns{display:flex;gap:3px}
 .asist-hoy-btns .asist-btn{padding:3px 7px;font-size:11px;min-width:28px}
+.asist-hoy-nav{padding:5px 12px;border-bottom:1px solid var(--border);background:var(--bg)}
+.asist-nav-fecha{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.asist-nav-arr{background:none;border:1px solid var(--border);border-radius:5px;width:24px;height:22px;font-size:15px;line-height:1;cursor:pointer;color:var(--serig-m);display:flex;align-items:center;justify-content:center;padding:0;transition:background .12s}
+.asist-nav-arr:hover:not([disabled]){background:var(--serig-l)}
 /* Gráfico faltas del mes */
 .faltas-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
 .faltas-hdr{padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:8px}
@@ -1066,7 +1070,8 @@ var MATRIZ_KEY = 'tetra_matriz_serig';
 var matrizDragCodigo = null;
 var matrizDbDisponible = null;   // null = aún no se sabe; true/false una vez detectado
 var ausentesHoy   = {};          // { codigo: true } — se carga al init y al marcar asistencia
-var asistHoyCache = {};          // { codigo: estado } — siempre refleja HOY, independiente de asistFecha
+var asistHoyCache = {};          // { codigo: estado } — refleja la fecha del widget
+var asistHoyFecha = new Date().toISOString().slice(0,10); // fecha activa del widget (no necesariamente hoy)
 
 async function cargarAusentesHoy() {
   var hoy = new Date().toISOString().slice(0,10);
@@ -1107,7 +1112,7 @@ async function toggleAsistHoy(codigo, estado) {
   renderAsistHoy();
   try {
     var r = await db.from(ASIST_TABLE).upsert({
-      fecha: hoy,
+      fecha: asistHoyFecha,
       operador_codigo: codigo,
       operador_nombre: getNombreOperario(codigo),
       area: 'serig', turno: 'dia',
@@ -1117,17 +1122,19 @@ async function toggleAsistHoy(codigo, estado) {
     if (r.error) throw r.error;
     // Actualizar localStorage
     var local = getAsistLocal();
-    if (!local[hoy]) local[hoy] = {};
-    local[hoy][codigo] = nuevoEstado;
+    if (!local[asistHoyFecha]) local[asistHoyFecha] = {};
+    local[asistHoyFecha][codigo] = nuevoEstado;
     saveAsistLocal(local);
-    // Sincronizar ausentesHoy y matriz
-    if (nuevoEstado === 'ausente') ausentesHoy[codigo] = true;
-    else delete ausentesHoy[codigo];
+    // Sincronizar ausentesHoy y matriz solo si la fecha del widget es hoy
+    if (asistHoyFecha === hoy) {
+      if (nuevoEstado === 'ausente') ausentesHoy[codigo] = true;
+      else delete ausentesHoy[codigo];
+      renderMatriz();
+    }
     faltasMesCache = null;
-    renderMatriz();
     renderFaltasChart();
-    // Sincronizar pestaña Asistencia si muestra hoy
-    if (asistFecha === hoy) {
+    // Sincronizar pestaña Asistencia si muestra la misma fecha
+    if (asistFecha === asistHoyFecha) {
       asistCache[codigo] = nuevoEstado;
       renderAsistRows();
     }
@@ -2010,6 +2017,32 @@ function renderInicio() {
 
 // ── Asistencia del día + gráfico de faltas ───────────────────
 
+async function cargarAsistHoyFecha(fecha) {
+  asistHoyCache = {};
+  var local = getAsistLocal();
+  if (local[fecha]) asistHoyCache = Object.assign({}, local[fecha]);
+  try {
+    var r = await db.from(ASIST_TABLE)
+      .select('operador_codigo,estado')
+      .eq('fecha', fecha).eq('area','serig').eq('turno','dia');
+    if (r.data && !r.error) {
+      asistHoyCache = {};
+      r.data.forEach(function(row){ asistHoyCache[row.operador_codigo] = row.estado; });
+      var loc2 = getAsistLocal();
+      loc2[fecha] = Object.assign({}, asistHoyCache);
+      saveAsistLocal(loc2);
+    }
+  } catch(e) { /* usa caché local */ }
+  renderAsistHoy();
+}
+
+async function navegarAsistHoy(delta) {
+  var d = new Date(asistHoyFecha + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  asistHoyFecha = d.toISOString().slice(0,10);
+  await cargarAsistHoyFecha(asistHoyFecha);
+}
+
 function renderAsistHoy() {
   var el = document.getElementById('asistHoy');
   if (!el) return;
@@ -2022,7 +2055,9 @@ function renderAsistHoy() {
     else if (est === 'ausente') ausentes++;
     else tardes++;
   });
-  var fechaLbl = new Date().toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long' });
+  var hoy = new Date().toISOString().slice(0,10);
+  var esHoy = asistHoyFecha === hoy;
+  var fechaLbl = new Date(asistHoyFecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long' });
   var rows = lista.map(function(p) {
     var est = asistHoyCache[p.codigo] || 'presente';
     var dot = est === 'ausente' ? '#dc2626' : est === 'tarde' ? '#d97706' : '#16a34a';
@@ -2040,16 +2075,25 @@ function renderAsistHoy() {
       '</div>' +
     '</div>';
   }).join('');
+  var navFecha =
+    '<div class="asist-nav-fecha">' +
+      '<button class="asist-nav-arr" onclick="navegarAsistHoy(-1)" title="Día anterior">‹</button>' +
+      '<span style="text-transform:capitalize;font-size:12px;font-weight:600;color:' + (esHoy ? 'var(--serig-m)' : 'var(--text)') + '">' +
+        fechaLbl + (esHoy ? ' · <span style="font-size:10px;font-weight:700;color:var(--serig-m)">HOY</span>' : '') +
+      '</span>' +
+      '<button class="asist-nav-arr" onclick="navegarAsistHoy(1)" title="Día siguiente"' + (esHoy ? ' disabled style="opacity:.35;cursor:default"' : '') + '>›</button>' +
+    '</div>';
   el.innerHTML =
     '<div class="asist-hoy-wrap">' +
       '<div class="asist-hoy-hdr">' +
-        '<span class="asist-hoy-title">📋 Asistencia · <span style="font-weight:500;font-size:12px;text-transform:capitalize">' + fechaLbl + '</span></span>' +
+        '<span class="asist-hoy-title">📋 Asistencia</span>' +
         '<div class="asist-hoy-chips">' +
           '<span class="asist-stat p">' + presentes + ' presentes</span>' +
           (ausentes ? '<span class="asist-stat a">' + ausentes + ' ausentes</span>' : '') +
           (tardes   ? '<span class="asist-stat t">' + tardes + ' tarde' + (tardes > 1 ? 's' : '') + '</span>' : '') +
         '</div>' +
       '</div>' +
+      '<div class="asist-hoy-nav">' + navFecha + '</div>' +
       '<div class="asist-hoy-list">' + rows + '</div>' +
     '</div>';
 }
