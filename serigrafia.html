@@ -1073,9 +1073,10 @@ var PROCESO_TO_MATRIZ = {
 var MATRIZ_KEY = 'tetra_matriz_serig';
 var matrizDragCodigo = null;
 var matrizDbDisponible = null;   // null = aún no se sabe; true/false una vez detectado
-var ausentesHoy   = {};          // { codigo: true } — se carga al init y al marcar asistencia
-var asistHoyCache = {};          // { codigo: estado } — refleja la fecha del widget
-var asistHoyFecha = new Date().toISOString().slice(0,10); // fecha activa del widget (no necesariamente hoy)
+var ausentesHoy    = {};         // { codigo: true } — se carga al init y al marcar asistencia
+var asistHoyCache  = {};         // { codigo: estado } — refleja la fecha del widget
+var asistHoyRolCache = {};       // { codigo: rol }   — rol guardado para la fecha del widget
+var asistHoyFecha  = new Date().toISOString().slice(0,10); // fecha activa del widget
 
 async function cargarAusentesHoy() {
   var hoy = new Date().toISOString().slice(0,10);
@@ -1297,6 +1298,8 @@ async function matrizDrop(e, targetKey) {
       if (op) { op.mtx_rol = rol; op.mtx_linea = linea; op.proceso_hab = procHab; }
       renderMatriz();
       renderPersonal();
+      renderAsistHoy();
+      guardarRolDiario(codigo, procHab);
       return;
     } catch(err) {
       if (/mtx_rol|mtx_linea|column|schema cache/i.test((err.message || '') + (err.details || ''))) {
@@ -1321,6 +1324,8 @@ async function matrizDrop(e, targetKey) {
   saveMatrizLines(lines);
   renderMatriz();
   renderPersonal();
+  renderAsistHoy();
+  guardarRolDiario(codigo, procHab);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2022,22 +2027,42 @@ function renderInicio() {
 // ── Asistencia del día + gráfico de faltas ───────────────────
 
 async function cargarAsistHoyFecha(fecha) {
-  asistHoyCache = {};
+  asistHoyCache    = {};
+  asistHoyRolCache = {};
   var local = getAsistLocal();
   if (local[fecha]) asistHoyCache = Object.assign({}, local[fecha]);
   try {
     var r = await db.from(ASIST_TABLE)
-      .select('operador_codigo,estado')
+      .select('operador_codigo,estado,rol')
       .eq('fecha', fecha).eq('area','serig').eq('turno','dia');
     if (r.data && !r.error) {
-      asistHoyCache = {};
-      r.data.forEach(function(row){ asistHoyCache[row.operador_codigo] = row.estado; });
+      asistHoyCache    = {};
+      asistHoyRolCache = {};
+      r.data.forEach(function(row) {
+        asistHoyCache[row.operador_codigo] = row.estado;
+        if (row.rol) asistHoyRolCache[row.operador_codigo] = row.rol;
+      });
       var loc2 = getAsistLocal();
       loc2[fecha] = Object.assign({}, asistHoyCache);
       saveAsistLocal(loc2);
     }
   } catch(e) { /* usa caché local */ }
   renderAsistHoy();
+}
+
+async function guardarRolDiario(codigo, rol) {
+  var hoy = new Date().toISOString().slice(0,10);
+  asistHoyRolCache[codigo] = rol;
+  try {
+    await db.from(ASIST_TABLE).upsert({
+      fecha: hoy,
+      operador_codigo: codigo,
+      operador_nombre: getNombreOperario(codigo),
+      area: 'serig', turno: 'dia',
+      estado: asistHoyCache[codigo] || 'presente',
+      rol: rol
+    }, { onConflict: 'fecha,operador_codigo,area,turno' });
+  } catch(e) { /* columna rol puede no existir aún — ignorar */ }
 }
 
 async function navegarAsistHoy(delta) {
@@ -2072,7 +2097,7 @@ function renderAsistHoy() {
         '<div class="asist-hoy-dot" style="background:' + dot + '"></div>' +
         '<div style="min-width:0">' +
           '<div style="font-size:11px;font-weight:600;' + tachado + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(p.nombre || p.codigo) + '</div>' +
-          (p.proceso_hab ? '<div style="font-size:9px;font-weight:500;' + ((p.proceso_hab==='Prestado') ? 'color:#16a34a' : 'color:var(--gray-l)') + ';line-height:1.2">' + escHtml(p.proceso_hab) + '</div>' : '') +
+          (function(){ var rol = asistHoyRolCache[p.codigo] || p.proceso_hab || ''; return rol ? '<div style="font-size:9px;font-weight:500;' + (rol==='Prestado' ? 'color:#16a34a' : 'color:var(--gray-l)') + ';line-height:1.2">' + escHtml(rol) + '</div>' : ''; })() +
         '</div>' +
       '</div>' +
       '<div class="asist-hoy-btns">' +
@@ -3354,6 +3379,8 @@ async function cambiarRolOperador(codigo, rol) {
     }
     renderPersonal();
     renderMatriz();
+    renderAsistHoy();
+    guardarRolDiario(codigo, rol || '');
     showToast('✅ Rol actualizado');
   } catch(e) {
     // Columnas mtx_* no existen aún → guardar solo el rol (proceso_hab)
@@ -3366,6 +3393,8 @@ async function cambiarRolOperador(codigo, rol) {
         if (!matrixRol) { var ln = getMatrizLines(); delete ln[codigo]; saveMatrizLines(ln); }
         renderPersonal();
         renderMatriz();
+        renderAsistHoy();
+        guardarRolDiario(codigo, rol || '');
         showToast('✅ Rol actualizado');
       } catch(e3) { showToast('❌ Error: ' + e3.message, '#B83232'); }
     } else {
