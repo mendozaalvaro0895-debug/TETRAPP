@@ -2678,81 +2678,72 @@ function eliminarEntregadoManual(id) {
 }
 
 function renderProduccionActual() {
-  var el = document.getElementById('produccionActual');
-  if (!el) return;
+  try {
+    var el = document.getElementById('produccionActual');
+    if (!el) return;
 
-  // Solicitudes entregadas del sistema
-  var entregadasSistema = solicitudes.filter(function(s){ return s.estado === 'entregada'; });
-  // Registros manuales
-  var manuales = getEntregasManuales();
+    var entregadasSistema = solicitudes.filter(function(s){ return s.estado === 'entregada'; });
+    var manuales = getEntregasManuales();
 
-  if (entregadasSistema.length === 0 && manuales.length === 0) {
-    el.innerHTML = '<div class="prod-empty">No hay entregados registrados aún</div>';
-    return;
-  }
+    if (entregadasSistema.length === 0 && manuales.length === 0) {
+      el.innerHTML = '<div class="prod-empty">No hay entregados registrados aún</div>';
+      return;
+    }
 
-  // Filas del sistema
-  var rowsSistema = entregadasSistema.map(function(s) {
-    return '<tr onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + s.id + '\')},100)" style="cursor:pointer">' +
-      '<td><span style="font-family:var(--mono);font-weight:700;color:var(--serig-m)">' + (s.id_display || s.id.slice(0,8)) + '</span></td>' +
-      '<td style="font-weight:600">' + escHtml(s.cliente || '—') + '</td>' +
-      '<td style="color:var(--gray-l);font-size:11px">' + escHtml(s.desc || s.sku || '—') + '</td>' +
-      '<td style="font-family:var(--mono);font-weight:600">' + (s.cant||0).toLocaleString() + '</td>' +
-      '<td style="font-size:11px;color:var(--gray)">' + (s.created || '—') + '</td>' +
-      '<td><span style="font-size:9px;background:#E0E7FF;color:#3730a3;border-radius:4px;padding:2px 6px;font-weight:700">SISTEMA</span></td>' +
-      '<td></td>' +
-    '</tr>';
-  }).join('');
-
-  // Filas manuales — una fila principal por requi + sub-filas por producto
-  var rowsManuales = manuales.map(function(m) {
-    var requiCol = m.solCodigo
-      ? '<span style="font-family:var(--mono);font-weight:800;color:var(--serig-m);font-size:11px">' + escHtml(m.solCodigo) + '</span>' +
-        (m.requi ? '<span style="font-size:10px;color:var(--gray-l);margin-left:4px">' + escHtml(m.requi) + '</span>' : '')
-      : '<span style="font-family:var(--mono);font-weight:700;color:var(--gray);font-size:11px">' + (m.requi || '—') + '</span>';
-    var lineas = m.lineas && m.lineas.length ? m.lineas : [{ desc: m.desc || '—', cant: m.cant || 0, sku: m.sku || '' }];
-    var totalCant = lineas.reduce(function(s, l) { return s + (l.cant || 0); }, 0);
-    // Fila principal
-    var rows = '<tr>' +
-      '<td rowspan="' + (lineas.length + 1) + '">' + requiCol + '</td>' +
-      '<td rowspan="' + (lineas.length + 1) + '" style="font-weight:600">' + escHtml(m.cliente) + '</td>' +
-      '<td colspan="2" style="font-size:10px;color:var(--gray);padding:4px 8px 2px">' +
-        (lineas.length > 1 ? lineas.length + ' productos · ' : '') +
-        '<strong style="color:var(--ink)">' + totalCant.toLocaleString() + ' und</strong>' +
-        (m.nota ? ' · <em>' + escHtml(m.nota) + '</em>' : '') +
-      '</td>' +
-      '<td style="font-size:11px;color:var(--gray)">' + (m.fecha || '—') + '</td>' +
-      '<td><span style="font-size:9px;background:#FEF3C7;color:#92400e;border-radius:4px;padding:2px 6px;font-weight:700">MANUAL</span></td>' +
-      '<td rowspan="' + (lineas.length + 1) + '"><button onclick="event.stopPropagation();eliminarEntregadoManual(\'' + m.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 4px" title="Eliminar">✕</button></td>' +
-    '</tr>';
-    // Sub-filas de productos
-    rows += lineas.map(function(l) {
-      var cliLabel = l.cliente
-        ? '<span style="font-size:10px;font-weight:600;color:var(--serig-m);white-space:nowrap">' + escHtml(l.cliente) + '</span>'
-        : '';
-      var pedBadge = l.solCodigo
-        ? '<span style="font-family:var(--mono);font-size:9px;font-weight:800;background:var(--serig-l);color:var(--serig-m);border-radius:3px;padding:1px 5px;margin-right:5px">' + escHtml(l.solCodigo) + '</span>'
-        : '';
-      return '<tr style="background:var(--bg2)">' +
-        '<td style="font-size:11px;color:var(--gray-l);padding-left:12px">' + cliLabel + '</td>' +
-        '<td style="font-size:11px;color:var(--gray-l)">' + pedBadge +
-          (l.sku ? '<span style="font-family:var(--mono);font-size:10px;color:var(--gray-l);margin-right:4px">' + escHtml(l.sku) + '</span>' : '') +
-          escHtml(l.desc || '—') +
-        '</td>' +
-        '<td style="font-family:var(--mono);font-size:11px;color:var(--ink)">' + (l.cant || 0).toLocaleString() + '</td>' +
-        '<td></td><td></td>' +
+    // Filas del sistema
+    var rowsSistema = entregadasSistema.map(function(s) {
+      return '<tr onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + s.id + '\')},100)" style="cursor:pointer">' +
+        '<td><span style="font-family:var(--mono);font-weight:700;color:var(--serig-m)">' + escHtml(s.id_display || s.id.slice(0,8)) + '</span></td>' +
+        '<td style="font-weight:600">' + escHtml(s.cliente || '—') + '</td>' +
+        '<td></td>' +
+        '<td style="color:var(--gray-l);font-size:11px">' + escHtml(s.desc || s.sku || '—') + '</td>' +
+        '<td style="font-family:var(--mono);font-weight:600">' + (s.cant||0).toLocaleString() + '</td>' +
+        '<td style="font-size:11px;color:var(--gray)">' + (s.created || '—') + '</td>' +
+        '<td><span style="font-size:9px;background:#E0E7FF;color:#3730a3;border-radius:4px;padding:2px 6px;font-weight:700">SISTEMA</span></td>' +
+        '<td></td>' +
       '</tr>';
     }).join('');
-    return rows;
-  }).join('');
 
-  el.innerHTML = '<table class="prod-table">' +
-    '<thead><tr>' +
-      '<th>No. Requi</th><th>Cliente</th><th>Producto</th>' +
-      '<th>Unidades</th><th>Fecha</th><th>Origen</th><th></th>' +
-    '</tr></thead>' +
-    '<tbody>' + rowsManuales + rowsSistema + '</tbody>' +
-    '</table>';
+    // Filas manuales — UNA fila por producto (sin rowspan, evita bugs de tabla)
+    var rowsManuales = manuales.map(function(m) {
+      var lineas = (m.lineas && m.lineas.length) ? m.lineas : [{ cliente: m.cliente || '', desc: m.desc || '—', cant: m.cant || 0, sku: m.sku || '', solId: m.solId || '', solCodigo: m.solCodigo || '' }];
+      return lineas.map(function(l, li) {
+        var isFirst = li === 0;
+        // Columna requi: solo en la primera fila, resto queda vacía con indicador de agrupación
+        var requiCell = isFirst
+          ? (m.solCodigo ? '<span style="font-family:var(--mono);font-weight:800;color:var(--serig-m);font-size:11px">' + escHtml(m.solCodigo) + '</span> ' : '') +
+            '<span style="font-family:var(--mono);font-weight:700;color:var(--gray);font-size:11px">' + escHtml(m.requi || '—') + '</span>'
+          : '<span style="color:var(--border);font-size:10px;padding-left:8px">└</span>';
+        var pedBadge = (l.solCodigo && l.solCodigo !== m.solCodigo)
+          ? '<span style="font-family:var(--mono);font-size:9px;font-weight:800;background:var(--serig-l);color:var(--serig-m);border-radius:3px;padding:1px 5px;margin-right:4px">' + escHtml(l.solCodigo) + '</span>'
+          : '';
+        var bgSty = isFirst ? '' : 'background:var(--bg2)';
+        return '<tr style="' + bgSty + '">' +
+          '<td>' + requiCell + '</td>' +
+          '<td style="font-weight:600;font-size:11px">' + escHtml(l.cliente || m.cliente || '—') + '</td>' +
+          '<td>' + pedBadge + '</td>' +
+          '<td style="font-size:11px;color:var(--gray-l)">' +
+            (l.sku ? '<span style="font-family:var(--mono);font-size:10px;color:var(--gray-l);margin-right:3px">' + escHtml(l.sku) + '</span>' : '') +
+            escHtml(l.desc || '—') +
+          '</td>' +
+          '<td style="font-family:var(--mono);font-weight:600">' + (l.cant||0).toLocaleString() + '</td>' +
+          (isFirst ? '<td style="font-size:11px;color:var(--gray)">' + escHtml(m.fecha || '—') + '</td>' : '<td></td>') +
+          (isFirst ? '<td><span style="font-size:9px;background:#FEF3C7;color:#92400e;border-radius:4px;padding:2px 6px;font-weight:700">MANUAL</span>' + (m.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(m.nota) + '</span>' : '') + '</td>' : '<td></td>') +
+          (isFirst ? '<td><button onclick="event.stopPropagation();eliminarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 4px" title="Eliminar">✕</button></td>' : '<td></td>') +
+        '</tr>';
+      }).join('');
+    }).join('');
+
+    el.innerHTML = '<table class="prod-table">' +
+      '<thead><tr>' +
+        '<th>No. Requi</th><th>Cliente</th><th>Pedido</th><th>Producto</th>' +
+        '<th>Unidades</th><th>Fecha</th><th>Origen</th><th></th>' +
+      '</tr></thead>' +
+      '<tbody>' + rowsManuales + rowsSistema + '</tbody>' +
+      '</table>';
+  } catch(e) {
+    console.error('renderProduccionActual:', e);
+  }
 }
 
 // ════════════════════════════════════════════════════════════
