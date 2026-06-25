@@ -1464,7 +1464,7 @@ function boardBuildCardCompact(item) {
   '</div>';
 }
 
-function boardBuildCardSinRow(item) {
+function boardBuildCardSinRow(item, solEsc, cliEsc) {
   var entregado = 0;
   var requis = [];
   (getEntregasManuales() || []).forEach(function(m) {
@@ -1485,11 +1485,9 @@ function boardBuildCardSinRow(item) {
   var badgeTxt = item.estado === 'proceso' ? 'PROC' : item.estado === 'programada' ? 'PROG' : 'NEW';
   var dragArg  = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var desc = (item.sku ? item.sku + ' · ' : '') + (item.desc || '—');
-  // Siempre mostrar entregado / total (0 / total si no hay entregas)
   var cantHtml =
     '<span style="color:' + (entregado > 0 ? '#16a34a' : 'var(--gray-l)') + ';font-weight:800;font-size:11px">' + entregado.toLocaleString() + '</span>' +
     '<span style="color:var(--gray-l);font-size:10px"> / ' + (item.cant||0).toLocaleString() + ' und</span>';
-  // Fila de requis de entrega
   var requiRow = requis.length
     ? '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed var(--border);display:flex;flex-wrap:wrap;gap:4px">' +
         requis.map(function(r) {
@@ -1501,12 +1499,18 @@ function boardBuildCardSinRow(item) {
         }).join('') +
       '</div>'
     : '';
+  // Grip de reordenamiento (izquierda) — usa sinHandleDragStart
+  var grip = solEsc
+    ? '<span draggable="true" ondragstart="event.stopPropagation();sinHandleDragStart(event,\'' + solEsc + '\',\'' + (cliEsc||'') + '\')" onclick="event.stopPropagation()"' +
+      ' style="flex-shrink:0;cursor:grab;color:var(--serig-m);opacity:.45;font-size:13px;line-height:1;padding:0 3px 0 0;user-select:none" title="Arrastrar para reordenar">⠿</span>'
+    : '';
   return '<div class="board-card" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
     ' onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + item.solId + '\')},100)"' +
     ' style="padding:7px 9px">' +
     '<div style="display:flex;align-items:center;gap:6px">' +
+      grip +
       '<span style="font-family:var(--mono);font-size:10px;font-weight:800;color:var(--serig-m);flex-shrink:0">' + escHtml(item.solCodigo) + '</span>' +
       '<span style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:3px;padding:1px 4px;font-size:8px;font-weight:800;flex-shrink:0">' + badgeTxt + '</span>' +
       '<span style="flex:1;font-size:10px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + escHtml(desc) + '">' + escHtml(desc) + '</span>' +
@@ -1908,10 +1912,7 @@ function boardBuildSinBlock(items) {
             ' ondragover="sinCardDragOver(event,\'' + solEsc + '\')"' +
             ' ondragleave="sinCardDragLeave(event)"' +
             ' ondrop="sinCardDrop(event,\'' + solEsc + '\',\'' + cliEsc + '\')">' +
-            '<div class="sin-reorder-handle" draggable="true"' +
-              ' ondragstart="sinHandleDragStart(event,\'' + solEsc + '\',\'' + cliEsc + '\')"' +
-              ' onclick="event.stopPropagation()">· · ·</div>' +
-            boardBuildCardSinRow(item) +
+            boardBuildCardSinRow(item, solEsc, cliEsc) +
           '</div>';
         }).join('');
         return '<div class="sin-grupo"' +
