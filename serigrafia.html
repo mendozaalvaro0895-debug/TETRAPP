@@ -2811,11 +2811,10 @@ function renderProduccionActual() {
       return lineas.map(function(l, li) {
         var isFirst = li === 0;
         var requiCell = isFirst
-          ? (m.solCodigo ? '<span style="font-family:var(--mono);font-weight:800;color:var(--serig-m);font-size:11px">' + escHtml(m.solCodigo) + '</span> ' : '') +
-            '<span style="font-family:var(--mono);font-weight:700;color:var(--gray);font-size:11px">' + escHtml(m.requi || '—') + '</span>'
+          ? '<span style="font-family:var(--mono);font-weight:700;color:var(--gray);font-size:11px">' + escHtml(m.requi || '—') + '</span>'
           : '<span style="color:var(--border);font-size:10px;padding-left:8px">└</span>';
-        var pedBadge = (l.solCodigo && l.solCodigo !== m.solCodigo)
-          ? '<span style="font-family:var(--mono);font-size:9px;font-weight:800;background:var(--serig-l);color:var(--serig-m);border-radius:3px;padding:1px 5px;margin-right:4px">' + escHtml(l.solCodigo) + '</span>'
+        var pedBadge = l.solCodigo
+          ? '<span style="font-family:var(--mono);font-size:9px;font-weight:800;background:var(--serig-l);color:var(--serig-m);border-radius:3px;padding:1px 5px">' + escHtml(l.solCodigo) + '</span>'
           : '';
         var rowSty = 'background:' + grpBg + ';' + (isFirst ? sepBdr : '');
         return '<tr style="' + rowSty + '">' +
