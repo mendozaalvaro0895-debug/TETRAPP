@@ -259,6 +259,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-grow-item{display:flex;align-items:center;gap:5px;flex:1}
 .mtx-grow-item .mtx-rolcell{width:84px;flex-shrink:0}
 .mtx-cell-g{flex:1}
+.mtx-noche-section{margin-top:8px;border-radius:10px;overflow:hidden;border:1.5px solid #4338ca}
+.mtx-noche-hdr{background:#1e1b4b;color:#e0e7ff;font-size:12px;font-weight:700;padding:7px 12px;letter-spacing:.3px}
+.mtx-cell-noche{background:#eef2ff;min-height:44px;display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border:none;border-radius:0}
+.mtx-cell-noche.drag-over{background:#e0e7ff;outline:2px dashed #6366f1;outline-offset:-2px}
 
 /* ── SPLIT LAYOUT ─────────────────────────────────────────── */
 .split{display:flex;flex:1;overflow:hidden;gap:1px;background:var(--border)}
@@ -922,7 +926,7 @@ function metaParaProcesos(procs) {
 }
 
 // Roles de Serigrafía
-var ROLES_SERIG = ['Supervisor','Flameador','Impresión','Receptor','Calidad','Empaque','Apoyo','Prestado'];
+var ROLES_SERIG = ['Supervisor','Flameador','Impresión','Receptor','Calidad','Empaque','Apoyo','Prestado','Turno Nocturno'];
 
 // Personal base — se upserta con "Sincronizar lista"
 var PERSONAL_SERIG_SEED = [
@@ -1051,8 +1055,9 @@ var MATRIZ_ROLES = [
 ];
 // Roles generales (no son por línea): un solo espacio de ancho completo
 var MATRIZ_ROLES_GLOBAL = [
-  { key: 'supervisor', lbl: 'Supervisor', ico: '⭐' },
-  { key: 'auxiliar',   lbl: 'Auxiliar',   ico: '🤝' }
+  { key: 'supervisor', lbl: 'Supervisor',     ico: '⭐' },
+  { key: 'auxiliar',   lbl: 'Auxiliar',       ico: '🤝' },
+  { key: 'nocturno',   lbl: 'Turno Nocturno', ico: '🌙' }
 ];
 // Equivalencia matriz → rol en la página Personal (proceso_hab / ROLES_SERIG)
 var MATRIZ_TO_PROCESO = {
@@ -1060,15 +1065,17 @@ var MATRIZ_TO_PROCESO = {
   imprime:    'Impresión',
   recibe:     'Receptor',
   supervisor: 'Supervisor',
-  auxiliar:   'Apoyo'
+  auxiliar:   'Apoyo',
+  nocturno:   'Turno Nocturno'
 };
 // Inverso: rol de Personal (proceso_hab) → fila de la matriz
 var PROCESO_TO_MATRIZ = {
-  'Flameador':  'flameador',
-  'Impresión':  'imprime',
-  'Receptor':   'recibe',
-  'Supervisor': 'supervisor',
-  'Apoyo':      'auxiliar'
+  'Flameador':      'flameador',
+  'Impresión':      'imprime',
+  'Receptor':       'recibe',
+  'Supervisor':     'supervisor',
+  'Apoyo':          'auxiliar',
+  'Turno Nocturno': 'nocturno'
 };
 var MATRIZ_KEY = 'tetra_matriz_serig';
 var matrizDragCodigo = null;
@@ -1245,9 +1252,9 @@ function renderMatriz() {
     }
   });
   html += '</div>';
-  // Roles generales (no por línea): fila propia, lado a lado
+  // Roles generales (no por línea): Supervisor + Auxiliar lado a lado
   html += '<div class="mtx-global-row">';
-  MATRIZ_ROLES_GLOBAL.forEach(function(rol) {
+  MATRIZ_ROLES_GLOBAL.filter(function(r){ return r.key !== 'nocturno'; }).forEach(function(rol) {
     var chips = (m[rol.key] || []).map(function(c) { return matrizChip(c); }).join('');
     html += '<div class="mtx-grow-item">' +
       '<div class="mtx-rolcell">' + rol.ico + ' ' + rol.lbl + '</div>' +
@@ -1258,6 +1265,16 @@ function renderMatriz() {
       '</div>';
   });
   html += '</div>';
+  // Turno Nocturno — sección full-width con estilo nocturno
+  var nochips = (m['nocturno'] || []).map(function(c) { return matrizChip(c); }).join('');
+  var noEmpty  = !nochips ? '<span style="font-size:11px;color:#a5b4fc;font-style:italic">Arrastrar operadores aquí para asignar turno nocturno</span>' : '';
+  html += '<div class="mtx-noche-section">' +
+    '<div class="mtx-noche-hdr">🌙 Turno Nocturno <span style="font-size:10px;font-weight:400;opacity:.7;margin-left:6px">Línea única</span></div>' +
+    '<div class="mtx-cell mtx-cell-noche" id="mtx-nocturno"' +
+    ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
+    ' ondragleave="this.classList.remove(\'drag-over\')"' +
+    ' ondrop="matrizDrop(event,\'nocturno\')">' + noEmpty + nochips + '</div>' +
+    '</div>';
   cont.innerHTML = pool + html;
 }
 
