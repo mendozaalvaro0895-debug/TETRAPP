@@ -2433,8 +2433,8 @@ function buildPedidoOpts() {
   var opts = '<option value="">— Sin vincular —</option>';
   candidatos.forEach(function(s) {
     var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'programada' ? '🟡' : '✅';
-    var lbl = ico + ' ' + (s.solCodigo || '') + ' · ' + (s.cliente || '') + (s.desc ? ' · ' + s.desc.slice(0, 35) : '');
-    opts += '<option value="' + escHtml(s.solId) + '">' + escHtml(lbl) + '</option>';
+    var lbl = ico + ' ' + (s.id_display || '') + ' · ' + (s.cliente || '') + (s.desc ? ' · ' + s.desc.slice(0, 35) : '');
+    opts += '<option value="' + escHtml(s.id) + '">' + escHtml(lbl) + '</option>';
   });
   return opts;
 }
@@ -2442,22 +2442,29 @@ function buildPedidoOpts() {
 function vincularPedidoEntregado(solId) {
   eEntregadoSolId  = null;
   eEntregadoSolCod = '';
-  var badge = document.getElementById('eSolBadge');
+  var badge  = document.getElementById('eSolBadge');
+  var helper = document.getElementById('eSolHelper');
   if (!solId) {
-    if (badge) badge.style.display = 'none';
+    if (badge)  badge.style.display  = 'none';
+    if (helper) helper.style.display = 'none';
     return;
   }
-  var s = solicitudes.find(function(x) { return x.solId === solId; });
+  var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!s) return;
-  eEntregadoSolId  = s.solId;
-  eEntregadoSolCod = s.solCodigo || '';
+  eEntregadoSolId  = s.id;
+  eEntregadoSolCod = s.id_display || '';
+  // Pre-rellenar cliente y descripción; cantidad NO (puede ser entrega parcial)
   var ec = document.getElementById('eCliente');
   if (ec) ec.value = s.cliente || '';
   var ed = document.getElementById('eDesc');
   if (ed) { ed.value = s.desc || ''; eEntregadoSku = s.sku || null; }
-  var eq = document.getElementById('eCant');
-  if (eq) eq.value = s.cant || '';
+  // Badge correlativo
   if (badge) { badge.textContent = eEntregadoSolCod; badge.style.display = 'inline-block'; }
+  // Helper: total del pedido como referencia para entregas parciales
+  if (helper) {
+    helper.innerHTML = 'Pedido total: <strong>' + (s.cant || 0).toLocaleString() + ' und</strong> · Ingresar solo las unidades de esta entrega';
+    helper.style.display = 'block';
+  }
 }
 
 function abrirFormEntregado() {
@@ -2486,6 +2493,7 @@ function abrirFormEntregado() {
         '<select id="eSolId" onchange="vincularPedidoEntregado(this.value)" style="' + inputSty + ';background:var(--card);color:var(--text)">' +
           buildPedidoOpts() +
         '</select>' +
+        '<div id="eSolHelper" style="display:none;font-size:10px;color:var(--gray);margin-top:4px;padding:4px 8px;background:var(--bg2);border-radius:5px"></div>' +
       '</div>' +
       // — Cliente / Requi —
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
