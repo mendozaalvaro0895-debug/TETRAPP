@@ -2418,13 +2418,53 @@ function saveEntregasManuales(arr) {
   localStorage.setItem('tetra_entregas_s', JSON.stringify(arr));
 }
 
-var eEntregadoSku = null;
+var eEntregadoSku     = null;
+var eEntregadoSolId   = null;
+var eEntregadoSolCod  = '';
+
+function buildPedidoOpts() {
+  var candidatos = solicitudes.filter(function(s) {
+    return s.estado === 'proceso' || s.estado === 'programada' || s.estado === 'entregada';
+  }).sort(function(a, b) {
+    var ord = { proceso: 0, programada: 1, entregada: 2 };
+    return (ord[a.estado] || 9) - (ord[b.estado] || 9);
+  });
+  if (!candidatos.length) return '<option value="">— No hay pedidos activos —</option>';
+  var opts = '<option value="">— Sin vincular —</option>';
+  candidatos.forEach(function(s) {
+    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'programada' ? '🟡' : '✅';
+    var lbl = ico + ' ' + (s.solCodigo || '') + ' · ' + (s.cliente || '') + (s.desc ? ' · ' + s.desc.slice(0, 35) : '');
+    opts += '<option value="' + escHtml(s.solId) + '">' + escHtml(lbl) + '</option>';
+  });
+  return opts;
+}
+
+function vincularPedidoEntregado(solId) {
+  eEntregadoSolId  = null;
+  eEntregadoSolCod = '';
+  var badge = document.getElementById('eSolBadge');
+  if (!solId) {
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+  var s = solicitudes.find(function(x) { return x.solId === solId; });
+  if (!s) return;
+  eEntregadoSolId  = s.solId;
+  eEntregadoSolCod = s.solCodigo || '';
+  var ec = document.getElementById('eCliente');
+  if (ec) ec.value = s.cliente || '';
+  var ed = document.getElementById('eDesc');
+  if (ed) { ed.value = s.desc || ''; eEntregadoSku = s.sku || null; }
+  var eq = document.getElementById('eCant');
+  if (eq) eq.value = s.cant || '';
+  if (badge) { badge.textContent = eEntregadoSolCod; badge.style.display = 'inline-block'; }
+}
 
 function abrirFormEntregado() {
   var el = document.getElementById('formEntregadoInline');
   if (!el) return;
   if (el.style.display !== 'none') { cerrarFormEntregado(); return; }
-  eEntregadoSku = null;
+  eEntregadoSku = null; eEntregadoSolId = null; eEntregadoSolCod = '';
   var usage = getCliUsage();
   var sorted = CLIENTES.slice().sort(function(a, b) {
     var diff = (usage[b] || 0) - (usage[a] || 0);
@@ -2432,31 +2472,46 @@ function abrirFormEntregado() {
   });
   var optsHtml = '<option value="">— Seleccionar cliente —</option>' +
     sorted.map(function(c) { return '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>'; }).join('');
+  var inputSty = 'width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box';
   el.style.display = 'block';
   el.innerHTML =
     '<div style="background:var(--card);border:1.5px solid var(--serig-m);border-radius:10px;padding:14px 16px">' +
-      '<div style="font-size:12px;font-weight:800;color:var(--serig-m);margin-bottom:10px">📦 Registrar entregado manual</div>' +
+      '<div style="font-size:12px;font-weight:800;color:var(--serig-m);margin-bottom:10px">📦 Registrar entregado</div>' +
+      // — Pedido (correlativo) —
+      '<div style="margin-bottom:10px">' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">' +
+          '<span style="font-size:10px;font-weight:700;color:var(--gray)">PEDIDO / CORRELATIVO</span>' +
+          '<span id="eSolBadge" style="display:none;font-size:10px;font-weight:800;font-family:var(--mono);background:var(--serig-l);color:var(--serig-m);border-radius:4px;padding:1px 6px"></span>' +
+        '</div>' +
+        '<select id="eSolId" onchange="vincularPedidoEntregado(this.value)" style="' + inputSty + ';background:var(--card);color:var(--text)">' +
+          buildPedidoOpts() +
+        '</select>' +
+      '</div>' +
+      // — Cliente / Requi —
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
         '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">CLIENTE *</div>' +
-          '<select id="eCliente" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box;background:var(--card);color:var(--text)">' + optsHtml + '</select></div>' +
+          '<select id="eCliente" style="' + inputSty + ';background:var(--card);color:var(--text)">' + optsHtml + '</select></div>' +
         '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">No. DE REQUI</div>' +
-          '<input id="eRequi" placeholder="Ej. R-2024-001" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+          '<input id="eRequi" placeholder="Ej. R-2024-001" style="' + inputSty + '"></div>' +
       '</div>' +
+      // — Producto —
       '<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">PRODUCTO / DESCRIPCIÓN</div>' +
         '<div class="sku-wrap-s">' +
-          '<input id="eDesc" placeholder="🔍 SKU, nombre o descripción libre…" autocomplete="off" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"' +
+          '<input id="eDesc" placeholder="🔍 SKU, nombre o descripción libre…" autocomplete="off" style="' + inputSty + '"' +
             ' oninput="entregadoDescInput(this.value)" onblur="setTimeout(cerrarEntregadoSkuDrop,200)">' +
           '<div class="sku-drop-s" id="e-sku-drop"></div>' +
         '</div>' +
       '</div>' +
+      // — Cantidad / Fecha —
       '<div style="display:grid;grid-template-columns:160px 1fr;gap:8px;margin-bottom:8px">' +
         '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">CANTIDAD *</div>' +
-          '<input id="eCant" type="number" min="1" placeholder="0" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+          '<input id="eCant" type="number" min="1" placeholder="0" style="' + inputSty + '"></div>' +
         '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">FECHA ENTREGA</div>' +
-          '<input id="eFecha" type="date" value="' + new Date().toISOString().slice(0,10) + '" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+          '<input id="eFecha" type="date" value="' + new Date().toISOString().slice(0,10) + '" style="' + inputSty + '"></div>' +
       '</div>' +
+      // — Nota —
       '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">NOTA (opcional)</div>' +
-        '<input id="eNota" placeholder="Observaciones, referencia, etc." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+        '<input id="eNota" placeholder="Observaciones, referencia, etc." style="' + inputSty + '"></div>' +
       '<div style="display:flex;gap:8px">' +
         '<button onclick="guardarEntregadoManual()" style="background:var(--serig-m);color:#fff;border:none;border-radius:7px;padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>' +
         '<button onclick="cerrarFormEntregado()" style="background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer">Cancelar</button>' +
@@ -2467,7 +2522,7 @@ function abrirFormEntregado() {
 function cerrarFormEntregado() {
   var el = document.getElementById('formEntregadoInline');
   if (el) { el.style.display = 'none'; el.innerHTML = ''; }
-  eEntregadoSku = null;
+  eEntregadoSku = null; eEntregadoSolId = null; eEntregadoSolCod = '';
 }
 
 function entregadoDescInput(val) {
@@ -2529,7 +2584,9 @@ function guardarEntregadoManual() {
     desc: desc,
     cant: cant,
     fecha: ((document.getElementById('eFecha') || {}).value || new Date().toISOString().slice(0,10)),
-    nota: nota
+    nota: nota,
+    solId: eEntregadoSolId || '',
+    solCodigo: eEntregadoSolCod || ''
   });
   saveEntregasManuales(arr);
   registrarUsoCliente(cliente);
@@ -2574,8 +2631,12 @@ function renderProduccionActual() {
 
   // Filas manuales
   var rowsManuales = manuales.map(function(m) {
+    var requiCol = m.solCodigo
+      ? '<span style="font-family:var(--mono);font-weight:800;color:var(--serig-m);font-size:11px">' + escHtml(m.solCodigo) + '</span>' +
+        (m.requi ? '<span style="font-size:10px;color:var(--gray-l);margin-left:4px">' + escHtml(m.requi) + '</span>' : '')
+      : '<span style="font-family:var(--mono);font-weight:700;color:var(--gray);font-size:11px">' + (m.requi || '—') + '</span>';
     return '<tr>' +
-      '<td><span style="font-family:var(--mono);font-weight:700;color:var(--serig-m);font-size:11px">' + (m.requi || '—') + '</span></td>' +
+      '<td>' + requiCol + '</td>' +
       '<td style="font-weight:600">' + escHtml(m.cliente) + '</td>' +
       '<td style="color:var(--gray-l);font-size:11px">' + escHtml(m.desc || '—') + (m.nota ? ' · <em>' + escHtml(m.nota) + '</em>' : '') + '</td>' +
       '<td style="font-family:var(--mono);font-weight:600">' + (m.cant||0).toLocaleString() + '</td>' +
