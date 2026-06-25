@@ -2019,27 +2019,44 @@ function saveEntregasManuales(arr) {
   localStorage.setItem('tetra_entregas_s', JSON.stringify(arr));
 }
 
+var eEntregadoSku = null;
+
 function abrirFormEntregado() {
   var el = document.getElementById('formEntregadoInline');
   if (!el) return;
   if (el.style.display !== 'none') { cerrarFormEntregado(); return; }
-  var hoy = new Date().toISOString().slice(0,10);
+  eEntregadoSku = null;
+  var usage = getCliUsage();
+  var sorted = CLIENTES.slice().sort(function(a, b) {
+    var diff = (usage[b] || 0) - (usage[a] || 0);
+    return diff !== 0 ? diff : a.localeCompare(b);
+  });
+  var optsHtml = '<option value="">— Seleccionar cliente —</option>' +
+    sorted.map(function(c) { return '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>'; }).join('');
   el.style.display = 'block';
   el.innerHTML =
     '<div style="background:var(--card);border:1.5px solid var(--serig-m);border-radius:10px;padding:14px 16px">' +
       '<div style="font-size:12px;font-weight:800;color:var(--serig-m);margin-bottom:10px">📦 Registrar entregado manual</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
         '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">CLIENTE *</div>' +
-          '<input id="eCliente" placeholder="Nombre del cliente" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
-        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">PRODUCTO / DESCRIPCIÓN</div>' +
-          '<input id="eDesc" placeholder="Descripción del producto" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+          '<select id="eCliente" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box;background:var(--card);color:var(--text)">' + optsHtml + '</select></div>' +
+        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">No. DE REQUI</div>' +
+          '<input id="eRequi" placeholder="Ej. R-2024-001" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+      '</div>' +
+      '<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">PRODUCTO / DESCRIPCIÓN</div>' +
+        '<div class="sku-wrap-s">' +
+          '<input id="eDesc" placeholder="🔍 SKU, nombre o descripción libre…" autocomplete="off" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"' +
+            ' oninput="entregadoDescInput(this.value)" onblur="setTimeout(cerrarEntregadoSkuDrop,200)">' +
+          '<div class="sku-drop-s" id="e-sku-drop"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:160px 1fr;gap:8px;margin-bottom:8px">' +
         '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">CANTIDAD *</div>' +
           '<input id="eCant" type="number" min="1" placeholder="0" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
-        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">FECHA ENTREGA</div>' +
-          '<input id="eFecha" type="date" value="' + hoy + '" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+        '<div></div>' +
       '</div>' +
       '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">NOTA (opcional)</div>' +
-        '<input id="eNota" placeholder="Observaciones, No. de remisión, etc." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
+        '<input id="eNota" placeholder="Observaciones, referencia, etc." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
       '<div style="display:flex;gap:8px">' +
         '<button onclick="guardarEntregadoManual()" style="background:var(--serig-m);color:#fff;border:none;border-radius:7px;padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>' +
         '<button onclick="cerrarFormEntregado()" style="background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer">Cancelar</button>' +
@@ -2050,19 +2067,72 @@ function abrirFormEntregado() {
 function cerrarFormEntregado() {
   var el = document.getElementById('formEntregadoInline');
   if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+  eEntregadoSku = null;
+}
+
+function entregadoDescInput(val) {
+  var drop = document.getElementById('e-sku-drop');
+  if (!drop) return;
+  eEntregadoSku = null;
+  var v = val.trim().toLowerCase();
+  if (v.length < 2) { drop.classList.remove('open'); return; }
+  var matches = inventarioCache.filter(function(item) {
+    return item.sku.toLowerCase().includes(v) || (item.descripcion || '').toLowerCase().includes(v);
+  }).slice(0, 8);
+  if (!matches.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(function(item) {
+    var esc = item.sku.replace(/'/g, "\\'");
+    return '<div class="sku-item-s" onmousedown="seleccionarEntregadoDesc(\'' + esc + '\')">' +
+      '<div class="sku-code-s">' + item.sku + '</div>' +
+      '<div class="sku-desc-s">' + escHtml(item.descripcion || '') + '</div>' +
+      '</div>';
+  }).join('');
+  var inp = document.getElementById('eDesc');
+  if (inp) {
+    var r = inp.getBoundingClientRect();
+    drop.style.top   = (r.bottom + 2) + 'px';
+    drop.style.left  = r.left + 'px';
+    drop.style.width = r.width + 'px';
+  }
+  drop.classList.add('open');
+}
+
+function seleccionarEntregadoDesc(sku) {
+  var item = inventarioCache.find(function(i) { return i.sku === sku; });
+  if (!item) return;
+  eEntregadoSku = sku;
+  var inp = document.getElementById('eDesc');
+  if (inp) inp.value = (item.descripcion || sku);
+  cerrarEntregadoSkuDrop();
+}
+
+function cerrarEntregadoSkuDrop() {
+  var drop = document.getElementById('e-sku-drop');
+  if (drop) drop.classList.remove('open');
 }
 
 function guardarEntregadoManual() {
-  var cliente = (document.getElementById('eCliente') || {}).value || '';
-  var desc    = (document.getElementById('eDesc')    || {}).value || '';
-  var cant    = parseInt((document.getElementById('eCant')  || {}).value || '0');
-  var fecha   = (document.getElementById('eFecha')  || {}).value || new Date().toISOString().slice(0,10);
-  var nota    = (document.getElementById('eNota')   || {}).value || '';
-  if (!cliente.trim()) { showToast('⚠️ Ingresá el nombre del cliente', '#92400e'); return; }
+  var clienteEl = document.getElementById('eCliente');
+  var cliente = clienteEl ? clienteEl.value : '';
+  var requi = ((document.getElementById('eRequi') || {}).value || '').trim();
+  var desc  = ((document.getElementById('eDesc')  || {}).value || '').trim();
+  var cant  = parseInt((document.getElementById('eCant') || {}).value || '0');
+  var nota  = ((document.getElementById('eNota')  || {}).value || '').trim();
+  if (!cliente) { showToast('⚠️ Seleccioná el cliente', '#92400e'); return; }
   if (!cant || cant < 1) { showToast('⚠️ Ingresá una cantidad válida', '#92400e'); return; }
   var arr = getEntregasManuales();
-  arr.unshift({ id: 'm-' + Date.now(), cliente: cliente.trim(), desc: desc.trim(), cant: cant, fecha: fecha, nota: nota.trim() });
+  arr.unshift({
+    id: 'm-' + Date.now(),
+    cliente: cliente,
+    requi: requi,
+    sku: eEntregadoSku || '',
+    desc: desc,
+    cant: cant,
+    fecha: new Date().toISOString().slice(0,10),
+    nota: nota
+  });
   saveEntregasManuales(arr);
+  registrarUsoCliente(cliente);
   cerrarFormEntregado();
   renderProduccionActual();
   showToast('✅ Entregado registrado');
@@ -2093,8 +2163,8 @@ function renderProduccionActual() {
   var rowsSistema = entregadasSistema.map(function(s) {
     return '<tr onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + s.id + '\')},100)" style="cursor:pointer">' +
       '<td><span style="font-family:var(--mono);font-weight:700;color:var(--serig-m)">' + (s.id_display || s.id.slice(0,8)) + '</span></td>' +
-      '<td style="font-weight:600">' + (s.cliente || '—') + '</td>' +
-      '<td style="color:var(--gray-l);font-size:11px">' + (s.desc || s.sku || '—') + '</td>' +
+      '<td style="font-weight:600">' + escHtml(s.cliente || '—') + '</td>' +
+      '<td style="color:var(--gray-l);font-size:11px">' + escHtml(s.desc || s.sku || '—') + '</td>' +
       '<td style="font-family:var(--mono);font-weight:600">' + (s.cant||0).toLocaleString() + '</td>' +
       '<td style="font-size:11px;color:var(--gray)">' + (s.created || '—') + '</td>' +
       '<td><span style="font-size:9px;background:#E0E7FF;color:#3730a3;border-radius:4px;padding:2px 6px;font-weight:700">SISTEMA</span></td>' +
@@ -2105,9 +2175,9 @@ function renderProduccionActual() {
   // Filas manuales
   var rowsManuales = manuales.map(function(m) {
     return '<tr>' +
-      '<td><span style="font-family:var(--mono);font-weight:700;color:var(--gray)">MANUAL</span></td>' +
-      '<td style="font-weight:600">' + m.cliente + '</td>' +
-      '<td style="color:var(--gray-l);font-size:11px">' + (m.desc || '—') + (m.nota ? ' · <em>' + m.nota + '</em>' : '') + '</td>' +
+      '<td><span style="font-family:var(--mono);font-weight:700;color:var(--serig-m);font-size:11px">' + (m.requi || '—') + '</span></td>' +
+      '<td style="font-weight:600">' + escHtml(m.cliente) + '</td>' +
+      '<td style="color:var(--gray-l);font-size:11px">' + escHtml(m.desc || '—') + (m.nota ? ' · <em>' + escHtml(m.nota) + '</em>' : '') + '</td>' +
       '<td style="font-family:var(--mono);font-weight:600">' + (m.cant||0).toLocaleString() + '</td>' +
       '<td style="font-size:11px;color:var(--gray)">' + (m.fecha || '—') + '</td>' +
       '<td><span style="font-size:9px;background:#FEF3C7;color:#92400e;border-radius:4px;padding:2px 6px;font-weight:700">MANUAL</span></td>' +
@@ -2117,7 +2187,7 @@ function renderProduccionActual() {
 
   el.innerHTML = '<table class="prod-table">' +
     '<thead><tr>' +
-      '<th>Código</th><th>Cliente</th><th>Producto</th>' +
+      '<th>No. Requi</th><th>Cliente</th><th>Producto</th>' +
       '<th>Unidades</th><th>Fecha</th><th>Origen</th><th></th>' +
     '</tr></thead>' +
     '<tbody>' + rowsManuales + rowsSistema + '</tbody>' +
