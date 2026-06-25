@@ -268,8 +268,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .prod-mens-hdr{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .prod-mens-chart{padding:10px 14px 8px}
 .prod-mens-bars{display:flex;align-items:flex-end;gap:3px;height:80px;width:100%}
-.prod-bar-col{display:flex;flex-direction:column;align-items:center;flex:1;min-width:0}
-.prod-bar{width:100%;border-radius:3px 3px 0 0;transition:height .3s;min-height:2px}
+.prod-bar-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1;min-width:0;height:100%}
+.prod-bar{width:100%;border-radius:3px 3px 0 0;transition:height .3s}
 .prod-bar-lbl{font-size:8px;color:var(--gray-l);margin-top:3px;text-align:center;line-height:1}
 .prod-mens-total{display:flex;gap:16px;padding:6px 14px 10px;border-top:1px solid var(--border);margin-top:4px}
 .prod-stat{display:flex;flex-direction:column}
@@ -2111,12 +2111,12 @@ function renderProdMensual() {
   var barras = '';
   for (var d = 1; d <= diaHoy; d++) {
     var val  = porDia[d] || 0;
-    var pct  = Math.round((val / maxVal) * 100);
+    var px   = val ? Math.max(Math.round((val / maxVal) * 68), 5) : 2;
     var esHoy = d === diaHoy;
-    var barColor = esHoy ? 'var(--serig-m)' : (val > promDia ? '#16a34a' : val > 0 ? 'var(--serig-l2, #a78bfa)' : 'var(--border)');
+    var barColor = esHoy ? 'var(--serig-m)' : (val > promDia ? '#16a34a' : val > 0 ? '#a78bfa' : 'var(--border)');
     var tooltip  = val ? val.toLocaleString() + ' und' : 'Sin entregas';
     barras += '<div class="prod-bar-col" title="Día ' + d + ': ' + tooltip + '">' +
-      '<div class="prod-bar" style="height:' + Math.max(pct, val ? 8 : 2) + '%;background:' + barColor + '"></div>' +
+      '<div class="prod-bar" style="height:' + px + 'px;background:' + barColor + '"></div>' +
       '<div class="prod-bar-lbl">' + (d % 5 === 0 || d === 1 || esHoy ? d : '') + '</div>' +
     '</div>';
   }
