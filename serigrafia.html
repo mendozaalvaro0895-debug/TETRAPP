@@ -2053,7 +2053,8 @@ function abrirFormEntregado() {
       '<div style="display:grid;grid-template-columns:160px 1fr;gap:8px;margin-bottom:8px">' +
         '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">CANTIDAD *</div>' +
           '<input id="eCant" type="number" min="1" placeholder="0" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
-        '<div></div>' +
+        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">FECHA ENTREGA</div>' +
+          '<input id="eFecha" type="date" value="' + new Date().toISOString().slice(0,10) + '" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
       '</div>' +
       '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">NOTA (opcional)</div>' +
         '<input id="eNota" placeholder="Observaciones, referencia, etc." style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box"></div>' +
@@ -2128,7 +2129,7 @@ function guardarEntregadoManual() {
     sku: eEntregadoSku || '',
     desc: desc,
     cant: cant,
-    fecha: new Date().toISOString().slice(0,10),
+    fecha: ((document.getElementById('eFecha') || {}).value || new Date().toISOString().slice(0,10)),
     nota: nota
   });
   saveEntregasManuales(arr);
