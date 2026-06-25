@@ -1364,11 +1364,18 @@ var boardDragSolId = null;
 function boardBuildCard(item) {
   // Entregas parciales vinculadas a este pedido — busca en lineas[] por solId
   var entregado = 0;
+  var requis = [];
   (getEntregasManuales() || []).forEach(function(m) {
     if (m.lineas && m.lineas.length) {
-      m.lineas.forEach(function(l) { if (l.solId === item.solId) entregado += (l.cant || 0); });
+      m.lineas.forEach(function(l) {
+        if (l.solId === item.solId) {
+          entregado += (l.cant || 0);
+          requis.push({ cant: l.cant, fecha: m.fecha, requi: m.requi });
+        }
+      });
     } else if (m.solId === item.solId) {
       entregado += (m.cant || 0);
+      requis.push({ cant: m.cant, fecha: m.fecha, requi: m.requi });
     }
   });
   var progColor = item.prog >= 80 ? 'var(--green)' : item.prog >= 40 ? 'var(--amber)' : 'var(--serig-m)';
