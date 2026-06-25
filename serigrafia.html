@@ -239,9 +239,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .faltas-sub{font-size:10px;color:var(--gray-l)}
 .faltas-chart{padding:12px 14px 8px;display:flex;align-items:flex-end;gap:3px;height:80px;overflow-x:auto}
 .faltas-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:14px}
-.faltas-bar{width:100%;border-radius:3px 3px 0 0;background:var(--serig-m);min-height:2px;transition:height .3s}
+.faltas-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:18px}
+.faltas-bars-grp{display:flex;align-items:flex-end;gap:1px;width:100%}
+.faltas-bar{flex:1;border-radius:3px 3px 0 0;min-height:2px;transition:height .3s;background:var(--serig-m)}
 .faltas-bar.hoy{background:#dc2626}
 .faltas-bar.cero{background:var(--bg3);min-height:4px}
+.faltas-bar.prestado{background:#16a34a}
+.faltas-bar.prestado.hoy{background:#15803d}
 .faltas-day{font-size:8px;color:var(--gray-l);text-align:center;line-height:1}
 .mtx-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;flex-wrap:wrap}
 .mtx-hdr-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--serig-m)}
@@ -918,7 +922,7 @@ function metaParaProcesos(procs) {
 }
 
 // Roles de Serigrafía
-var ROLES_SERIG = ['Supervisor','Flameador','Impresión','Receptor','Calidad','Empaque','Apoyo'];
+var ROLES_SERIG = ['Supervisor','Flameador','Impresión','Receptor','Calidad','Empaque','Apoyo','Prestado'];
 
 // Personal base — se upserta con "Sincronizar lista"
 var PERSONAL_SERIG_SEED = [
@@ -2098,65 +2102,94 @@ function renderAsistHoy() {
     '</div>';
 }
 
-var faltasMesCache = null; // { 'YYYY-MM-DD': count }
+var faltasMesCache = null; // { _mes, ausentes:{fecha:n}, prestados:{fecha:n} }
 
 async function renderFaltasChart() {
   var el = document.getElementById('faltasChart');
   if (!el) return;
-  var hoy     = new Date();
-  var mesStr  = hoy.toISOString().slice(0,7);          // 'YYYY-MM'
-  var inicio  = mesStr + '-01';
-  var fin     = hoy.toISOString().slice(0,10);
+  var hoy    = new Date();
+  var mesStr = hoy.toISOString().slice(0,7);
+  var inicio = mesStr + '-01';
+  var fin    = hoy.toISOString().slice(0,10);
 
-  // Cargar datos si no están en caché o es un mes diferente
+  // Identificar codigos de prestados
+  var prestadosCod = (personalData && personalData.serig ? personalData.serig : [])
+    .filter(function(p){ return (p.proceso_hab || '') === 'Prestado'; })
+    .map(function(p){ return p.codigo; });
+
   if (!faltasMesCache || faltasMesCache._mes !== mesStr) {
     try {
       var r = await db.from('asistencia_diaria')
-        .select('fecha')
-        .eq('area','serig').eq('turno','dia').eq('estado','ausente')
+        .select('fecha,operador_codigo,estado')
+        .eq('area','serig').eq('turno','dia')
         .gte('fecha', inicio).lte('fecha', fin);
-      var counts = { _mes: mesStr };
+      var ausMap = {}, preMap = {};
       if (r.data && !r.error) {
-        r.data.forEach(function(row){ counts[row.fecha] = (counts[row.fecha] || 0) + 1; });
+        r.data.forEach(function(row) {
+          var esPrestado = prestadosCod.indexOf(row.operador_codigo) >= 0;
+          if (esPrestado && row.estado === 'presente') {
+            preMap[row.fecha] = (preMap[row.fecha] || 0) + 1;
+          } else if (!esPrestado && row.estado === 'ausente') {
+            ausMap[row.fecha] = (ausMap[row.fecha] || 0) + 1;
+          }
+        });
       }
-      faltasMesCache = counts;
-    } catch(e) { faltasMesCache = { _mes: mesStr }; }
+      faltasMesCache = { _mes: mesStr, ausentes: ausMap, prestados: preMap };
+    } catch(e) { faltasMesCache = { _mes: mesStr, ausentes: {}, prestados: {} }; }
   }
 
-  // Construir barras para cada día del mes hasta hoy
+  var ausMap = faltasMesCache.ausentes || {};
+  var preMap = faltasMesCache.prestados || {};
+
+  // Rango de días
   var dias = [];
   var d = new Date(inicio + 'T12:00:00');
   var hoyCopy = new Date(fin + 'T12:00:00');
-  while (d <= hoyCopy) {
-    dias.push(d.toISOString().slice(0,10));
-    d.setDate(d.getDate() + 1);
-  }
+  while (d <= hoyCopy) { dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
 
   var maxVal = 1;
-  dias.forEach(function(f){ var v = faltasMesCache[f]||0; if (v > maxVal) maxVal = v; });
+  dias.forEach(function(f){
+    var v = (ausMap[f]||0) + (preMap[f]||0);
+    if (v > maxVal) maxVal = v;
+  });
 
-  var CHART_H = 56; // px disponibles para las barras
+  var CHART_H = 56;
   var barras = dias.map(function(f) {
-    var v = faltasMesCache[f] || 0;
-    var h = v ? Math.max(4, Math.round((v / maxVal) * CHART_H)) : 4;
+    var va = ausMap[f] || 0;
+    var vp = preMap[f] || 0;
+    var ha = va ? Math.max(4, Math.round((va / maxVal) * CHART_H)) : (vp ? 0 : 4);
+    var hp = vp ? Math.max(4, Math.round((vp / maxVal) * CHART_H)) : 0;
     var esHoy = f === fin;
-    var dia   = parseInt(f.slice(8));
-    return '<div class="faltas-bar-wrap" title="' + f + ': ' + v + ' falta' + (v!==1?'s':'') + '">' +
-      '<div class="faltas-bar' + (esHoy ? ' hoy' : (v===0?' cero':'')) + '" style="height:' + h + 'px"></div>' +
+    var dia = parseInt(f.slice(8));
+    var tip = f + ': ' + va + ' ausente' + (va!==1?'s':'') + (vp ? ' · ' + vp + ' prestado' + (vp!==1?'s':'') : '');
+    return '<div class="faltas-bar-wrap" title="' + tip + '">' +
+      '<div class="faltas-bars-grp">' +
+        '<div class="faltas-bar' + (esHoy?' hoy':'') + (va===0&&!vp?' cero':'') + '" style="height:' + ha + 'px"></div>' +
+        (vp ? '<div class="faltas-bar prestado' + (esHoy?' hoy':'') + '" style="height:' + hp + 'px"></div>' : '') +
+      '</div>' +
       '<div class="faltas-day">' + dia + '</div>' +
     '</div>';
   }).join('');
 
   var mesNombre = hoy.toLocaleDateString('es-GT', { month:'long', year:'numeric' });
-  var totalFaltas = dias.reduce(function(s,f){ return s + (faltasMesCache[f]||0); }, 0);
+  var totalAus = dias.reduce(function(s,f){ return s+(ausMap[f]||0); }, 0);
+  var totalPre = dias.reduce(function(s,f){ return s+(preMap[f]||0); }, 0);
+  var leyenda =
+    '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gray)">' +
+      '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--serig-m)"></span>Ausentes: ' + totalAus +
+    '</span>' +
+    (totalPre ? '&nbsp;&nbsp;<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gray)">' +
+      '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#16a34a"></span>Prestados: ' + totalPre +
+    '</span>' : '');
 
   el.innerHTML =
     '<div class="faltas-wrap">' +
       '<div class="faltas-hdr">' +
-        '<span class="faltas-title">📊 Faltas este mes</span>' +
-        '<span class="faltas-sub" style="text-transform:capitalize">' + mesNombre + ' · ' + totalFaltas + ' total</span>' +
+        '<span class="faltas-title">📊 Faltas del mes</span>' +
+        '<span class="faltas-sub" style="text-transform:capitalize">' + mesNombre + '</span>' +
       '</div>' +
       '<div class="faltas-chart">' + barras + '</div>' +
+      '<div style="padding:4px 14px 8px;display:flex;gap:12px">' + leyenda + '</div>' +
     '</div>';
 }
 
