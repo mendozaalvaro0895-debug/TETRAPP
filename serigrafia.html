@@ -2601,8 +2601,14 @@ function guardarEntregadoManual() {
   var cant  = parseInt((document.getElementById('eCant') || {}).value || '0');
   var nota  = ((document.getElementById('eNota')  || {}).value || '').trim();
   if (!cliente) { showToast('⚠️ Seleccioná el cliente', '#92400e'); return; }
+  if (!requi)   { showToast('⚠️ El No. de Requi es obligatorio', '#92400e'); var r = document.getElementById('eRequi'); if (r) { r.style.borderColor='#dc2626'; r.focus(); } return; }
   if (!cant || cant < 1) { showToast('⚠️ Ingresá una cantidad válida', '#92400e'); return; }
   var arr = getEntregasManuales();
+  var dup = arr.find(function(m) { return m.requi && m.requi.trim().toLowerCase() === requi.toLowerCase(); });
+  if (dup) {
+    var dupInfo = (dup.fecha ? ' · ' + dup.fecha : '') + (dup.cliente ? ' · ' + dup.cliente : '');
+    if (!confirm('⚠️ La Requi "' + requi + '" ya está registrada' + dupInfo + '.\n¿Registrar de todas formas?')) return;
+  }
   arr.unshift({
     id: 'm-' + Date.now(),
     cliente: cliente,
