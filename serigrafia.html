@@ -2769,7 +2769,9 @@ function editarEntregadoManual(id) {
   eLineasCount = 0; eEntregadoSkus = {};
   var lineas = (m.lineas && m.lineas.length) ? m.lineas : [{ desc: m.desc || '', cant: m.cant || 0, sku: m.sku || '', cliente: m.cliente || '', solId: m.solId || '' }];
   lineas.forEach(function(l) {
-    agregarLineaEntregado(l.desc, l.sku, l.cant, l.cliente, l.solId);
+    // Si el solId ya no existe en solicitudes, limpiar el vínculo para que el usuario lo corrija
+    var solIdValido = l.solId && solicitudes.some(function(x) { return x.id === l.solId; }) ? l.solId : null;
+    agregarLineaEntregado(l.desc, l.sku, l.cant, l.cliente, solIdValido);
   });
   // Hacer scroll al form
   var formEl = document.getElementById('formEntregadoInline');
@@ -2813,8 +2815,11 @@ function renderProduccionActual() {
         var requiCell = isFirst
           ? '<span style="font-family:var(--mono);font-weight:700;color:var(--gray);font-size:11px">' + escHtml(m.requi || '—') + '</span>'
           : '<span style="color:var(--border);font-size:10px;padding-left:8px">└</span>';
+        var solExiste = l.solId ? solicitudes.some(function(x) { return x.id === l.solId; }) : false;
         var pedBadge = l.solCodigo
-          ? '<span style="font-family:var(--mono);font-size:9px;font-weight:800;background:var(--serig-l);color:var(--serig-m);border-radius:3px;padding:1px 5px">' + escHtml(l.solCodigo) + '</span>'
+          ? (solExiste || !l.solId
+              ? '<span style="font-family:var(--mono);font-size:9px;font-weight:800;background:var(--serig-l);color:var(--serig-m);border-radius:3px;padding:1px 5px">' + escHtml(l.solCodigo) + '</span>'
+              : '<span style="font-family:var(--mono);font-size:9px;font-weight:700;background:#fee2e2;color:#b91c1c;border-radius:3px;padding:1px 5px;text-decoration:line-through" title="Pedido eliminado — editar para limpiar">' + escHtml(l.solCodigo) + '</span>')
           : '';
         var rowSty = 'background:' + grpBg + ';' + (isFirst ? sepBdr : '');
         return '<tr style="' + rowSty + '">' +
