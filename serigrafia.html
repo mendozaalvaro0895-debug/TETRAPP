@@ -2505,43 +2505,43 @@ function abrirFormEntregado() {
   eClientesOptsHtml = optsHtml;
   el.style.display = 'block';
   el.innerHTML =
-    '<div style="background:var(--card);border:1.5px solid var(--serig-m);border-radius:10px;padding:14px 16px">' +
-      '<div style="font-size:12px;font-weight:800;color:var(--serig-m);margin-bottom:10px">📦 Registrar entregado</div>' +
-      '<div style="margin-bottom:10px">' +
-        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">' +
-          '<span style="font-size:10px;font-weight:700;color:var(--gray)">PEDIDO / CORRELATIVO</span>' +
-          '<span id="eSolBadge" style="display:none;font-size:10px;font-weight:800;font-family:var(--mono);background:var(--serig-l);color:var(--serig-m);border-radius:4px;padding:1px 6px"></span>' +
+    '<div style="background:var(--card);border:1.5px solid var(--serig-m);border-radius:10px;padding:10px 14px">' +
+      // Fila 1: título + botones
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+        '<span style="font-size:12px;font-weight:800;color:var(--serig-m)">📦 Registrar entregado</span>' +
+        '<div style="display:flex;gap:6px">' +
+          '<button onclick="guardarEntregadoManual()" style="background:var(--serig-m);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>' +
+          '<button onclick="cerrarFormEntregado()" style="background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">✕</button>' +
         '</div>' +
-        '<select id="eSolId" onchange="vincularPedidoEntregado(this.value)" style="' + inputSty + ';background:var(--card);color:var(--text)">' +
-          buildPedidoOpts() +
-        '</select>' +
-        '<div id="eSolHelper" style="display:none;font-size:10px;color:var(--gray);margin-top:4px;padding:4px 8px;background:var(--bg2);border-radius:5px"></div>' +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 150px;gap:8px;margin-bottom:10px">' +
-        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">No. DE REQUI *</div>' +
-          '<input id="eRequi" placeholder="Ej. R-2024-001" style="' + inputSty + '"></div>' +
-        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">FECHA ENTREGA</div>' +
-          '<input id="eFecha" type="date" value="' + new Date().toISOString().slice(0,10) + '" style="' + inputSty + '"></div>' +
-      '</div>' +
-      '<div style="margin-bottom:8px">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
-          '<span style="font-size:10px;font-weight:700;color:var(--gray)">PRODUCTOS *</span>' +
-          '<button onclick="agregarLineaEntregado()" style="background:var(--serig-l);color:var(--serig-m);border:1px solid var(--serig-m);border-radius:5px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">+ Agregar producto</button>' +
+      // Fila 2: Correlativo + Requi + Fecha en una sola línea
+      '<div style="display:grid;grid-template-columns:1fr 1fr 140px;gap:6px;margin-bottom:7px">' +
+        '<div>' +
+          '<div style="font-size:9px;font-weight:700;color:var(--gray-l);margin-bottom:2px">PEDIDO / CORRELATIVO' +
+            '<span id="eSolBadge" style="display:none;font-size:9px;font-weight:800;font-family:var(--mono);background:var(--serig-l);color:var(--serig-m);border-radius:3px;padding:1px 5px;margin-left:5px"></span>' +
+          '</div>' +
+          '<select id="eSolId" onchange="vincularPedidoEntregado(this.value)" style="' + inputSty + ';background:var(--card);color:var(--text)">' +
+            buildPedidoOpts() +
+          '</select>' +
         '</div>' +
-        '<div style="display:grid;grid-template-columns:130px 1fr 100px 28px;gap:4px;margin-bottom:3px;padding:0 1px">' +
-          '<div style="font-size:9px;font-weight:700;color:var(--gray-l)">CLIENTE</div>' +
-          '<div style="font-size:9px;font-weight:700;color:var(--gray-l)">PRODUCTO / DESCRIPCIÓN</div>' +
-          '<div style="font-size:9px;font-weight:700;color:var(--gray-l)">CANTIDAD</div>' +
-          '<div></div>' +
+        '<div>' +
+          '<div style="font-size:9px;font-weight:700;color:var(--gray-l);margin-bottom:2px">No. DE REQUI *</div>' +
+          '<input id="eRequi" placeholder="Ej. R-2024-001" style="' + inputSty + '">' +
         '</div>' +
-        '<div id="eLineasContainer"></div>' +
+        '<div>' +
+          '<div style="font-size:9px;font-weight:700;color:var(--gray-l);margin-bottom:2px">FECHA ENTREGA</div>' +
+          '<input id="eFecha" type="date" value="' + new Date().toISOString().slice(0,10) + '" style="' + inputSty + '">' +
+        '</div>' +
       '</div>' +
-      '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">NOTA (opcional)</div>' +
-        '<input id="eNota" placeholder="Observaciones, referencia, etc." style="' + inputSty + '"></div>' +
-      '<div style="display:flex;gap:8px">' +
-        '<button onclick="guardarEntregadoManual()" style="background:var(--serig-m);color:#fff;border:none;border-radius:7px;padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>' +
-        '<button onclick="cerrarFormEntregado()" style="background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer">Cancelar</button>' +
+      '<div id="eSolHelper" style="display:none;font-size:10px;color:var(--gray);margin-bottom:6px;padding:3px 8px;background:var(--bg2);border-radius:5px"></div>' +
+      // Fila 3: Productos
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
+        '<span style="font-size:9px;font-weight:700;color:var(--gray-l)">PRODUCTOS *</span>' +
+        '<button onclick="agregarLineaEntregado()" style="background:var(--serig-l);color:var(--serig-m);border:1px solid var(--serig-m);border-radius:5px;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer">+ Agregar</button>' +
       '</div>' +
+      '<div id="eLineasContainer" style="margin-bottom:6px"></div>' +
+      // Fila 4: Nota
+      '<input id="eNota" placeholder="Nota / observaciones (opcional)" style="' + inputSty + '">' +
     '</div>';
   agregarLineaEntregado();
 }
