@@ -201,9 +201,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-chip:hover{box-shadow:0 2px 8px rgba(0,0,0,.14);transform:translateY(-1px);border-color:var(--serig-m)}
 .mtx-chip.dragging{opacity:.4}
 .mtx-ava{width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:8px;font-weight:800;flex-shrink:0}
-.mtx-grid{display:grid;grid-template-columns:84px repeat(4,minmax(0,1fr));gap:5px}
+.mtx-grid{display:grid;grid-template-columns:84px repeat(4,minmax(0,1fr)) minmax(0,1.1fr);gap:5px}
 .mtx-hcell{font-size:10px;font-weight:800;color:var(--serig-m);text-transform:uppercase;letter-spacing:.4px;padding:2px;display:flex;align-items:center;justify-content:center}
 .mtx-hcell.left{justify-content:flex-start}
+.mtx-hcell.noche{background:#1e1b4b;color:#e0e7ff;border-radius:6px;padding:3px 6px}
+.mtx-cell.noche{background:#eef2ff;border-color:#6366f1;border-style:solid}
 .mtx-rolcell{font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap}
 .mtx-cell{border:1.5px dashed var(--border);border-radius:8px;min-height:32px;padding:3px;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;background:var(--bg2);transition:border-color .15s,background .15s}
 .mtx-cell.drag-over{border-color:var(--serig-m);background:var(--serig-l)}
@@ -259,10 +261,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-grow-item{display:flex;align-items:center;gap:5px;flex:1}
 .mtx-grow-item .mtx-rolcell{width:84px;flex-shrink:0}
 .mtx-cell-g{flex:1}
-.mtx-noche-section{margin-top:8px;border-radius:10px;overflow:hidden;border:1.5px solid #4338ca}
-.mtx-noche-hdr{background:#1e1b4b;color:#e0e7ff;font-size:12px;font-weight:700;padding:7px 12px;letter-spacing:.3px}
-.mtx-cell-noche{background:#eef2ff;min-height:44px;display:flex;flex-wrap:wrap;gap:5px;padding:8px 10px;border:none;border-radius:0}
-.mtx-cell-noche.drag-over{background:#e0e7ff;outline:2px dashed #6366f1;outline-offset:-2px}
+
 
 /* ── SPLIT LAYOUT ─────────────────────────────────────────── */
 .split{display:flex;flex:1;overflow:hidden;gap:1px;background:var(--border)}
@@ -926,7 +925,7 @@ function metaParaProcesos(procs) {
 }
 
 // Roles de Serigrafía
-var ROLES_SERIG = ['Supervisor','Flameador','Impresión','Receptor','Calidad','Empaque','Apoyo','Prestado','Turno Nocturno'];
+var ROLES_SERIG = ['Supervisor','Flameador','Impresión','Receptor','Calidad','Empaque','Apoyo','Prestado'];
 
 // Personal base — se upserta con "Sincronizar lista"
 var PERSONAL_SERIG_SEED = [
@@ -1055,9 +1054,8 @@ var MATRIZ_ROLES = [
 ];
 // Roles generales (no son por línea): un solo espacio de ancho completo
 var MATRIZ_ROLES_GLOBAL = [
-  { key: 'supervisor', lbl: 'Supervisor',     ico: '⭐' },
-  { key: 'auxiliar',   lbl: 'Auxiliar',       ico: '🤝' },
-  { key: 'nocturno',   lbl: 'Turno Nocturno', ico: '🌙' }
+  { key: 'supervisor', lbl: 'Supervisor', ico: '⭐' },
+  { key: 'auxiliar',   lbl: 'Auxiliar',   ico: '🤝' }
 ];
 // Equivalencia matriz → rol en la página Personal (proceso_hab / ROLES_SERIG)
 var MATRIZ_TO_PROCESO = {
@@ -1065,18 +1063,18 @@ var MATRIZ_TO_PROCESO = {
   imprime:    'Impresión',
   recibe:     'Receptor',
   supervisor: 'Supervisor',
-  auxiliar:   'Apoyo',
-  nocturno:   'Turno Nocturno'
+  auxiliar:   'Apoyo'
 };
 // Inverso: rol de Personal (proceso_hab) → fila de la matriz
 var PROCESO_TO_MATRIZ = {
-  'Flameador':      'flameador',
-  'Impresión':      'imprime',
-  'Receptor':       'recibe',
-  'Supervisor':     'supervisor',
-  'Apoyo':          'auxiliar',
-  'Turno Nocturno': 'nocturno'
+  'Flameador':  'flameador',
+  'Impresión':  'imprime',
+  'Receptor':   'recibe',
+  'Supervisor': 'supervisor',
+  'Apoyo':      'auxiliar'
 };
+// Línea que corresponde al turno nocturno en la grilla
+var LINEA_NOCTURNO = 5;
 var MATRIZ_KEY = 'tetra_matriz_serig';
 var matrizDragCodigo = null;
 var matrizDbDisponible = null;   // null = aún no se sabe; true/false una vez detectado
@@ -1240,12 +1238,14 @@ function renderMatriz() {
   var html = '<div class="mtx-grid">';
   html += '<div class="mtx-hcell left">Tarea</div>';
   for (var h = 1; h <= 4; h++) html += '<div class="mtx-hcell">Línea ' + h + '</div>';
+  html += '<div class="mtx-hcell noche">🌙 Nocturno</div>';
   MATRIZ_ROLES.forEach(function(rol) {
     html += '<div class="mtx-rolcell">' + rol.ico + ' ' + rol.lbl + '</div>';
-    for (var li = 1; li <= 4; li++) {
+    for (var li = 1; li <= 5; li++) {
       var key = rol.key + '-' + li;
       var chips = (m[key] || []).map(function(c) { return matrizChip(c); }).join('');
-      html += '<div class="mtx-cell" id="mtx-' + key + '"' +
+      var extraClass = (li === LINEA_NOCTURNO) ? ' noche' : '';
+      html += '<div class="mtx-cell' + extraClass + '" id="mtx-' + key + '"' +
         ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
         ' ondragleave="this.classList.remove(\'drag-over\')"' +
         ' ondrop="matrizDrop(event,\'' + key + '\')">' + chips + '</div>';
@@ -1254,7 +1254,7 @@ function renderMatriz() {
   html += '</div>';
   // Roles generales (no por línea): Supervisor + Auxiliar lado a lado
   html += '<div class="mtx-global-row">';
-  MATRIZ_ROLES_GLOBAL.filter(function(r){ return r.key !== 'nocturno'; }).forEach(function(rol) {
+  MATRIZ_ROLES_GLOBAL.forEach(function(rol) {
     var chips = (m[rol.key] || []).map(function(c) { return matrizChip(c); }).join('');
     html += '<div class="mtx-grow-item">' +
       '<div class="mtx-rolcell">' + rol.ico + ' ' + rol.lbl + '</div>' +
@@ -1265,16 +1265,6 @@ function renderMatriz() {
       '</div>';
   });
   html += '</div>';
-  // Turno Nocturno — sección full-width con estilo nocturno
-  var nochips = (m['nocturno'] || []).map(function(c) { return matrizChip(c); }).join('');
-  var noEmpty  = !nochips ? '<span style="font-size:11px;color:#a5b4fc;font-style:italic">Arrastrar operadores aquí para asignar turno nocturno</span>' : '';
-  html += '<div class="mtx-noche-section">' +
-    '<div class="mtx-noche-hdr">🌙 Turno Nocturno <span style="font-size:10px;font-weight:400;opacity:.7;margin-left:6px">Línea única</span></div>' +
-    '<div class="mtx-cell mtx-cell-noche" id="mtx-nocturno"' +
-    ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
-    ' ondragleave="this.classList.remove(\'drag-over\')"' +
-    ' ondrop="matrizDrop(event,\'nocturno\')">' + noEmpty + nochips + '</div>' +
-    '</div>';
   cont.innerHTML = pool + html;
 }
 
