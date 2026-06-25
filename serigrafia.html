@@ -2456,6 +2456,7 @@ var eLineasCount      = 0;
 var eClientesOptsHtml = '';   // opciones de clientes para líneas dinámicas
 var eEntregadoSolId   = null;
 var eEntregadoSolCod  = '';
+var eEditandoId       = null; // id del registro en edición (null = nuevo)
 
 function buildPedidoOpts(selectedId) {
   var candidatos = solicitudes.filter(function(s) {
@@ -2576,7 +2577,7 @@ function eliminarLineaEntregado(i) {
 function cerrarFormEntregado() {
   var el = document.getElementById('formEntregadoInline');
   if (el) { el.style.display = 'none'; el.innerHTML = ''; }
-  eEntregadoSkus = {}; eLineasCount = 0; eEntregadoSolId = null; eEntregadoSolCod = '';
+  eEntregadoSkus = {}; eLineasCount = 0; eEntregadoSolId = null; eEntregadoSolCod = ''; eEditandoId = null;
 }
 
 function entregadoDescInput(val, i) {
@@ -2653,28 +2654,32 @@ function guardarEntregadoManual() {
   lineas.forEach(function(l) { if (l.cliente && clientesPrincipales.indexOf(l.cliente) < 0) clientesPrincipales.push(l.cliente); });
   var clientePrincipal = clientesPrincipales.join(' / ');
   var arr = getEntregasManuales();
-  var dup = arr.find(function(m) { return m.requi && m.requi.trim().toLowerCase() === requi.toLowerCase(); });
-  if (dup) {
-    var dupInfo = (dup.fecha ? ' · ' + dup.fecha : '') + (dup.cliente ? ' · ' + dup.cliente : '');
-    if (!confirm('⚠️ La Requi "' + requi + '" ya está registrada' + dupInfo + '.\n¿Registrar de todas formas?')) return;
-  }
   var firstLinked = lineas.find(function(l) { return l.solId; }) || {};
-  arr.unshift({
-    id: 'm-' + Date.now(),
-    cliente: clientePrincipal,
-    requi: requi,
-    lineas: lineas,
-    cant: totalCant,
-    fecha: ((document.getElementById('eFecha') || {}).value || new Date().toISOString().slice(0,10)),
-    nota: nota,
-    solId: firstLinked.solId || '',
-    solCodigo: firstLinked.solCodigo || ''
-  });
-  saveEntregasManuales(arr);
-  clientesPrincipales.forEach(function(c) { registrarUsoCliente(c); });
-  cerrarFormEntregado();
-  renderProduccionActual();
-  showToast('✅ Entregado registrado (' + lineas.length + ' producto' + (lineas.length > 1 ? 's' : '') + ')');
+  var fechaVal = ((document.getElementById('eFecha') || {}).value || new Date().toISOString().slice(0,10));
+  if (eEditandoId) {
+    // Modo edición: reemplazar el registro existente manteniendo su id y posición
+    arr = arr.map(function(x) {
+      if (x.id !== eEditandoId) return x;
+      return { id: x.id, cliente: clientePrincipal, requi: requi, lineas: lineas, cant: totalCant, fecha: fechaVal, nota: nota, solId: firstLinked.solId || '', solCodigo: firstLinked.solCodigo || '' };
+    });
+    saveEntregasManuales(arr);
+    clientesPrincipales.forEach(function(c) { registrarUsoCliente(c); });
+    cerrarFormEntregado();
+    renderProduccionActual();
+    showToast('✅ Entregado actualizado');
+  } else {
+    var dup = arr.find(function(m) { return m.requi && m.requi.trim().toLowerCase() === requi.toLowerCase(); });
+    if (dup) {
+      var dupInfo = (dup.fecha ? ' · ' + dup.fecha : '') + (dup.cliente ? ' · ' + dup.cliente : '');
+      if (!confirm('⚠️ La Requi "' + requi + '" ya está registrada' + dupInfo + '.\n¿Registrar de todas formas?')) return;
+    }
+    arr.unshift({ id: 'm-' + Date.now(), cliente: clientePrincipal, requi: requi, lineas: lineas, cant: totalCant, fecha: fechaVal, nota: nota, solId: firstLinked.solId || '', solCodigo: firstLinked.solCodigo || '' });
+    saveEntregasManuales(arr);
+    clientesPrincipales.forEach(function(c) { registrarUsoCliente(c); });
+    cerrarFormEntregado();
+    renderProduccionActual();
+    showToast('✅ Entregado registrado (' + lineas.length + ' producto' + (lineas.length > 1 ? 's' : '') + ')');
+  }
 }
 
 function eliminarEntregadoManual(id) {
@@ -2682,6 +2687,34 @@ function eliminarEntregadoManual(id) {
   var arr = getEntregasManuales().filter(function(e){ return e.id !== id; });
   saveEntregasManuales(arr);
   renderProduccionActual();
+}
+
+function editarEntregadoManual(id) {
+  var m = getEntregasManuales().find(function(x) { return x.id === id; });
+  if (!m) return;
+  eEditandoId = id;
+  abrirFormEntregado();
+  // Poblar campos del encabezado
+  var reqEl = document.getElementById('eRequi');
+  if (reqEl) reqEl.value = m.requi || '';
+  var fEl = document.getElementById('eFecha');
+  if (fEl && m.fecha) fEl.value = m.fecha;
+  var nEl = document.getElementById('eNota');
+  if (nEl) nEl.value = m.nota || '';
+  // Cambiar título a Editar
+  var titleEl = document.querySelector('#formEntregadoInline span[style*="font-weight:800"]');
+  if (titleEl) titleEl.textContent = '✏️ Editar entregado';
+  // Limpiar la línea en blanco que agrega abrirFormEntregado y reconstruir desde el registro
+  var container = document.getElementById('eLineasContainer');
+  if (container) container.innerHTML = '';
+  eLineasCount = 0; eEntregadoSkus = {};
+  var lineas = (m.lineas && m.lineas.length) ? m.lineas : [{ desc: m.desc || '', cant: m.cant || 0, sku: m.sku || '', cliente: m.cliente || '', solId: m.solId || '' }];
+  lineas.forEach(function(l) {
+    agregarLineaEntregado(l.desc, l.sku, l.cant, l.cliente, l.solId);
+  });
+  // Hacer scroll al form
+  var formEl = document.getElementById('formEntregadoInline');
+  if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function renderProduccionActual() {
@@ -2737,7 +2770,7 @@ function renderProduccionActual() {
           '<td style="font-family:var(--mono);font-weight:600">' + (l.cant||0).toLocaleString() + '</td>' +
           (isFirst ? '<td style="font-size:11px;color:var(--gray)">' + escHtml(m.fecha || '—') + '</td>' : '<td></td>') +
           (isFirst ? '<td><span style="font-size:9px;background:#FEF3C7;color:#92400e;border-radius:4px;padding:2px 6px;font-weight:700">MANUAL</span>' + (m.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(m.nota) + '</span>' : '') + '</td>' : '<td></td>') +
-          (isFirst ? '<td><button onclick="event.stopPropagation();eliminarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 4px" title="Eliminar">✕</button></td>' : '<td></td>') +
+          (isFirst ? '<td style="white-space:nowrap"><button onclick="event.stopPropagation();editarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--serig-m);font-size:13px;padding:2px 4px" title="Editar">✏️</button><button onclick="event.stopPropagation();eliminarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 4px" title="Eliminar">✕</button></td>' : '<td></td>') +
         '</tr>';
       }).join('');
     }).join('');
