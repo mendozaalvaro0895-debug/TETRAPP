@@ -2460,15 +2460,15 @@ var eEditandoId       = null; // id del registro en edición (null = nuevo)
 
 function buildPedidoOpts(selectedId) {
   var candidatos = solicitudes.filter(function(s) {
-    return s.estado === 'proceso' || s.estado === 'programada' || s.estado === 'entregada';
+    return s.estado === 'proceso' || s.estado === 'programada' || s.estado === 'entregada' || s.estado === 'nueva';
   }).sort(function(a, b) {
-    var ord = { proceso: 0, programada: 1, entregada: 2 };
+    var ord = { proceso: 0, programada: 1, nueva: 2, entregada: 3 };
     return (ord[a.estado] || 9) - (ord[b.estado] || 9);
   });
   if (!candidatos.length) return '<option value="">— Sin vincular —</option>';
   var opts = '<option value="">— Sin vincular —</option>';
   candidatos.forEach(function(s) {
-    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'programada' ? '🟡' : '✅';
+    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'programada' ? '🟡' : s.estado === 'nueva' ? '⚪' : '✅';
     var lbl = ico + ' ' + (s.id_display || '') + ' · ' + (s.cliente || '').slice(0, 12);
     var sel = selectedId && selectedId === s.id ? ' selected' : '';
     opts += '<option value="' + escHtml(s.id) + '"' + sel + '>' + escHtml(lbl) + '</option>';
