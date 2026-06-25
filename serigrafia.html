@@ -263,23 +263,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-cell-g{flex:1}
 
 
-/* ── AVANCE EN PROCESO ────────────────────────────────────── */
-.avance-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
-.avance-hdr{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.avance-hdr-title{font-size:12px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:6px}
-.avance-item{padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
-.avance-item:last-child{border-bottom:none}
-.avance-item:hover{background:var(--bg2)}
-.avance-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
-.avance-codigo{font-size:10px;font-weight:800;color:var(--serig-m);font-family:var(--mono)}
-.avance-pct{font-size:13px;font-weight:800}
-.avance-cliente{font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
-.avance-desc{font-size:11px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:5px}
-.avance-bar-bg{background:var(--border);border-radius:4px;height:6px}
-.avance-bar-fg{height:6px;border-radius:4px;transition:width .3s}
-.avance-footer{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
-.avance-und{font-size:10px;color:var(--gray-l);font-weight:600}
-.avance-fecha{font-size:10px;color:var(--gray-l)}
+/* ── PRODUCCIÓN MENSUAL ───────────────────────────────────── */
+.prod-mens-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.prod-mens-hdr{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.prod-mens-chart{padding:10px 14px 8px}
+.prod-mens-bars{display:flex;align-items:flex-end;gap:3px;height:80px;width:100%}
+.prod-bar-col{display:flex;flex-direction:column;align-items:center;flex:1;min-width:0}
+.prod-bar{width:100%;border-radius:3px 3px 0 0;transition:height .3s;min-height:2px}
+.prod-bar-lbl{font-size:8px;color:var(--gray-l);margin-top:3px;text-align:center;line-height:1}
+.prod-mens-total{display:flex;gap:16px;padding:6px 14px 10px;border-top:1px solid var(--border);margin-top:4px}
+.prod-stat{display:flex;flex-direction:column}
+.prod-stat-val{font-size:16px;font-weight:800;color:var(--ink)}
+.prod-stat-lbl{font-size:10px;color:var(--gray-l);font-weight:500}
 
 /* ── SPLIT LAYOUT ─────────────────────────────────────────── */
 .split{display:flex;flex:1;overflow:hidden;gap:1px;background:var(--border)}
@@ -542,7 +537,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
               </div>
               <div id="matrizPersonal"></div>
             </div>
-            <div id="avanceSolicitudes"></div>
+            <div id="prodMensual"></div>
           </div>
           <div class="ta-asist">
             <div id="asistHoy"></div>
@@ -2048,57 +2043,87 @@ function renderInicio() {
   if (el) el.textContent = new Date().toLocaleTimeString('es-GT', {hour:'2-digit', minute:'2-digit'});
 
   renderMatriz();
-  renderAvanceSolicitudes();
+  renderProdMensual();
   renderBoard();
   renderProduccionActual();
   renderAsistHoy();
   renderFaltasChart();
 }
 
-function renderAvanceSolicitudes() {
-  var cont = document.getElementById('avanceSolicitudes');
+function renderProdMensual() {
+  var cont = document.getElementById('prodMensual');
   if (!cont) return;
-  var activas = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
-  if (!activas.length) { cont.innerHTML = ''; return; }
 
-  // Ordenar: menor progreso primero (los más rezagados arriba)
-  activas = activas.slice().sort(function(a, b) { return (a.prog || 0) - (b.prog || 0); });
+  var hoy   = new Date();
+  var anio  = hoy.getFullYear();
+  var mes   = hoy.getMonth();       // 0-based
+  var diaHoy = hoy.getDate();
+  var diasMes = new Date(anio, mes + 1, 0).getDate();
+  var mesStr  = hoy.toLocaleString('es-GT', { month: 'long', year: 'numeric' });
 
-  var items = activas.map(function(s) {
-    var prog = s.prog || 0;
-    var barColor = prog >= 80 ? '#16a34a' : prog >= 40 ? '#d97706' : 'var(--serig-m)';
-    var pctColor = prog >= 80 ? '#16a34a' : prog >= 40 ? '#d97706' : 'var(--serig-m)';
-    var fechaStr = '';
-    if (s.fecha_lim) {
-      var dias = Math.round((new Date(s.fecha_lim) - new Date()) / 86400000);
-      fechaStr = dias < 0
-        ? '<span style="color:#dc2626;font-weight:700">Vencido ' + Math.abs(dias) + 'd</span>'
-        : dias === 0
-          ? '<span style="color:#d97706;font-weight:700">Hoy</span>'
-          : '<span>Entrega en ' + dias + 'd</span>';
-    }
-    var solIdEsc = String(s.solId || '').replace(/'/g, "\\'");
-    return '<div class="avance-item" onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + solIdEsc + '\')},100)">' +
-      '<div class="avance-top">' +
-        '<span class="avance-codigo">' + escHtml(s.solCodigo || '') + '</span>' +
-        '<span class="avance-pct" style="color:' + pctColor + '">' + prog + '%</span>' +
-      '</div>' +
-      '<div class="avance-cliente">' + escHtml(s.cliente || '—') + '</div>' +
-      '<div class="avance-desc">' + escHtml(s.desc || '—') + '</div>' +
-      '<div class="avance-bar-bg"><div class="avance-bar-fg" style="width:' + prog + '%;background:' + barColor + '"></div></div>' +
-      '<div class="avance-footer">' +
-        '<span class="avance-und">' + (s.cant || 0).toLocaleString() + ' und</span>' +
-        '<span class="avance-fecha">' + fechaStr + '</span>' +
-      '</div>' +
+  // Acumular unidades por día (1-indexed)
+  var porDia = {};
+
+  // Fuente 1: solicitudes entregadas en Supabase
+  solicitudes.forEach(function(s) {
+    if (s.estado !== 'entregada') return;
+    var f = new Date(s.created_at || s.fecha_lim || '');
+    if (isNaN(f) || f.getFullYear() !== anio || f.getMonth() !== mes) return;
+    var d = f.getDate();
+    porDia[d] = (porDia[d] || 0) + (s.cant || 0);
+  });
+
+  // Fuente 2: entregados manuales (localStorage)
+  (getEntregasManuales() || []).forEach(function(m) {
+    if (!m.fecha) return;
+    var f = new Date(m.fecha + 'T12:00:00');
+    if (isNaN(f) || f.getFullYear() !== anio || f.getMonth() !== mes) return;
+    var d = f.getDate();
+    porDia[d] = (porDia[d] || 0) + (m.cant || 0);
+  });
+
+  // KPIs
+  var totalMes  = Object.values(porDia).reduce(function(s, v) { return s + v; }, 0);
+  var diasConProd = Object.keys(porDia).length;
+  var promDia   = diasConProd ? Math.round(totalMes / diasConProd) : 0;
+  var maxVal    = Math.max.apply(null, Object.values(porDia).concat([1]));
+
+  // Barras — solo días transcurridos hasta hoy
+  var barras = '';
+  for (var d = 1; d <= diaHoy; d++) {
+    var val  = porDia[d] || 0;
+    var pct  = Math.round((val / maxVal) * 100);
+    var esHoy = d === diaHoy;
+    var barColor = esHoy ? 'var(--serig-m)' : (val > promDia ? '#16a34a' : val > 0 ? 'var(--serig-l2, #a78bfa)' : 'var(--border)');
+    var tooltip  = val ? val.toLocaleString() + ' und' : 'Sin entregas';
+    barras += '<div class="prod-bar-col" title="Día ' + d + ': ' + tooltip + '">' +
+      '<div class="prod-bar" style="height:' + Math.max(pct, val ? 8 : 2) + '%;background:' + barColor + '"></div>' +
+      '<div class="prod-bar-lbl">' + (d % 5 === 0 || d === 1 || esHoy ? d : '') + '</div>' +
+    '</div>';
+  }
+
+  if (!totalMes && !diasConProd) {
+    cont.innerHTML = '<div class="prod-mens-wrap">' +
+      '<div class="prod-mens-hdr"><span style="font-size:12px;font-weight:800">📦 Producción mensual</span>' +
+      '<span style="font-size:11px;color:var(--gray-l)">' + mesStr + '</span></div>' +
+      '<div style="padding:18px 14px;font-size:12px;color:var(--gray-l);text-align:center">Sin entregas registradas este mes</div>' +
       '</div>';
-  }).join('');
+    return;
+  }
 
-  cont.innerHTML = '<div class="avance-wrap" style="margin-bottom:12px">' +
-    '<div class="avance-hdr">' +
-      '<span class="avance-hdr-title">📋 Avance en proceso</span>' +
-      '<span style="font-size:11px;font-weight:700;color:var(--serig-m)">' + activas.length + ' pedido' + (activas.length !== 1 ? 's' : '') + '</span>' +
+  cont.innerHTML = '<div class="prod-mens-wrap">' +
+    '<div class="prod-mens-hdr">' +
+      '<span style="font-size:12px;font-weight:800">📦 Producción mensual</span>' +
+      '<span style="font-size:11px;color:var(--gray-l);text-transform:capitalize">' + mesStr + '</span>' +
     '</div>' +
-    items +
+    '<div class="prod-mens-chart">' +
+      '<div class="prod-mens-bars">' + barras + '</div>' +
+    '</div>' +
+    '<div class="prod-mens-total">' +
+      '<div class="prod-stat"><span class="prod-stat-val">' + totalMes.toLocaleString() + '</span><span class="prod-stat-lbl">und totales</span></div>' +
+      '<div class="prod-stat"><span class="prod-stat-val">' + promDia.toLocaleString() + '</span><span class="prod-stat-lbl">und / día activo</span></div>' +
+      '<div class="prod-stat"><span class="prod-stat-val">' + diasConProd + '</span><span class="prod-stat-lbl">días con entrega</span></div>' +
+    '</div>' +
     '</div>';
 }
 
