@@ -1899,19 +1899,38 @@ function boardBuildSinBlock(items) {
 
   var allCardOrden = getSinCardOrden();
 
+  // Pre-calcular tier de entrega por solId: 0=rojo(sin entregas), 1=amarillo(parcial), 2=verde(completo)
+  var manuales = getEntregasManuales() || [];
+  var entregadoMap = {};
+  manuales.forEach(function(m) {
+    if (m.lineas && m.lineas.length) {
+      m.lineas.forEach(function(l) { if (l.solId) entregadoMap[l.solId] = (entregadoMap[l.solId] || 0) + (l.cant || 0); });
+    } else if (m.solId) {
+      entregadoMap[m.solId] = (entregadoMap[m.solId] || 0) + (m.cant || 0);
+    }
+  });
+  function getTier(item) {
+    var ent = entregadoMap[item.solId] || 0;
+    var tot = item.cant || 0;
+    if (ent > 0 && ent >= tot) return 2; // verde
+    if (ent > 0) return 1;               // amarillo (parcial)
+    return 0;                            // rojo (sin entregas)
+  }
+
   var gruposHtml = grupoKeys.length === 0
     ? '<div class="board-empty-lane">No hay pedidos sin asignar</div>'
     : grupoKeys.map(function(cli) {
         var gItems = grupoMap[cli].slice();
-        // Aplicar orden guardado de tarjetas para este cliente
+        // Ordenar: primero por tier (rojo→amarillo→verde), luego por orden manual guardado
         var cliOrden = allCardOrden[cli] || [];
-        if (cliOrden.length > 0) {
-          gItems.sort(function(a, b) {
-            var ia = cliOrden.indexOf(a.solId); var ib = cliOrden.indexOf(b.solId);
-            ia = ia === -1 ? 9999 : ia; ib = ib === -1 ? 9999 : ib;
-            if (ia !== ib) return ia - ib;
-            return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
-          });
+        gItems.sort(function(a, b) {
+          var ta = getTier(a); var tb = getTier(b);
+          if (ta !== tb) return ta - tb;
+          var ia = cliOrden.indexOf(a.solId); var ib = cliOrden.indexOf(b.solId);
+          ia = ia === -1 ? 9999 : ia; ib = ib === -1 ? 9999 : ib;
+          if (ia !== ib) return ia - ib;
+          return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
+        });
         }
         var totalG = gItems.reduce(function(s,i){ return s+(i.cant||0); }, 0);
         var pedidosTxt = gItems.length + ' pedido' + (gItems.length !== 1 ? 's' : '');
