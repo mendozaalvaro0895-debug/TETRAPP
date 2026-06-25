@@ -1362,9 +1362,15 @@ var boardDragId = null;
 var boardDragSolId = null;
 
 function boardBuildCard(item) {
-  // Entregas parciales vinculadas a este pedido (localStorage)
-  var requis = (getEntregasManuales() || []).filter(function(m) { return m.solId === item.solId; });
-  var entregado = requis.reduce(function(s, m) { return s + (m.cant || 0); }, 0);
+  // Entregas parciales vinculadas a este pedido — busca en lineas[] por solId
+  var entregado = 0;
+  (getEntregasManuales() || []).forEach(function(m) {
+    if (m.lineas && m.lineas.length) {
+      m.lineas.forEach(function(l) { if (l.solId === item.solId) entregado += (l.cant || 0); });
+    } else if (m.solId === item.solId) {
+      entregado += (m.cant || 0);
+    }
+  });
   var progColor = item.prog >= 80 ? 'var(--green)' : item.prog >= 40 ? 'var(--amber)' : 'var(--serig-m)';
   var badgeBg   = item.estado === 'proceso'    ? 'var(--serig-l)' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
   var badgeClr  = item.estado === 'proceso'    ? 'var(--serig-m)' : item.estado === 'programada' ? '#92400e' : '#64748b';
@@ -2444,49 +2450,33 @@ var eClientesOptsHtml = '';   // opciones de clientes para líneas dinámicas
 var eEntregadoSolId   = null;
 var eEntregadoSolCod  = '';
 
-function buildPedidoOpts() {
+function buildPedidoOpts(selectedId) {
   var candidatos = solicitudes.filter(function(s) {
     return s.estado === 'proceso' || s.estado === 'programada' || s.estado === 'entregada';
   }).sort(function(a, b) {
     var ord = { proceso: 0, programada: 1, entregada: 2 };
     return (ord[a.estado] || 9) - (ord[b.estado] || 9);
   });
-  if (!candidatos.length) return '<option value="">— No hay pedidos activos —</option>';
+  if (!candidatos.length) return '<option value="">— Sin vincular —</option>';
   var opts = '<option value="">— Sin vincular —</option>';
   candidatos.forEach(function(s) {
     var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'programada' ? '🟡' : '✅';
-    var lbl = ico + ' ' + (s.id_display || '') + ' · ' + (s.cliente || '') + (s.desc ? ' · ' + s.desc.slice(0, 35) : '');
-    opts += '<option value="' + escHtml(s.id) + '">' + escHtml(lbl) + '</option>';
+    var lbl = ico + ' ' + (s.id_display || '') + ' · ' + (s.cliente || '').slice(0, 12);
+    var sel = selectedId && selectedId === s.id ? ' selected' : '';
+    opts += '<option value="' + escHtml(s.id) + '"' + sel + '>' + escHtml(lbl) + '</option>';
   });
   return opts;
 }
 
-function vincularPedidoEntregado(solId) {
-  eEntregadoSolId  = null;
-  eEntregadoSolCod = '';
-  var badge  = document.getElementById('eSolBadge');
-  var helper = document.getElementById('eSolHelper');
-  if (!solId) {
-    if (badge)  badge.style.display  = 'none';
-    if (helper) helper.style.display = 'none';
-    return;
-  }
-  var s = solicitudes.find(function(x) { return x.id === solId; });
+function vincularPedidoLinea(solId, i) {
+  var s = solId ? solicitudes.find(function(x) { return x.id === solId; }) : null;
   if (!s) return;
-  eEntregadoSolId  = s.id;
-  eEntregadoSolCod = s.id_display || '';
-  // Pre-llenar cliente y desc en la primera línea
-  var ec0 = document.getElementById('eCli-0');
-  if (ec0 && s.cliente) ec0.value = s.cliente;
-  var ed0 = document.getElementById('eDesc-0');
-  if (ed0 && s.desc) { ed0.value = s.desc; eEntregadoSkus[0] = s.sku || null; }
-  // Badge correlativo
-  if (badge) { badge.textContent = eEntregadoSolCod; badge.style.display = 'inline-block'; }
-  // Helper: total del pedido como referencia para entregas parciales
-  if (helper) {
-    helper.innerHTML = 'Pedido total: <strong>' + (s.cant || 0).toLocaleString() + ' und</strong> · Ingresar solo las unidades de esta entrega';
-    helper.style.display = 'block';
-  }
+  // Autollenar cliente
+  var ec = document.getElementById('eCli-' + i);
+  if (ec && s.cliente) ec.value = s.cliente;
+  // Autollenar descripción si el campo está vacío
+  var ed = document.getElementById('eDesc-' + i);
+  if (ed && !ed.value.trim() && s.desc) { ed.value = s.desc; eEntregadoSkus[i] = s.sku || null; }
 }
 
 function abrirFormEntregado() {
@@ -2514,16 +2504,8 @@ function abrirFormEntregado() {
           '<button onclick="cerrarFormEntregado()" style="background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">✕</button>' +
         '</div>' +
       '</div>' +
-      // Fila 2: Correlativo + Requi + Fecha en una sola línea
-      '<div style="display:grid;grid-template-columns:1fr 1fr 140px;gap:6px;margin-bottom:7px">' +
-        '<div>' +
-          '<div style="font-size:9px;font-weight:700;color:var(--gray-l);margin-bottom:2px">PEDIDO / CORRELATIVO' +
-            '<span id="eSolBadge" style="display:none;font-size:9px;font-weight:800;font-family:var(--mono);background:var(--serig-l);color:var(--serig-m);border-radius:3px;padding:1px 5px;margin-left:5px"></span>' +
-          '</div>' +
-          '<select id="eSolId" onchange="vincularPedidoEntregado(this.value)" style="' + inputSty + ';background:var(--card);color:var(--text)">' +
-            buildPedidoOpts() +
-          '</select>' +
-        '</div>' +
+      // Fila 2: Requi + Fecha
+      '<div style="display:grid;grid-template-columns:1fr 140px;gap:6px;margin-bottom:7px">' +
         '<div>' +
           '<div style="font-size:9px;font-weight:700;color:var(--gray-l);margin-bottom:2px">No. DE REQUI *</div>' +
           '<input id="eRequi" placeholder="Ej. R-2024-001" style="' + inputSty + '">' +
@@ -2533,7 +2515,6 @@ function abrirFormEntregado() {
           '<input id="eFecha" type="date" value="' + new Date().toISOString().slice(0,10) + '" style="' + inputSty + '">' +
         '</div>' +
       '</div>' +
-      '<div id="eSolHelper" style="display:none;font-size:10px;color:var(--gray);margin-bottom:6px;padding:3px 8px;background:var(--bg2);border-radius:5px"></div>' +
       // Fila 3: Productos
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
         '<span style="font-size:9px;font-weight:700;color:var(--gray-l)">PRODUCTOS *</span>' +
@@ -2546,7 +2527,7 @@ function abrirFormEntregado() {
   agregarLineaEntregado();
 }
 
-function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal) {
+function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal, solIdVal) {
   var container = document.getElementById('eLineasContainer');
   if (!container) return;
   var i = eLineasCount++;
@@ -2556,16 +2537,18 @@ function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal) {
     var prevCli = document.getElementById('eCli-' + (i - 1));
     if (prevCli) clienteVal = prevCli.value;
   }
-  var bSty = 'padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box;width:100%';
+  var bSty = 'padding:5px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box;width:100%';
   var row = document.createElement('div');
   row.id = 'eLinea-' + i;
-  row.style.cssText = 'display:grid;grid-template-columns:130px 1fr 100px 28px;gap:4px;margin-bottom:5px;align-items:start';
+  row.style.cssText = 'display:grid;grid-template-columns:118px 118px 1fr 80px 26px;gap:4px;margin-bottom:5px;align-items:start';
   var cliOpts = eClientesOptsHtml.replace(
     'value="' + escHtml(clienteVal || '') + '"',
     'value="' + escHtml(clienteVal || '') + '" selected'
   );
+  var pedOpts = buildPedidoOpts(solIdVal || '');
   row.innerHTML =
     '<select id="eCli-' + i + '" style="' + bSty + ';background:var(--card);color:var(--text)">' + cliOpts + '</select>' +
+    '<select id="eSol-' + i + '" onchange="vincularPedidoLinea(this.value,' + i + ')" style="' + bSty + ';background:var(--card);color:var(--text)">' + pedOpts + '</select>' +
     '<div class="sku-wrap-s">' +
       '<input id="eDesc-' + i + '" placeholder="🔍 SKU o descripción…" autocomplete="off" style="' + bSty + '"' +
         ' oninput="entregadoDescInput(this.value,' + i + ')" onblur="setTimeout(function(){cerrarEntregadoSkuDrop(' + i + ')},200)"' +
@@ -2573,7 +2556,7 @@ function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal) {
       '<div class="sku-drop-s" id="e-sku-drop-' + i + '"></div>' +
     '</div>' +
     '<input id="eCant-' + i + '" type="number" min="1" placeholder="Cant." style="' + bSty + '" value="' + (cantVal || '') + '">' +
-    '<button onclick="eliminarLineaEntregado(' + i + ')" title="Quitar" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--gray-l);font-size:14px;cursor:pointer;padding:4px 6px;line-height:1;width:28px">✕</button>';
+    '<button onclick="eliminarLineaEntregado(' + i + ')" title="Quitar" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--gray-l);font-size:13px;cursor:pointer;padding:3px 5px;line-height:1">✕</button>';
   container.appendChild(row);
 }
 
@@ -2650,7 +2633,10 @@ function guardarEntregadoManual() {
       if (!cliv) { showToast('⚠️ Seleccioná el cliente en producto ' + (ri + 1), '#92400e'); if (cliEl) { cliEl.style.outline='2px solid #dc2626'; cliEl.focus(); } return; }
       if (!dv)   { showToast('⚠️ Completá la descripción del producto ' + (ri + 1), '#92400e'); if (dInp) { dInp.style.borderColor='#dc2626'; dInp.focus(); } return; }
       if (!cv || cv < 1) { showToast('⚠️ Cantidad inválida en producto ' + (ri + 1), '#92400e'); if (cInp) { cInp.style.borderColor='#dc2626'; cInp.focus(); } return; }
-      lineas.push({ cliente: cliv, sku: eEntregadoSkus[idx] || '', desc: dv, cant: cv });
+      var solEl = document.getElementById('eSol-' + idx);
+      var solv  = solEl ? solEl.value : '';
+      var solS  = solv ? solicitudes.find(function(x) { return x.id === solv; }) : null;
+      lineas.push({ cliente: cliv, sku: eEntregadoSkus[idx] || '', desc: dv, cant: cv, solId: solv || '', solCodigo: solS ? (solS.id_display || '') : '' });
     }
   }
   if (!lineas.length) { showToast('⚠️ Agregá al menos un producto', '#92400e'); return; }
@@ -2665,6 +2651,7 @@ function guardarEntregadoManual() {
     var dupInfo = (dup.fecha ? ' · ' + dup.fecha : '') + (dup.cliente ? ' · ' + dup.cliente : '');
     if (!confirm('⚠️ La Requi "' + requi + '" ya está registrada' + dupInfo + '.\n¿Registrar de todas formas?')) return;
   }
+  var firstLinked = lineas.find(function(l) { return l.solId; }) || {};
   arr.unshift({
     id: 'm-' + Date.now(),
     cliente: clientePrincipal,
@@ -2673,8 +2660,8 @@ function guardarEntregadoManual() {
     cant: totalCant,
     fecha: ((document.getElementById('eFecha') || {}).value || new Date().toISOString().slice(0,10)),
     nota: nota,
-    solId: eEntregadoSolId || '',
-    solCodigo: eEntregadoSolCod || ''
+    solId: firstLinked.solId || '',
+    solCodigo: firstLinked.solCodigo || ''
   });
   saveEntregasManuales(arr);
   clientesPrincipales.forEach(function(c) { registrarUsoCliente(c); });
@@ -2743,10 +2730,13 @@ function renderProduccionActual() {
       var cliLabel = l.cliente
         ? '<span style="font-size:10px;font-weight:600;color:var(--serig-m);white-space:nowrap">' + escHtml(l.cliente) + '</span>'
         : '';
+      var pedBadge = l.solCodigo
+        ? '<span style="font-family:var(--mono);font-size:9px;font-weight:800;background:var(--serig-l);color:var(--serig-m);border-radius:3px;padding:1px 5px;margin-right:5px">' + escHtml(l.solCodigo) + '</span>'
+        : '';
       return '<tr style="background:var(--bg2)">' +
         '<td style="font-size:11px;color:var(--gray-l);padding-left:12px">' + cliLabel + '</td>' +
-        '<td style="font-size:11px;color:var(--gray-l)">' +
-          (l.sku ? '<span style="font-family:var(--mono);font-size:10px;color:var(--serig-m);margin-right:5px">' + escHtml(l.sku) + '</span>' : '') +
+        '<td style="font-size:11px;color:var(--gray-l)">' + pedBadge +
+          (l.sku ? '<span style="font-family:var(--mono);font-size:10px;color:var(--gray-l);margin-right:4px">' + escHtml(l.sku) + '</span>' : '') +
           escHtml(l.desc || '—') +
         '</td>' +
         '<td style="font-family:var(--mono);font-size:11px;color:var(--ink)">' + (l.cant || 0).toLocaleString() + '</td>' +
