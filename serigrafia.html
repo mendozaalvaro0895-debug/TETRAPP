@@ -2457,6 +2457,7 @@ var eClientesOptsHtml = '';   // opciones de clientes para líneas dinámicas
 var eEntregadoSolId   = null;
 var eEntregadoSolCod  = '';
 var eEditandoId       = null; // id del registro en edición (null = nuevo)
+var eEntregadoSolIds  = {};  // { lineaIdx: solId UUID }
 
 function buildPedidoOpts(selectedId) {
   var candidatos = solicitudes.filter(function(s) {
@@ -2553,10 +2554,22 @@ function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal, solIdVal) {
     'value="' + escHtml(clienteVal || '') + '"',
     'value="' + escHtml(clienteVal || '') + '" selected'
   );
-  var pedOpts = buildPedidoOpts(solIdVal || '');
+  // Precarga de solId si viene de edición
+  if (solIdVal) {
+    eEntregadoSolIds[i] = solIdVal;
+  }
+  var solLabel = '';
+  if (solIdVal) {
+    var solPre = solicitudes.find(function(x) { return x.id === solIdVal; });
+    if (solPre) solLabel = (solPre.id_display || '') + ' · ' + (solPre.cliente || '').slice(0, 14);
+  }
   row.innerHTML =
     '<select id="eCli-' + i + '" style="' + bSty + ';background:var(--card);color:var(--text)">' + cliOpts + '</select>' +
-    '<select id="eSol-' + i + '" onchange="vincularPedidoLinea(this.value,' + i + ')" style="' + bSty + ';background:var(--card);color:var(--text)">' + pedOpts + '</select>' +
+    '<div class="sku-wrap-s">' +
+      '<input id="eSol-' + i + '" placeholder="🔗 Buscar pedido…" autocomplete="off" style="' + bSty + '" value="' + escHtml(solLabel) + '"' +
+        ' oninput="entregadoSolInput(this.value,' + i + ')" onfocus="entregadoSolInput(this.value,' + i + ')" onblur="setTimeout(function(){cerrarEntregadoSolDrop(' + i + ')},200)">' +
+      '<div class="sku-drop-s" id="e-sol-drop-' + i + '"></div>' +
+    '</div>' +
     '<div class="sku-wrap-s">' +
       '<input id="eDesc-' + i + '" placeholder="🔍 SKU o descripción…" autocomplete="off" style="' + bSty + '"' +
         ' oninput="entregadoDescInput(this.value,' + i + ')" onblur="setTimeout(function(){cerrarEntregadoSkuDrop(' + i + ')},200)"' +
@@ -2577,7 +2590,7 @@ function eliminarLineaEntregado(i) {
 function cerrarFormEntregado() {
   var el = document.getElementById('formEntregadoInline');
   if (el) { el.style.display = 'none'; el.innerHTML = ''; }
-  eEntregadoSkus = {}; eLineasCount = 0; eEntregadoSolId = null; eEntregadoSolCod = ''; eEditandoId = null;
+  eEntregadoSkus = {}; eEntregadoSolIds = {}; eLineasCount = 0; eEntregadoSolId = null; eEntregadoSolCod = ''; eEditandoId = null;
 }
 
 function entregadoDescInput(val, i) {
@@ -2621,6 +2634,53 @@ function cerrarEntregadoSkuDrop(i) {
   if (drop) drop.classList.remove('open');
 }
 
+function entregadoSolInput(val, i) {
+  var drop = document.getElementById('e-sol-drop-' + i);
+  if (!drop) return;
+  eEntregadoSolIds[i] = null;
+  var v = val.trim().toLowerCase();
+  var candidatos = solicitudes.filter(function(s) {
+    return s.estado === 'proceso' || s.estado === 'programada' || s.estado === 'nueva' || s.estado === 'entregada';
+  });
+  var matches = v.length === 0 ? candidatos.slice(0, 12) : candidatos.filter(function(s) {
+    return (s.id_display || '').toLowerCase().includes(v) || (s.cliente || '').toLowerCase().includes(v) || (s.desc || '').toLowerCase().includes(v);
+  }).slice(0, 12);
+  if (!matches.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(function(s) {
+    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'programada' ? '🟡' : s.estado === 'nueva' ? '⚪' : '✅';
+    var lbl = escHtml((s.id_display || '') + ' · ' + (s.cliente || ''));
+    var sub = escHtml((s.desc || '').slice(0, 40));
+    var sid = s.id.replace(/'/g, "\\'");
+    return '<div class="sku-item-s" onmousedown="seleccionarEntregadoSol(\'' + sid + '\',' + i + ')">' +
+      '<div class="sku-code-s">' + ico + ' ' + lbl + '</div>' +
+      (sub ? '<div class="sku-desc-s">' + sub + '</div>' : '') +
+    '</div>';
+  }).join('');
+  var inp = document.getElementById('eSol-' + i);
+  if (inp) {
+    var r = inp.getBoundingClientRect();
+    drop.style.top   = (r.bottom + 2) + 'px';
+    drop.style.left  = r.left + 'px';
+    drop.style.width = r.width + 'px';
+  }
+  drop.classList.add('open');
+}
+
+function seleccionarEntregadoSol(solId, i) {
+  var s = solicitudes.find(function(x) { return x.id === solId; });
+  if (!s) return;
+  eEntregadoSolIds[i] = solId;
+  var inp = document.getElementById('eSol-' + i);
+  if (inp) inp.value = (s.id_display || '') + ' · ' + (s.cliente || '').slice(0, 14);
+  cerrarEntregadoSolDrop(i);
+  vincularPedidoLinea(solId, i);
+}
+
+function cerrarEntregadoSolDrop(i) {
+  var drop = document.getElementById('e-sol-drop-' + i);
+  if (drop) drop.classList.remove('open');
+}
+
 function guardarEntregadoManual() {
   var requi = ((document.getElementById('eRequi') || {}).value || '').trim();
   var nota  = ((document.getElementById('eNota')  || {}).value || '').trim();
@@ -2641,8 +2701,7 @@ function guardarEntregadoManual() {
       if (!cliv) { showToast('⚠️ Seleccioná el cliente en producto ' + (ri + 1), '#92400e'); if (cliEl) { cliEl.style.outline='2px solid #dc2626'; cliEl.focus(); } return; }
       if (!dv)   { showToast('⚠️ Completá la descripción del producto ' + (ri + 1), '#92400e'); if (dInp) { dInp.style.borderColor='#dc2626'; dInp.focus(); } return; }
       if (!cv || cv < 1) { showToast('⚠️ Cantidad inválida en producto ' + (ri + 1), '#92400e'); if (cInp) { cInp.style.borderColor='#dc2626'; cInp.focus(); } return; }
-      var solEl = document.getElementById('eSol-' + idx);
-      var solv  = solEl ? solEl.value : '';
+      var solv  = eEntregadoSolIds[idx] || '';
       var solS  = solv ? solicitudes.find(function(x) { return x.id === solv; }) : null;
       lineas.push({ cliente: cliv, sku: eEntregadoSkus[idx] || '', desc: dv, cant: cv, solId: solv || '', solCodigo: solS ? (solS.id_display || '') : '' });
     }
