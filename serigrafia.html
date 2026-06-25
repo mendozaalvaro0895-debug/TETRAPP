@@ -2926,7 +2926,7 @@ function renderListas() {
   var html = filtradas.map(function(s) {
     var sel = selId === s.id ? 'sel-s' : '';
     var allProcs = s.lineas.reduce(function(acc, l) { return acc.concat(l.procs || []); }, []);
-    var horas = calcularHoras(s.cant, 1, allProcs);
+    var horas = calcularHoras(s.cant, 1, allProcs, s.tiros || 1);
     var progRow = s.prog > 0
       ? '<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-s" style="width:' + s.prog + '%"></div></div><div class="pr-pct">' + s.prog + '%</div></div>'
       : '';
@@ -2969,9 +2969,36 @@ function prioridadPill(prioridad) {
   return '<span class="pill pill-entregada">' + (textos[prioridad] || prioridad) + '</span>';
 }
 
-function calcularHoras(cantidad, opsCount, procs) {
-  var meta = metaParaProcesos(procs);
-  return cantidad / (meta * (opsCount || 1));
+function calcularHoras(cantidad, opsCount, procs, tiros) {
+  if (!cantidad) return 0;
+  tiros = Math.max(tiros || 1, 1);
+  var procsNorm = (procs || []).map(function(p){ return (p||'').toLowerCase().trim(); });
+  var total = 0;
+  // Procesos que se multiplican por tiros (el corazon del trabajo de impresion)
+  var IMPRESION_PROCS = ['impresion', 'serigrafia', 'tampografia'];
+  // Procesos que NO se multiplican por tiros (se hacen una sola vez)
+  var SINGLE_PROCS   = ['flameado', 'empaque', 'encajado', 'banda', 'armado',
+                        'armado_pushpull', 'liner', 'secado', 'horno', 'separar cavidad',
+                        'limpiar grasa', 'limpiar pestana', 'armadora tapa 28', 'liner tapa 33', 'otra tarea'];
+  var hasImpresion = procsNorm.some(function(p){ return IMPRESION_PROCS.indexOf(p) >= 0; });
+  var seen = {};
+  procsNorm.forEach(function(p) {
+    if (!p || seen[p]) return;
+    seen[p] = true;
+    var meta = METAS[p] || META_DEFAULT;
+    if (IMPRESION_PROCS.indexOf(p) >= 0) {
+      // Tiempo de impresion × tiros
+      total += (cantidad / meta) * tiros;
+      // Secado entre tiros: 3 horas fijas por cada intervalo
+      if (tiros > 1) total += 3 * (tiros - 1);
+    } else {
+      // Proceso secuencial simple (una sola vez)
+      total += cantidad / meta;
+    }
+  });
+  // Si no hay procesos definidos, usar meta por defecto
+  if (total === 0) total = cantidad / META_DEFAULT;
+  return total;
 }
 
 function fechaEst(turnos) {
@@ -3089,7 +3116,8 @@ async function mostrarDetalle(id) {
   var det = document.getElementById('detSerig');
   var allProcs = s.lineas.reduce(function(acc,l){return acc.concat(l.procs||[]);}, []);
   var metaSol  = metaParaProcesos(allProcs);
-  var horas    = calcularHoras(s.cant, 1, allProcs);
+  var tirosSol = s.tiros || 1;
+  var horas    = calcularHoras(s.cant, 1, allProcs, tirosSol);
 
   var btnEstado = '';
   if (s.estado === 'nueva')    btnEstado = '<button class="btn btn-s btn-xs" onclick="cambiarEstado(\'' + s.id + '\',\'proceso\')">▶ Iniciar</button>';
@@ -3158,11 +3186,29 @@ async function mostrarDetalle(id) {
         '</div>';
       })() +
 
-      '<div class="tbox">' +
-        '<div class="tbox-lbl">Tiempo estimado</div>' +
-        '<div class="tbox-val">' + horas.toFixed(1) + ' horas</div>' +
-        '<div class="tbox-sub">' + Math.ceil(horas/12) + ' turno(s) · Meta: ' + metaSol.toLocaleString() + ' und/h · Entrega est.: ' + fechaEst(Math.ceil(horas/12)) + '</div>' +
-      '</div>' +
+      (function(){
+        var procsNorm = allProcs.map(function(p){ return (p||'').toLowerCase().trim(); });
+        var IMPRESION = ['impresion','serigrafia','tampografia'];
+        var desglose = [];
+        var seen = {};
+        procsNorm.forEach(function(p){
+          if (!p || seen[p]) return; seen[p] = true;
+          var meta = METAS[p] || META_DEFAULT;
+          if (IMPRESION.indexOf(p) >= 0) {
+            var hImp = (s.cant / meta) * tirosSol;
+            desglose.push(p.charAt(0).toUpperCase()+p.slice(1)+' ×'+tirosSol+': ' + hImp.toFixed(1)+'h');
+            if (tirosSol > 1) desglose.push('Secado entre tiros: ' + (3*(tirosSol-1))+'h');
+          } else {
+            desglose.push(p.charAt(0).toUpperCase()+p.slice(1)+': ' + (s.cant/meta).toFixed(1)+'h');
+          }
+        });
+        return '<div class="tbox">' +
+          '<div class="tbox-lbl">Tiempo estimado</div>' +
+          '<div class="tbox-val">' + horas.toFixed(1) + ' horas</div>' +
+          '<div class="tbox-sub">' + Math.ceil(horas/12) + ' turno(s) · Entrega est.: ' + fechaEst(Math.ceil(horas/12)) + '</div>' +
+          (desglose.length ? '<div style="margin-top:6px;font-size:10px;color:var(--gray-l);line-height:1.8">' + desglose.join(' &nbsp;+&nbsp; ') + '</div>' : '') +
+        '</div>';
+      })() +
 
       '<div class="dc" style="border-color:var(--amber)">' +
         '<div class="dc-h" style="background:var(--amber-l);color:var(--amber)">📉 Trazabilidad de fugas</div>' +
