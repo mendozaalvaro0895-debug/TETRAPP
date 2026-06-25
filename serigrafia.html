@@ -2438,7 +2438,8 @@ function saveEntregasManuales(arr) {
   localStorage.setItem('tetra_entregas_s', JSON.stringify(arr));
 }
 
-var eEntregadoSku     = null;
+var eEntregadoSkus    = {};   // { lineaIdx: sku }
+var eLineasCount      = 0;
 var eEntregadoSolId   = null;
 var eEntregadoSolCod  = '';
 
@@ -2473,11 +2474,11 @@ function vincularPedidoEntregado(solId) {
   if (!s) return;
   eEntregadoSolId  = s.id;
   eEntregadoSolCod = s.id_display || '';
-  // Pre-rellenar cliente y descripción; cantidad NO (puede ser entrega parcial)
   var ec = document.getElementById('eCliente');
   if (ec) ec.value = s.cliente || '';
-  var ed = document.getElementById('eDesc');
-  if (ed) { ed.value = s.desc || ''; eEntregadoSku = s.sku || null; }
+  // Pre-llenar primera línea con desc del pedido si viene del inventario
+  var ed0 = document.getElementById('eDesc-0');
+  if (ed0 && s.desc) { ed0.value = s.desc; eEntregadoSkus[0] = s.sku || null; }
   // Badge correlativo
   if (badge) { badge.textContent = eEntregadoSolCod; badge.style.display = 'inline-block'; }
   // Helper: total del pedido como referencia para entregas parciales
@@ -2491,7 +2492,7 @@ function abrirFormEntregado() {
   var el = document.getElementById('formEntregadoInline');
   if (!el) return;
   if (el.style.display !== 'none') { cerrarFormEntregado(); return; }
-  eEntregadoSku = null; eEntregadoSolId = null; eEntregadoSolCod = '';
+  eEntregadoSkus = {}; eLineasCount = 0; eEntregadoSolId = null; eEntregadoSolCod = '';
   var usage = getCliUsage();
   var sorted = CLIENTES.slice().sort(function(a, b) {
     var diff = (usage[b] || 0) - (usage[a] || 0);
@@ -2504,7 +2505,6 @@ function abrirFormEntregado() {
   el.innerHTML =
     '<div style="background:var(--card);border:1.5px solid var(--serig-m);border-radius:10px;padding:14px 16px">' +
       '<div style="font-size:12px;font-weight:800;color:var(--serig-m);margin-bottom:10px">📦 Registrar entregado</div>' +
-      // — Pedido (correlativo) —
       '<div style="margin-bottom:10px">' +
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">' +
           '<span style="font-size:10px;font-weight:700;color:var(--gray)">PEDIDO / CORRELATIVO</span>' +
@@ -2515,48 +2515,70 @@ function abrirFormEntregado() {
         '</select>' +
         '<div id="eSolHelper" style="display:none;font-size:10px;color:var(--gray);margin-top:4px;padding:4px 8px;background:var(--bg2);border-radius:5px"></div>' +
       '</div>' +
-      // — Cliente / Requi —
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">' +
         '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">CLIENTE *</div>' +
           '<select id="eCliente" style="' + inputSty + ';background:var(--card);color:var(--text)">' + optsHtml + '</select></div>' +
-        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">No. DE REQUI</div>' +
+        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">No. DE REQUI *</div>' +
           '<input id="eRequi" placeholder="Ej. R-2024-001" style="' + inputSty + '"></div>' +
       '</div>' +
-      // — Producto —
-      '<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">PRODUCTO / DESCRIPCIÓN</div>' +
-        '<div class="sku-wrap-s">' +
-          '<input id="eDesc" placeholder="🔍 SKU, nombre o descripción libre…" autocomplete="off" style="' + inputSty + '"' +
-            ' oninput="entregadoDescInput(this.value)" onblur="setTimeout(cerrarEntregadoSkuDrop,200)">' +
-          '<div class="sku-drop-s" id="e-sku-drop"></div>' +
+      '<div style="margin-bottom:8px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+          '<span style="font-size:10px;font-weight:700;color:var(--gray)">PRODUCTOS *</span>' +
+          '<button onclick="agregarLineaEntregado()" style="background:var(--serig-l);color:var(--serig-m);border:1px solid var(--serig-m);border-radius:5px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer">+ Agregar producto</button>' +
         '</div>' +
+        '<div id="eLineasContainer"></div>' +
       '</div>' +
-      // — Cantidad / Fecha —
       '<div style="display:grid;grid-template-columns:160px 1fr;gap:8px;margin-bottom:8px">' +
-        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">CANTIDAD *</div>' +
-          '<input id="eCant" type="number" min="1" placeholder="0" style="' + inputSty + '"></div>' +
         '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">FECHA ENTREGA</div>' +
           '<input id="eFecha" type="date" value="' + new Date().toISOString().slice(0,10) + '" style="' + inputSty + '"></div>' +
+        '<div><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">NOTA (opcional)</div>' +
+          '<input id="eNota" placeholder="Observaciones, referencia, etc." style="' + inputSty + '"></div>' +
       '</div>' +
-      // — Nota —
-      '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:3px">NOTA (opcional)</div>' +
-        '<input id="eNota" placeholder="Observaciones, referencia, etc." style="' + inputSty + '"></div>' +
       '<div style="display:flex;gap:8px">' +
         '<button onclick="guardarEntregadoManual()" style="background:var(--serig-m);color:#fff;border:none;border-radius:7px;padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>' +
         '<button onclick="cerrarFormEntregado()" style="background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer">Cancelar</button>' +
       '</div>' +
     '</div>';
+  agregarLineaEntregado();
+}
+
+function agregarLineaEntregado(descVal, skuVal, cantVal) {
+  var container = document.getElementById('eLineasContainer');
+  if (!container) return;
+  var i = eLineasCount++;
+  eEntregadoSkus[i] = skuVal || null;
+  var bSty = 'padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box';
+  var row = document.createElement('div');
+  row.id = 'eLinea-' + i;
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 110px 28px;gap:6px;margin-bottom:6px;align-items:start';
+  row.innerHTML =
+    '<div class="sku-wrap-s">' +
+      '<input id="eDesc-' + i + '" placeholder="🔍 SKU o descripción…" autocomplete="off" style="' + bSty + ';width:100%"' +
+        ' oninput="entregadoDescInput(this.value,' + i + ')" onblur="setTimeout(function(){cerrarEntregadoSkuDrop(' + i + ')},200)"' +
+        ' value="' + escHtml(descVal || '') + '">' +
+      '<div class="sku-drop-s" id="e-sku-drop-' + i + '"></div>' +
+    '</div>' +
+    '<input id="eCant-' + i + '" type="number" min="1" placeholder="Cant." style="' + bSty + ';width:100%" value="' + (cantVal || '') + '">' +
+    '<button onclick="eliminarLineaEntregado(' + i + ')" title="Quitar" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--gray-l);font-size:14px;cursor:pointer;padding:4px 6px;line-height:1">✕</button>';
+  container.appendChild(row);
+}
+
+function eliminarLineaEntregado(i) {
+  var row = document.getElementById('eLinea-' + i);
+  if (row) row.remove();
+  delete eEntregadoSkus[i];
 }
 
 function cerrarFormEntregado() {
   var el = document.getElementById('formEntregadoInline');
   if (el) { el.style.display = 'none'; el.innerHTML = ''; }
-  eEntregadoSku = null; eEntregadoSolId = null; eEntregadoSolCod = '';
+  eEntregadoSkus = {}; eLineasCount = 0; eEntregadoSolId = null; eEntregadoSolCod = '';
 }
 
-function entregadoDescInput(val) {
-  var drop = document.getElementById('e-sku-drop');
+function entregadoDescInput(val, i) {
+  var drop = document.getElementById('e-sku-drop-' + i);
   if (!drop) return;
-  eEntregadoSku = null;
+  eEntregadoSkus[i] = null;
   var v = val.trim().toLowerCase();
   if (v.length < 2) { drop.classList.remove('open'); return; }
   var matches = inventarioCache.filter(function(item) {
@@ -2565,12 +2587,12 @@ function entregadoDescInput(val) {
   if (!matches.length) { drop.classList.remove('open'); return; }
   drop.innerHTML = matches.map(function(item) {
     var esc = item.sku.replace(/'/g, "\\'");
-    return '<div class="sku-item-s" onmousedown="seleccionarEntregadoDesc(\'' + esc + '\')">' +
+    return '<div class="sku-item-s" onmousedown="seleccionarEntregadoDesc(\'' + esc + '\',' + i + ')">' +
       '<div class="sku-code-s">' + item.sku + '</div>' +
       '<div class="sku-desc-s">' + escHtml(item.descripcion || '') + '</div>' +
       '</div>';
   }).join('');
-  var inp = document.getElementById('eDesc');
+  var inp = document.getElementById('eDesc-' + i);
   if (inp) {
     var r = inp.getBoundingClientRect();
     drop.style.top   = (r.bottom + 2) + 'px';
@@ -2580,17 +2602,17 @@ function entregadoDescInput(val) {
   drop.classList.add('open');
 }
 
-function seleccionarEntregadoDesc(sku) {
-  var item = inventarioCache.find(function(i) { return i.sku === sku; });
+function seleccionarEntregadoDesc(sku, i) {
+  var item = inventarioCache.find(function(x) { return x.sku === sku; });
   if (!item) return;
-  eEntregadoSku = sku;
-  var inp = document.getElementById('eDesc');
+  eEntregadoSkus[i] = sku;
+  var inp = document.getElementById('eDesc-' + i);
   if (inp) inp.value = (item.descripcion || sku);
-  cerrarEntregadoSkuDrop();
+  cerrarEntregadoSkuDrop(i);
 }
 
-function cerrarEntregadoSkuDrop() {
-  var drop = document.getElementById('e-sku-drop');
+function cerrarEntregadoSkuDrop(i) {
+  var drop = document.getElementById('e-sku-drop-' + i);
   if (drop) drop.classList.remove('open');
 }
 
@@ -2598,12 +2620,28 @@ function guardarEntregadoManual() {
   var clienteEl = document.getElementById('eCliente');
   var cliente = clienteEl ? clienteEl.value : '';
   var requi = ((document.getElementById('eRequi') || {}).value || '').trim();
-  var desc  = ((document.getElementById('eDesc')  || {}).value || '').trim();
-  var cant  = parseInt((document.getElementById('eCant') || {}).value || '0');
   var nota  = ((document.getElementById('eNota')  || {}).value || '').trim();
   if (!cliente) { showToast('⚠️ Seleccioná el cliente', '#92400e'); return; }
-  if (!requi)   { showToast('⚠️ El No. de Requi es obligatorio', '#92400e'); var r = document.getElementById('eRequi'); if (r) { r.style.borderColor='#dc2626'; r.focus(); } return; }
-  if (!cant || cant < 1) { showToast('⚠️ Ingresá una cantidad válida', '#92400e'); return; }
+  if (!requi) { showToast('⚠️ El No. de Requi es obligatorio', '#92400e'); var r = document.getElementById('eRequi'); if (r) { r.style.borderColor='#dc2626'; r.focus(); } return; }
+  // Recolectar líneas visibles
+  var lineas = [];
+  var container = document.getElementById('eLineasContainer');
+  if (container) {
+    var rows = container.querySelectorAll('[id^="eLinea-"]');
+    for (var ri = 0; ri < rows.length; ri++) {
+      var idx = parseInt(rows[ri].id.replace('eLinea-', ''));
+      var dInp = document.getElementById('eDesc-' + idx);
+      var cInp = document.getElementById('eCant-' + idx);
+      var dv = dInp ? dInp.value.trim() : '';
+      var cv = cInp ? parseInt(cInp.value || '0') : 0;
+      if (!dv && !cv) continue;
+      if (!dv) { showToast('⚠️ Completá la descripción del producto ' + (ri + 1), '#92400e'); if (dInp) { dInp.style.borderColor='#dc2626'; dInp.focus(); } return; }
+      if (!cv || cv < 1) { showToast('⚠️ Cantidad inválida en producto ' + (ri + 1), '#92400e'); if (cInp) { cInp.style.borderColor='#dc2626'; cInp.focus(); } return; }
+      lineas.push({ sku: eEntregadoSkus[idx] || '', desc: dv, cant: cv });
+    }
+  }
+  if (!lineas.length) { showToast('⚠️ Agregá al menos un producto', '#92400e'); return; }
+  var totalCant = lineas.reduce(function(s, l) { return s + l.cant; }, 0);
   var arr = getEntregasManuales();
   var dup = arr.find(function(m) { return m.requi && m.requi.trim().toLowerCase() === requi.toLowerCase(); });
   if (dup) {
@@ -2614,9 +2652,8 @@ function guardarEntregadoManual() {
     id: 'm-' + Date.now(),
     cliente: cliente,
     requi: requi,
-    sku: eEntregadoSku || '',
-    desc: desc,
-    cant: cant,
+    lineas: lineas,
+    cant: totalCant,
     fecha: ((document.getElementById('eFecha') || {}).value || new Date().toISOString().slice(0,10)),
     nota: nota,
     solId: eEntregadoSolId || '',
@@ -2626,7 +2663,7 @@ function guardarEntregadoManual() {
   registrarUsoCliente(cliente);
   cerrarFormEntregado();
   renderProduccionActual();
-  showToast('✅ Entregado registrado');
+  showToast('✅ Entregado registrado (' + lineas.length + ' producto' + (lineas.length > 1 ? 's' : '') + ')');
 }
 
 function eliminarEntregadoManual(id) {
@@ -2663,21 +2700,39 @@ function renderProduccionActual() {
     '</tr>';
   }).join('');
 
-  // Filas manuales
+  // Filas manuales — una fila principal por requi + sub-filas por producto
   var rowsManuales = manuales.map(function(m) {
     var requiCol = m.solCodigo
       ? '<span style="font-family:var(--mono);font-weight:800;color:var(--serig-m);font-size:11px">' + escHtml(m.solCodigo) + '</span>' +
         (m.requi ? '<span style="font-size:10px;color:var(--gray-l);margin-left:4px">' + escHtml(m.requi) + '</span>' : '')
       : '<span style="font-family:var(--mono);font-weight:700;color:var(--gray);font-size:11px">' + (m.requi || '—') + '</span>';
-    return '<tr>' +
-      '<td>' + requiCol + '</td>' +
-      '<td style="font-weight:600">' + escHtml(m.cliente) + '</td>' +
-      '<td style="color:var(--gray-l);font-size:11px">' + escHtml(m.desc || '—') + (m.nota ? ' · <em>' + escHtml(m.nota) + '</em>' : '') + '</td>' +
-      '<td style="font-family:var(--mono);font-weight:600">' + (m.cant||0).toLocaleString() + '</td>' +
+    var lineas = m.lineas && m.lineas.length ? m.lineas : [{ desc: m.desc || '—', cant: m.cant || 0, sku: m.sku || '' }];
+    var totalCant = lineas.reduce(function(s, l) { return s + (l.cant || 0); }, 0);
+    // Fila principal
+    var rows = '<tr>' +
+      '<td rowspan="' + (lineas.length + 1) + '">' + requiCol + '</td>' +
+      '<td rowspan="' + (lineas.length + 1) + '" style="font-weight:600">' + escHtml(m.cliente) + '</td>' +
+      '<td colspan="2" style="font-size:10px;color:var(--gray);padding:4px 8px 2px">' +
+        (lineas.length > 1 ? lineas.length + ' productos · ' : '') +
+        '<strong style="color:var(--ink)">' + totalCant.toLocaleString() + ' und</strong>' +
+        (m.nota ? ' · <em>' + escHtml(m.nota) + '</em>' : '') +
+      '</td>' +
       '<td style="font-size:11px;color:var(--gray)">' + (m.fecha || '—') + '</td>' +
       '<td><span style="font-size:9px;background:#FEF3C7;color:#92400e;border-radius:4px;padding:2px 6px;font-weight:700">MANUAL</span></td>' +
-      '<td><button onclick="event.stopPropagation();eliminarEntregadoManual(\'' + m.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 4px" title="Eliminar">✕</button></td>' +
+      '<td rowspan="' + (lineas.length + 1) + '"><button onclick="event.stopPropagation();eliminarEntregadoManual(\'' + m.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 4px" title="Eliminar">✕</button></td>' +
     '</tr>';
+    // Sub-filas de productos
+    rows += lineas.map(function(l) {
+      return '<tr style="background:var(--bg2)">' +
+        '<td style="font-size:11px;color:var(--gray-l);padding-left:16px">' +
+          (l.sku ? '<span style="font-family:var(--mono);font-size:10px;color:var(--serig-m);margin-right:5px">' + escHtml(l.sku) + '</span>' : '') +
+          escHtml(l.desc || '—') +
+        '</td>' +
+        '<td style="font-family:var(--mono);font-size:11px;color:var(--ink)">' + (l.cant || 0).toLocaleString() + '</td>' +
+        '<td></td><td></td>' +
+      '</tr>';
+    }).join('');
+    return rows;
   }).join('');
 
   el.innerHTML = '<table class="prod-table">' +
