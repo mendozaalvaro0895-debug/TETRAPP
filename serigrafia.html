@@ -1031,7 +1031,8 @@ async function cargarSolicitudes() {
                    procs: l.procesos || [], operadores: l.operadores_ids || [],
                    linea_id: l.linea_id || null,
                    cap_impresion: l.cap_impresion || null,
-                   tiros: l.tiros || 1 };
+                   tiros: l.tiros || 1,
+                   sku_base: l.sku_base || '' };
         }),
         cant: ld.reduce(function(sum, l) { return sum + (l.cantidad || 0); }, 0),
         fecha_lim: s.fecha_limite || '',
@@ -3211,6 +3212,7 @@ async function mostrarDetalle(id) {
     return '<tr>' +
       '<td style="font-family:var(--mono)">' + (l.sku||'—') + '</td>' +
       '<td>' + (l.desc||'—') + '</td>' +
+      '<td style="font-family:var(--mono);color:var(--gray)">' + (l.sku_base||'—') + '</td>' +
       '<td style="text-align:right">' + (l.cant||0).toLocaleString() + '</td>' +
       '<td style="text-align:right;color:' + stockColor + '">' + (l.existencia||0).toLocaleString() + '</td>' +
       '</tr>';
@@ -3308,7 +3310,7 @@ async function mostrarDetalle(id) {
       '</div>' +
 
       '<div class="dc"><div class="dc-h">Líneas del pedido</div><div class="dc-b">' +
-        '<table class="dt"><thead><tr><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock</th></tr></thead>' +
+        '<table class="dt"><thead><tr><th>SKU PT</th><th>Descripción</th><th>Envase Base</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock</th></tr></thead>' +
         '<tbody>' + lineasRows + '</tbody></table>' +
       '</div></div>' +
 
@@ -3343,7 +3345,9 @@ async function mostrarDetalle(id) {
 
 function abrirModalPerdida(solicitudId) {
   perdidaSolicitudActual = solicitudId;
-  document.getElementById('perdidaSku').value = '';
+  var sol = solicitudes.find(function(x) { return x.id === solicitudId; });
+  var skuBase = (sol && sol.lineas && sol.lineas[0] && sol.lineas[0].sku_base) ? sol.lineas[0].sku_base : '';
+  document.getElementById('perdidaSku').value = skuBase;
   document.getElementById('perdidaCant').value = '';
   document.getElementById('perdidaMotivo').value = 'cavidad_defectuosa';
   document.getElementById('perdidaObs').value = '';
@@ -3483,7 +3487,8 @@ function abrirFormEditar(solId) {
       sku: l.sku || '', desc: l.desc || '', cant: l.cant || 0,
       procs: (l.procs && l.procs.length) ? l.procs : ['flameado','impresion','secado','empaque'],
       existencia: l.existencia, cap_impresion: l.cap_impresion || 0,
-      tiros: l.tiros || 1, linea_id: l.linea_id || 0, es_nuevo: false
+      tiros: l.tiros || 1, linea_id: l.linea_id || 0, es_nuevo: false,
+      sku_base: l.sku_base || ''
     };
   });
   if (lineas.length === 0) addLinea();
@@ -3510,7 +3515,8 @@ function addLinea() {
   if (lineas.length >= 5) return;
   lineas.push({ sku: '', desc: '', cant: 0,
     procs: ['flameado', 'impresion', 'secado', 'empaque'],
-    existencia: undefined, cap_impresion: 0, tiros: 1, linea_id: 0, es_nuevo: false });
+    existencia: undefined, cap_impresion: 0, tiros: 1, linea_id: 0, es_nuevo: false,
+    sku_base: '' });
   renderLineas();
 }
 function removeLinea(idx) { lineas.splice(idx, 1); renderLineas(); calcular(); }
@@ -3583,6 +3589,12 @@ function renderLineas() {
         '<button onclick="removeLinea(' + i + ')" style="background:var(--red-l);border:none;border-radius:5px;cursor:pointer;font-size:13px">✕</button>' +
       '</div>' +
       descRow +
+      '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">' +
+        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);white-space:nowrap;text-transform:uppercase;letter-spacing:.4px">Envase base SKU</span>' +
+        '<input class="fi" placeholder="SKU materia prima…" value="' + escHtml(l.sku_base || '') + '"' +
+          ' style="font-size:11px;padding:3px 6px;flex:1;max-width:200px"' +
+          ' oninput="lineas[' + i + '].sku_base=this.value">' +
+      '</div>' +
       lineaRow +
       '</div>';
   }).join('');
@@ -3755,6 +3767,7 @@ function buildLineasPayload(lineasValidas, solicitudId) {
     if (l.cap_impresion) ext.cap_impresion = l.cap_impresion;
     if (l.tiros && l.tiros !== 1) ext.tiros = l.tiros;
     if (l.linea_id) ext.linea_id = l.linea_id;
+    if (l.sku_base) ext.sku_base = l.sku_base;
     return ext;
   });
   return { base: base, full: full };

@@ -972,7 +972,8 @@ async function cargarSolicitudes() {
           cant: l.cantidad,
           existencia: l.existencia_snap,
           procs: l.procesos || [],
-          operadores: l.operadores_ids || []
+          operadores: l.operadores_ids || [],
+          sku_base: l.sku_base || ''
         })),
         cant: lineasData.reduce((sum, l) => sum + (l.cantidad || 0), 0),
         fecha_lim: s.fecha_limite || '',
@@ -1270,12 +1271,13 @@ async function mostrarDetalle(id) {
         <div class="dc-h">Líneas del pedido</div>
         <div class="dc-b">
           <table class="dt">
-            <thead><tr><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock</th></tr></thead>
+            <thead><tr><th>SKU PT</th><th>Descripción</th><th>Envase Base</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock</th></tr></thead>
             <tbody>
               ${s.lineas.map(l => `
                 <tr>
                   <td style="font-family:var(--mono)">${l.sku || '—'}</td>
                   <td>${l.desc || '—'}</td>
+                  <td style="font-family:var(--mono);color:var(--gray)">${l.sku_base || '—'}</td>
                   <td style="text-align:right">${(l.cant || 0).toLocaleString()}</td>
                   <td style="text-align:right;color:${(l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)'}">${(l.existencia || 0).toLocaleString()}</td>
                 </tr>
@@ -1311,7 +1313,9 @@ async function mostrarDetalle(id) {
 // ══ ACCIONES ════════════════════════════════════════════════
 function abrirModalPerdida(solicitudId) {
   perdidaSolicitudActual = solicitudId;
-  document.getElementById('perdidaSku').value = '';
+  const sol = solicitudes.find(x => x.id === solicitudId);
+  const skuBase = (sol && sol.lineas && sol.lineas[0] && sol.lineas[0].sku_base) ? sol.lineas[0].sku_base : '';
+  document.getElementById('perdidaSku').value = skuBase;
   document.getElementById('perdidaCant').value = '';
   document.getElementById('perdidaMotivo').value = 'cavidad_defectuosa';
   document.getElementById('perdidaObs').value = '';
@@ -1477,7 +1481,7 @@ function cerrarForm() {
 
 function addLinea() {
   if (lineas.length >= 5) return;
-  lineas.push({ sku: '', desc: '', cant: 0, procs: [], existencia: undefined });
+  lineas.push({ sku: '', desc: '', cant: 0, procs: [], existencia: undefined, sku_base: '' });
   renderLineas();
 }
 
@@ -1494,11 +1498,15 @@ function renderLineas() {
   cont.innerHTML = lineas.map((l, i) => `
     <div style="border-bottom:1px solid var(--border);padding:8px 10px">
       <div style="display:grid;grid-template-columns:110px 1fr 90px 80px 28px;gap:6px;margin-bottom:5px">
-        <input class="fi" placeholder="SKU" value="${l.sku}" onchange="lineas[${i}].sku=this.value;buscarExistencia(${i},this.value)">
+        <input class="fi" placeholder="SKU PT" value="${l.sku}" onchange="lineas[${i}].sku=this.value;buscarExistencia(${i},this.value)">
         <input class="fi" placeholder="Descripción" value="${l.desc}" onchange="lineas[${i}].desc=this.value">
         <input class="fi" type="number" placeholder="Cant" value="${l.cant || ''}" onchange="lineas[${i}].cant=parseInt(this.value)||0;calcular()">
         <div style="font-size:11px;text-align:right;color:${(l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)'}">${l.existencia !== undefined ? l.existencia.toLocaleString() : '—'}</div>
         <button onclick="removeLinea(${i})" style="background:var(--red-l);border:none;border-radius:5px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+        <span style="font-size:9px;font-weight:700;color:var(--gray-l);white-space:nowrap;text-transform:uppercase;letter-spacing:.4px">Envase base SKU</span>
+        <input class="fi" placeholder="SKU materia prima…" value="${l.sku_base || ''}" style="font-size:11px;padding:3px 6px;flex:1;max-width:200px" oninput="lineas[${i}].sku_base=this.value">
       </div>
       <div style="display:flex;gap:5px;flex-wrap:wrap">
         ${ALL_PROCS_TAPAS.map(p => `
@@ -1582,7 +1590,8 @@ async function guardar() {
         solicitud_id: sol.id, orden: i + 1,
         sku: l.sku, descripcion: l.desc,
         cantidad: l.cant, existencia_snap: l.existencia || 0,
-        procesos: l.procs || [], operadores_ids: []
+        procesos: l.procs || [], operadores_ids: [],
+        ...(l.sku_base ? { sku_base: l.sku_base } : {})
       }));
       await db.from('solicitud_lineas').insert(lineasInsert);
     }
