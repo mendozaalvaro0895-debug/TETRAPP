@@ -2534,11 +2534,46 @@ function buildProcNode(proc, estado) {
 
 // ── Entregados ────────────────────────────────────────────────
 
-function getEntregasManuales() {
-  try { return JSON.parse(localStorage.getItem('tetra_entregas_s') || '[]'); } catch(e) { return []; }
+var entregasCache = [];
+
+function getEntregasManuales() { return entregasCache; }
+
+function _rowToEntrega(r) {
+  return { id: r.id, cliente: r.cliente || '', requi: r.requi || '',
+           lineas: r.lineas || [], cant: r.cant || 0, fecha: r.fecha || '',
+           nota: r.nota || '', solId: r.sol_id || '', solCodigo: r.sol_codigo || '' };
 }
-function saveEntregasManuales(arr) {
-  localStorage.setItem('tetra_entregas_s', JSON.stringify(arr));
+
+async function cargarEntregasSerig() {
+  try {
+    var r = await db.from('entregas_serig').select('*').order('created_at', { ascending: false });
+    if (r.error) throw r.error;
+    entregasCache = (r.data || []).map(_rowToEntrega);
+
+    // Migración única desde localStorage
+    if (entregasCache.length === 0) {
+      try {
+        var local = JSON.parse(localStorage.getItem('tetra_entregas_s') || '[]');
+        if (local.length > 0) {
+          var payload = local.map(function(m) {
+            return { requi: m.requi || '', cliente: m.cliente || '', cant: m.cant || 0,
+                     fecha: m.fecha || new Date().toISOString().slice(0,10), nota: m.nota || '',
+                     sol_id: m.solId || null, sol_codigo: m.solCodigo || '', lineas: m.lineas || [] };
+          });
+          var ins = await db.from('entregas_serig').insert(payload).select();
+          if (!ins.error && ins.data) {
+            entregasCache = ins.data.map(_rowToEntrega);
+            localStorage.removeItem('tetra_entregas_s');
+            showToast('✅ ' + entregasCache.length + ' entregas migradas a Supabase');
+          }
+        }
+      } catch(em) { console.warn('Migración localStorage:', em); }
+    }
+  } catch(e) {
+    console.error('cargarEntregasSerig:', e);
+    try { entregasCache = JSON.parse(localStorage.getItem('tetra_entregas_s') || '[]'); } catch(_) { entregasCache = []; }
+  }
+  renderProduccionActual();
 }
 
 var eEntregadoSkus    = {};   // { lineaIdx: sku }
@@ -2771,7 +2806,7 @@ function cerrarEntregadoSolDrop(i) {
   if (drop) drop.classList.remove('open');
 }
 
-function guardarEntregadoManual() {
+async function guardarEntregadoManual() {
   var requi = ((document.getElementById('eRequi') || {}).value || '').trim();
   var nota  = ((document.getElementById('eNota')  || {}).value || '').trim();
   if (!requi) { showToast('⚠️ El No. de Requi es obligatorio', '#92400e'); var r = document.getElementById('eRequi'); if (r) { r.style.borderColor='#dc2626'; r.focus(); } return; }
@@ -2802,40 +2837,46 @@ function guardarEntregadoManual() {
   var clientesPrincipales = [];
   lineas.forEach(function(l) { if (l.cliente && clientesPrincipales.indexOf(l.cliente) < 0) clientesPrincipales.push(l.cliente); });
   var clientePrincipal = clientesPrincipales.join(' / ');
-  var arr = getEntregasManuales();
   var firstLinked = lineas.find(function(l) { return l.solId; }) || {};
   var fechaVal = ((document.getElementById('eFecha') || {}).value || new Date().toISOString().slice(0,10));
+  var dbPayload = { requi: requi, cliente: clientePrincipal, cant: totalCant, fecha: fechaVal,
+                    nota: nota, sol_id: firstLinked.solId || null, sol_codigo: firstLinked.solCodigo || '', lineas: lineas };
+
   if (eEditandoId) {
-    // Modo edición: reemplazar el registro existente manteniendo su id y posición
-    arr = arr.map(function(x) {
-      if (x.id !== eEditandoId) return x;
-      return { id: x.id, cliente: clientePrincipal, requi: requi, lineas: lineas, cant: totalCant, fecha: fechaVal, nota: nota, solId: firstLinked.solId || '', solCodigo: firstLinked.solCodigo || '' };
+    var ru = await db.from('entregas_serig').update(dbPayload).eq('id', eEditandoId).select().single();
+    if (ru.error) { showToast('⚠️ Error al guardar: ' + ru.error.message, '#b91c1c'); return; }
+    entregasCache = entregasCache.map(function(x) {
+      return x.id === eEditandoId ? _rowToEntrega(ru.data) : x;
     });
-    saveEntregasManuales(arr);
     clientesPrincipales.forEach(function(c) { registrarUsoCliente(c); });
     cerrarFormEntregado();
     renderProduccionActual();
+    renderBoard();
     showToast('✅ Entregado actualizado');
   } else {
-    var dup = arr.find(function(m) { return m.requi && m.requi.trim().toLowerCase() === requi.toLowerCase(); });
+    var dup = entregasCache.find(function(m) { return m.requi && m.requi.trim().toLowerCase() === requi.toLowerCase(); });
     if (dup) {
       var dupInfo = (dup.fecha ? ' · ' + dup.fecha : '') + (dup.cliente ? ' · ' + dup.cliente : '');
       if (!confirm('⚠️ La Requi "' + requi + '" ya está registrada' + dupInfo + '.\n¿Registrar de todas formas?')) return;
     }
-    arr.unshift({ id: 'm-' + Date.now(), cliente: clientePrincipal, requi: requi, lineas: lineas, cant: totalCant, fecha: fechaVal, nota: nota, solId: firstLinked.solId || '', solCodigo: firstLinked.solCodigo || '' });
-    saveEntregasManuales(arr);
+    var ri = await db.from('entregas_serig').insert(dbPayload).select().single();
+    if (ri.error) { showToast('⚠️ Error al guardar: ' + ri.error.message, '#b91c1c'); return; }
+    entregasCache.unshift(_rowToEntrega(ri.data));
     clientesPrincipales.forEach(function(c) { registrarUsoCliente(c); });
     cerrarFormEntregado();
     renderProduccionActual();
+    renderBoard();
     showToast('✅ Entregado registrado (' + lineas.length + ' producto' + (lineas.length > 1 ? 's' : '') + ')');
   }
 }
 
-function eliminarEntregadoManual(id) {
+async function eliminarEntregadoManual(id) {
   if (!confirm('¿Eliminar este registro manual?')) return;
-  var arr = getEntregasManuales().filter(function(e){ return e.id !== id; });
-  saveEntregasManuales(arr);
+  var r = await db.from('entregas_serig').delete().eq('id', id);
+  if (r.error) { showToast('⚠️ Error al eliminar: ' + r.error.message, '#b91c1c'); return; }
+  entregasCache = entregasCache.filter(function(e) { return e.id !== id; });
   renderProduccionActual();
+  renderBoard();
 }
 
 function editarEntregadoManual(id) {
@@ -4508,7 +4549,7 @@ async function init() {
   if (fi) fi.value = d.toISOString().split('T')[0];
 
   // Carga paralela de datos
-  await Promise.all([cargarInventario(), cargarPersonal()]);
+  await Promise.all([cargarInventario(), cargarPersonal(), cargarEntregasSerig()]);
   await cargarAusentesHoy(); // filtra ausentes de la matriz (llama renderMatriz internamente)
   await cargarSolicitudes(); // llama renderInicio() internamente
 
