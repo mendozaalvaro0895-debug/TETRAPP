@@ -3120,12 +3120,22 @@ async function refreshKPIs() {
 // TRAZABILIDAD
 // ════════════════════════════════════════════════════════════
 
+async function ajustarExistencia(sku, delta) {
+  try {
+    var r = await db.from('inventario').select('existencia').eq('sku', sku).single();
+    if (r.error || !r.data) return;
+    var nueva = Math.max(0, (r.data.existencia || 0) + delta);
+    await db.from('inventario').update({ existencia: nueva }).eq('sku', sku);
+  } catch(e) { console.error('ajustarExistencia:', e); }
+}
+
 async function registrarPerdida(solicitudId, sku, cantidad, motivo, usuario, obs) {
   try {
     var r = await db.from('movimientos_materiales').insert({
       solicitud_id: solicitudId, sku_original: sku, cantidad: cantidad,
       tipo: 'perdida', operador_id: usuario, motivo_perdida: motivo, observaciones: obs
     });
+    if (!r.error) await ajustarExistencia(sku, -cantidad);
     return { ok: !r.error, error: r.error ? r.error.message : null };
   } catch(e) { return { ok: false, error: e.message }; }
 }
@@ -3136,6 +3146,7 @@ async function registrarEntradaPT(solicitudId, sku, cantidad, usuario, obs) {
       solicitud_id: solicitudId, sku_original: sku, cantidad: cantidad,
       tipo: 'entrada_pt', operador_id: usuario, observaciones: obs
     });
+    if (!r.error) await ajustarExistencia(sku, +cantidad);
     return { ok: !r.error, error: r.error ? r.error.message : null };
   } catch(e) { return { ok: false, error: e.message }; }
 }
@@ -3146,6 +3157,7 @@ async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
       solicitud_id: solicitudId, sku_original: sku, cantidad: cantidad,
       tipo: 'salida_bodega', operador_id: usuario, observaciones: obs
     });
+    if (!r.error) await ajustarExistencia(sku, -cantidad);
     return { ok: !r.error, error: r.error ? r.error.message : null };
   } catch(e) { return { ok: false, error: e.message }; }
 }

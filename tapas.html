@@ -1125,6 +1125,15 @@ async function cargarKPIComandas() {
 }
 
 // ══ TRAZABILIDAD (FUNCIONES FALTANTES) ══════════════════════
+async function ajustarExistencia(sku, delta) {
+  try {
+    const { data, error } = await db.from('inventario').select('existencia').eq('sku', sku).single();
+    if (error || !data) return;
+    const nueva = Math.max(0, (data.existencia || 0) + delta);
+    await db.from('inventario').update({ existencia: nueva }).eq('sku', sku);
+  } catch(e) { console.error('ajustarExistencia:', e); }
+}
+
 async function registrarPerdida(solicitudId, sku, cantidad, motivo, usuario, obs) {
   try {
     const { error } = await db.from('movimientos_materiales').insert({
@@ -1136,6 +1145,7 @@ async function registrarPerdida(solicitudId, sku, cantidad, motivo, usuario, obs
       motivo_perdida: motivo,
       observaciones: obs
     });
+    if (!error) await ajustarExistencia(sku, -cantidad);
     return { ok: !error, error: error?.message };
   } catch(e) {
     return { ok: false, error: e.message };
@@ -1152,6 +1162,7 @@ async function registrarEntradaPT(solicitudId, sku, cantidad, usuario, obs) {
       operador_id: usuario,
       observaciones: obs
     });
+    if (!error) await ajustarExistencia(sku, +cantidad);
     return { ok: !error, error: error?.message };
   } catch(e) {
     return { ok: false, error: e.message };
@@ -1168,6 +1179,7 @@ async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
       operador_id: usuario,
       observaciones: obs
     });
+    if (!error) await ajustarExistencia(sku, -cantidad);
     return { ok: !error, error: error?.message };
   } catch(e) {
     return { ok: false, error: e.message };
@@ -2280,6 +2292,9 @@ async function confirmarMov() {
       observaciones: obsFinal
     });
     if (error) throw error;
+
+    if (movTipoActual === 'salida_bodega') await ajustarExistencia(sku, -cant);
+    else if (movTipoActual === 'entrada_pt') await ajustarExistencia(sku, +cant);
 
     var label = movTipoActual === 'salida_bodega' ? 'Salida' : 'Ingreso PT';
     showToast('✅ ' + label + ' registrado: Doc ' + numDoc + ' · ' + cant.toLocaleString() + ' und');
