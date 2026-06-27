@@ -3596,9 +3596,13 @@ function renderLineas() {
       descRow +
       '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">' +
         '<span style="font-size:9px;font-weight:700;color:var(--gray-l);white-space:nowrap;text-transform:uppercase;letter-spacing:.4px">Envase base SKU</span>' +
-        '<input class="fi" placeholder="SKU materia prima…" value="' + escHtml(l.sku_base || '') + '"' +
-          ' style="font-size:11px;padding:3px 6px;flex:1;max-width:200px"' +
-          ' oninput="lineas[' + i + '].sku_base=this.value">' +
+        '<div class="sku-wrap-s" style="flex:1;max-width:220px">' +
+          '<input class="fi" placeholder="🔍 SKU o descripción…" value="' + escHtml(l.sku_base || '') + '" autocomplete="off"' +
+            ' style="font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box"' +
+            ' oninput="lineaSkuBaseInput(' + i + ',this.value)"' +
+            ' onblur="setTimeout(function(){cerrarLineaSkuBaseDrop(' + i + ')},200)">' +
+          '<div class="sku-drop-s" id="linea-base-drop-' + i + '"></div>' +
+        '</div>' +
       '</div>' +
       lineaRow +
       '</div>';
@@ -3668,6 +3672,44 @@ function seleccionarLineaNuevo(idx) {
 
 function cerrarLineaSkuDrop(idx) {
   var d = document.getElementById('linea-drop-' + idx);
+  if (d) d.classList.remove('open');
+}
+
+function lineaSkuBaseInput(idx, val) {
+  lineas[idx].sku_base = val;
+  var drop = document.getElementById('linea-base-drop-' + idx);
+  if (!drop) return;
+  var v = val.trim().toLowerCase();
+  if (v.length < 2) { drop.classList.remove('open'); return; }
+  var matches = inventarioCache.filter(function(item) {
+    return item.sku.toLowerCase().includes(v) || (item.descripcion || '').toLowerCase().includes(v);
+  }).slice(0, 8);
+  if (!matches.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(function(item) {
+    var esc = item.sku.replace(/'/g, "\\'");
+    return '<div class="sku-item-s" onmousedown="seleccionarLineaSkuBase(' + idx + ',\'' + esc + '\')">' +
+      '<div class="sku-code-s">' + item.sku + '</div>' +
+      '<div class="sku-desc-s">' + escHtml(item.descripcion || '') + '</div>' +
+    '</div>';
+  }).join('');
+  var inp = drop.previousElementSibling;
+  if (inp) {
+    var r = inp.getBoundingClientRect();
+    drop.style.top   = (r.bottom + 2) + 'px';
+    drop.style.left  = r.left + 'px';
+    drop.style.width = r.width + 'px';
+  }
+  drop.classList.add('open');
+}
+
+function seleccionarLineaSkuBase(idx, sku) {
+  lineas[idx].sku_base = sku;
+  cerrarLineaSkuBaseDrop(idx);
+  renderLineas();
+}
+
+function cerrarLineaSkuBaseDrop(idx) {
+  var d = document.getElementById('linea-base-drop-' + idx);
   if (d) d.classList.remove('open');
 }
 
