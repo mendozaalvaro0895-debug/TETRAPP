@@ -2216,16 +2216,18 @@ function renderProdMensual() {
 
   // Barras — solo días transcurridos hasta hoy
   var barras = '';
+  var labels = '';
   for (var d = 1; d <= diaHoy; d++) {
     var val  = porDia[d] || 0;
-    var px   = val ? Math.max(Math.round((val / maxVal) * 68), 5) : 2;
+    var px   = val ? Math.max(Math.round((val / maxVal) * 72), 5) : 2;
     var esHoy = d === diaHoy;
     var barColor = esHoy ? 'var(--serig-m)' : (val > promDia ? '#16a34a' : val > 0 ? '#a78bfa' : 'var(--border)');
     var tooltip  = val ? val.toLocaleString() + ' und' : 'Sin entregas';
+    var lbl = (d % 5 === 0 || d === 1 || esHoy) ? d : '';
     barras += '<div class="prod-bar-col" title="Día ' + d + ': ' + tooltip + '">' +
       '<div class="prod-bar" style="height:' + px + 'px;background:' + barColor + '"></div>' +
-      '<div class="prod-bar-lbl">' + (d % 5 === 0 || d === 1 || esHoy ? d : '') + '</div>' +
     '</div>';
+    labels += '<div style="flex:1;min-width:0;text-align:center;font-size:8px;color:var(--gray-l);line-height:1">' + lbl + '</div>';
   }
 
   if (!totalMes && !diasConProd) {
@@ -2244,6 +2246,7 @@ function renderProdMensual() {
     '</div>' +
     '<div class="prod-mens-chart">' +
       '<div class="prod-mens-bars">' + barras + '</div>' +
+      '<div style="display:flex;gap:3px;padding:0 0 2px">' + labels + '</div>' +
     '</div>' +
     '<div class="prod-mens-total">' +
       '<div class="prod-stat"><span class="prod-stat-val">' + totalMes.toLocaleString() + '</span><span class="prod-stat-lbl">und totales</span></div>' +
