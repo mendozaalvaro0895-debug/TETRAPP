@@ -2380,17 +2380,20 @@ async function renderFaltasChart() {
   if (!faltasMesCache || faltasMesCache._mes !== mesStr) {
     try {
       var r = await db.from('asistencia_diaria')
-        .select('fecha,operador_codigo,estado')
+        .select('fecha,operador_codigo,operador_nombre,estado')
         .eq('area','serig').eq('turno','dia')
         .gte('fecha', inicio).lte('fecha', fin);
       var ausMap = {}, preMap = {};
       if (r.data && !r.error) {
         r.data.forEach(function(row) {
           var esPrestado = prestadosCod.indexOf(row.operador_codigo) >= 0;
+          var nombre = row.operador_nombre || row.operador_codigo;
           if (esPrestado && row.estado === 'presente') {
-            preMap[row.fecha] = (preMap[row.fecha] || 0) + 1;
+            if (!preMap[row.fecha]) preMap[row.fecha] = [];
+            preMap[row.fecha].push(nombre);
           } else if (!esPrestado && row.estado === 'ausente') {
-            ausMap[row.fecha] = (ausMap[row.fecha] || 0) + 1;
+            if (!ausMap[row.fecha]) ausMap[row.fecha] = [];
+            ausMap[row.fecha].push(nombre);
           }
         });
       }
@@ -2401,7 +2404,6 @@ async function renderFaltasChart() {
   var ausMap = faltasMesCache.ausentes || {};
   var preMap = faltasMesCache.prestados || {};
 
-  // Rango de días
   var dias = [];
   var d = new Date(inicio + 'T12:00:00');
   var hoyCopy = new Date(fin + 'T12:00:00');
@@ -2409,20 +2411,19 @@ async function renderFaltasChart() {
 
   var maxVal = 1;
   dias.forEach(function(f){
-    var v = (ausMap[f]||0) + (preMap[f]||0);
+    var v = (ausMap[f]||[]).length + (preMap[f]||[]).length;
     if (v > maxVal) maxVal = v;
   });
 
   var CHART_H = 48;
   var barras = dias.map(function(f) {
-    var va = ausMap[f] || 0;
-    var vp = preMap[f] || 0;
+    var va = (ausMap[f]||[]).length;
+    var vp = (preMap[f]||[]).length;
     var ha = va ? Math.max(4, Math.round((va / maxVal) * CHART_H)) : (vp ? 0 : 4);
     var hp = vp ? Math.max(4, Math.round((vp / maxVal) * CHART_H)) : 0;
     var esHoy = f === fin;
     var dia = parseInt(f.slice(8));
-    var tip = f + ': ' + va + ' ausente' + (va!==1?'s':'') + (vp ? ' · ' + vp + ' prestado' + (vp!==1?'s':'') : '');
-    return '<div class="faltas-bar-wrap" title="' + tip + '">' +
+    return '<div class="faltas-bar-wrap" style="cursor:pointer" onclick="verDetalleAsistencia(\'' + f + '\',event)">' +
       '<div class="faltas-bars-grp">' +
         '<div class="faltas-bar' + (esHoy?' hoy':'') + (va===0&&!vp?' cero':'') + '" style="height:' + ha + 'px"></div>' +
         (vp ? '<div class="faltas-bar prestado' + (esHoy?' hoy':'') + '" style="height:' + hp + 'px"></div>' : '') +
@@ -2432,8 +2433,8 @@ async function renderFaltasChart() {
   }).join('');
 
   var mesNombre = hoy.toLocaleDateString('es-GT', { month:'long', year:'numeric' });
-  var totalAus = dias.reduce(function(s,f){ return s+(ausMap[f]||0); }, 0);
-  var totalPre = dias.reduce(function(s,f){ return s+(preMap[f]||0); }, 0);
+  var totalAus = dias.reduce(function(s,f){ return s+(ausMap[f]||[]).length; }, 0);
+  var totalPre = dias.reduce(function(s,f){ return s+(preMap[f]||[]).length; }, 0);
   var leyenda =
     '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gray)">' +
       '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--serig-m)"></span>Ausentes: ' + totalAus +
@@ -2441,9 +2442,7 @@ async function renderFaltasChart() {
     (totalPre ? '&nbsp;&nbsp;<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gray)">' +
       '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#16a34a"></span>Prestados: ' + totalPre +
     '</span>' : '') +
-    '&nbsp;&nbsp;<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gray)">' +
-      '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#dc2626"></span>Hoy' +
-    '</span>';
+    '&nbsp;&nbsp;<span style="font-size:10px;color:var(--gray-l);font-style:italic">· Clic en barra para ver detalle</span>';
 
   el.innerHTML =
     '<div class="faltas-wrap">' +
@@ -2451,12 +2450,76 @@ async function renderFaltasChart() {
         '<span class="faltas-title">📊 Faltas del mes</span>' +
         '<div style="display:flex;align-items:center;gap:8px">' +
           '<span class="faltas-sub" style="text-transform:capitalize">' + mesNombre + '</span>' +
-          '<button class="btn btn-g btn-xs" onclick="exportarAsistenciaMes()" title="Descargar reporte mensual">⬇ Exportar</button>' +
+          '<button class="btn btn-g btn-xs" onclick="exportarAsistenciaMes()" title="Exportar reporte PDF">⬇ Exportar</button>' +
         '</div>' +
       '</div>' +
       '<div class="faltas-chart">' + barras + '</div>' +
       '<div class="faltas-legend">' + leyenda + '</div>' +
+    '</div>' +
+    '<div id="faltas-detalle" style="display:none;position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;min-width:190px;max-width:250px;box-shadow:0 8px 28px rgba(0,0,0,.18)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+        '<span id="faltas-det-fecha" style="font-size:11px;font-weight:800;color:var(--ink)"></span>' +
+        '<button onclick="document.getElementById(\'faltas-detalle\').style.display=\'none\'" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0;margin-left:10px">✕</button>' +
+      '</div>' +
+      '<div id="faltas-det-body"></div>' +
     '</div>';
+}
+
+function verDetalleAsistencia(fecha, evt) {
+  var ausMap = faltasMesCache ? (faltasMesCache.ausentes || {}) : {};
+  var preMap = faltasMesCache ? (faltasMesCache.prestados || {}) : {};
+  var ausentes = ausMap[fecha] || [];
+  var prestados = preMap[fecha] || [];
+
+  var popup = document.getElementById('faltas-detalle');
+  if (!popup) return;
+
+  var fechaLabel = new Date(fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long' });
+  fechaLabel = fechaLabel.charAt(0).toUpperCase() + fechaLabel.slice(1);
+  document.getElementById('faltas-det-fecha').textContent = fechaLabel;
+
+  var body = '';
+  if (ausentes.length) {
+    body += '<div style="margin-bottom:9px">' +
+      '<div style="font-size:9px;font-weight:800;color:#dc2626;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Ausentes (' + ausentes.length + ')</div>';
+    ausentes.forEach(function(n) {
+      body += '<div style="font-size:11px;color:var(--ink);padding:2px 0;display:flex;align-items:center;gap:5px">' +
+        '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#dc2626;flex-shrink:0"></span>' + escHtml(n) + '</div>';
+    });
+    body += '</div>';
+  }
+  if (prestados.length) {
+    body += '<div>' +
+      '<div style="font-size:9px;font-weight:800;color:#16a34a;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Prestados presentes (' + prestados.length + ')</div>';
+    prestados.forEach(function(n) {
+      body += '<div style="font-size:11px;color:var(--ink);padding:2px 0;display:flex;align-items:center;gap:5px">' +
+        '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0"></span>' + escHtml(n) + '</div>';
+    });
+    body += '</div>';
+  }
+  if (!ausentes.length && !prestados.length) {
+    body = '<div style="font-size:11px;color:var(--gray-l);text-align:center;padding:6px 0">Sin novedades</div>';
+  }
+
+  document.getElementById('faltas-det-body').innerHTML = body;
+  popup.style.display = 'block';
+
+  if (evt) {
+    var r = evt.currentTarget.getBoundingClientRect();
+    var left = Math.max(8, Math.min(r.left + window.scrollX - 50, window.innerWidth - 270));
+    popup.style.top  = (r.bottom + window.scrollY + 6) + 'px';
+    popup.style.left = left + 'px';
+  }
+
+  setTimeout(function() {
+    function cerrarPopup(e) {
+      if (!popup.contains(e.target)) {
+        popup.style.display = 'none';
+        document.removeEventListener('click', cerrarPopup);
+      }
+    }
+    document.addEventListener('click', cerrarPopup);
+  }, 10);
 }
 
 async function exportarAsistenciaMes() {
@@ -2464,6 +2527,8 @@ async function exportarAsistenciaMes() {
   var mesStr = hoy.toISOString().slice(0,7);
   var inicio = mesStr + '-01';
   var fin    = hoy.toISOString().slice(0,10);
+  var mesNombre = hoy.toLocaleDateString('es-GT', { month:'long', year:'numeric' });
+  mesNombre = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1);
 
   try {
     var r = await db.from('asistencia_diaria')
@@ -2488,38 +2553,72 @@ async function exportarAsistenciaMes() {
       idx[row.operador_codigo + '_' + row.fecha] = row.estado;
     });
 
-    var lineas = [];
-    var encabezado = ['Operario','Rol'].concat(dias.map(function(f){ return f.slice(8); })).concat(['Ausencias','Presentes']);
-    lineas.push(encabezado.join(','));
-
-    operarios.forEach(function(cod) {
+    // Construir filas de la tabla
+    var filas = operarios.map(function(cod) {
       var info = operariosMap[cod];
       var ausencias = 0, presentes = 0;
       var celdas = dias.map(function(f) {
         var est = idx[cod + '_' + f];
-        if (!est) return '-';
-        if (est === 'ausente') { ausencias++; return 'A'; }
+        if (!est) return '<td style="background:#f3f4f6;color:#9ca3af;text-align:center">—</td>';
+        if (est === 'ausente') { ausencias++; return '<td style="background:#fee2e2;color:#dc2626;font-weight:700;text-align:center">A</td>'; }
         presentes++;
-        return 'P';
-      });
-      lineas.push(['"' + info.nombre + '"', info.rol].concat(celdas).concat([ausencias, presentes]).join(','));
-    });
+        return '<td style="background:#dcfce7;color:#16a34a;font-weight:700;text-align:center">P</td>';
+      }).join('');
+      return '<tr>' +
+        '<td style="white-space:nowrap;font-weight:600;padding:4px 8px">' + info.nombre + '</td>' +
+        '<td style="color:#6b7280;font-size:10px;white-space:nowrap;padding:4px 6px">' + (info.rol || '') + '</td>' +
+        celdas +
+        '<td style="background:#fee2e2;color:#dc2626;font-weight:800;text-align:center">' + ausencias + '</td>' +
+        '<td style="background:#dcfce7;color:#16a34a;font-weight:800;text-align:center">' + presentes + '</td>' +
+      '</tr>';
+    }).join('');
 
+    // Fila de totales por día
     var totAus = dias.map(function(f) {
-      return operarios.reduce(function(s,c){ return s + (idx[c+'_'+f]==='ausente'?1:0); },0);
+      return operarios.reduce(function(s,c){ return s + (idx[c+'_'+f]==='ausente'?1:0); }, 0);
     });
-    lineas.push(['TOTAL AUSENTES',''].concat(totAus.map(String)).concat([totAus.reduce(function(a,b){return a+b;},0),'']).join(','));
+    var totAusTotal = totAus.reduce(function(a,b){return a+b;},0);
+    var totFilas = '<tr style="border-top:2px solid #374151;background:#f9fafb">' +
+      '<td colspan="2" style="font-weight:800;font-size:11px;padding:4px 8px;color:#374151">TOTAL AUSENTES</td>' +
+      totAus.map(function(n){ return '<td style="text-align:center;font-weight:700;color:' + (n>0?'#dc2626':'#9ca3af') + '">' + (n||'—') + '</td>'; }).join('') +
+      '<td style="text-align:center;font-weight:800;color:#dc2626">' + totAusTotal + '</td>' +
+      '<td></td>' +
+    '</tr>';
 
-    var bom = '﻿';
-    var blob = new Blob([bom + lineas.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'asistencia_serig_' + mesStr + '.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Encabezados de días (número + día semana abreviado)
+    var diasHeaders = dias.map(function(f) {
+      var d2 = new Date(f + 'T12:00:00');
+      var dow = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'][d2.getDay()];
+      var num = parseInt(f.slice(8));
+      return '<th style="text-align:center;font-weight:700;min-width:28px;background:#374151;color:#fff;font-size:10px;padding:4px 2px">' + num + '<br><span style="font-weight:400;font-size:9px">' + dow + '</span></th>';
+    }).join('');
+
+    var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+      '<title>Asistencia Serigrafía ' + mesNombre + '</title>' +
+      '<style>' +
+        'body{font-family:Arial,sans-serif;font-size:11px;margin:20px;color:#111}' +
+        'h2{margin:0 0 4px;font-size:15px;color:#4c1d95}' +
+        'p.sub{margin:0 0 14px;color:#6b7280;font-size:11px}' +
+        'table{border-collapse:collapse;width:100%;font-size:11px}' +
+        'th,td{border:1px solid #d1d5db;padding:3px 5px}' +
+        'tr:nth-child(even){background:#f9fafb}' +
+        '@media print{body{margin:10px}h2{font-size:13px}}' +
+      '</style></head><body>' +
+      '<h2>Asistencia Serigrafía — ' + mesNombre + '</h2>' +
+      '<p class="sub">Generado: ' + new Date().toLocaleDateString('es-GT', {day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}) + ' · P = Presente · A = Ausente</p>' +
+      '<table><thead><tr>' +
+        '<th style="background:#374151;color:#fff;padding:5px 8px;text-align:left">Operario</th>' +
+        '<th style="background:#374151;color:#fff;padding:5px 6px;text-align:left">Rol</th>' +
+        diasHeaders +
+        '<th style="background:#7f1d1d;color:#fff;text-align:center;padding:4px 5px">Aus.</th>' +
+        '<th style="background:#14532d;color:#fff;text-align:center;padding:4px 5px">Pres.</th>' +
+      '</tr></thead><tbody>' + filas + totFilas + '</tbody></table>' +
+      '<script>window.onload=function(){window.print();}<\/script>' +
+      '</body></html>';
+
+    var win = window.open('', '_blank', 'width=1100,height=750');
+    win.document.write(html);
+    win.document.close();
   } catch(e) {
     alert('Error al exportar: ' + e.message);
   }
