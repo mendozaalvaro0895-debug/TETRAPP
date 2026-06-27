@@ -1787,11 +1787,12 @@ async function toggleProcesoPedido(solId, procIdx) {
 var sinGrupoArrastre = null;
 var sinHandleDrag = null; // { solId, cliente } — reorder independiente del board drag
 
-function getSinCardOrden() {
-  try { return JSON.parse(localStorage.getItem('tetra_sin_cards_s') || '{}'); } catch(e) { return {}; }
-}
+var sinCardOrdenCache = {};
+
+function getSinCardOrden() { return sinCardOrdenCache; }
 function saveSinCardOrden(obj) {
-  localStorage.setItem('tetra_sin_cards_s', JSON.stringify(obj));
+  sinCardOrdenCache = obj;
+  db.from('configuracion').upsert({ clave: 'sin_cards_serig', valor: obj, updated_at: new Date().toISOString() }).then(function(){});
 }
 
 function sinHandleDragStart(e, solId, cliente) {
@@ -1837,11 +1838,12 @@ function sinCardDrop(e, targetSolId, cliente) {
   renderBoard();
 }
 
-function getSinGrupoOrden() {
-  try { return JSON.parse(localStorage.getItem('tetra_sin_grupos_s') || '[]'); } catch(e) { return []; }
-}
+var sinGrupoOrdenCache = [];
+
+function getSinGrupoOrden() { return sinGrupoOrdenCache; }
 function saveSinGrupoOrden(arr) {
-  localStorage.setItem('tetra_sin_grupos_s', JSON.stringify(arr));
+  sinGrupoOrdenCache = arr;
+  db.from('configuracion').upsert({ clave: 'sin_grupos_serig', valor: arr, updated_at: new Date().toISOString() }).then(function(){});
 }
 
 function sinGrupoDragStart(e, cliente) {
@@ -4565,6 +4567,25 @@ async function velCambiarFecha(delta) {
 // INICIO
 // ════════════════════════════════════════════════════════════
 
+async function cargarOrdenSinAsignar() {
+  try {
+    var r = await db.from('configuracion').select('clave,valor').in('clave', ['sin_cards_serig', 'sin_grupos_serig']);
+    if (r.data && r.data.length) {
+      r.data.forEach(function(row) {
+        if (row.clave === 'sin_cards_serig') sinCardOrdenCache = row.valor || {};
+        if (row.clave === 'sin_grupos_serig') sinGrupoOrdenCache = row.valor || [];
+      });
+    } else {
+      // migrar desde localStorage si existe
+      try { sinCardOrdenCache  = JSON.parse(localStorage.getItem('tetra_sin_cards_s')  || '{}'); } catch(_) {}
+      try { sinGrupoOrdenCache = JSON.parse(localStorage.getItem('tetra_sin_grupos_s') || '[]'); } catch(_) {}
+    }
+  } catch(e) {
+    try { sinCardOrdenCache  = JSON.parse(localStorage.getItem('tetra_sin_cards_s')  || '{}'); } catch(_) {}
+    try { sinGrupoOrdenCache = JSON.parse(localStorage.getItem('tetra_sin_grupos_s') || '[]'); } catch(_) {}
+  }
+}
+
 async function init() {
   poblarClientes();
 
@@ -4574,7 +4595,7 @@ async function init() {
   if (fi) fi.value = d.toISOString().split('T')[0];
 
   // Carga paralela de datos
-  await Promise.all([cargarInventario(), cargarPersonal(), cargarEntregasSerig()]);
+  await Promise.all([cargarInventario(), cargarPersonal(), cargarEntregasSerig(), cargarOrdenSinAsignar()]);
   await cargarAusentesHoy(); // filtra ausentes de la matriz (llama renderMatriz internamente)
   await cargarSolicitudes(); // llama renderInicio() internamente
 
