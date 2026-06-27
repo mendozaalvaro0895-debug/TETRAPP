@@ -242,9 +242,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .faltas-chart{padding:8px 14px 0;display:flex;align-items:flex-end;gap:0;height:72px;overflow-x:auto}
 .faltas-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:14px;border-right:1px solid var(--border);padding:0 2px}
 .faltas-bars-grp{display:flex;align-items:flex-end;gap:1px;width:100%}
-.faltas-bar{flex:1;border-radius:3px 3px 0 0;min-height:2px;transition:height .3s;background:var(--serig-m)}
-.faltas-bar.cero{background:var(--bg3);min-height:4px}
-.faltas-bar.prestado{background:#16a34a}
+.faltas-bar{flex:1;border-radius:3px 3px 0 0;min-height:2px;transition:height .3s}
+.faltas-bar.presente{background:#16a34a}
+.faltas-bar.ausente{background:#dc2626}
+.faltas-bar.prestado{background:#d97706}
+.faltas-bar.cero{background:var(--bg3);min-height:3px}
 .faltas-day{font-size:8px;color:var(--gray-l);text-align:center;line-height:1;margin-top:3px}
 .faltas-day.hoy{color:var(--serig-m);font-weight:800}
 .faltas-legend{display:flex;gap:12px;padding:6px 14px 10px;border-top:1px solid var(--border);margin-top:4px}
@@ -2382,26 +2384,30 @@ async function renderFaltasChart() {
         .select('fecha,operador_codigo,operador_nombre,estado')
         .eq('area','serig').eq('turno','dia')
         .gte('fecha', inicio).lte('fecha', fin);
-      var ausMap = {}, preMap = {};
+      var ausMap = {}, presMap = {}, prtMap = {};
       if (r.data && !r.error) {
         r.data.forEach(function(row) {
           var esPrestado = prestadosCod.indexOf(row.operador_codigo) >= 0;
           var nombre = row.operador_nombre || row.operador_codigo;
           if (esPrestado && row.estado === 'presente') {
-            if (!preMap[row.fecha]) preMap[row.fecha] = [];
-            preMap[row.fecha].push(nombre);
+            if (!prtMap[row.fecha]) prtMap[row.fecha] = [];
+            prtMap[row.fecha].push(nombre);
           } else if (!esPrestado && row.estado === 'ausente') {
             if (!ausMap[row.fecha]) ausMap[row.fecha] = [];
             ausMap[row.fecha].push(nombre);
+          } else if (!esPrestado && row.estado === 'presente') {
+            if (!presMap[row.fecha]) presMap[row.fecha] = [];
+            presMap[row.fecha].push(nombre);
           }
         });
       }
-      faltasMesCache = { _mes: mesStr, ausentes: ausMap, prestados: preMap };
+      faltasMesCache = { _mes: mesStr, ausentes: ausMap, presentes: presMap, prestados: prtMap };
     } catch(e) { faltasMesCache = { _mes: mesStr, ausentes: {}, prestados: {} }; }
   }
 
-  var ausMap = faltasMesCache.ausentes || {};
-  var preMap = faltasMesCache.prestados || {};
+  var ausMap  = faltasMesCache.ausentes  || {};
+  var presMap = faltasMesCache.presentes || {};
+  var prtMap  = faltasMesCache.prestados || {};
 
   var dias = [];
   var d = new Date(inicio + 'T12:00:00');
@@ -2410,38 +2416,48 @@ async function renderFaltasChart() {
 
   var maxVal = 1;
   dias.forEach(function(f){
-    var v = (ausMap[f]||[]).length + (preMap[f]||[]).length;
+    var v = (presMap[f]||[]).length + (ausMap[f]||[]).length + (prtMap[f]||[]).length;
     if (v > maxVal) maxVal = v;
   });
 
   var CHART_H = 48;
   var barras = dias.map(function(f) {
-    var va = (ausMap[f]||[]).length;
-    var vp = (preMap[f]||[]).length;
-    var ha = va ? Math.max(4, Math.round((va / maxVal) * CHART_H)) : (vp ? 0 : 4);
-    var hp = vp ? Math.max(4, Math.round((vp / maxVal) * CHART_H)) : 0;
+    var vpr = (presMap[f]||[]).length;
+    var va  = (ausMap[f]||[]).length;
+    var vpt = (prtMap[f]||[]).length;
+    var sinDatos = !vpr && !va && !vpt;
+    var hpr = vpr ? Math.max(4, Math.round((vpr / maxVal) * CHART_H)) : 0;
+    var ha  = va  ? Math.max(4, Math.round((va  / maxVal) * CHART_H)) : 0;
+    var hpt = vpt ? Math.max(4, Math.round((vpt / maxVal) * CHART_H)) : 0;
     var esHoy = f === fin;
     var dia = parseInt(f.slice(8));
     return '<div class="faltas-bar-wrap" style="cursor:pointer" onclick="verDetalleAsistencia(\'' + f + '\',event)">' +
       '<div class="faltas-bars-grp">' +
-        '<div class="faltas-bar' + (va===0&&!vp?' cero':'') + '" style="height:' + ha + 'px"></div>' +
-        (vp ? '<div class="faltas-bar prestado" style="height:' + hp + 'px"></div>' : '') +
+        (sinDatos
+          ? '<div class="faltas-bar cero" style="height:3px"></div>'
+          : (vpr ? '<div class="faltas-bar presente" style="height:' + hpr + 'px"></div>' : '') +
+            (va  ? '<div class="faltas-bar ausente"  style="height:' + ha  + 'px"></div>' : '') +
+            (vpt ? '<div class="faltas-bar prestado" style="height:' + hpt + 'px"></div>' : '')) +
       '</div>' +
       '<div class="faltas-day' + (esHoy?' hoy':'') + '">' + dia + '</div>' +
     '</div>';
   }).join('');
 
   var mesNombre = hoy.toLocaleDateString('es-GT', { month:'long', year:'numeric' });
-  var totalAus = dias.reduce(function(s,f){ return s+(ausMap[f]||[]).length; }, 0);
-  var totalPre = dias.reduce(function(s,f){ return s+(preMap[f]||[]).length; }, 0);
+  var totalPres = dias.reduce(function(s,f){ return s+(presMap[f]||[]).length; }, 0);
+  var totalAus  = dias.reduce(function(s,f){ return s+(ausMap[f]||[]).length;  }, 0);
+  var totalPrt  = dias.reduce(function(s,f){ return s+(prtMap[f]||[]).length;  }, 0);
   var leyenda =
     '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gray)">' +
-      '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--serig-m)"></span>Ausentes: ' + totalAus +
+      '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#16a34a"></span>Presentes: ' + totalPres +
     '</span>' +
-    (totalPre ? '&nbsp;&nbsp;<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gray)">' +
-      '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#16a34a"></span>Prestados: ' + totalPre +
+    '&nbsp;&nbsp;<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gray)">' +
+      '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#dc2626"></span>Ausentes: ' + totalAus +
+    '</span>' +
+    (totalPrt ? '&nbsp;&nbsp;<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gray)">' +
+      '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#d97706"></span>Prestados: ' + totalPrt +
     '</span>' : '') +
-    '&nbsp;&nbsp;<span style="font-size:10px;color:var(--gray-l);font-style:italic">· Clic en barra para ver detalle</span>';
+    '&nbsp;&nbsp;<span style="font-size:10px;color:var(--gray-l);font-style:italic">· Clic en barra</span>';
 
   el.innerHTML =
     '<div class="faltas-wrap">' +
@@ -2469,10 +2485,12 @@ var _faltasPopupListener = null;
 function verDetalleAsistencia(fecha, evt) {
   if (evt) evt.stopPropagation();
 
-  var ausMap = faltasMesCache ? (faltasMesCache.ausentes || {}) : {};
-  var preMap = faltasMesCache ? (faltasMesCache.prestados || {}) : {};
-  var ausentes = ausMap[fecha] || [];
-  var prestados = preMap[fecha] || [];
+  var ausMap  = faltasMesCache ? (faltasMesCache.ausentes  || {}) : {};
+  var presMap = faltasMesCache ? (faltasMesCache.presentes || {}) : {};
+  var prtMap  = faltasMesCache ? (faltasMesCache.prestados || {}) : {};
+  var presentes = presMap[fecha] || [];
+  var ausentes  = ausMap[fecha]  || [];
+  var prestados = prtMap[fecha]  || [];
 
   var popup = document.getElementById('faltas-detalle');
   if (!popup) return;
@@ -2481,28 +2499,21 @@ function verDetalleAsistencia(fecha, evt) {
   fechaLabel = fechaLabel.charAt(0).toUpperCase() + fechaLabel.slice(1);
   document.getElementById('faltas-det-fecha').textContent = fechaLabel;
 
-  var body = '';
-  if (ausentes.length) {
-    body += '<div style="margin-bottom:9px">' +
-      '<div style="font-size:9px;font-weight:800;color:#dc2626;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Ausentes (' + ausentes.length + ')</div>';
-    ausentes.forEach(function(n) {
-      body += '<div style="font-size:11px;color:var(--ink);padding:2px 0;display:flex;align-items:center;gap:5px">' +
-        '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#dc2626;flex-shrink:0"></span>' + escHtml(n) + '</div>';
+  function grupoHtml(lista, color, titulo) {
+    if (!lista.length) return '';
+    var h = '<div style="margin-bottom:8px">' +
+      '<div style="font-size:9px;font-weight:800;color:' + color + ';text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">' + titulo + ' (' + lista.length + ')</div>';
+    lista.forEach(function(n) {
+      h += '<div style="font-size:11px;color:var(--ink);padding:2px 0;display:flex;align-items:center;gap:5px">' +
+        '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + color + ';flex-shrink:0"></span>' + escHtml(n) + '</div>';
     });
-    body += '</div>';
+    return h + '</div>';
   }
-  if (prestados.length) {
-    body += '<div>' +
-      '<div style="font-size:9px;font-weight:800;color:#16a34a;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Prestados presentes (' + prestados.length + ')</div>';
-    prestados.forEach(function(n) {
-      body += '<div style="font-size:11px;color:var(--ink);padding:2px 0;display:flex;align-items:center;gap:5px">' +
-        '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0"></span>' + escHtml(n) + '</div>';
-    });
-    body += '</div>';
-  }
-  if (!ausentes.length && !prestados.length) {
-    body = '<div style="font-size:11px;color:var(--gray-l);text-align:center;padding:6px 0">Sin novedades</div>';
-  }
+
+  var body = grupoHtml(presentes, '#16a34a', 'Presentes') +
+             grupoHtml(ausentes,  '#dc2626', 'Ausentes') +
+             grupoHtml(prestados, '#d97706', 'Prestados');
+  if (!body) body = '<div style="font-size:11px;color:var(--gray-l);text-align:center;padding:6px 0">Sin registros</div>';
 
   document.getElementById('faltas-det-body').innerHTML = body;
   popup.style.display = 'block';
