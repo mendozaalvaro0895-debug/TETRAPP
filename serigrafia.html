@@ -3791,9 +3791,15 @@ function renderLineas() {
             ' onblur="setTimeout(function(){cerrarLineaSkuBaseDrop(' + i + ')},200)">' +
           '<div class="sku-drop-s" id="linea-base-drop-' + i + '"></div>' +
         '</div>' +
-        (l.existencia_base !== undefined
-          ? '<div style="font-size:11px;font-weight:700;padding:0 4px;color:' + (l.existencia_base > 0 ? 'var(--green)' : 'var(--amber)') + '" title="Stock Envase Base">' + l.existencia_base.toLocaleString() + '</div>'
-          : '') +
+        (l.existencia_base !== undefined ? (function() {
+          var faltante = (l.cant || 0) - l.existencia_base;
+          var alcanza  = faltante <= 0;
+          return '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
+            '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px">Stock</span>' +
+            '<span style="font-size:11px;font-weight:700;color:' + (alcanza ? 'var(--green)' : 'var(--amber)') + '">' + l.existencia_base.toLocaleString() + '</span>' +
+            (!alcanza ? '<span style="font-size:9px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.3px">Faltante: ' + faltante.toLocaleString() + '</span>' : '') +
+          '</div>';
+        })() : '') +
       '</div>' +
       (l.desc_base ? '<div style="font-size:11px;color:var(--gray);padding:2px 0 0 0;margin-top:1px">📦 ' + escHtml(l.desc_base) + '</div>' : '') +
       lineaRow +
