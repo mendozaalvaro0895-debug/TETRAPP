@@ -243,11 +243,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .faltas-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:14px;border-right:1px solid var(--border);padding:0 2px}
 .faltas-bars-grp{display:flex;align-items:flex-end;gap:1px;width:100%}
 .faltas-bar{flex:1;border-radius:3px 3px 0 0;min-height:2px;transition:height .3s;background:var(--serig-m)}
-.faltas-bar.hoy{background:#dc2626}
 .faltas-bar.cero{background:var(--bg3);min-height:4px}
 .faltas-bar.prestado{background:#16a34a}
-.faltas-bar.prestado.hoy{background:#15803d}
 .faltas-day{font-size:8px;color:var(--gray-l);text-align:center;line-height:1;margin-top:3px}
+.faltas-day.hoy{color:var(--serig-m);font-weight:800}
 .faltas-legend{display:flex;gap:12px;padding:6px 14px 10px;border-top:1px solid var(--border);margin-top:4px}
 .mtx-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;flex-wrap:wrap}
 .mtx-hdr-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--serig-m)}
@@ -2425,10 +2424,10 @@ async function renderFaltasChart() {
     var dia = parseInt(f.slice(8));
     return '<div class="faltas-bar-wrap" style="cursor:pointer" onclick="verDetalleAsistencia(\'' + f + '\',event)">' +
       '<div class="faltas-bars-grp">' +
-        '<div class="faltas-bar' + (esHoy?' hoy':'') + (va===0&&!vp?' cero':'') + '" style="height:' + ha + 'px"></div>' +
-        (vp ? '<div class="faltas-bar prestado' + (esHoy?' hoy':'') + '" style="height:' + hp + 'px"></div>' : '') +
+        '<div class="faltas-bar' + (va===0&&!vp?' cero':'') + '" style="height:' + ha + 'px"></div>' +
+        (vp ? '<div class="faltas-bar prestado" style="height:' + hp + 'px"></div>' : '') +
       '</div>' +
-      '<div class="faltas-day">' + dia + '</div>' +
+      '<div class="faltas-day' + (esHoy?' hoy':'') + '">' + dia + '</div>' +
     '</div>';
   }).join('');
 
@@ -2465,7 +2464,11 @@ async function renderFaltasChart() {
     '</div>';
 }
 
+var _faltasPopupListener = null;
+
 function verDetalleAsistencia(fecha, evt) {
+  if (evt) evt.stopPropagation();
+
   var ausMap = faltasMesCache ? (faltasMesCache.ausentes || {}) : {};
   var preMap = faltasMesCache ? (faltasMesCache.prestados || {}) : {};
   var ausentes = ausMap[fecha] || [];
@@ -2511,15 +2514,18 @@ function verDetalleAsistencia(fecha, evt) {
     popup.style.left = left + 'px';
   }
 
-  setTimeout(function() {
-    function cerrarPopup(e) {
-      if (!popup.contains(e.target)) {
-        popup.style.display = 'none';
-        document.removeEventListener('click', cerrarPopup);
-      }
+  if (_faltasPopupListener) {
+    document.removeEventListener('click', _faltasPopupListener);
+    _faltasPopupListener = null;
+  }
+  _faltasPopupListener = function(e) {
+    if (!popup.contains(e.target)) {
+      popup.style.display = 'none';
+      document.removeEventListener('click', _faltasPopupListener);
+      _faltasPopupListener = null;
     }
-    document.addEventListener('click', cerrarPopup);
-  }, 10);
+  };
+  document.addEventListener('click', _faltasPopupListener);
 }
 
 async function exportarAsistenciaMes() {
