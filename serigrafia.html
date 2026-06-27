@@ -3263,9 +3263,9 @@ function calcularHoras(cantidad, opsCount, procs, tiros) {
     if (IMPRESION_PROCS.indexOf(p) >= 0) {
       total += (cantidad / meta) * tiros;
       if (tiros > 1) total += 6 * (tiros - 1); // secado entre tiros: 6h
-      total += 6; // secado final: 6h después del último tiro
+    } else if (p === 'secado') {
+      total += 6; // secado final fijo: 6h (independiente de cantidad)
     } else {
-      // Proceso secuencial simple (una sola vez)
       total += cantidad / meta;
     }
   });
@@ -3484,7 +3484,8 @@ async function mostrarDetalle(id) {
             var hImp = (s.cant / meta) * tirosSol;
             desglose.push(p.charAt(0).toUpperCase()+p.slice(1)+' ×'+tirosSol+': ' + hImp.toFixed(1)+'h');
             if (tirosSol > 1) desglose.push('Secado entre tiros: ' + (6*(tirosSol-1))+'h');
-            desglose.push('Secado final: 6h');
+          } else if (p === 'secado') {
+            desglose.push('Secado: 6h');
           } else {
             desglose.push(p.charAt(0).toUpperCase()+p.slice(1)+': ' + (s.cant/meta).toFixed(1)+'h');
           }
@@ -3994,8 +3995,9 @@ function calcular() {
           horasTotal += hSec;
           desgloseItems.push('Secado entre tiros: ' + hSec + 'h');
         }
+      } else if (p === 'secado') {
         horasTotal += 6;
-        desgloseItems.push('Secado final: 6h');
+        desgloseItems.push('Secado: 6h');
       } else {
         var h = l.cant / meta;
         horasTotal += h;
