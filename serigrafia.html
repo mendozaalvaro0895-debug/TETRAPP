@@ -1946,6 +1946,17 @@ function boardBuildSinBlock(items) {
         var totalG = gItems.reduce(function(s,i){ return s+(i.cant||0); }, 0);
         var pedidosTxt = gItems.length + ' pedido' + (gItems.length !== 1 ? 's' : '');
         var undTxt = totalG > 0 ? totalG.toLocaleString() + ' und' : '';
+        var horasG = gItems.reduce(function(sum, s) {
+          var allProcs = (s.lineas || []).reduce(function(acc, l) { return acc.concat(l.procs || []); }, []);
+          return sum + calcularHoras(s.cant, 1, allProcs, s.tiros || 1);
+        }, 0);
+        var tiempoTxt = (function(h) {
+          if (!h) return '';
+          if (h < 8) return '⏱ ' + h.toFixed(1) + ' h';
+          var dias = Math.floor(h / 8);
+          var resto = Math.round(h % 8);
+          return '⏱ ' + dias + ' día' + (dias !== 1 ? 's' : '') + (resto > 0 ? ' ' + resto + 'h' : '');
+        })(horasG);
         var cliEsc = cli.replace(/'/g, "\\'");
         var cardsHtml = gItems.map(function(item) {
           var solEsc = item.solId.replace(/'/g, "\\'");
@@ -1968,6 +1979,7 @@ function boardBuildSinBlock(items) {
               '<div class="sin-grupo-meta">' +
                 '<span>' + pedidosTxt + '</span>' +
                 (undTxt ? '<span>' + undTxt + '</span>' : '') +
+                (tiempoTxt ? '<span>' + tiempoTxt + '</span>' : '') +
               '</div>' +
             '</div>' +
           '</div>' +
