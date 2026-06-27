@@ -3261,10 +3261,9 @@ function calcularHoras(cantidad, opsCount, procs, tiros) {
     seen[p] = true;
     var meta = METAS[p] || META_DEFAULT;
     if (IMPRESION_PROCS.indexOf(p) >= 0) {
-      // Tiempo de impresion × tiros
       total += (cantidad / meta) * tiros;
-      // Secado entre tiros: 3 horas fijas por cada intervalo
-      if (tiros > 1) total += 3 * (tiros - 1);
+      if (tiros > 1) total += 6 * (tiros - 1); // secado entre tiros: 6h
+      total += 6; // secado final: 6h después del último tiro
     } else {
       // Proceso secuencial simple (una sola vez)
       total += cantidad / meta;
@@ -3484,7 +3483,8 @@ async function mostrarDetalle(id) {
           if (IMPRESION.indexOf(p) >= 0) {
             var hImp = (s.cant / meta) * tirosSol;
             desglose.push(p.charAt(0).toUpperCase()+p.slice(1)+' ×'+tirosSol+': ' + hImp.toFixed(1)+'h');
-            if (tirosSol > 1) desglose.push('Secado entre tiros: ' + (3*(tirosSol-1))+'h');
+            if (tirosSol > 1) desglose.push('Secado entre tiros: ' + (6*(tirosSol-1))+'h');
+            desglose.push('Secado final: 6h');
           } else {
             desglose.push(p.charAt(0).toUpperCase()+p.slice(1)+': ' + (s.cant/meta).toFixed(1)+'h');
           }
@@ -3990,10 +3990,12 @@ function calcular() {
         horasTotal += hImp;
         desgloseItems.push((p.charAt(0).toUpperCase()+p.slice(1)) + ' ×' + tiros + ': ' + hImp.toFixed(1) + 'h');
         if (tiros > 1) {
-          var hSec = 3 * (tiros - 1);
+          var hSec = 6 * (tiros - 1);
           horasTotal += hSec;
           desgloseItems.push('Secado entre tiros: ' + hSec + 'h');
         }
+        horasTotal += 6;
+        desgloseItems.push('Secado final: 6h');
       } else {
         var h = l.cant / meta;
         horasTotal += h;
