@@ -4886,6 +4886,31 @@ async function init() {
   tick();
   setInterval(tick, 30000);
   setInterval(refreshKPIs, 30000);
+
+  // Auto-scroll mientras se arrastra cerca del borde superior o inferior
+  var _dragScrollY = 0;
+  var _dragScrolling = false;
+  var _dragActive = false;
+
+  function _dragScrollStep() {
+    if (!_dragActive) { _dragScrolling = false; return; }
+    var zona = 120;   // px desde el borde para activar scroll
+    var speed = 14;   // px por frame
+    var y = _dragScrollY;
+    if (y < zona) {
+      window.scrollBy(0, -speed * (1 - y / zona));
+    } else if (y > window.innerHeight - zona) {
+      window.scrollBy(0, speed * (1 - (window.innerHeight - y) / zona));
+    }
+    requestAnimationFrame(_dragScrollStep);
+  }
+
+  document.addEventListener('dragstart', function() {
+    _dragActive = true;
+    if (!_dragScrolling) { _dragScrolling = true; requestAnimationFrame(_dragScrollStep); }
+  });
+  document.addEventListener('dragend', function() { _dragActive = false; });
+  document.addEventListener('dragover', function(e) { _dragScrollY = e.clientY; });
 }
 
 init();
