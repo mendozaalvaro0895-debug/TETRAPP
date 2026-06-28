@@ -2404,14 +2404,16 @@ function renderAsistHoy() {
     '</div>';
   }
 
-  var seccionPrestados = prestados.length
-    ? '<div style="grid-column:1/-1;margin-top:8px;padding-top:6px;border-top:1.5px dashed var(--border)">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
-          '<span style="font-size:9px;font-weight:800;color:#d97706;text-transform:uppercase;letter-spacing:.6px">Prestados</span>' +
-          chipsHtml(stPR) +
-        '</div>' +
-        buildRows(prestados) +
-      '</div>'
+  var prestadosPresentes = prestados.filter(function(p){ return asistHoyCache[p.codigo] === 'presente'; });
+  var seccionPrestados = '<div style="grid-column:1/-1;margin-top:8px;padding-top:6px;border-top:1.5px dashed var(--border)">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
+      '<span style="font-size:9px;font-weight:800;color:#d97706;text-transform:uppercase;letter-spacing:.6px">Prestados</span>' +
+      '<span class="asist-stat p">' + prestadosPresentes.length + ' presentes</span>' +
+    '</div>' +
+    (prestadosPresentes.length
+      ? buildRows(prestadosPresentes)
+      : '<div style="font-size:10px;color:var(--gray-l);font-style:italic;padding:3px 12px">Ninguno hoy</div>') +
+  '</div>'
     : '';
 
   el.innerHTML =
