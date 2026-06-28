@@ -2486,19 +2486,16 @@ async function renderFaltasChart() {
     var vpr = (presMap[f]||[]).length;
     var va  = (ausMap[f]||[]).length;
     var vpt = (prtMap[f]||[]).length;
-    var sinDatos = !vpr && !va && !vpt;
-    var hpr = vpr ? Math.max(4, Math.round((vpr / maxVal) * CHART_H)) : 0;
-    var ha  = va  ? Math.max(4, Math.round((va  / maxVal) * CHART_H)) : 0;
-    var hpt = vpt ? Math.max(4, Math.round((vpt / maxVal) * CHART_H)) : 0;
+    var hpr = vpr ? Math.max(4, Math.round((vpr / maxVal) * CHART_H)) : 3;
+    var ha  = va  ? Math.max(4, Math.round((va  / maxVal) * CHART_H)) : 3;
+    var hpt = vpt ? Math.max(4, Math.round((vpt / maxVal) * CHART_H)) : 3;
     var esHoy = f === fin;
     var dia = parseInt(f.slice(8));
     return '<div class="faltas-bar-wrap" style="cursor:pointer" onclick="verDetalleAsistencia(\'' + f + '\',event)">' +
       '<div class="faltas-bars-grp">' +
-        (sinDatos
-          ? '<div class="faltas-bar cero" style="height:3px"></div>'
-          : (vpr ? '<div class="faltas-bar presente" style="height:' + hpr + 'px"></div>' : '') +
-            (va  ? '<div class="faltas-bar ausente"  style="height:' + ha  + 'px"></div>' : '') +
-            (vpt ? '<div class="faltas-bar prestado" style="height:' + hpt + 'px"></div>' : '')) +
+        '<div class="faltas-bar presente' + (!vpr?' cero':'') + '" style="height:' + hpr + 'px"></div>' +
+        '<div class="faltas-bar ausente'  + (!va ?' cero':'') + '" style="height:' + ha  + 'px"></div>' +
+        '<div class="faltas-bar prestado' + (!vpt?' cero':'') + '" style="height:' + hpt + 'px"></div>' +
       '</div>' +
       '<div class="faltas-day' + (esHoy?' hoy':'') + '">' + dia + '</div>' +
     '</div>';
