@@ -246,7 +246,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .faltas-bar.presente{background:#16a34a}
 .faltas-bar.ausente{background:#dc2626}
 .faltas-bar.prestado{background:#d97706}
-.faltas-bar.cero{background:var(--bg3);min-height:3px}
+.faltas-bar.cero{opacity:.25}
+.faltas-bar.presente.cero{background:#16a34a}
+.faltas-bar.ausente.cero{background:#dc2626}
+.faltas-bar.prestado.cero{background:#d97706}
 .faltas-day{font-size:8px;color:var(--gray-l);text-align:center;line-height:1;margin-top:3px}
 .faltas-day.hoy{color:var(--serig-m);font-weight:800}
 .faltas-legend{display:flex;gap:12px;padding:6px 14px 10px;border-top:1px solid var(--border);margin-top:4px}
@@ -2486,9 +2489,9 @@ async function renderFaltasChart() {
     var vpr = (presMap[f]||[]).length;
     var va  = (ausMap[f]||[]).length;
     var vpt = (prtMap[f]||[]).length;
-    var hpr = vpr ? Math.max(4, Math.round((vpr / maxVal) * CHART_H)) : 3;
-    var ha  = va  ? Math.max(4, Math.round((va  / maxVal) * CHART_H)) : 3;
-    var hpt = vpt ? Math.max(4, Math.round((vpt / maxVal) * CHART_H)) : 3;
+    var hpr = vpr ? Math.max(4, Math.round((vpr / maxVal) * CHART_H)) : 8;
+    var ha  = va  ? Math.max(4, Math.round((va  / maxVal) * CHART_H)) : 8;
+    var hpt = vpt ? Math.max(4, Math.round((vpt / maxVal) * CHART_H)) : 8;
     var esHoy = f === fin;
     var dia = parseInt(f.slice(8));
     return '<div class="faltas-bar-wrap" style="cursor:pointer" onclick="verDetalleAsistencia(\'' + f + '\',event)">' +
