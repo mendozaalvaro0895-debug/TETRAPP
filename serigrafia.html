@@ -2428,10 +2428,11 @@ var faltasMesCache = null; // { _mes, ausentes:{fecha:n}, prestados:{fecha:n} }
 async function renderFaltasChart() {
   var el = document.getElementById('faltasChart');
   if (!el) return;
-  var hoy    = new Date();
-  var mesStr = hoy.toISOString().slice(0,7);
-  var inicio = ASIST_FECHA_MIN;
-  var fin    = hoy.toISOString().slice(0,10);
+  var hoy       = new Date();
+  var mesStr    = hoy.toISOString().slice(0,7);
+  var inicioDias = mesStr + '-01';   // eje X: todo el mes
+  var inicioData = ASIST_FECHA_MIN;  // datos: solo desde fecha mínima
+  var fin        = hoy.toISOString().slice(0,10);
 
   // Identificar codigos de prestados
   var prestadosCod = (personalData && personalData.serig ? personalData.serig : [])
@@ -2443,7 +2444,7 @@ async function renderFaltasChart() {
       var r = await db.from('asistencia_diaria')
         .select('fecha,operador_codigo,operador_nombre,estado')
         .eq('area','serig').eq('turno','dia')
-        .gte('fecha', inicio).lte('fecha', fin);
+        .gte('fecha', inicioData).lte('fecha', fin);
       var ausMap = {}, presMap = {}, prtMap = {};
       if (r.data && !r.error) {
         r.data.forEach(function(row) {
@@ -2470,7 +2471,7 @@ async function renderFaltasChart() {
   var prtMap  = faltasMesCache.prestados || {};
 
   var dias = [];
-  var d = new Date(inicio + 'T12:00:00');
+  var d = new Date(inicioDias + 'T12:00:00');
   var hoyCopy = new Date(fin + 'T12:00:00');
   while (d <= hoyCopy) { dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
 
