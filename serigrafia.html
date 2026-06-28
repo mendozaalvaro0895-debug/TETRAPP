@@ -2325,38 +2325,51 @@ async function navegarAsistHoy(delta) {
 function renderAsistHoy() {
   var el = document.getElementById('asistHoy');
   if (!el) return;
-  var lista = (personalData && personalData.serig ? personalData.serig : []).filter(function(p){ return p.activo; });
-  if (!lista.length) { el.innerHTML = ''; return; }
-  var presentes = 0, ausentes = 0, tardes = 0;
-  lista.forEach(function(p) {
-    var est = asistHoyCache[p.codigo] || 'presente';
-    if (est === 'presente') presentes++;
-    else if (est === 'ausente') ausentes++;
-    else tardes++;
-  });
+  var todaLista = (personalData && personalData.serig ? personalData.serig : []).filter(function(p){ return p.activo; });
+  if (!todaLista.length) { el.innerHTML = ''; return; }
+  var plazaFija = todaLista.filter(function(p){ return (p.proceso_hab || '') !== 'Prestado'; });
+  var prestados  = todaLista.filter(function(p){ return (p.proceso_hab || '') === 'Prestado'; });
+
+  function contarStats(grupo) {
+    var presentes = 0, ausentes = 0, tardes = 0;
+    grupo.forEach(function(p) {
+      var est = asistHoyCache[p.codigo] || 'presente';
+      if (est === 'presente') presentes++;
+      else if (est === 'ausente') ausentes++;
+      else tardes++;
+    });
+    return { presentes: presentes, ausentes: ausentes, tardes: tardes };
+  }
+
+  function buildRows(grupo) {
+    return grupo.map(function(p) {
+      var est = asistHoyCache[p.codigo] || 'presente';
+      var dot = est === 'ausente' ? '#dc2626' : est === 'tarde' ? '#d97706' : '#16a34a';
+      var tachado = est === 'ausente' ? 'color:var(--gray-l);text-decoration:line-through' : '';
+      var cod = p.codigo.replace(/'/g, "\\'");
+      return '<div class="asist-hoy-row">' +
+        '<div class="asist-hoy-op">' +
+          '<div class="asist-hoy-dot" style="background:' + dot + '"></div>' +
+          '<div style="min-width:0">' +
+            '<div style="font-size:11px;font-weight:600;' + tachado + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(p.nombre || p.codigo) + '</div>' +
+            (function(){ var rol = asistHoyRolCache[p.codigo] || p.proceso_hab || ''; return rol ? '<div style="font-size:9px;font-weight:500;color:var(--gray-l);line-height:1.2">' + escHtml(rol) + '</div>' : ''; })() +
+          '</div>' +
+        '</div>' +
+        '<div class="asist-hoy-btns">' +
+          '<button class="asist-btn ab-p' + (est==='presente'?' active':'') + '" onclick="toggleAsistHoy(\'' + cod + '\',\'presente\')" title="Presente">✓</button>' +
+          '<button class="asist-btn ab-a' + (est==='ausente'?' active':'') + '" onclick="toggleAsistHoy(\'' + cod + '\',\'ausente\')" title="Ausente">✗</button>' +
+          '<button class="asist-btn ab-t' + (est==='tarde'  ?' active':'') + '" onclick="toggleAsistHoy(\'' + cod + '\',\'tarde\')"   title="Tarde">⚠</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  var stPF = contarStats(plazaFija);
+  var stPR = contarStats(prestados);
+
   var hoy = new Date().toISOString().slice(0,10);
   var esHoy = asistHoyFecha === hoy;
   var fechaLbl = new Date(asistHoyFecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long' });
-  var rows = lista.map(function(p) {
-    var est = asistHoyCache[p.codigo] || 'presente';
-    var dot = est === 'ausente' ? '#dc2626' : est === 'tarde' ? '#d97706' : '#16a34a';
-    var tachado = est === 'ausente' ? 'color:var(--gray-l);text-decoration:line-through' : '';
-    var cod = p.codigo.replace(/'/g, "\\'");
-    return '<div class="asist-hoy-row">' +
-      '<div class="asist-hoy-op">' +
-        '<div class="asist-hoy-dot" style="background:' + dot + '"></div>' +
-        '<div style="min-width:0">' +
-          '<div style="font-size:11px;font-weight:600;' + tachado + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(p.nombre || p.codigo) + '</div>' +
-          (function(){ var rol = asistHoyRolCache[p.codigo] || p.proceso_hab || ''; return rol ? '<div style="font-size:9px;font-weight:500;' + (rol==='Prestado' ? 'color:#16a34a' : 'color:var(--gray-l)') + ';line-height:1.2">' + escHtml(rol) + '</div>' : ''; })() +
-        '</div>' +
-      '</div>' +
-      '<div class="asist-hoy-btns">' +
-        '<button class="asist-btn ab-p' + (est==='presente'?' active':'') + '" onclick="toggleAsistHoy(\'' + cod + '\',\'presente\')" title="Presente">✓</button>' +
-        '<button class="asist-btn ab-a' + (est==='ausente'?' active':'') + '" onclick="toggleAsistHoy(\'' + cod + '\',\'ausente\')" title="Ausente">✗</button>' +
-        '<button class="asist-btn ab-t' + (est==='tarde'  ?' active':'') + '" onclick="toggleAsistHoy(\'' + cod + '\',\'tarde\')"   title="Tarde">⚠</button>' +
-      '</div>' +
-    '</div>';
-  }).join('');
   var navFecha =
     '<div class="asist-nav-fecha">' +
       '<button class="asist-nav-arr" onclick="navegarAsistHoy(-1)" title="Día anterior">‹</button>' +
@@ -2365,18 +2378,34 @@ function renderAsistHoy() {
       '</span>' +
       '<button class="asist-nav-arr" onclick="navegarAsistHoy(1)" title="Día siguiente"' + (esHoy ? ' disabled style="opacity:.35;cursor:default"' : '') + '>›</button>' +
     '</div>';
+
+  function chipsHtml(st) {
+    return '<div class="asist-hoy-chips">' +
+      '<span class="asist-stat p">' + st.presentes + ' presentes</span>' +
+      (st.ausentes ? '<span class="asist-stat a">' + st.ausentes + ' ausentes</span>' : '') +
+      (st.tardes   ? '<span class="asist-stat t">' + st.tardes + ' tarde' + (st.tardes > 1 ? 's' : '') + '</span>' : '') +
+    '</div>';
+  }
+
+  var seccionPrestados = prestados.length
+    ? '<div style="margin-top:8px;padding-top:6px;border-top:1.5px dashed var(--border)">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
+          '<span style="font-size:9px;font-weight:800;color:#d97706;text-transform:uppercase;letter-spacing:.6px">Prestados</span>' +
+          chipsHtml(stPR) +
+        '</div>' +
+        buildRows(prestados) +
+      '</div>'
+    : '';
+
   el.innerHTML =
     '<div class="asist-hoy-wrap">' +
       '<div class="asist-hoy-hdr">' +
         '<span class="asist-hoy-title">📋 Asistencia</span>' +
-        '<div class="asist-hoy-chips">' +
-          '<span class="asist-stat p">' + presentes + ' presentes</span>' +
-          (ausentes ? '<span class="asist-stat a">' + ausentes + ' ausentes</span>' : '') +
-          (tardes   ? '<span class="asist-stat t">' + tardes + ' tarde' + (tardes > 1 ? 's' : '') + '</span>' : '') +
-        '</div>' +
+        chipsHtml(stPF) +
       '</div>' +
       '<div class="asist-hoy-nav">' + navFecha + '</div>' +
-      '<div class="asist-hoy-list">' + rows + '</div>' +
+      '<div style="font-size:9px;font-weight:800;color:var(--serig-m);text-transform:uppercase;letter-spacing:.6px;padding:4px 0 2px">Plaza fija</div>' +
+      '<div class="asist-hoy-list">' + buildRows(plazaFija) + seccionPrestados + '</div>' +
     '</div>';
 }
 
