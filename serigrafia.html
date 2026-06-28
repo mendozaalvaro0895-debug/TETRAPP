@@ -2561,20 +2561,22 @@ function verDetalleAsistencia(fecha, evt) {
   document.getElementById('faltas-det-fecha').textContent = fechaLabel;
 
   function grupoHtml(lista, color, titulo) {
-    if (!lista.length) return '';
     var h = '<div style="margin-bottom:8px">' +
       '<div style="font-size:9px;font-weight:800;color:' + color + ';text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">' + titulo + ' (' + lista.length + ')</div>';
-    lista.forEach(function(n) {
-      h += '<div style="font-size:11px;color:var(--ink);padding:2px 0;display:flex;align-items:center;gap:5px">' +
-        '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + color + ';flex-shrink:0"></span>' + escHtml(n) + '</div>';
-    });
+    if (!lista.length) {
+      h += '<div style="font-size:11px;color:var(--gray-l);padding:2px 0;font-style:italic">—</div>';
+    } else {
+      lista.forEach(function(n) {
+        h += '<div style="font-size:11px;color:var(--ink);padding:2px 0;display:flex;align-items:center;gap:5px">' +
+          '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + color + ';flex-shrink:0"></span>' + escHtml(n) + '</div>';
+      });
+    }
     return h + '</div>';
   }
 
   var body = grupoHtml(presentes, '#16a34a', 'Presentes') +
              grupoHtml(ausentes,  '#dc2626', 'Ausentes') +
              grupoHtml(prestados, '#d97706', 'Prestados');
-  if (!body) body = '<div style="font-size:11px;color:var(--gray-l);text-align:center;padding:6px 0">Sin registros</div>';
 
   document.getElementById('faltas-det-body').innerHTML = body;
   popup.style.display = 'block';
