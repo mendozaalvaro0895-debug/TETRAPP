@@ -2304,11 +2304,10 @@ async function cargarAsistHoyFecha(fecha) {
 }
 
 async function guardarRolDiario(codigo, rol) {
-  var hoy = new Date().toISOString().slice(0,10);
   asistHoyRolCache[codigo] = rol;
   try {
     await db.from(ASIST_TABLE).upsert({
-      fecha: hoy,
+      fecha: asistHoyFecha,
       operador_codigo: codigo,
       operador_nombre: getNombreOperario(codigo),
       area: 'serig', turno: 'dia',
