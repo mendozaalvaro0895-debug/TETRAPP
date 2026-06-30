@@ -3022,14 +3022,14 @@ function entregadoSolInput(val, i) {
   eEntregadoSolIds[i] = null;
   var v = val.trim().toLowerCase();
   var candidatos = solicitudes.filter(function(s) {
-    return s.estado === 'proceso' || s.estado === 'programada' || s.estado === 'nueva' || s.estado === 'entregada';
+    return s.estado === 'proceso' || s.estado === 'programada' || s.estado === 'nueva' || s.estado === 'lista' || s.estado === 'entregada';
   });
   var matches = v.length === 0 ? candidatos.slice(0, 12) : candidatos.filter(function(s) {
     return (s.id_display || '').toLowerCase().includes(v) || (s.cliente || '').toLowerCase().includes(v) || (s.desc || '').toLowerCase().includes(v);
   }).slice(0, 12);
   if (!matches.length) { drop.classList.remove('open'); return; }
   drop.innerHTML = matches.map(function(s) {
-    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'programada' ? '🟡' : s.estado === 'nueva' ? '⚪' : '✅';
+    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'programada' ? '🟡' : s.estado === 'nueva' ? '⚪' : s.estado === 'lista' ? '✅' : '📦';
     var lbl = escHtml((s.id_display || '') + ' · ' + (s.cliente || ''));
     var sub = escHtml((s.desc || '').slice(0, 40));
     var sid = s.id.replace(/'/g, "\\'");
