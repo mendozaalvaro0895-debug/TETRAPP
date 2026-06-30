@@ -2532,12 +2532,12 @@ async function renderFaltasChart() {
       '<div class="faltas-chart">' + barras + '</div>' +
       '<div class="faltas-legend">' + leyenda + '</div>' +
     '</div>' +
-    '<div id="faltas-detalle" style="display:none;position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;min-width:190px;max-width:250px;box-shadow:0 8px 28px rgba(0,0,0,.18)">' +
+    '<div id="faltas-detalle" style="display:none;position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;min-width:420px;max-width:560px;box-shadow:0 8px 28px rgba(0,0,0,.18)">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
         '<span id="faltas-det-fecha" style="font-size:11px;font-weight:800;color:var(--ink)"></span>' +
         '<button onclick="document.getElementById(\'faltas-detalle\').style.display=\'none\'" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0;margin-left:10px">✕</button>' +
       '</div>' +
-      '<div id="faltas-det-body"></div>' +
+      '<div id="faltas-det-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px"></div>' +
     '</div>';
 }
 
@@ -2583,7 +2583,7 @@ function verDetalleAsistencia(fecha, evt) {
 
   if (evt) {
     var r = evt.currentTarget.getBoundingClientRect();
-    var left = Math.max(8, Math.min(r.left + window.scrollX - 50, window.innerWidth - 270));
+    var left = Math.max(8, Math.min(r.left + window.scrollX - 150, window.innerWidth - 440));
     popup.style.top  = (r.bottom + window.scrollY + 6) + 'px';
     popup.style.left = left + 'px';
   }
