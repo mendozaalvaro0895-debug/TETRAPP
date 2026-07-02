@@ -2190,7 +2190,8 @@ function renderProdMensual() {
     var bStyle = esFuturo ? ';opacity:.25' : '';
     var tip    = !esFuturo && val ? ' title="' + f + ': ' + val.toLocaleString() + ' und"' : '';
     var lbl    = (numDia % 5 === 0 || numDia === 1 || esHoy) ? numDia : '';
-    cols += '<div' + (esHoy ? ' id="prodTodayBar"' : '') + ' style="flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end"' + tip + '>' +
+    var clickProd = (!esFuturo && val) ? ' onclick="verDetalleProdDia(\'' + f + '\',event)"' : '';
+    cols += '<div' + (esHoy ? ' id="prodTodayBar"' : '') + clickProd + ' style="flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end' + (!esFuturo && val ? ';cursor:pointer' : '') + '"' + tip + '>' +
       '<div class="prod-bar" style="width:100%;height:' + px + 'px;background:' + barColor + bStyle + '"></div>' +
       '<div style="font-size:8px;color:var(--gray-l);line-height:1;margin-top:3px;text-align:center;height:8px;flex-shrink:0;' + (esFuturo?'opacity:.3':'') + '">' + lbl + '</div>' +
     '</div>';
@@ -2221,6 +2222,83 @@ function renderProdMensual() {
       sc.scrollLeft = sc.scrollWidth;
     }
   }, 50);
+
+  // Popup de detalle por día (se crea una sola vez en body)
+  if (!document.getElementById('prod-dia-popup')) {
+    document.body.insertAdjacentHTML('beforeend',
+      '<div id="prod-dia-popup" style="display:none;position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;min-width:300px;max-width:460px;box-shadow:0 8px 28px rgba(0,0,0,.2)">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+          '<span id="prod-dia-fecha" style="font-size:12px;font-weight:800;color:var(--ink)"></span>' +
+          '<div style="display:flex;align-items:center;gap:10px">' +
+            '<span id="prod-dia-total" style="font-size:11px;font-weight:700;color:var(--serig-m)"></span>' +
+            '<button onclick="document.getElementById(\'prod-dia-popup\').style.display=\'none\'" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0">✕</button>' +
+          '</div>' +
+        '</div>' +
+        '<div id="prod-dia-body" style="max-height:340px;overflow-y:auto"></div>' +
+      '</div>');
+  }
+}
+
+function verDetalleProdDia(fecha, event) {
+  if (event) event.stopPropagation();
+  var manuales = (getEntregasManuales() || []).filter(function(m) { return m.fecha === fecha; });
+  var fechaLabel = new Date(fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long' });
+  fechaLabel = fechaLabel.charAt(0).toUpperCase() + fechaLabel.slice(1);
+  var total = manuales.reduce(function(s, m) { return s + (m.cant || 0); }, 0);
+
+  var html = '';
+  if (!manuales.length) {
+    html = '<div style="font-size:12px;color:var(--gray-l);font-style:italic;padding:6px 0">Sin entregas registradas</div>';
+  } else {
+    manuales.forEach(function(m) {
+      var lineasHtml = '';
+      if (m.lineas && m.lineas.length) {
+        m.lineas.forEach(function(l) {
+          lineasHtml +=
+            '<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)">' +
+              '<span style="font-family:monospace;font-size:9px;color:var(--serig-m);flex-shrink:0;padding-top:2px">' + escHtml(l.sku || '—') + '</span>' +
+              '<span style="font-size:11px;color:var(--ink);flex:1;line-height:1.3">' + escHtml(l.desc || l.sku || '—') + '</span>' +
+              '<span style="font-size:11px;font-weight:700;color:var(--ink);flex-shrink:0;white-space:nowrap">' + (l.cant || 0).toLocaleString() + ' und</span>' +
+            '</div>';
+        });
+      } else {
+        lineasHtml = '<div style="font-size:10px;color:var(--gray-l);font-style:italic;padding:3px 0">Sin detalle de SKUs</div>';
+      }
+      html +=
+        '<div style="margin-bottom:10px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:5px;margin-bottom:5px;border-bottom:2px solid var(--serig-l)">' +
+            '<span style="font-size:10px;font-weight:800;color:var(--serig-m)">Requi ' + escHtml(m.requi || '—') + '</span>' +
+            (m.cliente ? '<span style="font-size:10px;color:var(--gray-l)">' + escHtml(m.cliente) + '</span>' : '') +
+            '<span style="font-size:11px;font-weight:700;color:var(--ink)">' + (m.cant || 0).toLocaleString() + ' und</span>' +
+          '</div>' +
+          lineasHtml +
+        '</div>';
+    });
+  }
+
+  var popup = document.getElementById('prod-dia-popup');
+  if (!popup) return;
+  document.getElementById('prod-dia-fecha').textContent = fechaLabel;
+  document.getElementById('prod-dia-total').textContent = total.toLocaleString() + ' und totales';
+  document.getElementById('prod-dia-body').innerHTML = html;
+
+  // Posicionar cerca del clic
+  popup.style.display = 'block';
+  if (event) {
+    var pw = 460, ph = 400;
+    var x = Math.min(event.clientX, window.innerWidth - pw - 16);
+    var y = event.clientY + 12;
+    if (y + ph > window.innerHeight) y = event.clientY - ph - 8;
+    popup.style.left = Math.max(8, x) + 'px';
+    popup.style.top  = Math.max(8, y) + 'px';
+  }
+
+  // Cerrar al hacer clic fuera
+  setTimeout(function() {
+    document.addEventListener('click', function _ph(e) {
+      if (!popup.contains(e.target)) { popup.style.display = 'none'; document.removeEventListener('click', _ph); }
+    });
+  }, 0);
 }
 
 // ── Asistencia del día + gráfico de faltas ───────────────────
