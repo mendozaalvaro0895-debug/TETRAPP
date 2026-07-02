@@ -2124,66 +2124,85 @@ function renderProdMensual() {
   var cont = document.getElementById('prodMensual');
   if (!cont) return;
 
-  var hoy   = new Date();
-  var anio  = hoy.getFullYear();
-  var mes   = hoy.getMonth();       // 0-based
-  var diaHoy = hoy.getDate();
-  var diasMes = new Date(anio, mes + 1, 0).getDate();
-  var mesStr  = hoy.toLocaleString('es-GT', { month: 'long', year: 'numeric' });
+  var hoy      = new Date();
+  var anio     = hoy.getFullYear();
+  var mes      = hoy.getMonth();
+  var diasMes  = new Date(anio, mes + 1, 0).getDate();
+  var mesStr   = hoy.toLocaleString('es-GT', { month: 'long', year: 'numeric' });
+  var todayStr = hoy.toISOString().slice(0,10);
+  var finStr   = new Date(anio, mes, diasMes).toISOString().slice(0,10);
 
-  // Acumular unidades por día (1-indexed)
-  var porDia = {};
+  // Rango: desde inicio del mes anterior
+  var startD   = new Date(anio, mes - 1, 1);
+  var startStr = startD.toISOString().slice(0,10);
 
-  // Fuente 1: solicitudes entregadas en Supabase
+  // Acumular por fecha YYYY-MM-DD
+  var porFecha = {};
   solicitudes.forEach(function(s) {
     if (s.estado !== 'entregada') return;
     var f = new Date(s.created_at || s.fecha_lim || '');
-    if (isNaN(f) || f.getFullYear() !== anio || f.getMonth() !== mes) return;
-    var d = f.getDate();
-    porDia[d] = (porDia[d] || 0) + (s.cant || 0);
+    if (isNaN(f) || f < startD) return;
+    var fStr = f.toISOString().slice(0,10);
+    porFecha[fStr] = (porFecha[fStr] || 0) + (s.cant || 0);
   });
-
-  // Fuente 2: entregados manuales (localStorage)
   (getEntregasManuales() || []).forEach(function(m) {
     if (!m.fecha) return;
     var f = new Date(m.fecha + 'T12:00:00');
-    if (isNaN(f) || f.getFullYear() !== anio || f.getMonth() !== mes) return;
-    var d = f.getDate();
-    porDia[d] = (porDia[d] || 0) + (m.cant || 0);
+    if (isNaN(f) || f < startD) return;
+    porFecha[m.fecha] = (porFecha[m.fecha] || 0) + (m.cant || 0);
   });
 
-  // KPIs
-  var totalMes  = Object.values(porDia).reduce(function(s, v) { return s + v; }, 0);
-  var diasConProd = Object.keys(porDia).length;
-  var promDia   = diasConProd ? Math.round(totalMes / diasConProd) : 0;
-  var maxVal    = Math.max.apply(null, Object.values(porDia).concat([1]));
+  // Array de días
+  var dias = [];
+  var dIt = new Date(startStr + 'T12:00:00');
+  var finD = new Date(finStr + 'T12:00:00');
+  while (dIt <= finD) { dias.push(dIt.toISOString().slice(0,10)); dIt.setDate(dIt.getDate()+1); }
 
-  // Barras — todos los días del mes (futuros como placeholder)
-  var barras = '';
-  var labels = '';
-  for (var d = 1; d <= diasMes; d++) {
-    var esFuturo = d > diaHoy;
-    var val  = esFuturo ? 0 : (porDia[d] || 0);
-    var px   = esFuturo ? 2 : (val ? Math.max(Math.round((val / maxVal) * 72), 5) : 2);
-    var esHoy = d === diaHoy;
-    var barColor = esFuturo ? 'var(--border)' : (esHoy ? 'var(--serig-m)' : (val > promDia ? '#16a34a' : val > 0 ? '#a78bfa' : 'var(--border)'));
-    var extraStyle = esFuturo ? ';opacity:.25' : '';
-    var tooltip  = esFuturo ? '' : (val ? val.toLocaleString() + ' und' : 'Sin entregas');
-    var lbl = (d % 5 === 0 || d === 1 || esHoy || d === diasMes) ? d : '';
-    barras += '<div class="prod-bar-col"' + (tooltip ? ' title="Día ' + d + ': ' + tooltip + '"' : '') + '>' +
-      '<div class="prod-bar" style="height:' + px + 'px;background:' + barColor + extraStyle + '"></div>' +
+  // KPIs solo mes actual
+  var mesActStr = anio + '-' + String(mes+1).padStart(2,'0');
+  var totalMes = 0, diasConProd = 0;
+  dias.forEach(function(f) {
+    if (f.slice(0,7) === mesActStr && porFecha[f]) { totalMes += porFecha[f]; diasConProd++; }
+  });
+  var promDia = diasConProd ? Math.round(totalMes / diasConProd) : 0;
+  var maxVal  = Math.max.apply(null, dias.map(function(f){ return porFecha[f]||0; }).concat([1]));
+
+  // Columnas con separadores de mes (bar + label en un solo div)
+  var cols = '';
+  var prevM = null;
+  dias.forEach(function(f) {
+    var curM = f.slice(0,7);
+    if (prevM !== null && curM !== prevM) {
+      var mNm = new Date(f + 'T12:00:00').toLocaleString('es-GT', {month:'short'}).replace('.','').toUpperCase();
+      cols += '<div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:16px;padding:0 2px">' +
+        '<div style="flex:1;width:1.5px;background:var(--serig-m);opacity:.5;border-radius:1px;max-height:50px"></div>' +
+        '<div style="font-size:7px;font-weight:800;color:var(--serig-m);letter-spacing:.4px;white-space:nowrap;margin-top:2px;line-height:1.2">' + mNm + '</div>' +
+      '</div>';
+    }
+    prevM = curM;
+    var esFuturo = f > todayStr;
+    var val = esFuturo ? 0 : (porFecha[f] || 0);
+    var px  = esFuturo ? 2 : (val ? Math.max(Math.round((val / maxVal) * 60), 5) : 2);
+    var numDia = parseInt(f.slice(8));
+    var esHoy  = f === todayStr;
+    var barColor = esFuturo ? 'var(--border)' :
+      (esHoy ? 'var(--serig-m)' : (val > promDia ? '#16a34a' : val > 0 ? '#a78bfa' : 'var(--border)'));
+    var bStyle = esFuturo ? ';opacity:.25' : '';
+    var tip    = !esFuturo && val ? ' title="' + f + ': ' + val.toLocaleString() + ' und"' : '';
+    var lbl    = (numDia % 5 === 0 || numDia === 1 || esHoy) ? numDia : '';
+    cols += '<div style="flex:0 0 auto;min-width:10px;max-width:14px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end"' + tip + '>' +
+      '<div class="prod-bar" style="width:100%;height:' + px + 'px;background:' + barColor + bStyle + '"></div>' +
+      '<div style="font-size:8px;color:var(--gray-l);line-height:1;margin-top:3px;text-align:center;' + (esFuturo?'opacity:.3':'') + '">' + lbl + '</div>' +
     '</div>';
-    labels += '<div style="flex:1;min-width:0;text-align:center;font-size:8px;color:var(--gray-l);line-height:1;' + (esFuturo ? 'opacity:.3' : '') + '">' + lbl + '</div>';
-  }
+  });
 
   cont.innerHTML = '<div class="prod-mens-wrap">' +
     '<div class="prod-mens-hdr">' +
       '<span style="font-size:12px;font-weight:800">📦 Producción mensual</span>' +
       '<span style="font-size:11px;color:var(--gray-l);text-transform:capitalize">' + mesStr + '</span>' +
     '</div>' +
-    '<div class="prod-mens-chart">' +
-      '<div class="prod-mens-bars">' + barras + '</div>' +
-      '<div style="display:flex;gap:3px;padding:0 0 2px">' + labels + '</div>' +
+    '<div class="prod-mens-chart" id="prodChartScroll" style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px">' +
+      '<div style="display:flex;align-items:flex-end;gap:3px;min-height:88px;width:max-content;min-width:100%">' + cols + '</div>' +
     '</div>' +
     '<div class="prod-mens-total">' +
       '<div class="prod-stat"><span class="prod-stat-val">' + totalMes.toLocaleString() + '</span><span class="prod-stat-lbl">und totales</span></div>' +
@@ -2191,6 +2210,11 @@ function renderProdMensual() {
       '<div class="prod-stat"><span class="prod-stat-val">' + diasConProd + '</span><span class="prod-stat-lbl">días con entrega</span></div>' +
     '</div>' +
     '</div>';
+
+  setTimeout(function() {
+    var sc = document.getElementById('prodChartScroll');
+    if (sc) sc.scrollLeft = sc.scrollWidth;
+  }, 0);
 }
 
 // ── Asistencia del día + gráfico de faltas ───────────────────
@@ -2349,8 +2373,8 @@ async function renderFaltasChart() {
   if (!el) return;
   var hoy       = new Date();
   var mesStr    = hoy.toISOString().slice(0,7);
-  var inicioDias = mesStr + '-01';   // eje X: todo el mes
-  var inicioData = ASIST_FECHA_MIN;  // datos: solo desde fecha mínima
+  var inicioData  = ASIST_FECHA_MIN;
+  var inicioDias  = inicioData;      // eje X: desde fecha mínima
   var fin        = hoy.toISOString().slice(0,10);
 
   // Identificar codigos de prestados
@@ -2402,33 +2426,45 @@ async function renderFaltasChart() {
   });
 
   var CHART_H = 48;
-  var barras = dias.map(function(f) {
+  var barras = '';
+  var prevMesChart = null;
+  dias.forEach(function(f) {
+    var curMes = f.slice(0,7);
+    if (prevMesChart !== null && curMes !== prevMesChart) {
+      var mNm = new Date(f + 'T12:00:00').toLocaleString('es-GT', {month:'short'}).replace('.','').toUpperCase();
+      barras += '<div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:16px;padding:0 2px">' +
+        '<div style="flex:1;width:1.5px;background:var(--serig-m);opacity:.5;border-radius:1px;max-height:38px"></div>' +
+        '<div style="font-size:7px;font-weight:800;color:var(--serig-m);letter-spacing:.4px;white-space:nowrap;margin-top:2px;line-height:1.2">' + mNm + '</div>' +
+      '</div>';
+    }
+    prevMesChart = curMes;
     var esFuturo = f > fin;
     var dia = parseInt(f.slice(8));
     if (esFuturo) {
-      return '<div class="faltas-bar-wrap" style="opacity:.15;pointer-events:none">' +
+      barras += '<div class="faltas-bar-wrap" style="flex:0 0 auto;min-width:15px;opacity:.15;pointer-events:none">' +
         '<div class="faltas-bars-grp">' +
           '<div class="faltas-bar" style="height:4px;background:var(--border)"></div>' +
         '</div>' +
         '<div class="faltas-day">' + dia + '</div>' +
       '</div>';
+    } else {
+      var vpr = (presMap[f]||[]).length;
+      var va  = (ausMap[f]||[]).length;
+      var vpt = (prtMap[f]||[]).length;
+      var hpr = vpr ? Math.max(4, Math.round((vpr / maxVal) * CHART_H)) : 8;
+      var ha  = va  ? Math.max(4, Math.round((va  / maxVal) * CHART_H)) : 8;
+      var hpt = vpt ? Math.max(4, Math.round((vpt / maxVal) * CHART_H)) : 8;
+      var esHoy = f === fin;
+      barras += '<div class="faltas-bar-wrap" style="flex:0 0 auto;min-width:15px;cursor:pointer" onclick="verDetalleAsistencia(\'' + f + '\',event)">' +
+        '<div class="faltas-bars-grp">' +
+          '<div class="faltas-bar presente' + (!vpr?' cero':'') + '" style="height:' + hpr + 'px"></div>' +
+          '<div class="faltas-bar ausente'  + (!va ?' cero':'') + '" style="height:' + ha  + 'px"></div>' +
+          '<div class="faltas-bar prestado' + (!vpt?' cero':'') + '" style="height:' + hpt + 'px"></div>' +
+        '</div>' +
+        '<div class="faltas-day' + (esHoy?' hoy':'') + '">' + dia + '</div>' +
+      '</div>';
     }
-    var vpr = (presMap[f]||[]).length;
-    var va  = (ausMap[f]||[]).length;
-    var vpt = (prtMap[f]||[]).length;
-    var hpr = vpr ? Math.max(4, Math.round((vpr / maxVal) * CHART_H)) : 8;
-    var ha  = va  ? Math.max(4, Math.round((va  / maxVal) * CHART_H)) : 8;
-    var hpt = vpt ? Math.max(4, Math.round((vpt / maxVal) * CHART_H)) : 8;
-    var esHoy = f === fin;
-    return '<div class="faltas-bar-wrap" style="cursor:pointer" onclick="verDetalleAsistencia(\'' + f + '\',event)">' +
-      '<div class="faltas-bars-grp">' +
-        '<div class="faltas-bar presente' + (!vpr?' cero':'') + '" style="height:' + hpr + 'px"></div>' +
-        '<div class="faltas-bar ausente'  + (!va ?' cero':'') + '" style="height:' + ha  + 'px"></div>' +
-        '<div class="faltas-bar prestado' + (!vpt?' cero':'') + '" style="height:' + hpt + 'px"></div>' +
-      '</div>' +
-      '<div class="faltas-day' + (esHoy?' hoy':'') + '">' + dia + '</div>' +
-    '</div>';
-  }).join('');
+  });
 
   var mesNombre = hoy.toLocaleDateString('es-GT', { month:'long', year:'numeric' });
   var totalPres = dias.reduce(function(s,f){ return s+(presMap[f]||[]).length; }, 0);
@@ -2455,7 +2491,7 @@ async function renderFaltasChart() {
           '<button class="btn btn-g btn-xs" onclick="exportarAsistenciaMes()" title="Exportar reporte PDF">⬇ Exportar</button>' +
         '</div>' +
       '</div>' +
-      '<div class="faltas-chart">' + barras + '</div>' +
+      '<div class="faltas-chart" id="faltasChartScroll">' + barras + '</div>' +
       '<div class="faltas-legend">' + leyenda + '</div>' +
     '</div>' +
     '<div id="faltas-detalle" style="display:none;position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;min-width:420px;max-width:560px;box-shadow:0 8px 28px rgba(0,0,0,.18)">' +
@@ -2465,6 +2501,10 @@ async function renderFaltasChart() {
       '</div>' +
       '<div id="faltas-det-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px"></div>' +
     '</div>';
+  setTimeout(function() {
+    var sc = document.getElementById('faltasChartScroll');
+    if (sc) sc.scrollLeft = sc.scrollWidth;
+  }, 0);
 }
 
 var _faltasPopupListener = null;
