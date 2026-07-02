@@ -2120,6 +2120,26 @@ function renderInicio() {
   renderFaltasChart();
 }
 
+var PROD_META_DIA = 30000; // meta diaria de producción (unidades)
+
+function _prodColor(val) {
+  // Rojo(0) → Ámbar(meta/2) → Verde(meta)
+  var ratio = Math.min(1, Math.max(0, val / PROD_META_DIA));
+  var r, g, b;
+  if (ratio < 0.5) {
+    var t = ratio * 2;                          // 0→1 dentro del tramo rojo-ámbar
+    r = Math.round(220 + (217 - 220) * t);     // 220→217
+    g = Math.round(38  + (119 - 38)  * t);     // 38→119
+    b = Math.round(38  + (6   - 38)  * t);     // 38→6
+  } else {
+    var t = (ratio - 0.5) * 2;                  // 0→1 dentro del tramo ámbar-verde
+    r = Math.round(217 + (22  - 217) * t);     // 217→22
+    g = Math.round(119 + (163 - 119) * t);     // 119→163
+    b = Math.round(6   + (74  - 6)   * t);     // 6→74
+  }
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
 function renderProdMensual() {
   var cont = document.getElementById('prodMensual');
   if (!cont) return;
@@ -2185,9 +2205,8 @@ function renderProdMensual() {
     var px  = esFuturo ? 2 : (val ? Math.max(Math.round((val / maxVal) * 60), 5) : 2);
     var numDia = parseInt(f.slice(8));
     var esHoy  = f === todayStr;
-    var barColor = esFuturo ? 'var(--border)' :
-      (esHoy ? 'var(--serig-m)' : (val > promDia ? '#16a34a' : val > 0 ? '#a78bfa' : 'var(--border)'));
-    var bStyle = esFuturo ? ';opacity:.25' : '';
+    var barColor = esFuturo ? 'var(--border)' : (val > 0 ? _prodColor(val) : 'var(--border)');
+    var bStyle   = esFuturo ? ';opacity:.25' : (esHoy ? ';outline:2px solid var(--serig-m);outline-offset:1px;border-radius:3px 3px 0 0' : '');
     var tip    = !esFuturo && val ? ' title="' + f + ': ' + val.toLocaleString() + ' und"' : '';
     var lbl    = (numDia % 5 === 0 || numDia === 1 || esHoy) ? numDia : '';
     var clickProd = (!esFuturo && val) ? ' onclick="verDetalleProdDia(\'' + f + '\',event)"' : '';
