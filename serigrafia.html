@@ -2190,7 +2190,7 @@ function renderProdMensual() {
     var bStyle = esFuturo ? ';opacity:.25' : '';
     var tip    = !esFuturo && val ? ' title="' + f + ': ' + val.toLocaleString() + ' und"' : '';
     var lbl    = (numDia % 5 === 0 || numDia === 1 || esHoy) ? numDia : '';
-    cols += '<div style="flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end"' + tip + '>' +
+    cols += '<div' + (esHoy ? ' id="prodTodayBar"' : '') + ' style="flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end"' + tip + '>' +
       '<div class="prod-bar" style="width:100%;height:' + px + 'px;background:' + barColor + bStyle + '"></div>' +
       '<div style="font-size:8px;color:var(--gray-l);line-height:1;margin-top:3px;text-align:center;' + (esFuturo?'opacity:.3':'') + '">' + lbl + '</div>' +
     '</div>';
@@ -2213,8 +2213,14 @@ function renderProdMensual() {
 
   setTimeout(function() {
     var sc = document.getElementById('prodChartScroll');
-    if (sc) sc.scrollLeft = sc.scrollWidth;
-  }, 0);
+    if (!sc) return;
+    var hoyEl = document.getElementById('prodTodayBar');
+    if (hoyEl) {
+      sc.scrollLeft = Math.max(0, hoyEl.offsetLeft - sc.clientWidth + hoyEl.offsetWidth + 24);
+    } else {
+      sc.scrollLeft = sc.scrollWidth;
+    }
+  }, 50);
 }
 
 // ── Asistencia del día + gráfico de faltas ───────────────────
@@ -2503,8 +2509,15 @@ async function renderFaltasChart() {
     '</div>';
   setTimeout(function() {
     var sc = document.getElementById('faltasChartScroll');
-    if (sc) sc.scrollLeft = sc.scrollWidth;
-  }, 0);
+    if (!sc) return;
+    var hoyEl = sc.querySelector('.faltas-day.hoy');
+    if (hoyEl) {
+      var wrap = hoyEl.parentElement;
+      sc.scrollLeft = Math.max(0, wrap.offsetLeft - sc.clientWidth + wrap.offsetWidth + 24);
+    } else {
+      sc.scrollLeft = sc.scrollWidth;
+    }
+  }, 50);
 }
 
 var _faltasPopupListener = null;
