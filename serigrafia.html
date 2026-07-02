@@ -388,30 +388,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .lab.lab-inactiva{opacity:.45;cursor:not-allowed}
 .lab.lab-inactiva:hover{border-color:var(--border);background:transparent}
 
-/* ── PIPELINE SERIG (view-serig) ──────────────────────────── */
-.pipeline-serig{flex-shrink:0;background:var(--card);border-bottom:1px solid var(--border);padding:10px 16px}
-.pipeline-serig-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.pipeline-serig-title{font-family:var(--display);font-size:13px;font-weight:700}
-.pipeline-serig-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.psc{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:9px 11px;cursor:pointer;transition:all .15s}
-.psc:hover{border-color:var(--serig-m);background:var(--serig-l)}
-.psc.psc-sel{border-color:var(--serig-m);background:var(--serig-l)}
-.psc-inactiva{opacity:.5;cursor:default}
-.psc-inactiva:hover{border-color:var(--border);background:var(--bg)}
-.psc-hdr{display:flex;align-items:center;gap:6px;margin-bottom:5px}
-.psc-nombre{font-weight:700;font-size:12px}
-.psc-sol{font-size:10px;font-weight:600;color:var(--serig-m);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.psc-empty-lbl{font-size:10px;color:var(--gray-l);margin-bottom:4px}
-.psc-meta-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px}
-.psc-stat{font-size:9px;color:var(--gray);background:var(--card);padding:2px 7px;border-radius:20px;border:1px solid var(--border);white-space:nowrap}
-.psc-stat strong{color:var(--ink)}
-.psc-pipeline{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
-.psc-proc{font-size:9px;font-weight:600;padding:3px 7px;border-radius:20px}
-.psc-pending{background:var(--bg2);color:var(--gray-l)}
-.psc-active{background:var(--serig-m);color:#fff;box-shadow:0 1px 6px rgba(90,45,158,.3)}
-.psc-done{background:#DCFCE7;color:#166534}
-.psc-arr{font-size:9px;color:var(--gray-l);margin:0 1px}
-
 /* ── MENÚ CONTEXTUAL FICHA OPERARIO ──────────────────────── */
 .op-card{position:relative}
 .op-menu-btn{position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;font-size:16px;font-weight:700;color:var(--gray-l);padding:1px 7px;border-radius:6px;line-height:1;letter-spacing:1px;transition:all .12s}
@@ -424,9 +400,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .op-menu-danger:hover{background:var(--red-l)}
 
 /* ── RESPONSIVE ───────────────────────────────────────────── */
-@media(max-width:1200px){.pipeline-serig-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:1100px){.hub-grid{grid-template-columns:repeat(2,1fr)}.lineas-grid{grid-template-columns:1fr}.board-lines-row{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:768px){.tabs{gap:0;padding:0 8px}.tab{font-size:12px;padding:10px 7px}.hub-grid{grid-template-columns:1fr 1fr}.lineas-grid{grid-template-columns:1fr}.board-lines-row{grid-template-columns:repeat(2,1fr)}.proceso-pipeline{gap:3px}.proc-node{font-size:10px;padding:4px 7px}.pipeline-serig-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.tabs{gap:0;padding:0 8px}.tab{font-size:12px;padding:10px 7px}.hub-grid{grid-template-columns:1fr 1fr}.lineas-grid{grid-template-columns:1fr}.board-lines-row{grid-template-columns:repeat(2,1fr)}.proceso-pipeline{gap:3px}.proc-node{font-size:10px;padding:4px 7px}}
 </style>
 </head>
 <body>
@@ -466,11 +441,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   <!-- TABS (navegación — oculta en Inicio, visible en otras vistas) -->
   <div class="tabs" id="mainTabs" style="display:none">
     <div class="tab active" id="tab-inicio" onclick="switchTab('inicio')">🏠 Inicio</div>
-    <div class="tab" id="tab-serig" onclick="switchTab('serig')">
-      <div class="tdot" style="background:var(--serig-m)"></div>
-      Programación
-      <span class="tbadge tb-serig" id="cnt-serig">0</span>
-    </div>
     <div class="tab" id="tab-movimientos" onclick="switchTab('movimientos')">⬇⬆ Movimientos</div>
     <div class="tab" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
     <div class="tab" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
@@ -513,11 +483,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
         <!-- Nav cards -->
         <div class="hub-grid">
-          <div class="hub-card" onclick="switchTab('serig')">
-            <div class="hub-card-ico">🎨</div>
-            <div><div class="hub-card-title">Programación</div>
-            <div class="hub-card-sub" id="hc-prog-sub">Cargando solicitudes…</div></div>
-          </div>
           <div class="hub-card" onclick="switchTab('movimientos')">
             <div class="hub-card-ico">⬇⬆</div>
             <div><div class="hub-card-title">Movimientos</div>
@@ -578,51 +543,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
       </div>
     </div><!-- /view-inicio -->
-
-    <!-- ══ PROGRAMACIÓN / SERIGRAFÍA (DESBLOQUEADO) ══════════ -->
-    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-serig">
-
-      <!-- Pipeline por línea -->
-      <div class="pipeline-serig">
-        <div class="pipeline-serig-hdr">
-          <div class="pipeline-serig-title">Pipeline de Líneas</div>
-          <div style="font-size:11px;color:var(--gray-l)">Flameado · Impresión · Secado · Empaque</div>
-        </div>
-        <div class="pipeline-serig-grid" id="pipelineSerigGrid"></div>
-      </div>
-
-      <div class="kpi-strip">
-        <div class="kpi"><div class="kpi-l">En proceso</div><div class="kpi-v" style="color:var(--serig-m)" id="ks-proc">0</div><div class="kpi-s">solicitudes activas</div></div>
-        <div class="kpi"><div class="kpi-l">Pendientes</div><div class="kpi-v" style="color:var(--amber)" id="ks-pend">0</div><div class="kpi-s">sin iniciar</div></div>
-        <div class="kpi"><div class="kpi-l">Cap. disponible</div><div class="kpi-v" style="color:var(--green)" id="ks-cap">—</div><div class="kpi-s">und/hora hoy</div></div>
-        <div class="kpi"><div class="kpi-l">Operadores</div><div class="kpi-v" id="ks-ops">—</div><div class="kpi-s">activos</div></div>
-        <div class="kpi"><div class="kpi-l">Fugas hoy</div><div class="kpi-v" id="ks-fugas">0</div><div class="kpi-s">unidades perdidas</div></div>
-      </div>
-      <div class="split">
-        <div class="pane-l">
-          <div class="ph">
-            <div><div class="ph-title">Solicitudes · Serigrafía</div><div class="ph-sub">Haz clic para ver detalle completo</div></div>
-            <div class="ph-r">
-              <select class="fi" style="font-size:11px;padding:4px 7px;height:26px" id="filtroSerig" onchange="renderListas()">
-                <option value="">Todas</option>
-                <option value="nueva">Nuevas</option>
-                <option value="proceso">En proceso</option>
-                <option value="lista">Listas</option>
-              </select>
-            </div>
-          </div>
-          <div class="sol-list" id="listSerig"></div>
-        </div>
-        <div class="pane-r">
-          <div id="detSerig" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-            <div class="det-empty">
-              <div class="det-empty-ico">🎨</div>
-              <div class="det-empty-txt">Selecciona una solicitud</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div><!-- /view-serig -->
 
     <!-- ══ PERSONAL ══════════════════════════════════════════ -->
     <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
@@ -739,6 +659,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <button class="btn btn-s" id="btnSave" onclick="guardar()">Guardar</button>
     </div>
   </div>
+</div>
+
+<!-- ══════════════════ MODAL DETALLE SOLICITUD ═══════════════ -->
+<div class="overlay" id="overlayDetalle" onclick="cerrarSiOverlayDetalle(event)">
+  <div class="modal" id="modalDetalleBody" style="max-width:900px"></div>
 </div>
 
 <!-- ══════════════════ MODAL OPERARIO ═════════════════════ -->
@@ -1059,10 +984,8 @@ async function cargarSolicitudes() {
       };
     });
 
-    renderListas();
     refreshKPIs();
     renderInicio();
-    renderPipelineSerig();
   } catch(e) {
     console.error('Error solicitudes:', e);
     showToast('Error al cargar solicitudes', '#B83232');
@@ -1437,7 +1360,7 @@ function boardBuildCard(item) {
   return '<div class="board-card" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
-    ' onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + item.solId + '\')},100)">' +
+    ' onclick="mostrarDetalle(\'' + item.solId + '\')">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;margin-bottom:3px">' +
       '<span style="font-size:10px;font-weight:700;color:var(--serig-m);font-family:var(--mono)">' + item.solCodigo + '</span>' +
       badge +
@@ -1461,7 +1384,7 @@ function boardBuildCardCompact(item) {
   return '<div class="board-card" style="padding:6px 8px" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
-    ' onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + item.solId + '\')},100)">' +
+    ' onclick="mostrarDetalle(\'' + item.solId + '\')">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;margin-bottom:2px">' +
       '<span style="font-size:10px;font-weight:700;color:var(--serig-m);font-family:var(--mono)">' + item.solCodigo + '</span>' +
       badge +
@@ -1491,9 +1414,9 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
       requis.push({ cant: m.cant, fecha: m.fecha, requi: m.requi });
     }
   });
-  var badgeBg  = item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
-  var badgeClr = item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'programada' ? '#92400e' : '#64748b';
-  var badgeTxt = item.estado === 'proceso' ? 'PROC' : item.estado === 'programada' ? 'PROG' : 'NEW';
+  var badgeBg  = item.estado === 'lista' ? '#dcfce7' : item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
+  var badgeClr = item.estado === 'lista' ? '#15803d' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'programada' ? '#92400e' : '#64748b';
+  var badgeTxt = item.estado === 'lista' ? 'LISTA' : item.estado === 'proceso' ? 'PROC' : item.estado === 'programada' ? 'PROG' : 'NEW';
   var dragArg    = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var total      = item.cant || 0;
   var isComplete = entregado > 0 && entregado >= total;
@@ -1534,7 +1457,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
   return '<div class="board-card" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
-    ' onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + item.solId + '\')},100)"' +
+    ' onclick="mostrarDetalle(\'' + item.solId + '\')"' +
     ' style="padding:7px 9px;background:' + cardBg + ';border-color:' + cardBdr + '">' +
     '<div style="display:flex;align-items:center;gap:6px">' +
       grip +
@@ -1782,8 +1705,6 @@ async function toggleProcesoPedido(solId, procIdx) {
     if (r.error) throw r.error;
     s.proc_estado = nuevoProc; s.prog = prog; s.estado = nuevoEstado;
     renderInicio();
-    renderPipelineSerig();
-    renderListas();
     refreshKPIs();
     var estTxt = ['pendiente', 'en curso', 'completado'][parseInt(nuevoProc.charAt(procIdx))];
     showToast('✅ ' + (s.id_display || '') + ' · ' + PROCESOS_SEQ[procIdx].lbl + ': ' + estTxt);
@@ -2044,7 +1965,9 @@ function renderBoard() {
   if (!contSin || !contLines) return;
   var items = [];
   solicitudes.forEach(function(s) {
-    if (['nueva','programada','proceso'].indexOf(s.estado) < 0) return;
+    var esActiva   = ['nueva','programada','proceso'].indexOf(s.estado) >= 0;
+    var esListaSin = s.estado === 'lista' && !s.linea_id;
+    if (!esActiva && !esListaSin) return;
     var sTiros = s.tiros || Math.max.apply(null, (s.lineas.length ? s.lineas.map(function(l){ return l.tiros || 1; }) : [1]));
     if (s.lineas.length === 0) {
       items.push({
@@ -2235,29 +2158,22 @@ function renderProdMensual() {
   var promDia   = diasConProd ? Math.round(totalMes / diasConProd) : 0;
   var maxVal    = Math.max.apply(null, Object.values(porDia).concat([1]));
 
-  // Barras — solo días transcurridos hasta hoy
+  // Barras — todos los días del mes (futuros como placeholder)
   var barras = '';
   var labels = '';
-  for (var d = 1; d <= diaHoy; d++) {
-    var val  = porDia[d] || 0;
-    var px   = val ? Math.max(Math.round((val / maxVal) * 72), 5) : 2;
+  for (var d = 1; d <= diasMes; d++) {
+    var esFuturo = d > diaHoy;
+    var val  = esFuturo ? 0 : (porDia[d] || 0);
+    var px   = esFuturo ? 2 : (val ? Math.max(Math.round((val / maxVal) * 72), 5) : 2);
     var esHoy = d === diaHoy;
-    var barColor = esHoy ? 'var(--serig-m)' : (val > promDia ? '#16a34a' : val > 0 ? '#a78bfa' : 'var(--border)');
-    var tooltip  = val ? val.toLocaleString() + ' und' : 'Sin entregas';
-    var lbl = (d % 5 === 0 || d === 1 || esHoy) ? d : '';
-    barras += '<div class="prod-bar-col" title="Día ' + d + ': ' + tooltip + '">' +
-      '<div class="prod-bar" style="height:' + px + 'px;background:' + barColor + '"></div>' +
+    var barColor = esFuturo ? 'var(--border)' : (esHoy ? 'var(--serig-m)' : (val > promDia ? '#16a34a' : val > 0 ? '#a78bfa' : 'var(--border)'));
+    var extraStyle = esFuturo ? ';opacity:.25' : '';
+    var tooltip  = esFuturo ? '' : (val ? val.toLocaleString() + ' und' : 'Sin entregas');
+    var lbl = (d % 5 === 0 || d === 1 || esHoy || d === diasMes) ? d : '';
+    barras += '<div class="prod-bar-col"' + (tooltip ? ' title="Día ' + d + ': ' + tooltip + '"' : '') + '>' +
+      '<div class="prod-bar" style="height:' + px + 'px;background:' + barColor + extraStyle + '"></div>' +
     '</div>';
-    labels += '<div style="flex:1;min-width:0;text-align:center;font-size:8px;color:var(--gray-l);line-height:1">' + lbl + '</div>';
-  }
-
-  if (!totalMes && !diasConProd) {
-    cont.innerHTML = '<div class="prod-mens-wrap">' +
-      '<div class="prod-mens-hdr"><span style="font-size:12px;font-weight:800">📦 Producción mensual</span>' +
-      '<span style="font-size:11px;color:var(--gray-l)">' + mesStr + '</span></div>' +
-      '<div style="padding:18px 14px;font-size:12px;color:var(--gray-l);text-align:center">Sin entregas registradas este mes</div>' +
-      '</div>';
-    return;
+    labels += '<div style="flex:1;min-width:0;text-align:center;font-size:8px;color:var(--gray-l);line-height:1;' + (esFuturo ? 'opacity:.3' : '') + '">' + lbl + '</div>';
   }
 
   cont.innerHTML = '<div class="prod-mens-wrap">' +
@@ -2475,8 +2391,9 @@ async function renderFaltasChart() {
 
   var dias = [];
   var d = new Date(inicioDias + 'T12:00:00');
-  var hoyCopy = new Date(fin + 'T12:00:00');
-  while (d <= hoyCopy) { dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+  var finMes = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0).toISOString().slice(0,10);
+  var finMesCopy = new Date(finMes + 'T12:00:00');
+  while (d <= finMesCopy) { dias.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
 
   var maxVal = 1;
   dias.forEach(function(f){
@@ -2486,6 +2403,16 @@ async function renderFaltasChart() {
 
   var CHART_H = 48;
   var barras = dias.map(function(f) {
+    var esFuturo = f > fin;
+    var dia = parseInt(f.slice(8));
+    if (esFuturo) {
+      return '<div class="faltas-bar-wrap" style="opacity:.15;pointer-events:none">' +
+        '<div class="faltas-bars-grp">' +
+          '<div class="faltas-bar" style="height:4px;background:var(--border)"></div>' +
+        '</div>' +
+        '<div class="faltas-day">' + dia + '</div>' +
+      '</div>';
+    }
     var vpr = (presMap[f]||[]).length;
     var va  = (ausMap[f]||[]).length;
     var vpt = (prtMap[f]||[]).length;
@@ -2493,7 +2420,6 @@ async function renderFaltasChart() {
     var ha  = va  ? Math.max(4, Math.round((va  / maxVal) * CHART_H)) : 8;
     var hpt = vpt ? Math.max(4, Math.round((vpt / maxVal) * CHART_H)) : 8;
     var esHoy = f === fin;
-    var dia = parseInt(f.slice(8));
     return '<div class="faltas-bar-wrap" style="cursor:pointer" onclick="verDetalleAsistencia(\'' + f + '\',event)">' +
       '<div class="faltas-bars-grp">' +
         '<div class="faltas-bar presente' + (!vpr?' cero':'') + '" style="height:' + hpr + 'px"></div>' +
@@ -2704,85 +2630,7 @@ async function exportarAsistenciaMes() {
   }
 }
 
-// ════════════════════════════════════════════════════════════
-// PIPELINE DE LÍNEAS (view-serig)
-// ════════════════════════════════════════════════════════════
-
-function buildPscNode(proc, estado) {
-  return '<div class="psc-proc psc-' + estado + '">' + proc.ico + ' ' + proc.lbl + '</div>';
-}
-
-function buildPscPipeline(prog) {
-  var parts = [];
-  for (var i = 0; i < PROCESOS_SEQ.length; i++) {
-    if (i > 0) parts.push('<div class="psc-arr">›</div>');
-    parts.push(buildPscNode(PROCESOS_SEQ[i], getProcEstado(i, prog)));
-  }
-  return '<div class="psc-pipeline">' + parts.join('') + '</div>';
-}
-
-function buildPscMetaRow(sol) {
-  if (!sol) return '';
-  var envase = (sol.lineas && sol.lineas[0] && sol.lineas[0].desc) ? sol.lineas[0].desc : '—';
-  var cap    = sol.cap_impresion ? sol.cap_impresion.toLocaleString() + ' u/h' : '—';
-  var tiros  = sol.tiros ? sol.tiros + (sol.tiros === 1 ? ' tiro' : ' tiros') : '—';
-  return '<div class="psc-meta-row">' +
-    '<span class="psc-stat">📦 <strong>' + envase + '</strong></span>' +
-    '<span class="psc-stat">⚡ <strong>' + cap + '</strong></span>' +
-    '<span class="psc-stat">🖨️ <strong>' + tiros + '</strong></span>' +
-    '</div>';
-}
-
-function buildPscCard(linea, sol) {
-  var badge = linea.activa
-    ? '<span class="pill pill-lista" style="font-size:8px">ACTIVA</span>'
-    : '<span class="pill pill-entregada" style="font-size:8px">INACTIVA</span>';
-
-  var solLine = sol
-    ? '<div class="psc-sol" onclick="mostrarDetalle(\'' + sol.id + '\')">' + (sol.id_display || sol.id.slice(0,6)) + ' · ' + sol.cliente + '</div>'
-    : '<div class="psc-empty-lbl">Sin asignación</div>';
-
-  var metaRow  = sol ? buildPscMetaRow(sol) : '';
-  var pipeline = buildPscPipeline(sol ? sol.prog : 0);
-  var inactCls = linea.activa ? '' : ' psc-inactiva';
-
-  return '<div class="psc' + inactCls + '" id="psc-linea-' + linea.id + '">' +
-    '<div class="psc-hdr">' +
-      '<div class="psc-nombre">' + linea.nombre + '</div>' + badge +
-    '</div>' +
-    solLine +
-    metaRow +
-    pipeline +
-    '</div>';
-}
-
-function renderPipelineSerig() {
-  var g = document.getElementById('pipelineSerigGrid');
-  if (!g) return;
-  var html = '';
-  for (var i = 0; i < LINEAS_PRODUCCION.length; i++) {
-    var linea = LINEAS_PRODUCCION[i];
-    var sol = null;
-    if (linea.activa) {
-      sol = solicitudes.find(function(s) {
-        return s.linea_id === linea.id && s.estado === 'proceso';
-      }) || null;
-    }
-    html += buildPscCard(linea, sol);
-  }
-  g.innerHTML = html;
-}
-
 // ── Líneas de producción (HUB) ───────────────────────────────
-
-function getProcEstado(procIdx, prog) {
-  if (prog <= 0) return 'pending';
-  if (prog >= 100) return 'done';
-  var activeStep = Math.floor(prog / 25);
-  if (activeStep > procIdx) return 'done';
-  if (activeStep === procIdx) return 'active';
-  return 'pending';
-}
 
 function buildProcNode(proc, estado) {
   return '<div class="proc-node proc-' + estado + '">' + proc.ico + ' ' + proc.lbl + '</div>';
@@ -3107,6 +2955,7 @@ async function guardarEntregadoManual() {
     });
     clientesPrincipales.forEach(function(c) { registrarUsoCliente(c); });
     cerrarFormEntregado();
+    await autoCompletarSiCorresponde(lineas);
     renderProduccionActual();
     renderBoard();
     showToast('✅ Entregado actualizado');
@@ -3121,9 +2970,31 @@ async function guardarEntregadoManual() {
     entregasCache.unshift(_rowToEntrega(ri.data));
     clientesPrincipales.forEach(function(c) { registrarUsoCliente(c); });
     cerrarFormEntregado();
+    await autoCompletarSiCorresponde(lineas);
     renderProduccionActual();
     renderBoard();
     showToast('✅ Entregado registrado (' + lineas.length + ' producto' + (lineas.length > 1 ? 's' : '') + ')');
+  }
+}
+
+async function autoCompletarSiCorresponde(lineasGuardadas) {
+  var solIds = [];
+  lineasGuardadas.forEach(function(l) { if (l.solId && solIds.indexOf(l.solId) < 0) solIds.push(l.solId); });
+  for (var i = 0; i < solIds.length; i++) {
+    var solId = solIds[i];
+    var s = solicitudes.find(function(x) { return x.id === solId; });
+    if (!s || ['nueva','programada','proceso'].indexOf(s.estado) < 0) continue;
+    var entregado = 0;
+    (getEntregasManuales() || []).forEach(function(m) {
+      if (m.lineas && m.lineas.length) {
+        m.lineas.forEach(function(l) { if (l.solId === solId) entregado += (l.cant || 0); });
+      } else if (m.solId === solId) {
+        entregado += (m.cant || 0);
+      }
+    });
+    if ((s.cant || 0) > 0 && entregado >= s.cant) {
+      await cambiarEstado(solId, 'lista', true);
+    }
   }
 }
 
@@ -3181,7 +3052,7 @@ function renderProduccionActual() {
 
     // Filas del sistema
     var rowsSistema = entregadasSistema.map(function(s) {
-      return '<tr onclick="switchTab(\'serig\');setTimeout(function(){mostrarDetalle(\'' + s.id + '\')},100)" style="cursor:pointer">' +
+      return '<tr onclick="mostrarDetalle(\'' + s.id + '\')" style="cursor:pointer">' +
         '<td><span style="font-family:var(--mono);font-weight:700;color:var(--serig-m)">' + escHtml(s.id_display || s.id.slice(0,8)) + '</span></td>' +
         '<td style="font-weight:600">' + escHtml(s.cliente || '—') + '</td>' +
         '<td></td>' +
@@ -3236,62 +3107,6 @@ function renderProduccionActual() {
   } catch(e) {
     console.error('renderProduccionActual:', e);
   }
-}
-
-// ════════════════════════════════════════════════════════════
-// RENDER LISTAS (view-serig)
-// ════════════════════════════════════════════════════════════
-
-function renderListas() {
-  var filtro = document.getElementById('filtroSerig') ? document.getElementById('filtroSerig').value : '';
-  var filtradas = solicitudes.filter(function(s) { return !filtro || s.estado === filtro; });
-  var container = document.getElementById('listSerig');
-  if (!container) return;
-
-  var html = filtradas.map(function(s) {
-    var sel = selId === s.id ? 'sel-s' : '';
-    var allProcs = s.lineas.reduce(function(acc, l) { return acc.concat(l.procs || []); }, []);
-    var horas = calcularHoras(s.cant, 1, allProcs, s.tiros || 1);
-    var progRow = s.prog > 0
-      ? '<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-s" style="width:' + s.prog + '%"></div></div><div class="pr-pct">' + s.prog + '%</div></div>'
-      : '';
-    return '<div class="sc ' + sel + '" onclick="mostrarDetalle(\'' + s.id + '\')">' +
-      '<div class="sc-top">' +
-        '<div>' +
-          '<div class="sc-id">' + (s.id_display || s.id.slice(0,8)) + '</div>' +
-          '<div class="sc-cli">' + s.cliente + '</div>' +
-          '<div class="sc-desc">' + s.sku + ' — ' + s.desc + '</div>' +
-        '</div>' +
-        '<div>' + estadoPill(s.estado) + ' ' + prioridadPill(s.prio) + '</div>' +
-      '</div>' +
-      '<div class="sc-meta">' +
-        '<span class="sc-qty">' + s.cant.toLocaleString() + ' und</span>' +
-        '<span class="sc-date">🗓 ' + (s.fecha_lim || '—') + '</span>' +
-        '<span class="sc-date">⏱ ' + horas.toFixed(1) + 'h</span>' +
-      '</div>' +
-      (s.envase || s.tiros ? '<div class="sc-meta" style="margin-top:3px">' +
-        (s.envase ? '<span style="color:var(--serig-m);font-weight:600">📦 ' + s.envase + '</span>' : '') +
-        (s.tiros  ? '<span>🖨️ ' + s.tiros + ' tiro' + (s.tiros !== 1 ? 's' : '') + '</span>' : '') +
-        (s.cap_impresion ? '<span>' + s.cap_impresion.toLocaleString() + ' u/h</span>' : '') +
-      '</div>' : '') +
-      progRow +
-      '</div>';
-  }).join('');
-
-  container.innerHTML = html;
-  var cnt = document.getElementById('cnt-serig');
-  if (cnt) cnt.textContent = solicitudes.length;
-}
-
-function estadoPill(estado) {
-  var clases = {nueva:'pill-nueva',programada:'pill-programada',proceso:'pill-proceso',lista:'pill-lista',entregada:'pill-entregada'};
-  var textos = {nueva:'🟡 Nueva',programada:'📅 Programada',proceso:'🟢 En proceso',lista:'✅ Lista',entregada:'📦 Entregada'};
-  return '<span class="pill ' + (clases[estado] || 'pill-nueva') + '">' + (textos[estado] || estado) + '</span>';
-}
-
-function prioridadPill(prioridad) {
-  var textos = {normal:'🟢 Normal',urgente:'🔴 Urgente',programada:'📅 Programada',vela:'🌙 Vela'};
-  return '<span class="pill pill-entregada">' + (textos[prioridad] || prioridad) + '</span>';
 }
 
 function calcularHoras(cantidad, opsCount, procs, tiros) {
@@ -3436,7 +3251,6 @@ async function mostrarDetalle(id) {
   var s = solicitudes.find(function(x) { return x.id === id; });
   if (!s) return;
   selId = s.id;
-  renderListas();
 
   var fugas = { salidas: 0, entradas: 0, perdidas: 0, fugaTotal: 0 };
   try {
@@ -3449,7 +3263,8 @@ async function mostrarDetalle(id) {
     }
   } catch(e) {}
 
-  var det = document.getElementById('detSerig');
+  var det = document.getElementById('modalDetalleBody');
+  if (!det) return;
   var allProcs = s.lineas.reduce(function(acc,l){return acc.concat(l.procs||[]);}, []);
   var metaSol  = metaParaProcesos(allProcs);
   var tirosSol = s.tiros || 1;
@@ -3490,6 +3305,7 @@ async function mostrarDetalle(id) {
         btnEstado +
         '<button class="btn btn-g btn-xs" onclick="abrirFormEditar(\'' + s.id + '\')">✏️ Editar</button>' +
         '<button class="btn btn-g btn-xs" style="background:var(--red-l);color:var(--red)" onclick="confirmarBorrar(\'' + s.id + '\')">🗑</button>' +
+        '<button class="m-close" onclick="cerrarDetalleModal()">✕</button>' +
       '</div>' +
     '</div>' +
     '<div class="det-scroll">' +
@@ -3587,6 +3403,8 @@ async function mostrarDetalle(id) {
 
     '</div>';
 
+  document.getElementById('overlayDetalle').classList.add('open');
+
   var slider = document.getElementById('sldr_' + s.id);
   if (slider) {
     slider.oninput = function(e) {
@@ -3594,6 +3412,14 @@ async function mostrarDetalle(id) {
       if (vEl) vEl.textContent = e.target.value + '%';
     };
   }
+}
+
+function cerrarDetalleModal() {
+  document.getElementById('overlayDetalle').classList.remove('open');
+  selId = null;
+}
+function cerrarSiOverlayDetalle(e) {
+  if (e.target.id === 'overlayDetalle') cerrarDetalleModal();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -3651,16 +3477,15 @@ async function registrarSalidaRapida(solicitudId) {
   else showToast('❌ Error: ' + result.error, '#B83232');
 }
 
-async function cambiarEstado(id, nuevoEstado) {
+async function cambiarEstado(id, nuevoEstado, silent) {
   var s = solicitudes.find(function(x) { return x.id === id; });
   if (!s) return;
   try {
     await db.from('solicitudes').update({ estado: nuevoEstado }).eq('id', s.dbId);
     s.estado = nuevoEstado;
     if (nuevoEstado === 'lista' || nuevoEstado === 'entregada') s.prog = 100;
-    renderListas();
-    renderPipelineSerig();
-    mostrarDetalle(id);
+    renderBoard();
+    if (!silent) mostrarDetalle(id);
     var msg = {lista:'marcada como lista', entregada:'entregada', proceso:'en proceso'};
     showToast('✅ Solicitud ' + (msg[nuevoEstado] || nuevoEstado));
   } catch(e) { showToast('❌ Error al cambiar estado', '#B83232'); }
@@ -3674,7 +3499,6 @@ async function actualizarProg(id) {
   try {
     await db.from('solicitudes').update({ progreso_pct: prog }).eq('id', s.dbId);
     s.prog = prog;
-    renderPipelineSerig();
     mostrarDetalle(id);
     showToast('✅ Progreso actualizado a ' + prog + '%');
   } catch(e) { showToast('❌ Error al actualizar progreso', '#B83232'); }
@@ -3688,10 +3512,9 @@ async function confirmarBorrar(id) {
       await db.from('solicitud_lineas').delete().eq('solicitud_id', s.dbId);
       await db.from('solicitudes').delete().eq('id', s.dbId);
       solicitudes = solicitudes.filter(function(x) { return x.id !== id; });
-      renderListas();
-      document.getElementById('detSerig').innerHTML = '<div class="det-empty"><div class="det-empty-ico">🗑️</div><div class="det-empty-txt">Solicitud eliminada</div></div>';
+      cerrarDetalleModal();
+      renderBoard();
       showToast('🗑 Solicitud eliminada');
-      selId = null;
     } catch(e) { showToast('❌ Error al eliminar', '#B83232'); }
   }
 }
@@ -4219,10 +4042,6 @@ function switchTab(tab) {
     var v = document.getElementById('view-inicio');
     if (v) v.style.display = 'flex';
     renderInicio();
-  } else if (tab === 'serig') {
-    var v = document.getElementById('view-serig');
-    if (v) v.style.display = 'flex';
-    renderPipelineSerig();
   } else if (tab === 'personal') {
     var v = document.getElementById('view-personal');
     if (v) v.style.display = 'flex';
