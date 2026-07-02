@@ -1128,10 +1128,9 @@ async function cargarKPIComandas() {
 // ══ TRAZABILIDAD (FUNCIONES FALTANTES) ══════════════════════
 async function ajustarExistencia(sku, delta) {
   try {
-    const { data, error } = await db.from('inventario').select('existencia').eq('sku', sku).single();
-    if (error || !data) return;
-    const nueva = Math.max(0, (data.existencia || 0) + delta);
-    await db.from('inventario').update({ existencia: nueva }).eq('sku', sku);
+    const rpc = delta < 0 ? 'descontar_inventario' : 'aumentar_inventario';
+    const { error } = await db.rpc(rpc, { p_sku: sku, p_cantidad: Math.abs(delta) });
+    if (error) console.error('ajustarExistencia:', error);
   } catch(e) { console.error('ajustarExistencia:', e); }
 }
 

@@ -14,14 +14,18 @@
 
 ## Arquitectura actual
 Cada HTML es AUTÓNOMO (todo inline): su propio cliente db, CSS en <style>, funciones y datos.
-Los archivos en shared/ están HUÉRFANOS — ningún HTML los carga actualmente.
+`shared/` solo contiene `styles.css` (usado por los 6 HTML). Los `.js` que había ahí
+(supabase.js, helpers.js, data.js, inventario.js) eran huérfanos y con código desactualizado
+(bugs ya corregidos en las copias inline) — se borraron en jul/2026.
 
 ### Módulos activos
 - `index.html` — Landing con KPIs globales
-- `tapas.html` — Solicitudes de producción área Tapas (1266 líneas)
-- `serigrafia.html` — Solicitudes área Serigrafía (1244 líneas)
-- `comandas.html` — Registro de producción diaria por operario (890 líneas)
-- `dashboard.html` — KPIs ejecutivos (215 líneas)
+- `tapas.html` — Solicitudes de producción área Tapas
+- `serigrafia.html` — Solicitudes área Serigrafía
+- `comandas.html` — Registro de producción diaria por operario
+- `dashboard.html` — KPIs ejecutivos
+- `inventario.html` — Gestión de SKUs, existencias e importación desde Excel
+- `produccion.html` — Placeholder "en desarrollo" (aún sin funcionalidad real)
 
 ### Tablas Supabase (schema v2.0)
 - `solicitudes` — encabezado de órdenes (código auto T-001/S-001 via trigger)
@@ -37,19 +41,13 @@ Los archivos en shared/ están HUÉRFANOS — ningún HTML los carga actualmente
 - Vistas: `v_solicitudes`, `v_capacidad_hoy`
 
 ## Bugs conocidos (pendientes de corregir)
-1. 🔴 `registrarPerdida/EntradaPT/SalidaBodega` en tapas.html y serigrafia.html insertan
-   campos `sku` y `usuario` pero la tabla tiene `sku_original` y `operador_id`.
-   → Trazabilidad rota. Prioridad ALTA.
-
-2. 🔴 `cargarInventario()` en tapas.html y serigrafia.html usa `.limit(200)` pero hay
-   2358 SKUs activos → 92% de productos no se puede buscar.
-   → Quitar el límite o paginar. Prioridad ALTA.
-
-3. 🟡 RPCs `descontar_inventario()` y `aumentar_inventario()` existen en Supabase
-   pero el frontend nunca las llama → existencia no se ajusta al registrar movimientos.
-
-4. 🟡 Carpeta `shared/` con 5 archivos orphanos (nadie los carga).
-   Decidir: consolidar ahí o borrar.
+Ninguno abierto por ahora. Últimos cerrados (jul/2026):
+- `registrarPerdida/EntradaPT/SalidaBodega` ya usan `sku_original`/`operador_id` correctamente.
+- `cargarInventario()` ya pagina con `.range()` en lotes de 1000 (trae los 2358 SKUs).
+- `ajustarExistencia()` en tapas.html y serigrafia.html ahora llama a las RPCs atómicas
+  `descontar_inventario(p_sku, p_cantidad)` / `aumentar_inventario(p_sku, p_cantidad)`
+  en vez de hacer select+update manual en JS (evita race conditions).
+- Carpeta `shared/` limpiada: solo queda `styles.css`, los `.js` huérfanos se borraron.
 
 ## Reglas de trabajo OBLIGATORIAS
 1. Antes de modificar cualquier archivo: mostrar diagnóstico y esperar aprobación explícita.
@@ -58,6 +56,6 @@ Los archivos en shared/ están HUÉRFANOS — ningún HTML los carga actualmente
 4. Siempre entregar archivos descargables listos para subir a GitHub.
 5. Confirmar qué archivo base se usará antes de editar.
 
-## Personal (data.js — referencia, no se carga en producción)
+## Personal (referencia — datos reales viven en la tabla `personal`)
 - Tapas: T0 Heidy (supervisora), T1-T9 operadores
 - Serigrafía: S0 Luis Cordova (supervisor), S1-S7 operadores

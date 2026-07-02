@@ -3233,10 +3233,9 @@ async function refreshKPIs() {
 
 async function ajustarExistencia(sku, delta) {
   try {
-    var r = await db.from('inventario').select('existencia').eq('sku', sku).single();
-    if (r.error || !r.data) return;
-    var nueva = Math.max(0, (r.data.existencia || 0) + delta);
-    await db.from('inventario').update({ existencia: nueva }).eq('sku', sku);
+    var rpc = delta < 0 ? 'descontar_inventario' : 'aumentar_inventario';
+    var r = await db.rpc(rpc, { p_sku: sku, p_cantidad: Math.abs(delta) });
+    if (r.error) console.error('ajustarExistencia:', r.error);
   } catch(e) { console.error('ajustarExistencia:', e); }
 }
 
