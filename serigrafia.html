@@ -1427,7 +1427,8 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
   });
   var badgeBg  = item.estado === 'lista' ? '#dcfce7' : item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
   var badgeClr = item.estado === 'lista' ? '#15803d' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'programada' ? '#92400e' : '#64748b';
-  var badgeTxt = item.estado === 'lista' ? 'LISTA' : item.estado === 'proceso' ? 'PROC' : item.estado === 'programada' ? 'PROG' : 'NEW';
+  var badgeBdr = item.estado === 'lista' ? '#86efac' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'programada' ? '#fde68a' : '#cbd5e1';
+  var badgeTxt = item.estado === 'lista' ? 'LISTA' : item.estado === 'proceso' ? 'EN PROC.' : item.estado === 'programada' ? 'PROGRAMADA' : 'NUEVA';
   var dragArg    = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var total      = item.cant || 0;
   var isComplete = entregado > 0 && entregado >= total;
@@ -1473,7 +1474,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     '<div style="display:flex;align-items:center;gap:6px">' +
       grip +
       '<span style="font-family:var(--mono);font-size:10px;font-weight:800;color:' + (isComplete ? '#15803d' : 'var(--serig-m)') + ';flex-shrink:0">' + escHtml(item.solCodigo) + '</span>' +
-      '<span onclick="event.stopPropagation();abrirEstadoSin(event,\'' + item.solId + '\',\'' + (item.lineaDbId || '') + '\')" title="Cambiar estado" style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:3px;padding:1px 4px;font-size:8px;font-weight:800;flex-shrink:0;cursor:pointer">' + badgeTxt + ' ▾</span>' +
+      '<span onclick="event.stopPropagation();abrirEstadoSin(event,\'' + item.solId + '\',\'' + (item.lineaDbId || '') + '\')" title="Cambiar estado" style="background:' + badgeBg + ';color:' + badgeClr + ';border:1.5px solid ' + badgeBdr + ';border-radius:5px;padding:3px 8px;font-size:9px;font-weight:800;flex-shrink:0;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.10);letter-spacing:.3px;display:inline-flex;align-items:center;gap:4px">' + badgeTxt + ' <span style="font-size:8px;opacity:.7">▾</span></span>' +
       '<span style="flex:1"></span>' +
       '<span style="flex-shrink:0;text-align:right;white-space:nowrap">' + cantHtml + '</span>' +
     '</div>' +
