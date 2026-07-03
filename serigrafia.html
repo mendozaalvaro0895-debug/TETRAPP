@@ -974,6 +974,7 @@ async function cargarSolicitudes() {
                    cant: l.cantidad, existencia: l.existencia_snap,
                    procs: l.procesos || [], operadores: l.operadores_ids || [],
                    linea_id: l.linea_id || null,
+                   estado: l.estado || null,
                    cap_impresion: l.cap_impresion || null,
                    tiros: l.tiros || 1,
                    sku_base: l.sku_base || '' };
@@ -1472,7 +1473,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     '<div style="display:flex;align-items:center;gap:6px">' +
       grip +
       '<span style="font-family:var(--mono);font-size:10px;font-weight:800;color:' + (isComplete ? '#15803d' : 'var(--serig-m)') + ';flex-shrink:0">' + escHtml(item.solCodigo) + '</span>' +
-      '<span onclick="event.stopPropagation();abrirEstadoSin(event,\'' + item.solId + '\')" title="Cambiar estado" style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:3px;padding:1px 4px;font-size:8px;font-weight:800;flex-shrink:0;cursor:pointer">' + badgeTxt + ' ▾</span>' +
+      '<span onclick="event.stopPropagation();abrirEstadoSin(event,\'' + item.solId + '\',\'' + (item.lineaDbId || '') + '\')" title="Cambiar estado" style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:3px;padding:1px 4px;font-size:8px;font-weight:800;flex-shrink:0;cursor:pointer">' + badgeTxt + ' ▾</span>' +
       '<span style="flex:1"></span>' +
       '<span style="flex-shrink:0;text-align:right;white-space:nowrap">' + cantHtml + '</span>' +
     '</div>' +
@@ -2009,7 +2010,7 @@ function renderBoard() {
           cant:      l.cant || 0,
           linea_id:  l.linea_id || 0,
           prog:      s.prog || 0,
-          estado:    s.estado,
+          estado:    l.estado || s.estado,
           procEstado:  procEstadoEfectivo(s),
           tiros:       sTiros,
           tiro_actual: s.tiro_actual || 1,
@@ -3793,9 +3794,9 @@ async function registrarSalidaRapida(solicitudId) {
   else showToast('❌ Error: ' + result.error, '#B83232');
 }
 
-function abrirEstadoSin(event, solId) {
+function abrirEstadoSin(event, solId, lineaDbId) {
   var old = document.getElementById('estado-sin-pop');
-  if (old) { var wasMe = old._solId === solId; old.remove(); if (wasMe) return; }
+  if (old) { var wasMe = old._key === (lineaDbId || solId); old.remove(); if (wasMe) return; }
 
   var opciones = [
     { val: 'nueva',      label: 'Nueva',      bg: '#f1f5f9', clr: '#64748b' },
@@ -3806,7 +3807,7 @@ function abrirEstadoSin(event, solId) {
 
   var pop = document.createElement('div');
   pop.id = 'estado-sin-pop';
-  pop._solId = solId;
+  pop._key = lineaDbId || solId;
   pop.style.cssText = 'position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:5px;box-shadow:0 6px 20px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:3px;min-width:130px';
 
   opciones.forEach(function(op) {
@@ -3818,7 +3819,11 @@ function abrirEstadoSin(event, solId) {
     btn.onclick = function(e) {
       e.stopPropagation();
       pop.remove();
-      cambiarEstado(solId, op.val, true);
+      if (lineaDbId) {
+        cambiarEstadoLinea(lineaDbId, solId, op.val);
+      } else {
+        cambiarEstado(solId, op.val, true);
+      }
     };
     pop.appendChild(btn);
   });
@@ -3836,6 +3841,21 @@ function abrirEstadoSin(event, solId) {
       if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click', _ep); }
     });
   }, 0);
+}
+
+async function cambiarEstadoLinea(lineaDbId, solId, nuevoEstado) {
+  try {
+    var r = await db.from('solicitud_lineas').update({ estado: nuevoEstado }).eq('id', lineaDbId);
+    if (r.error) throw r.error;
+    // Actualizar en memoria
+    var s = solicitudes.find(function(x) { return x.id === solId; });
+    if (s) {
+      var l = s.lineas.find(function(x) { return x.id === lineaDbId; });
+      if (l) l.estado = nuevoEstado;
+    }
+    renderBoard();
+    showToast('✅ Línea marcada como ' + nuevoEstado);
+  } catch(e) { showToast('❌ Error al cambiar estado', '#B83232'); }
 }
 
 async function cambiarEstado(id, nuevoEstado, silent) {
