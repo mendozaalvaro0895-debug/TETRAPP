@@ -274,6 +274,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .charts-row{display:flex;gap:16px;align-items:stretch;margin-bottom:12px}
 .charts-row>div{flex:1 1 0;min-width:0}
 .charts-row .prod-mens-wrap,.charts-row .faltas-wrap{width:100%;height:100%;box-sizing:border-box}
+/* Layout 50/50 inicio */
+.inicio-dos-col{display:flex;gap:16px;align-items:flex-start;margin-bottom:12px}
+.inicio-col-izq{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:12px}
+.inicio-col-der{flex:1 1 0;min-width:0}
 /* Asistencia Grid */
 .asist-grid-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px}
 .asist-grid-hdr{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
@@ -528,9 +532,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
         </div>
 
-        <!-- Fila superior: Personal y Roles (izq) + Asistencia del día (der) -->
-        <div class="top-asignacion">
-          <div class="ta-personal">
+        <!-- Layout 50/50: izq = Personal + Producción · der = Asistencia -->
+        <div class="inicio-dos-col">
+          <div class="inicio-col-izq">
             <div class="mtx-wrap">
               <div class="mtx-hdr">
                 <span class="mtx-hdr-title">👥 Personal y Roles</span>
@@ -538,12 +542,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
               </div>
               <div id="matrizPersonal"></div>
             </div>
+            <div id="prodMensual"></div>
+          </div>
+          <div class="inicio-col-der">
+            <div id="asistGrid"></div>
           </div>
         </div>
-        <div class="charts-row">
-          <div id="prodMensual"></div>
-        </div>
-        <div id="asistGrid"></div>
 
         <!-- Board: carriles línea 1-4 (con pipeline de procesos integrado) -->
         <div class="sec-hdr">
