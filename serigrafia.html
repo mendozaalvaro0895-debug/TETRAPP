@@ -471,7 +471,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
             </div>
           </div>
         </div>
-        <div class="kpi">
+        <div class="kpi clickable" id="kpi-pend-card" onclick="verDetalleKpiPendientes()">
           <div class="kpi-l">Pendientes</div>
           <div class="kpi-v" style="color:var(--amber)" id="ki-pend">0</div>
           <div class="kpi-s">sin iniciar</div>
@@ -2166,6 +2166,70 @@ function verDetalleKpiProceso() {
       if (!popup.contains(e.target) && !e.target.closest('.kpi.clickable')) {
         popup.style.display = 'none';
         document.removeEventListener('click', _kh);
+      }
+    });
+  }, 0);
+}
+
+function verDetalleKpiPendientes() {
+  var pendientes = solicitudes.filter(function(s) { return s.estado === 'nueva' || s.estado === 'programada'; });
+  pendientes.sort(function(a, b) {
+    var pa = a.prio === 'alta' ? 0 : a.prio === 'media' ? 1 : 2;
+    var pb = b.prio === 'alta' ? 0 : b.prio === 'media' ? 1 : 2;
+    if (pa !== pb) return pa - pb;
+    return (a.created_at || '') < (b.created_at || '') ? -1 : 1;
+  });
+
+  var filas = !pendientes.length
+    ? '<div style="font-size:11px;color:var(--gray-l);font-style:italic;padding:4px 0">—</div>'
+    : pendientes.map(function(s) {
+        var prioColor = s.prio === 'alta' ? 'var(--red)' : s.prio === 'media' ? 'var(--amber)' : 'var(--gray-l)';
+        var prioLabel = s.prio === 'alta' ? '▲' : s.prio === 'media' ? '▸' : '·';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
+          '<div style="flex-shrink:0;min-width:52px">' +
+            '<span style="font-size:10px;font-weight:700;color:var(--amber)">' + escHtml(s.id_display || s.id.slice(0,6)) + '</span>' +
+            (s.desc ? '<div style="font-size:9px;color:var(--gray-l);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">' + escHtml(s.desc) + '</div>' : '') +
+          '</div>' +
+          '<span style="font-size:11px;color:var(--ink);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(s.cliente || '—') + '</span>' +
+          '<span style="font-size:10px;color:var(--gray-l);flex-shrink:0">' + (s.cant || 0).toLocaleString() + ' und</span>' +
+          '<span style="font-size:11px;color:' + prioColor + ';flex-shrink:0;width:12px;text-align:center" title="Prioridad ' + (s.prio||'normal') + '">' + prioLabel + '</span>' +
+        '</div>';
+      }).join('');
+
+  var html =
+    '<div style="font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--amber);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #fef3c7">Sin iniciar · ' + pendientes.length + '</div>' +
+    filas;
+
+  var popup = document.getElementById('kpi-pend-popup');
+  if (!popup) {
+    document.body.insertAdjacentHTML('beforeend',
+      '<div id="kpi-pend-popup" style="display:none;position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;min-width:340px;max-width:500px;box-shadow:0 8px 28px rgba(0,0,0,.2)">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+          '<span style="font-size:12px;font-weight:800;color:var(--ink)">Pendientes</span>' +
+          '<button onclick="document.getElementById(\'kpi-pend-popup\').style.display=\'none\'" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0">✕</button>' +
+        '</div>' +
+        '<div id="kpi-pend-body" style="max-height:400px;overflow-y:auto"></div>' +
+      '</div>');
+    popup = document.getElementById('kpi-pend-popup');
+  }
+
+  document.getElementById('kpi-pend-body').innerHTML = html;
+  popup.style.display = 'block';
+
+  var kpiEl = document.getElementById('kpi-pend-card');
+  if (kpiEl) {
+    var rect = kpiEl.getBoundingClientRect();
+    var pw = 340;
+    var left = Math.min(rect.left, window.innerWidth - pw - 16);
+    popup.style.left = Math.max(8, left) + 'px';
+    popup.style.top  = (rect.bottom + 6) + 'px';
+  }
+
+  setTimeout(function() {
+    document.addEventListener('click', function _ph(e) {
+      if (!popup.contains(e.target) && !e.target.closest('#kpi-pend-card')) {
+        popup.style.display = 'none';
+        document.removeEventListener('click', _ph);
       }
     });
   }, 0);
