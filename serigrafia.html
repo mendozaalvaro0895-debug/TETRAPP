@@ -2100,7 +2100,7 @@ async function boardDrop(e, targetLaneId) {
 // ════════════════════════════════════════════════════════════
 
 function verDetalleKpiProceso() {
-  var enProceso = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
+  var enLinea = solicitudes.filter(function(s) { return s.estado === 'proceso' && s.linea_id; });
   var entMap    = _buildEntregadoMap();
   var parciales = solicitudes.filter(function(s) {
     return ['nueva','programada','proceso'].indexOf(s.estado) >= 0
@@ -2114,7 +2114,10 @@ function verDetalleKpiProceso() {
       var entregado = entMap[s.id] || 0;
       var pct = s.cant ? Math.round(entregado / s.cant * 100) : 0;
       return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
-        '<span style="font-size:10px;font-weight:700;color:var(--serig-m);flex-shrink:0;min-width:52px">' + escHtml(s.codigo || s.id.slice(0,6)) + '</span>' +
+        '<div style="flex-shrink:0;min-width:52px">' +
+          '<span style="font-size:10px;font-weight:700;color:var(--serig-m)">' + escHtml(s.id_display || s.id.slice(0,6)) + '</span>' +
+          (s.desc ? '<div style="font-size:9px;color:var(--gray-l);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">' + escHtml(s.desc) + '</div>' : '') +
+        '</div>' +
         '<span style="font-size:11px;color:var(--ink);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(s.cliente || '—') + '</span>' +
         (mostrarEntregado
           ? '<span style="font-size:10px;color:var(--amber);flex-shrink:0;white-space:nowrap">' + entregado.toLocaleString() + ' / ' + (s.cant||0).toLocaleString() + ' und (' + pct + '%)</span>'
@@ -2126,8 +2129,8 @@ function verDetalleKpiProceso() {
 
   var html =
     '<div style="margin-bottom:14px">' +
-      '<div style="font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--serig-m);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--serig-l)">En línea · ' + enProceso.length + '</div>' +
-      filasSol(enProceso, false) +
+      '<div style="font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--serig-m);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid var(--serig-l)">En línea · ' + enLinea.length + '</div>' +
+      filasSol(enLinea, false) +
     '</div>' +
     '<div>' +
       '<div style="font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--amber);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #fef3c7">Parciales · ' + parciales.length + '</div>' +
@@ -2182,6 +2185,7 @@ function _buildEntregadoMap() {
 
 function renderInicio() {
   var enProceso  = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
+  var enLinea    = enProceso.filter(function(s) { return s.linea_id; });
   var pendientes = solicitudes.filter(function(s) { return s.estado === 'nueva' || s.estado === 'programada'; });
   var ops = personalData && personalData.serig
     ? personalData.serig.filter(function(p) { return p.activo; }).length
@@ -2196,7 +2200,7 @@ function renderInicio() {
 
   // KPIs
   var el;
-  el = document.getElementById('ki-proc');      if (el) el.textContent = enProceso.length;
+  el = document.getElementById('ki-proc');      if (el) el.textContent = enLinea.length;
   el = document.getElementById('ki-parciales'); if (el) el.textContent = parciales.length;
   el = document.getElementById('ki-pend');      if (el) el.textContent = pendientes.length;
   el = document.getElementById('ki-ops');  if (el) el.textContent = ops;
