@@ -474,7 +474,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="kpi clickable" id="kpi-pend-card" onclick="verDetalleKpiPendientes()">
           <div class="kpi-l">Pendientes</div>
           <div class="kpi-v" style="color:var(--amber)" id="ki-pend">0</div>
-          <div class="kpi-s">sin iniciar</div>
+          <div class="kpi-s">por completar</div>
         </div>
         <div class="kpi">
           <div class="kpi-l">Operadores</div>
@@ -2178,14 +2178,14 @@ function verDetalleKpiPendientes() {
   solicitudes.forEach(function(s) {
     if (s.lineas.length === 0) {
       var e0 = s.estado;
-      if (e0 === 'nueva' || e0 === 'programada') {
-        items.push({ codigo: s.id_display || s.id.slice(0,6), desc: s.desc || '', cliente: s.cliente || '—', cant: s.cant || 0, prio: s.prio, created_at: s.created_at });
+      if (e0 === 'nueva' || e0 === 'programada' || e0 === 'proceso') {
+        items.push({ codigo: s.id_display || s.id.slice(0,6), desc: s.desc || '', cliente: s.cliente || '—', cant: s.cant || 0, prio: s.prio, created_at: s.created_at, estado: e0 });
       }
     } else {
       s.lineas.forEach(function(l) {
         var e0 = l.estado || s.estado;
-        if (e0 === 'nueva' || e0 === 'programada') {
-          items.push({ codigo: s.id_display || s.id.slice(0,6), desc: l.desc || '', cliente: s.cliente || '—', cant: l.cant || 0, prio: s.prio, created_at: s.created_at });
+        if (e0 === 'nueva' || e0 === 'programada' || e0 === 'proceso') {
+          items.push({ codigo: s.id_display || s.id.slice(0,6), desc: l.desc || '', cliente: s.cliente || '—', cant: l.cant || 0, prio: s.prio, created_at: s.created_at, estado: e0 });
         }
       });
     }
@@ -2202,11 +2202,15 @@ function verDetalleKpiPendientes() {
     : items.map(function(it) {
         var prioColor = it.prio === 'alta' ? 'var(--red)' : it.prio === 'media' ? 'var(--amber)' : 'var(--gray-l)';
         var prioLabel = it.prio === 'alta' ? '▲' : it.prio === 'media' ? '▸' : '·';
+        var estBg  = it.estado === 'proceso' ? 'var(--serig-l)' : it.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
+        var estClr = it.estado === 'proceso' ? 'var(--serig-m)' : it.estado === 'programada' ? '#92400e' : '#64748b';
+        var estTxt = it.estado === 'proceso' ? 'PROC' : it.estado === 'programada' ? 'PROG' : 'NEW';
         return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
           '<div style="flex-shrink:0;min-width:52px">' +
             '<span style="font-size:10px;font-weight:700;color:var(--amber)">' + escHtml(it.codigo) + '</span>' +
             (it.desc ? '<div style="font-size:9px;color:var(--gray-l);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">' + escHtml(it.desc) + '</div>' : '') +
           '</div>' +
+          '<span style="font-size:8px;font-weight:800;background:' + estBg + ';color:' + estClr + ';border-radius:3px;padding:1px 4px;flex-shrink:0">' + estTxt + '</span>' +
           '<span style="font-size:11px;color:var(--ink);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(it.cliente) + '</span>' +
           '<span style="font-size:10px;color:var(--gray-l);flex-shrink:0">' + it.cant.toLocaleString() + ' und</span>' +
           '<span style="font-size:11px;color:' + prioColor + ';flex-shrink:0;width:12px;text-align:center" title="Prioridad ' + (it.prio||'normal') + '">' + prioLabel + '</span>' +
@@ -2214,7 +2218,7 @@ function verDetalleKpiPendientes() {
       }).join('');
 
   var html =
-    '<div style="font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--amber);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #fef3c7">Sin iniciar · ' + items.length + '</div>' +
+    '<div style="font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--amber);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #fef3c7">Pendientes · ' + items.length + '</div>' +
     filas;
 
   var popup = document.getElementById('kpi-pend-popup');
@@ -2271,11 +2275,11 @@ function renderInicio() {
   solicitudes.forEach(function(s) {
     if (s.lineas.length === 0) {
       var e0 = s.estado;
-      if (e0 === 'nueva' || e0 === 'programada') pendientesCount++;
+      if (e0 === 'nueva' || e0 === 'programada' || e0 === 'proceso') pendientesCount++;
     } else {
       s.lineas.forEach(function(l) {
         var e0 = l.estado || s.estado;
-        if (e0 === 'nueva' || e0 === 'programada') pendientesCount++;
+        if (e0 === 'nueva' || e0 === 'programada' || e0 === 'proceso') pendientesCount++;
       });
     }
   });
