@@ -2100,7 +2100,7 @@ async function boardDrop(e, targetLaneId) {
 // ════════════════════════════════════════════════════════════
 
 function verDetalleKpiProceso() {
-  var enLinea = solicitudes.filter(function(s) { return s.estado === 'proceso' && s.linea_id; });
+  var enLinea = solicitudes.filter(function(s) { return s.estado === 'proceso' && s.lineas.some(function(l){ return l.linea_id; }); });
   var entMap    = _buildEntregadoMap();
   var parciales = solicitudes.filter(function(s) {
     return ['nueva','programada','proceso'].indexOf(s.estado) >= 0
@@ -2185,7 +2185,7 @@ function _buildEntregadoMap() {
 
 function renderInicio() {
   var enProceso  = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
-  var enLinea    = enProceso.filter(function(s) { return s.linea_id; });
+  var enLinea    = enProceso.filter(function(s) { return s.lineas.some(function(l){ return l.linea_id; }); });
   var pendientes = solicitudes.filter(function(s) { return s.estado === 'nueva' || s.estado === 'programada'; });
   var ops = personalData && personalData.serig
     ? personalData.serig.filter(function(p) { return p.activo; }).length
