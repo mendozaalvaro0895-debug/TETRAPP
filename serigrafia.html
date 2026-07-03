@@ -2173,32 +2173,48 @@ function verDetalleKpiProceso() {
 }
 
 function verDetalleKpiPendientes() {
-  var pendientes = solicitudes.filter(function(s) { return s.estado === 'nueva' || s.estado === 'programada'; });
-  pendientes.sort(function(a, b) {
+  // Construir lista a nivel de línea (igual que el board SIN ASIGNAR)
+  var items = [];
+  solicitudes.forEach(function(s) {
+    if (s.lineas.length === 0) {
+      var e0 = s.estado;
+      if (e0 === 'nueva' || e0 === 'programada') {
+        items.push({ codigo: s.id_display || s.id.slice(0,6), desc: s.desc || '', cliente: s.cliente || '—', cant: s.cant || 0, prio: s.prio, created_at: s.created_at });
+      }
+    } else {
+      s.lineas.forEach(function(l) {
+        var e0 = l.estado || s.estado;
+        if (e0 === 'nueva' || e0 === 'programada') {
+          items.push({ codigo: s.id_display || s.id.slice(0,6), desc: l.desc || '', cliente: s.cliente || '—', cant: l.cant || 0, prio: s.prio, created_at: s.created_at });
+        }
+      });
+    }
+  });
+  items.sort(function(a, b) {
     var pa = a.prio === 'alta' ? 0 : a.prio === 'media' ? 1 : 2;
     var pb = b.prio === 'alta' ? 0 : b.prio === 'media' ? 1 : 2;
     if (pa !== pb) return pa - pb;
     return (a.created_at || '') < (b.created_at || '') ? -1 : 1;
   });
 
-  var filas = !pendientes.length
+  var filas = !items.length
     ? '<div style="font-size:11px;color:var(--gray-l);font-style:italic;padding:4px 0">—</div>'
-    : pendientes.map(function(s) {
-        var prioColor = s.prio === 'alta' ? 'var(--red)' : s.prio === 'media' ? 'var(--amber)' : 'var(--gray-l)';
-        var prioLabel = s.prio === 'alta' ? '▲' : s.prio === 'media' ? '▸' : '·';
+    : items.map(function(it) {
+        var prioColor = it.prio === 'alta' ? 'var(--red)' : it.prio === 'media' ? 'var(--amber)' : 'var(--gray-l)';
+        var prioLabel = it.prio === 'alta' ? '▲' : it.prio === 'media' ? '▸' : '·';
         return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">' +
           '<div style="flex-shrink:0;min-width:52px">' +
-            '<span style="font-size:10px;font-weight:700;color:var(--amber)">' + escHtml(s.id_display || s.id.slice(0,6)) + '</span>' +
-            (s.desc ? '<div style="font-size:9px;color:var(--gray-l);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">' + escHtml(s.desc) + '</div>' : '') +
+            '<span style="font-size:10px;font-weight:700;color:var(--amber)">' + escHtml(it.codigo) + '</span>' +
+            (it.desc ? '<div style="font-size:9px;color:var(--gray-l);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">' + escHtml(it.desc) + '</div>' : '') +
           '</div>' +
-          '<span style="font-size:11px;color:var(--ink);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(s.cliente || '—') + '</span>' +
-          '<span style="font-size:10px;color:var(--gray-l);flex-shrink:0">' + (s.cant || 0).toLocaleString() + ' und</span>' +
-          '<span style="font-size:11px;color:' + prioColor + ';flex-shrink:0;width:12px;text-align:center" title="Prioridad ' + (s.prio||'normal') + '">' + prioLabel + '</span>' +
+          '<span style="font-size:11px;color:var(--ink);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(it.cliente) + '</span>' +
+          '<span style="font-size:10px;color:var(--gray-l);flex-shrink:0">' + it.cant.toLocaleString() + ' und</span>' +
+          '<span style="font-size:11px;color:' + prioColor + ';flex-shrink:0;width:12px;text-align:center" title="Prioridad ' + (it.prio||'normal') + '">' + prioLabel + '</span>' +
         '</div>';
       }).join('');
 
   var html =
-    '<div style="font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--amber);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #fef3c7">Sin iniciar · ' + pendientes.length + '</div>' +
+    '<div style="font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--amber);margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #fef3c7">Sin iniciar · ' + items.length + '</div>' +
     filas;
 
   var popup = document.getElementById('kpi-pend-popup');
@@ -2251,7 +2267,18 @@ function _buildEntregadoMap() {
 function renderInicio() {
   var enProceso  = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
   var enLinea    = enProceso.filter(function(s) { return s.lineas.some(function(l){ return l.linea_id; }); });
-  var pendientes = solicitudes.filter(function(s) { return s.estado === 'nueva' || s.estado === 'programada'; });
+  var pendientesCount = 0;
+  solicitudes.forEach(function(s) {
+    if (s.lineas.length === 0) {
+      var e0 = s.estado;
+      if (e0 === 'nueva' || e0 === 'programada') pendientesCount++;
+    } else {
+      s.lineas.forEach(function(l) {
+        var e0 = l.estado || s.estado;
+        if (e0 === 'nueva' || e0 === 'programada') pendientesCount++;
+      });
+    }
+  });
   var ops = personalData && personalData.serig
     ? personalData.serig.filter(function(p) { return p.activo; }).length
     : 0;
@@ -2267,12 +2294,12 @@ function renderInicio() {
   var el;
   el = document.getElementById('ki-proc');      if (el) el.textContent = enLinea.length;
   el = document.getElementById('ki-parciales'); if (el) el.textContent = parciales.length;
-  el = document.getElementById('ki-pend');      if (el) el.textContent = pendientes.length;
+  el = document.getElementById('ki-pend');      if (el) el.textContent = pendientesCount;
   el = document.getElementById('ki-ops');  if (el) el.textContent = ops;
 
   // Hub card subtitles
   el = document.getElementById('hc-prog-sub');
-  if (el) el.textContent = enProceso.length + ' en proceso · ' + pendientes.length + ' pendientes';
+  if (el) el.textContent = enProceso.length + ' en proceso · ' + pendientesCount + ' pendientes';
   el = document.getElementById('hc-personal-sub');
   if (el) el.textContent = ops + ' operadores activos';
 
