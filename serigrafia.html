@@ -1472,7 +1472,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     '<div style="display:flex;align-items:center;gap:6px">' +
       grip +
       '<span style="font-family:var(--mono);font-size:10px;font-weight:800;color:' + (isComplete ? '#15803d' : 'var(--serig-m)') + ';flex-shrink:0">' + escHtml(item.solCodigo) + '</span>' +
-      '<span style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:3px;padding:1px 4px;font-size:8px;font-weight:800;flex-shrink:0">' + badgeTxt + '</span>' +
+      '<span onclick="event.stopPropagation();abrirEstadoSin(event,\'' + item.solId + '\')" title="Cambiar estado" style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:3px;padding:1px 4px;font-size:8px;font-weight:800;flex-shrink:0;cursor:pointer">' + badgeTxt + ' ▾</span>' +
       '<span style="flex:1"></span>' +
       '<span style="flex-shrink:0;text-align:right;white-space:nowrap">' + cantHtml + '</span>' +
     '</div>' +
@@ -3791,6 +3791,51 @@ async function registrarSalidaRapida(solicitudId) {
   var result = await registrarSalidaBodega(solicitudId, sku, parseInt(cant), 'operador', '');
   if (result.ok) { showToast('✅ Salida registrada: ' + cant + ' und de ' + sku); mostrarDetalle(solicitudId); refreshKPIs(); }
   else showToast('❌ Error: ' + result.error, '#B83232');
+}
+
+function abrirEstadoSin(event, solId) {
+  var old = document.getElementById('estado-sin-pop');
+  if (old) { var wasMe = old._solId === solId; old.remove(); if (wasMe) return; }
+
+  var opciones = [
+    { val: 'nueva',      label: 'Nueva',      bg: '#f1f5f9', clr: '#64748b' },
+    { val: 'programada', label: 'Programada', bg: '#fef3c7', clr: '#92400e' },
+    { val: 'proceso',    label: 'En proceso', bg: 'var(--serig-l)', clr: 'var(--serig-m)' },
+    { val: 'lista',      label: 'Lista ✓',    bg: '#dcfce7', clr: '#15803d' }
+  ];
+
+  var pop = document.createElement('div');
+  pop.id = 'estado-sin-pop';
+  pop._solId = solId;
+  pop.style.cssText = 'position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:5px;box-shadow:0 6px 20px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:3px;min-width:130px';
+
+  opciones.forEach(function(op) {
+    var btn = document.createElement('button');
+    btn.textContent = op.label;
+    btn.style.cssText = 'background:' + op.bg + ';color:' + op.clr + ';border:none;border-radius:5px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;text-align:left';
+    btn.onmouseenter = function() { btn.style.opacity = '.8'; };
+    btn.onmouseleave = function() { btn.style.opacity = '1'; };
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      pop.remove();
+      cambiarEstado(solId, op.val, true);
+    };
+    pop.appendChild(btn);
+  });
+
+  document.body.appendChild(pop);
+
+  var rect = event.target.getBoundingClientRect();
+  var pw = 130;
+  var left = Math.min(rect.left, window.innerWidth - pw - 12);
+  pop.style.left = Math.max(8, left) + 'px';
+  pop.style.top  = (rect.bottom + 4) + 'px';
+
+  setTimeout(function() {
+    document.addEventListener('click', function _ep(e) {
+      if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click', _ep); }
+    });
+  }, 0);
 }
 
 async function cambiarEstado(id, nuevoEstado, silent) {
