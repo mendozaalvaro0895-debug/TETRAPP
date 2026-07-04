@@ -167,6 +167,85 @@
   min-width: 0;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Animation System v1.1
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Entrada de vistas ───────────────────────────────────────── */
+@keyframes ds-viewIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.view-enter {
+  animation: ds-viewIn 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Skeleton loading (shimmer) ──────────────────────────────── */
+@keyframes ds-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg2, #F0EDEA) 25%,
+    #E6E3DC           50%,
+    var(--bg2, #F0EDEA) 75%
+  );
+  background-size: 1200px 100%;
+  animation: ds-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--r-sm, 6px);
+  display: inline-block;
+}
+.sk-num  { height: 26px; width: 52px; }
+.sk-line { height: 11px; width: 100%; }
+.sk-line-s { height: 10px; width: 55%; margin-top: 5px; }
+
+/* Skeleton row para tablas */
+.sk-tr td { padding: 10px 14px !important; }
+
+/* ── Shake (error de validación) ─────────────────────────────── */
+@keyframes ds-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60%  { transform: translateX(-5px); }
+  40%, 80%  { transform: translateX(5px); }
+}
+.anim-shake {
+  animation: ds-shake 380ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+/* ── Pop (confirmación exitosa) ──────────────────────────────── */
+@keyframes ds-pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.anim-pop { animation: ds-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* ── Ring pulse (highlight success) ─────────────────────────── */
+@keyframes ds-ring {
+  0%   { box-shadow: 0 0 0 0   rgba(26, 107, 91, .50); }
+  70%  { box-shadow: 0 0 0 10px rgba(26, 107, 91, 0);  }
+  100% { box-shadow: 0 0 0 0   rgba(26, 107, 91, 0);   }
+}
+.anim-ring { animation: ds-ring 650ms ease-out; }
+
+/* ── Tab active underline ────────────────────────────────────── */
+.tab { position: relative; }
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 10px; right: 10px;
+  height: 2px;
+  background: var(--teal, #1A6B5B);
+  border-radius: 2px 2px 0 0;
+  animation: ds-tabLine 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes ds-tabLine {
+  from { transform: scaleX(0); opacity: 0; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+
 /* ── Responsive ──────────────────────────────────────────────── */
 
 /* Tablet ≤ 1024px */

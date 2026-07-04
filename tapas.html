@@ -851,6 +851,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
 const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
 const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+const HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
 
 // Estado global
 let solicitudes = [];
@@ -1604,6 +1605,68 @@ async function guardar() {
   }
 }
 
+// ══ ANIMACIÓN — helpers ═════════════════════════════════════
+
+function countUp(el, target, duration) {
+  if (!el) return;
+  var n = parseInt(target, 10);
+  if (isNaN(n) || n === 0) { el.textContent = isNaN(n) ? (target || '0') : '0'; return; }
+  var t0 = null;
+  function step(ts) {
+    if (!t0) t0 = ts;
+    var p = Math.min((ts - t0) / (duration || 600), 1);
+    var e = 1 - Math.pow(1 - p, 3); // ease-out cubic
+    el.textContent = Math.round(e * n).toLocaleString();
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function staggerEls(selector, baseDelay) {
+  var els = document.querySelectorAll(selector);
+  els.forEach(function(el, i) {
+    el.style.opacity    = '0';
+    el.style.transform  = 'translateY(14px)';
+    el.style.transition = '';
+    var delay = (baseDelay || 0) + i * 65;
+    setTimeout(function() {
+      el.style.transition = 'opacity 340ms cubic-bezier(0.16,1,0.3,1), transform 340ms cubic-bezier(0.16,1,0.3,1)';
+      el.style.opacity    = '1';
+      el.style.transform  = 'translateY(0)';
+    }, delay);
+  });
+}
+
+function animShake(el) {
+  if (!el) return;
+  el.classList.remove('anim-shake');
+  void el.offsetWidth;
+  el.classList.add('anim-shake');
+  el.addEventListener('animationend', function h() {
+    el.classList.remove('anim-shake');
+    el.removeEventListener('animationend', h);
+  }, { once: true });
+}
+
+function animPop(el) {
+  if (!el) return;
+  el.classList.remove('anim-pop');
+  void el.offsetWidth;
+  el.classList.add('anim-pop');
+  el.addEventListener('animationend', function h() {
+    el.classList.remove('anim-pop');
+    el.removeEventListener('animationend', h);
+  }, { once: true });
+}
+
+function triggerViewEnter(viewId) {
+  var el = document.getElementById(viewId);
+  if (!el) return;
+  el.classList.remove('view-enter');
+  void el.offsetWidth;
+  el.classList.add('view-enter');
+}
+
 // ══ NAVEGACIÓN ══════════════════════════════════════════════
 function switchTab(tab) {
   const views = document.querySelectorAll('.view');
@@ -1637,7 +1700,10 @@ function switchTab(tab) {
   var viewId = viewMap[tab];
   var tabId  = tabMap[tab];
 
-  if (viewId) document.getElementById(viewId).style.display = 'flex';
+  if (viewId) {
+    var vEl = document.getElementById(viewId);
+    if (vEl) { vEl.style.display = 'flex'; triggerViewEnter(viewId); }
+  }
   if (tabId)  document.getElementById(tabId).classList.add('active');
 
   if (tab === 'dash')         renderDash();
@@ -1683,44 +1749,36 @@ function renderPersonal() {
 
 // ══ INICIO HUB ══════════════════════════════════════════════
 function renderInicio() {
-  // KPIs top
-  var proc  = solicitudes.filter(function(s){ return s.estado === 'proceso'; }).length;
-  var pend  = solicitudes.filter(function(s){ return s.estado === 'nueva' || s.estado === 'programada'; }).length;
-  var ops   = personalData && personalData.tapas ? personalData.tapas.filter(function(p){ return p.activo; }).length : 0;
+  var proc = solicitudes.filter(function(s){ return s.estado === 'proceso'; }).length;
+  var pend = solicitudes.filter(function(s){ return s.estado === 'nueva' || s.estado === 'programada'; }).length;
+  var ops  = personalData && personalData.tapas ? personalData.tapas.filter(function(p){ return p.activo; }).length : 0;
 
-  // KPI rechazos hoy
   var hoyStr = new Date().toISOString().split('T')[0];
-  var rechHoy = rechazosData.filter(function(r){
-    return r.created_at && r.created_at.startsWith(hoyStr);
+  var rechHoy    = rechazosData.filter(function(r){ return r.created_at && r.created_at.startsWith(hoyStr); });
+  var rechHoyUnid = rechHoy.reduce(function(a,r){ return a+(r.cantidad_rechazada||0); }, 0);
+  var hace7 = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];
+  var rechSemUnid = rechazosData.filter(function(r){ return r.created_at && r.created_at.slice(0,10)>=hace7; })
+                                .reduce(function(a,r){ return a+(r.cantidad_rechazada||0); }, 0);
+
+  // KPIs top — count-up
+  countUp(document.getElementById('ih-proc'), proc, 700);
+  countUp(document.getElementById('ih-pend'), pend, 700);
+  countUp(document.getElementById('ih-rech'), rechHoyUnid, 700);
+  var capEl = document.getElementById('ih-cap'); if (capEl) capEl.textContent = '—';
+
+  // Sub-card stats — count-up
+  countUp(document.getElementById('icard-proc'),     proc,        600);
+  countUp(document.getElementById('icard-pend'),     pend,        600);
+  countUp(document.getElementById('icard-ops'),      ops,         600);
+  countUp(document.getElementById('icard-rech-hoy'), rechHoyUnid, 600);
+  countUp(document.getElementById('icard-rech-sem'), rechSemUnid, 600);
+  ['icard-sal','icard-ing','icard-cmd','icard-cmd2','icard-fugas'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.textContent='—';
   });
-  var rechHoyUnid = rechHoy.reduce(function(a, r){ return a + (r.cantidad_rechazada || 0); }, 0);
 
-  function setEl(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
-
-  setEl('ih-proc', proc);
-  setEl('ih-pend', pend);
-  setEl('ih-rech', rechHoyUnid);
-  setEl('ih-cap',  '—');
-
-  // Cards de pedidos
-  setEl('icard-proc', proc);
-  setEl('icard-pend', pend);
-  setEl('icard-ops',  ops);
-  setEl('icard-sal',  '—');
-  setEl('icard-ing',  '—');
-  setEl('icard-cmd',  '—');
-
-  // Cards rechazos
-  var semanaMs = 7 * 24 * 60 * 60 * 1000;
-  var hace7 = new Date(Date.now() - semanaMs).toISOString().split('T')[0];
-  var rechSem = rechazosData.filter(function(r){
-    return r.created_at && r.created_at.slice(0,10) >= hace7;
-  });
-  var rechSemUnid = rechSem.reduce(function(a, r){ return a + (r.cantidad_rechazada || 0); }, 0);
-  setEl('icard-rech-hoy', rechHoyUnid);
-  setEl('icard-rech-sem', rechSemUnid);
-  setEl('icard-cmd2', '—');
-  setEl('icard-fugas', '—');
+  // Stagger: KPI cells → luego sub-cards
+  staggerEls('#view-inicio .inicio-kpi', 0);
+  staggerEls('#view-inicio .sub-card',   80);
 }
 
 // ══ RECHAZOS ════════════════════════════════════════════════
@@ -1911,9 +1969,9 @@ async function confirmarRechazo() {
   var lote   = (document.getElementById('rechLote')     || {}).value || '';
   var obs    = (document.getElementById('rechObs')      || {}).value || '';
 
-  if (!sku)    { showToast('Ingresa el SKU del producto rechazado', '#D97706'); return; }
-  if (!rech)   { showToast('Ingresa la cantidad rechazada', '#D97706'); return; }
-  if (!motivo) { showToast('Selecciona el motivo del rechazo', '#D97706'); return; }
+  if (!sku)    { showToast('Ingresa el SKU del producto rechazado', '#D97706'); animShake(document.getElementById('modalRechazo')); return; }
+  if (!rech)   { showToast('Ingresa la cantidad rechazada', '#D97706');          animShake(document.getElementById('modalRechazo')); return; }
+  if (!motivo) { showToast('Selecciona el motivo del rechazo', '#D97706');       animShake(document.getElementById('modalRechazo')); return; }
 
   var payload = {
     sku:                sku,
@@ -2126,8 +2184,25 @@ function formatFecha(isoStr) {
   return isoStr.split('T')[0];
 }
 
+// ── Skeleton para tablas de movimientos ───────────────────────
+function buildMovSkeleton() {
+  var cols = ['60px','80px','60px','120px','180px','48px','64px','100px'];
+  var rows = '';
+  for (var i = 0; i < 6; i++) {
+    rows += '<tr class="sk-tr">' + cols.map(function(w){
+      return '<td><div class="skeleton sk-line" style="width:' + w + ';height:13px"></div></td>';
+    }).join('') + '</tr>';
+  }
+  return '<table class="mov-table"><thead><tr>'
+    + '<th></th><th>Nº Documento</th><th>Fecha Doc.</th><th>SKU</th><th>Descripción</th>'
+    + '<th style="text-align:right">Cantidad</th><th>Solicitud</th><th>Observaciones</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
 // ── Carga ─────────────────────────────────────────────────────
 async function cargarMovimientos() {
+  var tabla = document.getElementById('movTabla');
+  if (tabla) tabla.innerHTML = buildMovSkeleton();
   try {
     var sal = await db.from('movimientos_materiales').select('*').eq('tipo','salida_bodega').order('created_at', { ascending: false });
     var ing = await db.from('movimientos_materiales').select('*').eq('tipo','entrada_pt').order('created_at', { ascending: false });
@@ -2281,9 +2356,9 @@ async function confirmarMov() {
   var solId  = document.getElementById('movSolicitud').value || null;
   var obs    = document.getElementById('movObs').value.trim();
 
-  if (!numDoc)         { showToast('⚠️ Nº de documento requerido', '#B83232'); return; }
-  if (!sku)            { showToast('⚠️ SKU requerido', '#B83232'); return; }
-  if (!cant || cant<1) { showToast('⚠️ Cantidad debe ser mayor a 0', '#B83232'); return; }
+  if (!numDoc)         { showToast('⚠️ Nº de documento requerido', '#B83232'); animShake(document.getElementById('modalMov')); return; }
+  if (!sku)            { showToast('⚠️ SKU requerido', '#B83232');            animShake(document.getElementById('modalMov')); return; }
+  if (!cant || cant<1) { showToast('⚠️ Cantidad debe ser mayor a 0', '#B83232'); animShake(document.getElementById('modalMov')); return; }
 
   var obsFinal = 'FECHA:' + fecha + (obs ? ' | ' + obs : '');
   var btnOk = document.getElementById('movBtnOk');
