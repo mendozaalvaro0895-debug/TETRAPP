@@ -97,9 +97,9 @@ function tetraPintarUsuario() {
   var nombre = TETRA.nombre || TETRA.email || 'Usuario';
   var iniciales = nombre.trim().split(/\s+/).map(function (p) { return p[0]; }).slice(0, 2).join('').toUpperCase();
   var avCls = pill.querySelector('.uavatar') ? 'uavatar' : 'user-av';
-  pill.innerHTML = '<div class="' + avCls + '">' + iniciales + '</div>' +
-    '<span>' + nombre.replace(/[<>&"]/g, '') + '</span>' +
-    '<span style="opacity:.55;font-size:11px;margin-left:6px;cursor:pointer" title="Cerrar sesión">⏻ Salir</span>';
+  pill.innerHTML = '<div class="' + avCls + '" style="color:#fff">' + iniciales + '</div>' +
+    '<span style="color:#fff;font-size:12px;font-weight:600">' + nombre.replace(/[<>&"]/g, '') + '</span>' +
+    '<span style="color:rgba(255,255,255,.65);font-size:11px;margin-left:6px;cursor:pointer;white-space:nowrap" title="Cerrar sesión">⏻ Salir</span>';
   pill.style.cursor = 'pointer';
   pill.title = 'Cerrar sesión (' + (TETRA.email || '') + ')';
   pill.onclick = function () {
