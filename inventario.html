@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TETRAPLASTIC — Inventario</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="shared/auth.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -283,9 +284,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 <div class="toast" id="toast"></div>
 
 <script>
-var SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
-var SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
-var db = supabase.createClient(SUPA_URL, SUPA_KEY);
+// SUPA_URL, SUPA_KEY y db vienen de shared/auth.js
 
 var todosLosItems = [];
 var filtrados    = [];
@@ -331,7 +330,7 @@ async function cargarTodo() {
     actualizarStats();
     aplicarFiltro();
   } catch(e) {
-    document.getElementById('tblBody').innerHTML = '<tr class="empty-row"><td colspan="5">Error al cargar: ' + e.message + '</td></tr>';
+    document.getElementById('tblBody').innerHTML = '<tr class="empty-row"><td colspan="5">Error al cargar: ' + escHtml(e.message) + '</td></tr>';
   }
 }
 
@@ -449,12 +448,12 @@ function buildFila(item) {
     : '<span class="badge badge-inactive">● Inactivo</span>';
   var exist = fmtExist(item.existencia || 0);
   var toggleLabel = item.activo ? 'Desactivar' : 'Activar';
-  var skuEsc = item.sku.replace(/'/g, "\\'");
+  var skuEsc = escHtml(item.sku.replace(/'/g, "\\'"));
   return '<tr>' +
-    '<td class="sku-cell">' + item.sku + '</td>' +
-    '<td class="desc-cell">' + (item.descripcion || '—') + '</td>' +
+    '<td class="sku-cell">' + escHtml(item.sku) + '</td>' +
+    '<td class="desc-cell">' + escHtml(item.descripcion || '—') + '</td>' +
     '<td class="exist-cell">' +
-      '<span id="ev-' + item.sku + '" ondblclick="editarExist(\'' + skuEsc + '\')" title="Doble clic para editar">' + exist + '</span>' +
+      '<span id="ev-' + escHtml(item.sku) + '" ondblclick="editarExist(\'' + skuEsc + '\')" title="Doble clic para editar">' + exist + '</span>' +
     '</td>' +
     '<td>' + badge + '</td>' +
     '<td><div class="act-btns">' +
@@ -471,8 +470,9 @@ function editarExist(sku) {
   var item = todosLosItems.find(function(i) { return i.sku === sku; });
   if (!item) return;
   var actual = item.existencia || 0;
-  span.innerHTML = '<input class="exist-input" id="ei-' + sku + '" type="number" step="0.001" value="' + actual + '"' +
-    ' onblur="guardarExist(\'' + sku + '\')" onkeydown="existKeydown(event,\'' + sku + '\')" autofocus>';
+  var skuAt = escHtml(sku.replace(/'/g, "\\'"));
+  span.innerHTML = '<input class="exist-input" id="ei-' + escHtml(sku) + '" type="number" step="0.001" value="' + actual + '"' +
+    ' onblur="guardarExist(\'' + skuAt + '\')" onkeydown="existKeydown(event,\'' + skuAt + '\')" autofocus>';
   var inp = document.getElementById('ei-' + sku);
   if (inp) { inp.focus(); inp.select(); }
 }
@@ -764,13 +764,13 @@ function mostrarPreviewImport(productos, filename) {
                  : diff < 0 ? '<span style="color:var(--red)">'  + fmtExist(diff) + '</span>'
                  : '<span style="color:var(--gray)">±0</span>';
       return '<tr><td><span class="tag-upd">ACT</span></td>' +
-        '<td style="font-family:var(--mono);font-weight:700">' + r.sku + '</td>' +
-        '<td>' + r.desc.substring(0,45) + '</td>' +
+        '<td style="font-family:var(--mono);font-weight:700">' + escHtml(r.sku) + '</td>' +
+        '<td>' + escHtml(r.desc.substring(0,45)) + '</td>' +
         '<td style="text-align:right;font-family:var(--mono)">' + fmtExist(r.existAntes) + ' → ' + fmtExist(r.existDespues) + ' ' + diffStr + '</td></tr>';
     } else {
       return '<tr><td><span class="tag-new">NUEVO</span></td>' +
-        '<td style="font-family:var(--mono);font-weight:700">' + r.sku + '</td>' +
-        '<td>' + r.descripcion.substring(0,45) + '</td>' +
+        '<td style="font-family:var(--mono);font-weight:700">' + escHtml(r.sku) + '</td>' +
+        '<td>' + escHtml(r.descripcion.substring(0,45)) + '</td>' +
         '<td style="text-align:right;font-family:var(--mono)">' + fmtExist(r.existencia) + '</td></tr>';
     }
   }).join('');
@@ -779,9 +779,9 @@ function mostrarPreviewImport(productos, filename) {
 
   document.getElementById('importBody').innerHTML =
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
-      '<span style="font-size:13px;font-weight:700">' + importBodegaLabel + '</span>' +
+      '<span style="font-size:13px;font-weight:700">' + escHtml(importBodegaLabel) + '</span>' +
       '<span style="font-size:11px;color:var(--gray-l)">·</span>' +
-      '<span style="font-size:11px;color:var(--gray)">' + filename + '</span>' +
+      '<span style="font-size:11px;color:var(--gray)">' + escHtml(filename) + '</span>' +
     '</div>' +
     '<div class="imp-summary">' +
       '<div class="imp-stat"><strong>' + productos.length + '</strong><span>En el Excel</span></div>' +
@@ -851,11 +851,11 @@ function mostrarPreviewVentas(rows, filename) {
   var sample = rows.slice(0, 6);
   var filas = sample.map(function(r) {
     return '<tr>' +
-      '<td style="white-space:nowrap">' + r.fecha + '</td>' +
+      '<td style="white-space:nowrap">' + escHtml(r.fecha) + '</td>' +
       '<td style="font-family:var(--mono);font-weight:700">' + r.docu + '</td>' +
-      '<td style="font-family:var(--mono);color:var(--inv)">' + r.sku + '</td>' +
-      '<td>' + r.descripcion.substring(0, 28) + '</td>' +
-      '<td>' + r.cliente.substring(0, 18) + '</td>' +
+      '<td style="font-family:var(--mono);color:var(--inv)">' + escHtml(r.sku) + '</td>' +
+      '<td>' + escHtml(r.descripcion.substring(0, 28)) + '</td>' +
+      '<td>' + escHtml(r.cliente.substring(0, 18)) + '</td>' +
       '<td style="text-align:right;font-family:var(--mono)">' + r.total_unidades.toLocaleString() + '</td>' +
       '<td style="text-align:right;font-family:var(--mono)">Q ' + r.total_quetzales.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) + '</td>' +
       '</tr>';
@@ -864,10 +864,10 @@ function mostrarPreviewVentas(rows, filename) {
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
       '<span style="font-size:13px;font-weight:700">💰 Ventas · Facturación diaria</span>' +
       '<span style="font-size:11px;color:var(--gray-l)">·</span>' +
-      '<span style="font-size:11px;color:var(--gray)">' + filename + '</span>' +
+      '<span style="font-size:11px;color:var(--gray)">' + escHtml(filename) + '</span>' +
     '</div>' +
     '<div style="font-size:11px;background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:7px;padding:7px 12px;margin-bottom:12px">' +
-      '📅 ' + fechaMin + (fechaMin !== fechaMax ? ' — ' + fechaMax : '') +
+      '📅 ' + escHtml(fechaMin) + (fechaMin !== fechaMax ? ' — ' + escHtml(fechaMax) : '') +
       ' · Los registros existentes para ' + fechasUnicas.length + ' día(s) serán reemplazados.' +
     '</div>' +
     '<div class="imp-summary">' +

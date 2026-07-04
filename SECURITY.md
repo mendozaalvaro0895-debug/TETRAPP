@@ -3,7 +3,7 @@
 **Empresa:** Tetraplastic · Guatemala  
 **Sistema:** Control Digital de Producción y Procesos  
 **Responsable:** Álvaro Mendoza (Administrador)  
-**Última revisión:** 2026-06-25
+**Última revisión:** 2026-07-03 (blindaje v1.0 + autenticación)
 
 ---
 
@@ -11,120 +11,101 @@
 
 | Capa | Mecanismo | Estado |
 |---|---|---|
+| Autenticación | Supabase Auth (email + contraseña) · login.html obligatorio | ✅ |
+| Autorización | RLS por rol: anónimo=nada · visor=solo lectura · master=todo | ✅ (tras correr `sql/seguridad_v1.sql`) |
+| Roles | Tabla `perfiles` (master / visor) · helpers `rol_actual()` / `es_master()` | ✅ |
+| Guardián frontend | `shared/auth.js` en todos los HTML — redirige a login sin sesión | ✅ |
+| Anti-XSS | `escHtml()` global (auth.js) aplicado a datos dinámicos en todos los módulos | ✅ |
 | Transporte | HSTS · HTTPS forzado 2 años | ✅ |
-| Autenticación de API | Supabase anon key (requerida en toda petición) | ✅ |
-| Autorización de datos | RLS habilitado en 14 tablas | ✅ |
-| Protección de interfaz | X-Frame-Options DENY · CSP estricto | ✅ |
-| Filtro de orígenes | Content-Security-Policy → solo Supabase + cdnjs | ✅ |
-| Rate limiting | Supabase 500 req/s · Vercel DDoS protection | ✅ |
+| CSP | Content-Security-Policy en `vercel.json` (solo self + Supabase + CDNs) | ✅ |
+| Protección de interfaz | X-Frame-Options DENY · frame-ancestors 'none' · nosniff | ✅ |
 | Permisos de browser | Permissions-Policy: cámara/mic/geo/pago bloqueados | ✅ |
 
 ---
 
-## 2. Claves y credenciales
-
-### Regla absoluta: dos keys, dos roles
+## 2. Modelo de acceso
 
 ```
-anon/public key  →  frontend HTML (seguro exponerla, protegida por RLS)
+Sin sesión        →  redirigido a login.html · la API no responde nada (RLS)
+visor@tetrapp.app →  ve todo, no puede editar NADA (RLS + bloqueo de fetch en cliente)
+master@tetrapp.app→  acceso total (Álvaro Mendoza)
+```
+
+- La protección REAL vive en las políticas RLS de Supabase. El bloqueo del
+  frontend (banner "Modo Visual" + intercepción de fetch) es solo experiencia
+  de usuario: aunque se salte, el servidor rechaza la escritura.
+- Un usuario autenticado SIN fila en `perfiles` no puede leer nada y el
+  guardián le cierra la sesión (`login.html?e=noperfil`).
+- El registro público de usuarios debe estar DESACTIVADO:
+  Dashboard → Authentication → Sign In / Up → "Allow new users to sign up" = OFF.
+
+### Crear un usuario nuevo
+1. Dashboard → Authentication → Users → Add user (email + contraseña, Auto Confirm ✓)
+2. SQL Editor: `insert into perfiles (user_id, rol, nombre) select id, 'visor', 'Nombre' from auth.users where email = 'nuevo@tetrapp.app';`
+
+---
+
+## 3. Claves y credenciales
+
+```
+anon/public key  →  frontend HTML (seguro exponerla: sin sesión no da acceso a nada)
 service_role key →  NUNCA en código frontend · solo backend/scripts internos
 ```
 
-### Dónde están las claves
-- **anon key**: visible en cada archivo HTML (es intencional y seguro)
-- **service_role key**: solo en Supabase Dashboard → Project Settings → API Keys
-
-### Rotación de claves
-- Rotar la anon key si se sospecha compromiso: Supabase Dashboard → API Keys → Regenerate
-- Actualizar en todos los archivos HTML después de rotar
-- Frecuencia recomendada: cada 6 meses o ante incidente
+- La anon key vive en `shared/auth.js` y `login.html` (único lugar en el código).
+- Rotación: Supabase Dashboard → API Keys → Regenerate → actualizar esos 2 archivos.
 
 ---
 
-## 3. Reglas para desarrollo
-
-### Al crear una nueva página HTML
+## 4. Reglas para desarrollo
 
 ```
 ✅ HACER:
-  - Copiar el cliente Supabase desde una página existente (mismo patrón)
-  - Usar escHtml() o equivalente en TODO texto dinámico del usuario
-  - Habilitar RLS en cualquier tabla nueva antes de exponer al frontend
-  - Validar inputs en el cliente Y en la política RLS
+  - Incluir <script src="shared/auth.js"></script> en TODA página nueva
+    (después del CDN de supabase-js, antes del script propio)
+  - Usar escHtml() en TODO texto dinámico insertado con innerHTML
+  - Toda tabla nueva queda protegida por el patrón de políticas de
+    sql/seguridad_v1.sql — correr la sección D para la tabla nueva
+  - Los fetch crudos a la API deben usar HEADERS (auth.js lo mantiene con el token)
 
 ❌ NO HACER:
+  - Declarar SUPA_URL/SUPA_KEY/db/HEADERS en las páginas (vienen de auth.js)
   - Poner la service_role key en ningún archivo HTML
-  - Usar innerHTML con datos sin sanitizar (riesgo XSS)
-  - Hacer .limit() en queries de inventario (bug conocido: oculta SKUs)
-  - Crear tablas sin RLS (quedan expuestas públicamente)
+  - innerHTML con datos sin escHtml() (riesgo XSS)
+  - Crear políticas RLS con `TO anon` — el rol anónimo no debe tener acceso
   - Usar eval() o new Function() con datos externos
 ```
-
-### Al crear una nueva tabla en Supabase
-
-```sql
--- Siempre incluir estas dos líneas después de CREATE TABLE:
-ALTER TABLE nueva_tabla ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "tetra_anon_all" ON nueva_tabla
-  FOR ALL TO anon USING (true) WITH CHECK (true);
-```
-
-### Inputs del usuario
-
-Siempre escapar antes de insertar en el DOM:
-```javascript
-function escHtml(str) {
-  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
-                          .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-```
-
----
-
-## 4. Vulnerabilidades conocidas y estado
-
-| # | Descripción | Impacto | Estado |
-|---|---|---|---|
-| 1 | `movimientos_materiales`: columnas `sku`/`usuario` incorrectas | Trazabilidad rota | 🔴 Pendiente |
-| 2 | `cargarInventario()` con `.limit(200)` en tapas + serigrafía | 92% SKUs invisibles | 🔴 Pendiente |
-| 3 | RPCs `descontar_inventario()` nunca llamadas | Existencia no se ajusta | 🟡 Pendiente |
-| 4 | Sin autenticación de usuarios | Cualquiera con URL accede | 🟡 Fase 2 |
-| 5 | `shared/` tiene 5 archivos huérfanos | Confusión de código | 🟢 Menor |
 
 ---
 
 ## 5. Configuración de infraestructura
 
 ### Supabase (rohdxjuuvpgrhevfsrye)
-- **RLS**: habilitado en todas las tablas ✅
-- **Data API**: activa, auto-expose nuevas tablas = OFF ✅
-- **Plan**: Free (suficiente hasta ~50 usuarios simultáneos)
+- **RLS**: por rol en todas las tablas (`sql/seguridad_v1.sql`)
+- **anon**: sin privilegios sobre tablas, vistas, secuencias ni funciones
+- **RPCs** `descontar_inventario`/`aumentar_inventario`: security invoker, solo authenticated
+- **Signups públicos**: OFF
 
 ### Vercel (tetrapp.vercel.app)
-- **Deploy**: auto desde rama `main` en GitHub
-- **Headers**: configurados en `vercel.json`
-- **HTTPS**: forzado por HSTS
-- **Plan**: Free (suficiente para fase actual)
-
-### GitHub (mendozaalvaro0895-debug/TETRAPP)
-- **Rama producción**: `main`
-- **Rama desarrollo**: `master` → merge a `main` en cada feature
-- Nunca subir archivos `.env` ni credenciales al repo
+- Headers de seguridad + CSP en `vercel.json`
+- Deploy auto desde rama `main`
 
 ---
 
 ## 6. Respuesta ante incidentes
 
-### Si sospechas que la API key fue comprometida
-1. Supabase Dashboard → API Keys → **Regenerate anon key**
-2. Actualizar la key en todos los archivos HTML
-3. Push a GitHub → Vercel auto-despliega
-4. Revisar logs en Supabase → Logs → API
+### Bloquear un usuario de inmediato
+Dashboard → Authentication → Users → (usuario) → Ban user.
+Su fila en `perfiles` puede borrarse para revocar lectura aunque conserve sesión.
+
+### Si sospechas que una contraseña fue comprometida
+1. Dashboard → Authentication → Users → Reset password
+2. Revisar Logs → API por actividad anómala
 
 ### Si detectas acceso no autorizado a datos
 1. Supabase Dashboard → Logs → revisar IPs y patrones
 2. Si es necesario: pausar proyecto (Settings → Pause project)
-3. Documentar el incidente con fecha, tabla afectada, y datos expuestos
+3. Documentar el incidente con fecha, tabla afectada y datos expuestos
 
 ### Contacto de seguridad
 Reportar incidentes a: **mendozaalvaro0895@gmail.com**
@@ -135,10 +116,8 @@ Reportar incidentes a: **mendozaalvaro0895@gmail.com**
 
 | Fase | Mejora | Prioridad |
 |---|---|---|
-| Fase 1 (actual) | Migrar toda data crítica de localStorage a Supabase | 🔴 Alta |
-| Fase 1 (actual) | Corregir bugs de trazabilidad (#1 y #2) | 🔴 Alta |
-| Fase 2 | Autenticación con magic link (Supabase Auth) | 🟡 Media |
-| Fase 2 | RLS por usuario: cada operador solo ve su data | 🟡 Media |
-| Fase 2 | Cloudflare delante de Vercel (rate limiting por IP) | 🟡 Media |
-| Fase 3 | Log de auditoría: quién cambió qué y cuándo | 🟢 Futura |
-| Fase 3 | Roles: admin / supervisor / operador | 🟢 Futura |
+| Siguiente | Corregir bugs de trazabilidad (#1 y #2 de CLAUDE.md) | 🔴 Alta |
+| Siguiente | `ajustarExistencia()` → usar RPCs atómicas (bug #3) | 🔴 Alta |
+| Fase 3 | Roles adicionales: supervisor / operador con permisos parciales | 🟡 Media |
+| Fase 3 | Log de auditoría: quién cambió qué y cuándo | 🟡 Media |
+| Fase 3 | Cloudflare delante de Vercel (rate limiting por IP) | 🟢 Futura |

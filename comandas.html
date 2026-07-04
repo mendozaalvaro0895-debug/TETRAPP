@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TETRAPLASTIC — Comandas · Tapas</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="shared/auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared/styles.css">
 <style>
@@ -200,9 +201,7 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
 // ============================================
 // CONEXIÓN SUPABASE
 // ============================================
-const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
-const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
-const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+// SUPA_URL, SUPA_KEY y db vienen de shared/auth.js
 
 // ============================================
 // ESTADO GLOBAL
@@ -249,7 +248,7 @@ async function cargarOperarios() {
     if (sel) {
       sel.innerHTML = '<option value="">— Selecciona operario —</option>';
       operariosCache.forEach(op => {
-        sel.insertAdjacentHTML('beforeend', `<option value="${op.codigo}">${op.nombre}</option>`);
+        sel.insertAdjacentHTML('beforeend', `<option value="${escHtml(op.codigo)}">${escHtml(op.nombre)}</option>`);
       });
     }
     return operariosCache;
@@ -371,11 +370,11 @@ function renderLista() {
     const tareas = c.comanda_tareas || [];
     const totalUnd = tareas.filter(t => t.estado === 'Terminada').reduce((s, t) => s + (t.cantidad || 0), 0);
     const isActive = comandaActual?.id === c.id;
-    return `<div class="cmd-item ${isActive ? 'active' : ''}" onclick="verComanda('${c.id}')">
-      <div class="cmd-av" style="background:${color}">${ini}</div>
+    return `<div class="cmd-item ${isActive ? 'active' : ''}" onclick="verComanda('${escHtml(c.id)}')">
+      <div class="cmd-av" style="background:${escHtml(color)}">${escHtml(ini)}</div>
       <div style="flex:1;min-width:0">
-        <div class="cmd-name">${c.operario_nombre || '—'}</div>
-        <div class="cmd-meta">${modoActual === 'operario' ? `📅 ${c.fecha || '—'} · ` : ''}${c.correlativo || '—'} · ${tareas.length} tareas · Sup: ${c.supervisor_nombre || '—'}</div>
+        <div class="cmd-name">${escHtml(c.operario_nombre || '—')}</div>
+        <div class="cmd-meta">${modoActual === 'operario' ? `📅 ${escHtml(c.fecha || '—')} · ` : ''}${escHtml(c.correlativo || '—')} · ${tareas.length} tareas · Sup: ${escHtml(c.supervisor_nombre || '—')}</div>
       </div>
       <div class="cmd-und">${totalUnd.toLocaleString()}<small>und PT</small></div>
     </div>`;
@@ -417,28 +416,28 @@ function mostrarDetalleComanda(c) {
     try {
       const devs = JSON.parse(c.material_devuelto);
       if (devs.length) {
-        devHtml = `<div class="sec"><div class="sec-label">📦 Material devuelto</div><table class="det-table"><thead><tr><th>Material</th><th>Cantidad</th></tr></thead><tbody>${devs.map(d => `<tr><td style="font-size:12px">${d.desc || '—'}</td><td style="font-family:monospace;font-weight:700">${(d.cantidad || 0).toLocaleString()}</td></tr>`).join('')}</tbody>}</div>`;
+        devHtml = `<div class="sec"><div class="sec-label">📦 Material devuelto</div><table class="det-table"><thead><tr><th>Material</th><th>Cantidad</th></tr></thead><tbody>${devs.map(d => `<tr><td style="font-size:12px">${escHtml(d.desc || '—')}</td><td style="font-family:monospace;font-weight:700">${(d.cantidad || 0).toLocaleString()}</td></tr>`).join('')}</tbody>}</div>`;
       } else {
-        devHtml = `<div class="sec"><div class="sec-label">📦 Material devuelto</div><p style="font-size:13px">${c.material_devuelto}</p></div>`;
+        devHtml = `<div class="sec"><div class="sec-label">📦 Material devuelto</div><p style="font-size:13px">${escHtml(c.material_devuelto)}</p></div>`;
       }
     } catch(e) {
-      devHtml = `<div class="sec"><div class="sec-label">📦 Material devuelto</div><p style="font-size:13px">${c.material_devuelto}</p></div>`;
+      devHtml = `<div class="sec"><div class="sec-label">📦 Material devuelto</div><p style="font-size:13px">${escHtml(c.material_devuelto)}</p></div>`;
     }
   }
   
   document.getElementById('detailContent').innerHTML = `
     <div class="det-head">
       <div style="display:flex;gap:14px;align-items:center">
-        <div class="det-avatar" style="background:${color}">${op.iniciales || '?'}</div>
+        <div class="det-avatar" style="background:${escHtml(color)}">${escHtml(op.iniciales || '?')}</div>
         <div>
-          <div class="det-name">${c.operario_nombre || '—'}</div>
-          <div class="det-meta">📅 ${c.fecha || ''} · ${c.correlativo || '—'} · Supervisor: ${c.supervisor_nombre || '—'}</div>
-          <div class="det-meta">🕐 Inicio: ${c.hora_inicio || '—'} · Cierre: ${c.hora_cierre || '—'}</div>
+          <div class="det-name">${escHtml(c.operario_nombre || '—')}</div>
+          <div class="det-meta">📅 ${escHtml(c.fecha || '')} · ${escHtml(c.correlativo || '—')} · Supervisor: ${escHtml(c.supervisor_nombre || '—')}</div>
+          <div class="det-meta">🕐 Inicio: ${escHtml(c.hora_inicio || '—')} · Cierre: ${escHtml(c.hora_cierre || '—')}</div>
         </div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-cancel" onclick="editarComanda('${c.id}')">✏️ Editar</button>
-        <button class="btn btn-del" onclick="borrarComanda('${c.id}')">🗑 Eliminar</button>
+        <button class="btn btn-cancel" onclick="editarComanda('${escHtml(c.id)}')">✏️ Editar</button>
+        <button class="btn btn-del" onclick="borrarComanda('${escHtml(c.id)}')">🗑 Eliminar</button>
       </div>
     </div>
     <div class="total-bar" style="margin-bottom:14px">
@@ -452,18 +451,18 @@ function mostrarDetalleComanda(c) {
         <tbody>${tareas.map((t, i) => `
           <tr>
             <td style="color:#6B6B6A;font-size:11px">${i + 1}</td>
-            <td><strong>${t.proceso || '—'}</strong></td>
-            <td style="font-size:12px">${t.tapa_desc || '—'}</td>
+            <td><strong>${escHtml(t.proceso || '—')}</strong></td>
+            <td style="font-size:12px">${escHtml(t.tapa_desc || '—')}</td>
             <td style="font-family:'DM Mono',monospace;font-weight:700">${(t.cantidad || 0).toLocaleString()}</td>
             <td>${t.metodo === 'manual' ? '✋ Manual' : t.metodo === 'maquina_liner' ? '⚙ Máquina Liner' : '⚙ Máquina Armado'}</td>
-            <td><span class="status-badge sb-${(t.estado || 'asignada').toLowerCase().replace(' ', '')}">${t.estado || 'Asignada'}</span></td>
+            <td><span class="status-badge sb-${escHtml((t.estado || 'asignada').toLowerCase().replace(' ', ''))}">${escHtml(t.estado || 'Asignada')}</span></td>
           </tr>
         `).join('')}</tbody>
       </table>
     </div>
     ${devHtml}
-    ${c.observaciones ? `<div class="sec" style="margin-bottom:12px"><div class="sec-label">📝 Observaciones</div><p style="font-size:13px">${c.observaciones}</p></div>` : ''}
-    <div style="background:#EBF7F4;border:1.5px solid #1A6B5B;border-radius:10px;padding:12px 16px;font-size:12px;color:#0D4035;font-weight:600">✍️ Firmado por: <strong>${c.supervisor_nombre || '—'}</strong> · Cierre: <strong>${c.hora_cierre || '—'}</strong></div>
+    ${c.observaciones ? `<div class="sec" style="margin-bottom:12px"><div class="sec-label">📝 Observaciones</div><p style="font-size:13px">${escHtml(c.observaciones)}</p></div>` : ''}
+    <div style="background:#EBF7F4;border:1.5px solid #1A6B5B;border-radius:10px;padding:12px 16px;font-size:12px;color:#0D4035;font-weight:600">✍️ Firmado por: <strong>${escHtml(c.supervisor_nombre || '—')}</strong> · Cierre: <strong>${escHtml(c.hora_cierre || '—')}</strong></div>
   `;
   showPanel('detail');
 }
@@ -644,9 +643,9 @@ async function buscarSKURow(n, query) {
     const sku = i.sku || '';
     const desc = i.descripcion || '';
     const exist = i.existencia !== undefined ? i.existencia : '';
-    return `<div class="ac-item" onclick="seleccionarTapa(${n},'${sku}','${desc.replace(/'/g, "\\'")}')">
-      <div class="ac-sku">${sku}</div>
-      <div class="ac-desc">${desc.substring(0, 60)}</div>
+    return `<div class="ac-item" onclick="seleccionarTapa(${n},'${escHtml(sku).replace(/'/g, "\\'")}','${escHtml(desc.replace(/'/g, "\\'"))}')">
+      <div class="ac-sku">${escHtml(sku)}</div>
+      <div class="ac-desc">${escHtml(desc.substring(0, 60))}</div>
       ${exist !== '' ? `<div class="ac-exist">Existencia: ${exist.toLocaleString()} und</div>` : ''}
     </div>`;
   }).join('');
@@ -675,10 +674,10 @@ function addDevolucionRow(datos = {}) {
     <tr class="tarea-row" id="dev_${n}">
       <td>
         <div class="ac-wrap">
-          <input type="text" id="dev_${n}_mat" value="${datos.desc || ''}"
+          <input type="text" id="dev_${n}_mat" value="${escHtml(datos.desc || '')}"
             placeholder="SKU o descripción del material..." autocomplete="off"
             oninput="buscarSKUDev(${n}, this.value)"
-            data-sku="${datos.sku || ''}"
+            data-sku="${escHtml(datos.sku || '')}"
             style="width:100%">
           <div class="ac-drop" id="dev_${n}_drop"></div>
         </div>
@@ -712,9 +711,9 @@ async function buscarSKUDev(n, query) {
     const sku = i.sku || '';
     const desc = i.descripcion || '';
     const exist = i.existencia !== undefined ? i.existencia : '';
-    return `<div class="ac-item" onclick="seleccionarDev(${n},'${sku}','${desc.replace(/'/g, "\\'")}')">
-      <div class="ac-sku">${sku}</div>
-      <div class="ac-desc">${desc.substring(0, 60)}</div>
+    return `<div class="ac-item" onclick="seleccionarDev(${n},'${escHtml(sku).replace(/'/g, "\\'")}','${escHtml(desc.replace(/'/g, "\\'"))}')">
+      <div class="ac-sku">${escHtml(sku)}</div>
+      <div class="ac-desc">${escHtml(desc.substring(0, 60))}</div>
       ${exist !== '' ? `<div class="ac-exist">Existencia: ${exist.toLocaleString()} und</div>` : ''}
     </div>`;
   }).join('');

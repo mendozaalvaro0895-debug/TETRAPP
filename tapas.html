@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TETRAPLASTIC — Tapas</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="shared/auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared/styles.css">
 <style>
@@ -847,11 +848,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 // TAPAS.JS - VERSIÓN CORREGIDA
 // ════════════════════════════════════════════════════════════
 
-// Conexión Supabase
-const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
-const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
-const db = supabase.createClient(SUPA_URL, SUPA_KEY);
-const HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
+// Conexión Supabase — SUPA_URL, SUPA_KEY, db y HEADERS vienen de shared/auth.js
 
 // Estado global
 let solicitudes = [];
@@ -1004,18 +1001,18 @@ function renderListas() {
   if (!container) return;
   
   container.innerHTML = filtradas.map(s => `
-    <div class="sc ${selId === s.id ? 'sel' : ''}" onclick="mostrarDetalle('${s.id}')">
+    <div class="sc ${selId === s.id ? 'sel' : ''}" onclick="mostrarDetalle('${escHtml(s.id)}')">
       <div class="sc-top">
         <div>
-          <div class="sc-id">${s.id_display || s.id.slice(0,8)}</div>
-          <div class="sc-cli">${s.cliente}</div>
-          <div class="sc-desc">${s.sku} — ${s.desc}</div>
+          <div class="sc-id">${escHtml(s.id_display || s.id.slice(0,8))}</div>
+          <div class="sc-cli">${escHtml(s.cliente)}</div>
+          <div class="sc-desc">${escHtml(s.sku)} — ${escHtml(s.desc)}</div>
         </div>
         <div>${estadoPill(s.estado)} ${prioridadPill(s.prio)}</div>
       </div>
       <div class="sc-meta">
         <span class="sc-qty">${s.cant.toLocaleString()} und</span>
-        <span class="sc-date">🗓 ${s.fecha_lim || '—'}</span>
+        <span class="sc-date">🗓 ${escHtml(s.fecha_lim || '—')}</span>
         <span class="sc-date">⏱ ${calcularHoras(s.cant, 1, s.lineas.flatMap(l => l.procs || [])).toFixed(1)}h</span>
       </div>
       ${s.prog > 0 ? `<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:${s.prog}%"></div></div><div class="pr-pct">${s.prog}%</div></div>` : ''}
@@ -1034,7 +1031,7 @@ function estadoPill(estado) {
     'nueva': '🟡 Nueva', 'programada': '📅 Programada',
     'proceso': '🟢 En proceso', 'lista': '✅ Lista', 'entregada': '📦 Entregada'
   };
-  return `<span class="pill ${clases[estado] || 'pill-nueva'}">${textos[estado] || estado}</span>`;
+  return `<span class="pill ${clases[estado] || 'pill-nueva'}">${textos[estado] || escHtml(estado)}</span>`;
 }
 
 function prioridadPill(prioridad) {
@@ -1046,7 +1043,7 @@ function prioridadPill(prioridad) {
     'normal': '🟢 Normal', 'urgente': '🔴 Urgente',
     'programada': '📅 Programada', 'vela': '🌙 Vela'
   };
-  return `<span class="pill ${clases[prioridad] || 'pill-normal'}">${textos[prioridad] || prioridad}</span>`;
+  return `<span class="pill ${clases[prioridad] || 'pill-normal'}">${textos[prioridad] || escHtml(prioridad)}</span>`;
 }
 
 function calcularHoras(cantidad, opsCount, procs) {
@@ -1232,8 +1229,8 @@ async function mostrarDetalle(id) {
   det.innerHTML = `
     <div class="ph" style="flex-shrink:0">
       <div>
-        <div class="ph-title">${s.id_display || s.id.slice(0,8)} — ${s.cliente}</div>
-        <div class="ph-sub">${s.sku} · ${s.cant.toLocaleString()} unidades</div>
+        <div class="ph-title">${escHtml(s.id_display || s.id.slice(0,8))} — ${escHtml(s.cliente)}</div>
+        <div class="ph-sub">${escHtml(s.sku)} · ${s.cant.toLocaleString()} unidades</div>
       </div>
       <div class="ph-r">
         ${s.estado === 'nueva' ? `<button class="btn btn-t btn-xs" onclick="cambiarEstado('${s.id}','proceso')">▶ Iniciar</button>` : ''}
@@ -1275,9 +1272,9 @@ async function mostrarDetalle(id) {
             <tbody>
               ${s.lineas.map(l => `
                 <tr>
-                  <td style="font-family:var(--mono)">${l.sku || '—'}</td>
-                  <td>${l.desc || '—'}</td>
-                  <td style="font-family:var(--mono);color:var(--gray)">${l.sku_base || '—'}</td>
+                  <td style="font-family:var(--mono)">${escHtml(l.sku || '—')}</td>
+                  <td>${escHtml(l.desc || '—')}</td>
+                  <td style="font-family:var(--mono);color:var(--gray)">${escHtml(l.sku_base || '—')}</td>
                   <td style="text-align:right">${(l.cant || 0).toLocaleString()}</td>
                   <td style="text-align:right;color:${(l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)'}">${(l.existencia || 0).toLocaleString()}</td>
                 </tr>
@@ -1298,7 +1295,7 @@ async function mostrarDetalle(id) {
         </div>
       </div>
       
-      ${s.notas ? `<div class="dc"><div class="dc-h">Notas</div><div class="dc-b">${s.notas}</div></div>` : ''}
+      ${s.notas ? `<div class="dc"><div class="dc-h">Notas</div><div class="dc-b">${escHtml(s.notas)}</div></div>` : ''}
     </div>
   `;
   
@@ -1498,15 +1495,15 @@ function renderLineas() {
   cont.innerHTML = lineas.map((l, i) => `
     <div style="border-bottom:1px solid var(--border);padding:8px 10px">
       <div style="display:grid;grid-template-columns:110px 1fr 90px 80px 28px;gap:6px;margin-bottom:5px">
-        <input class="fi" placeholder="SKU PT" value="${l.sku}" onchange="lineas[${i}].sku=this.value;buscarExistencia(${i},this.value)">
-        <input class="fi" placeholder="Descripción" value="${l.desc}" onchange="lineas[${i}].desc=this.value">
+        <input class="fi" placeholder="SKU PT" value="${escHtml(l.sku)}" onchange="lineas[${i}].sku=this.value;buscarExistencia(${i},this.value)">
+        <input class="fi" placeholder="Descripción" value="${escHtml(l.desc)}" onchange="lineas[${i}].desc=this.value">
         <input class="fi" type="number" placeholder="Cant" value="${l.cant || ''}" onchange="lineas[${i}].cant=parseInt(this.value)||0;calcular()">
         <div style="font-size:11px;text-align:right;color:${(l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)'}">${l.existencia !== undefined ? l.existencia.toLocaleString() : '—'}</div>
         <button onclick="removeLinea(${i})" style="background:var(--red-l);border:none;border-radius:5px;cursor:pointer">✕</button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
         <span style="font-size:9px;font-weight:700;color:var(--gray-l);white-space:nowrap;text-transform:uppercase;letter-spacing:.4px">Envase base SKU</span>
-        <input class="fi" placeholder="SKU materia prima…" value="${l.sku_base || ''}" style="font-size:11px;padding:3px 6px;flex:1;max-width:200px" oninput="lineas[${i}].sku_base=this.value">
+        <input class="fi" placeholder="SKU materia prima…" value="${escHtml(l.sku_base || '')}" style="font-size:11px;padding:3px 6px;flex:1;max-width:200px" oninput="lineas[${i}].sku_base=this.value">
       </div>
       <div style="display:flex;gap:5px;flex-wrap:wrap">
         ${ALL_PROCS_TAPAS.map(p => `
@@ -1737,8 +1734,8 @@ function renderPersonal() {
       ${personalData.tapas.map(p => `
         <div class="op-card">
           <div class="op-top">
-            <div class="op-avatar" style="background:${p.color_hex || '#1A6B5B'}">${p.iniciales || '?'}</div>
-            <div><div class="op-name">${p.nombre}</div><div class="op-proc">${p.proceso_hab || 'General'}</div></div>
+            <div class="op-avatar" style="background:${escHtml(p.color_hex || '#1A6B5B')}">${escHtml(p.iniciales || '?')}</div>
+            <div><div class="op-name">${escHtml(p.nombre)}</div><div class="op-proc">${escHtml(p.proceso_hab || 'General')}</div></div>
           </div>
           <div class="pill ${p.activo ? 'p-lista' : 'p-urg'}">${p.activo ? 'Activo' : 'Inactivo'}</div>
         </div>
@@ -1863,15 +1860,15 @@ function buildRechazoRow(r) {
 
   return '<tr>'
     + '<td><span class="mov-badge-rech">RECHAZO</span></td>'
-    + '<td class="mov-doc" style="font-family:var(--mono);font-size:11px">' + fecha + '</td>'
-    + '<td><span class="mov-sku">' + sku + '</span><div style="font-size:10px;color:var(--gray)">' + desc + '</div></td>'
-    + '<td style="font-size:12px;text-transform:capitalize">' + motivo + '</td>'
+    + '<td class="mov-doc" style="font-family:var(--mono);font-size:11px">' + escHtml(fecha) + '</td>'
+    + '<td><span class="mov-sku">' + escHtml(sku) + '</span><div style="font-size:10px;color:var(--gray)">' + escHtml(desc) + '</div></td>'
+    + '<td style="font-size:12px;text-transform:capitalize">' + escHtml(motivo) + '</td>'
     + '<td class="mov-cant" style="color:var(--red)">' + rech.toLocaleString() + '</td>'
     + '<td class="mov-cant" style="color:var(--green)">' + rec.toLocaleString() + '</td>'
     + '<td class="mov-cant" style="color:var(--amber)">' + neta.toLocaleString() + '</td>'
-    + '<td style="font-size:12px;text-align:right;color:var(--gray)">' + tiempo + '</td>'
-    + '<td style="font-size:12px">' + op + '</td>'
-    + '<td style="font-size:11px;color:var(--gray-l)">' + obs + '</td>'
+    + '<td style="font-size:12px;text-align:right;color:var(--gray)">' + escHtml(tiempo) + '</td>'
+    + '<td style="font-size:12px">' + escHtml(op) + '</td>'
+    + '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(obs) + '</td>'
     + '</tr>';
 }
 
@@ -1939,8 +1936,8 @@ function rechSkuInput(val) {
   }).slice(0, 8);
   if (!matches.length) { drop.style.display = 'none'; return; }
   drop.innerHTML = matches.map(function(i){
-    return '<div class="sku-opt" onmousedown="selRechSku(\'' + i.sku + '\',\'' + (i.descripcion||'').replace(/'/g,'') + '\')">'
-      + '<strong>' + i.sku + '</strong> — ' + (i.descripcion || '') + '</div>';
+    return '<div class="sku-opt" onmousedown="selRechSku(\'' + escHtml(String(i.sku).replace(/'/g,'')) + '\',\'' + escHtml((i.descripcion||'').replace(/'/g,'')) + '\')">'
+      + '<strong>' + escHtml(i.sku) + '</strong> — ' + escHtml(i.descripcion || '') + '</div>';
   }).join('');
   drop.style.display = 'block';
 }
@@ -2270,13 +2267,13 @@ function renderMov(tipo) {
     var desc     = getSkuDesc(m.sku_original);
     return '<tr>'
       + '<td><span class="' + badgeClass + '">' + badgeLabel + '</span></td>'
-      + '<td class="mov-doc">' + (m.num_documento || '—') + '</td>'
-      + '<td style="font-family:var(--mono);font-size:11px">' + fechaDoc + '</td>'
-      + '<td class="mov-sku">' + (m.sku_original  || '—') + '</td>'
-      + '<td style="font-size:11px;max-width:200px">' + desc + '</td>'
+      + '<td class="mov-doc">' + escHtml(m.num_documento || '—') + '</td>'
+      + '<td style="font-family:var(--mono);font-size:11px">' + escHtml(fechaDoc) + '</td>'
+      + '<td class="mov-sku">' + escHtml(m.sku_original  || '—') + '</td>'
+      + '<td style="font-size:11px;max-width:200px">' + escHtml(desc) + '</td>'
       + '<td class="mov-cant">' + (m.cantidad || 0).toLocaleString() + '</td>'
-      + '<td style="font-size:11px;color:var(--teal)">' + solLabel + '</td>'
-      + '<td style="font-size:11px;color:var(--gray-l)">' + obsText + '</td>'
+      + '<td style="font-size:11px;color:var(--teal)">' + escHtml(solLabel) + '</td>'
+      + '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(obsText) + '</td>'
       + '</tr>';
   }).join('');
 
@@ -2327,9 +2324,9 @@ function movSkuInput(val) {
   }).slice(0, 10);
   if (matches.length === 0) { drop.classList.remove('open'); return; }
   drop.innerHTML = matches.map(function(i) {
-    return '<div class="sku-item" onmousedown="seleccionarSku(\'' + i.sku.replace(/'/g,"\\'") + '\')">'
-      + '<div class="sku-code">' + i.sku + '</div>'
-      + '<div class="sku-desc">' + (i.descripcion || '') + '</div>'
+    return '<div class="sku-item" onmousedown="seleccionarSku(\'' + escHtml(i.sku.replace(/'/g,"\\'")) + '\')">'
+      + '<div class="sku-code">' + escHtml(i.sku) + '</div>'
+      + '<div class="sku-desc">' + escHtml(i.descripcion || '') + '</div>'
       + '</div>';
   }).join('');
   drop.classList.add('open');

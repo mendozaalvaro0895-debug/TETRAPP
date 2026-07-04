@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TETRAPLASTIC — Ingreso</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#0C0C0B;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.wrap{width:100%;max-width:380px;animation:ds-slideUp .35s ease both}
+@keyframes ds-slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.logo{font-family:'Playfair Display',serif;font-size:26px;font-weight:900;text-align:center;letter-spacing:.5px;margin-bottom:6px}
+.logo span{color:#7ECEC0}
+.tag{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:3px;color:#7ECEC0;text-transform:uppercase;text-align:center;margin-bottom:32px}
+.card{background:#161615;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:28px}
+.card.shake{animation:shk .4s}
+@keyframes shk{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.f-lbl{display:block;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.5);margin:0 0 6px 2px}
+.f-in{width:100%;background:#0C0C0B;border:1.5px solid rgba(255,255,255,.14);border-radius:10px;padding:12px 14px;font:500 14px 'DM Sans',sans-serif;color:#fff;outline:none;transition:border-color .15s;margin-bottom:18px}
+.f-in:focus{border-color:#1A6B5B}
+.btn{width:100%;background:#1A6B5B;color:#fff;border:none;border-radius:10px;padding:13px;font:700 14px 'DM Sans',sans-serif;cursor:pointer;transition:background .15s,transform .1s;letter-spacing:.3px}
+.btn:hover{background:#2A8B75}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:wait}
+.err{display:none;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#FCA5A5;border-radius:10px;padding:10px 14px;font-size:12.5px;font-weight:600;margin-bottom:18px;text-align:center}
+.foot{text-align:center;font-size:11px;color:rgba(255,255,255,.35);margin-top:24px;line-height:1.7}
+.foot code{font-family:'DM Mono',monospace;font-size:10px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="logo">TETRA<span>PLASTIC</span></div>
+  <div class="tag">Sistema Digital de Operaciones</div>
+
+  <div class="card" id="card">
+    <div class="err" id="err"></div>
+    <form id="frm" autocomplete="on">
+      <label class="f-lbl" for="usuario">Usuario</label>
+      <input class="f-in" id="usuario" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+      <label class="f-lbl" for="clave">Contraseña</label>
+      <input class="f-in" id="clave" type="password" autocomplete="current-password" required>
+      <button class="btn" id="btn" type="submit">Ingresar →</button>
+    </form>
+  </div>
+
+  <div class="foot">Acceso restringido · Tetraplastic Guatemala<br>Solicita tu usuario al administrador</div>
+</div>
+
+<script>
+var SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
+var SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
+var db = supabase.createClient(SUPA_URL, SUPA_KEY);
+var DOMINIO = '@tetrapp.app';
+
+// Si ya hay sesión activa → directo al inicio
+db.auth.getSession().then(function (s) {
+  if (s && s.data && s.data.session) location.replace('index.html');
+});
+
+// Aviso si el guardián expulsó por falta de perfil
+if (location.search.indexOf('e=noperfil') !== -1) {
+  mostrarError('Tu usuario no tiene un perfil autorizado. Contacta al administrador.');
+}
+
+function mostrarError(msg) {
+  var e = document.getElementById('err');
+  e.textContent = msg;
+  e.style.display = 'block';
+  var c = document.getElementById('card');
+  c.classList.remove('shake');
+  void c.offsetWidth;
+  c.classList.add('shake');
+}
+
+document.getElementById('frm').addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  var btn = document.getElementById('btn');
+  var usuario = document.getElementById('usuario').value.trim().toLowerCase();
+  var clave = document.getElementById('clave').value;
+  if (!usuario || !clave) return;
+  // Se puede escribir solo el usuario ("master") o el correo completo
+  var email = usuario.indexOf('@') === -1 ? usuario + DOMINIO : usuario;
+
+  btn.disabled = true;
+  btn.textContent = 'Verificando…';
+  try {
+    var r = await db.auth.signInWithPassword({ email: email, password: clave });
+    if (r.error) {
+      mostrarError('Usuario o contraseña incorrectos.');
+      btn.disabled = false;
+      btn.textContent = 'Ingresar →';
+      return;
+    }
+    location.replace('index.html');
+  } catch (e2) {
+    mostrarError('No se pudo conectar. Revisa tu internet e intenta de nuevo.');
+    btn.disabled = false;
+    btn.textContent = 'Ingresar →';
+  }
+});
+</script>
+</body>
+</html>

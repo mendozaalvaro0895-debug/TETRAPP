@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TETRAPLASTIC — Dashboard · Producción</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="shared/auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared/styles.css">
 <style>
@@ -203,9 +204,7 @@ body { font-family: 'DM Sans', sans-serif; background: #F7F6F2; color: #0C0C0B; 
 </div>
 
 <script>
-const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
-const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
-const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+// SUPA_URL, SUPA_KEY y db vienen de shared/auth.js
 
 let periodo = 'mes';
 let fechaRef = new Date();       // fecha de referencia navegable
@@ -413,7 +412,7 @@ function buildDetProcRow(proc, d, maxUnd) {
   const pend   = d.tareas - d.terminadas;
   const meta   = d.terminadas + ' OK' + (pend > 0 ? ' · ' + pend + ' pend.' : '');
   return '<div class="det-proc-row">'
-    + '<div class="det-proc-chip" style="background:' + color + '22;color:' + color + '">' + proc + '</div>'
+    + '<div class="det-proc-chip" style="background:' + color + '22;color:' + color + '">' + escHtml(proc) + '</div>'
     + '<div class="det-proc-bar-wrap"><div class="det-proc-bar" style="width:' + pct + '%;background:' + color + '"></div></div>'
     + '<div class="det-proc-und">' + d.und.toLocaleString() + ' und</div>'
     + '<div class="det-proc-meta">' + meta + '</div>'
@@ -469,11 +468,11 @@ function renderRanking() {
     const color = OP_COLORS[op.id] || '#6B6B6A';
     const pct   = Math.round((op.und / maxUnd) * 100);
     const isOpen = expandedOp === op.id;
-    return '<div class="rank-item" data-opid="' + op.id + '">'
-      + '<div class="ranking-row' + (isOpen ? ' expanded' : '') + '" onclick="toggleOpDetail(\'' + op.id + '\')">'
+    return '<div class="rank-item" data-opid="' + escHtml(op.id) + '">'
+      + '<div class="ranking-row' + (isOpen ? ' expanded' : '') + '" onclick="toggleOpDetail(\'' + escHtml(String(op.id).replace(/'/g, "\\'")) + '\')">'
       + '<div class="rank-medal">' + (medals[i] || '') + '</div>'
-      + '<div class="rank-avatar" style="background:' + color + '">' + initials(op.nombre) + '</div>'
-      + '<div class="rank-info"><div class="rank-name">' + op.nombre + '</div><div class="rank-cmds">' + op.cmds + ' comanda' + (op.cmds !== 1 ? 's' : '') + '</div></div>'
+      + '<div class="rank-avatar" style="background:' + color + '">' + escHtml(initials(op.nombre)) + '</div>'
+      + '<div class="rank-info"><div class="rank-name">' + escHtml(op.nombre) + '</div><div class="rank-cmds">' + op.cmds + ' comanda' + (op.cmds !== 1 ? 's' : '') + '</div></div>'
       + '<div class="rank-bar-wrap"><div class="rank-bar" style="width:' + pct + '%"></div></div>'
       + '<div class="rank-und">' + op.und.toLocaleString() + ' und</div>'
       + '<div class="rank-chevron' + (isOpen ? ' open' : '') + '">▼</div>'
@@ -507,8 +506,8 @@ function buildProcOpRow(opId, d, maxUnd) {
   var pend     = d.tareas - d.terminadas;
   var meta     = d.terminadas + ' OK' + (pend > 0 ? ' · ' + pend + ' pend.' : '');
   return '<div class="det-op-row">'
-    + '<div class="det-op-avatar" style="background:' + color + '">' + initials + '</div>'
-    + '<div class="det-op-name">' + d.nombre + '</div>'
+    + '<div class="det-op-avatar" style="background:' + color + '">' + escHtml(initials) + '</div>'
+    + '<div class="det-op-name">' + escHtml(d.nombre) + '</div>'
     + '<div class="det-op-bar-wrap"><div class="det-op-bar" style="width:' + pct + '%"></div></div>'
     + '<div class="det-op-und">' + d.und.toLocaleString() + ' und</div>'
     + '<div class="det-op-meta">' + meta + '</div>'
@@ -521,7 +520,7 @@ function buildProcDetail(proc) {
   var maxUnd   = ops[0][1].und;
   var totalUnd = ops.reduce(function(s, e) { return s + e[1].und; }, 0);
   var totalTar = ops.reduce(function(s, e) { return s + e[1].tareas; }, 0);
-  var html = '<div class="proc-detail-title">Ranking de operarios · ' + proc + '</div>';
+  var html = '<div class="proc-detail-title">Ranking de operarios · ' + escHtml(proc) + '</div>';
   ops.forEach(function(e) { html += buildProcOpRow(e[0], e[1], maxUnd); });
   html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #C8EDE7;display:flex;gap:16px;font-size:11px;color:#6B6B6A;flex-wrap:wrap;align-items:center">'
     + '<span>Total: <strong style="color:#0C0C0B">' + totalUnd.toLocaleString() + ' und</strong></span>'
@@ -568,10 +567,10 @@ function renderProcesos() {
     var color  = PROC_COLORS[proc] || '#6B6B6A';
     var pct    = Math.round((d.und / maxUnd) * 100);
     var isOpen = expandedProc === proc;
-    var safeProc = proc.replace(/'/g, "\\'");
-    return '<div class="proc-item" data-proc="' + proc + '">'
+    var safeProc = escHtml(proc.replace(/'/g, "\\'"));
+    return '<div class="proc-item" data-proc="' + escHtml(proc) + '">'
       + '<div class="proc-row' + (isOpen ? ' expanded' : '') + '" onclick="toggleProcDetail(\'' + safeProc + '\')">'
-      + '<div class="proc-chip" style="background:' + color + '20;color:' + color + '">' + proc + '</div>'
+      + '<div class="proc-chip" style="background:' + color + '20;color:' + color + '">' + escHtml(proc) + '</div>'
       + '<div class="proc-bar-wrap"><div class="proc-bar" style="width:' + pct + '%;background:' + color + '"></div></div>'
       + '<div class="proc-und">' + d.und.toLocaleString() + ' und</div>'
       + '<div class="proc-tareas">' + d.tareas + ' tareas</div>'
@@ -592,7 +591,7 @@ function renderHistorial() {
   document.getElementById('historialContent').innerHTML = `
     <div><div class="historial-header" onclick="toggleHistorial()"><span>📋 Mostrar / Ocultar historial (${total} comandas)</span><span class="toggle-icon ${historialOpen ? 'rotated' : ''}">▼</span></div>
     <div class="historial-body ${historialOpen ? 'open' : ''}"><div style="overflow-x:auto"><table class="hist-table"><thead><tr><th>Fecha</th><th>Correlativo</th><th>Operario</th><th>Supervisor</th><th style="text-align:right">Unidades</th></tr></thead><tbody>
-      ${mostrar.map(c => `<tr onclick="window.location.href='comandas.html?id=${c.id}'"><td style="font-family:monospace;font-size:11px">${c.fecha || '—'}</td><td><strong>${c.correlativo || '—'}</strong></td><td>${c.operario_nombre || '—'}</td><td>${c.supervisor_nombre || '—'}</td><td style="text-align:right;font-weight:700;color:#1A6B5B">${(c.total_unidades || 0).toLocaleString()}</td></tr>`).join('')}
+      ${mostrar.map(c => `<tr onclick="window.location.href='comandas.html?id=${escHtml(encodeURIComponent(c.id))}'"><td style="font-family:monospace;font-size:11px">${escHtml(c.fecha || '—')}</td><td><strong>${escHtml(c.correlativo || '—')}</strong></td><td>${escHtml(c.operario_nombre || '—')}</td><td>${escHtml(c.supervisor_nombre || '—')}</td><td style="text-align:right;font-weight:700;color:#1A6B5B">${(c.total_unidades || 0).toLocaleString()}</td></tr>`).join('')}
     </tbody></table></div>${tieneMas ? `<button class="ver-mas-btn" onclick="cargarMasHistorial()">+ Ver ${total - historialLimit} comandas más</button>` : ''}</div></div>
   `;
 }
