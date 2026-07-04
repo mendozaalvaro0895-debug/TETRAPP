@@ -826,6 +826,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
 const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
 const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+const HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
 
 // ── Meta-encoding (envase/cap/tiros en campo notas) ──────────
 var META_SEP = '__M__';
@@ -2316,12 +2317,11 @@ function renderInicio() {
       && (entMap[s.id] || 0) < (s.cant || 1);
   });
 
-  // KPIs
-  var el;
-  el = document.getElementById('ki-proc');      if (el) el.textContent = enLinea.length;
-  el = document.getElementById('ki-parciales'); if (el) el.textContent = parciales.length;
-  el = document.getElementById('ki-pend');      if (el) el.textContent = pendientesCount;
-  el = document.getElementById('ki-ops');  if (el) el.textContent = ops;
+  // KPIs — count-up animado
+  countUp(document.getElementById('ki-proc'),      enLinea.length,    700);
+  countUp(document.getElementById('ki-parciales'), parciales.length,  700);
+  countUp(document.getElementById('ki-pend'),      pendientesCount,   700);
+  countUp(document.getElementById('ki-ops'),       ops,               700);
 
   // Hub card subtitles
   el = document.getElementById('hc-prog-sub');
@@ -2340,6 +2340,10 @@ function renderInicio() {
   renderAsistHoy();
   renderFaltasChart();
   renderAsistGrid();
+
+  // Stagger: KPI cells → hub-cards
+  staggerEls('#view-inicio .kpi',      0);
+  staggerEls('#view-inicio .hub-card', 60);
 }
 
 var PROD_META_DIA = 30000; // meta diaria de producción (unidades)
@@ -4708,6 +4712,67 @@ function showWipView(key) {
   if (el) el.innerHTML = cfg.chips.map(buildWipChip).join('');
 }
 
+// ══ ANIMACIÓN — helpers ══════════════════════════════════════
+function countUp(el, target, duration) {
+  if (!el) return;
+  var n = parseInt(target, 10);
+  if (isNaN(n) || n === 0) { el.textContent = isNaN(n) ? (target || '0') : '0'; return; }
+  var t0 = null;
+  function step(ts) {
+    if (!t0) t0 = ts;
+    var p = Math.min((ts - t0) / (duration || 600), 1);
+    var e = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(e * n).toLocaleString();
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function staggerEls(selector, baseDelay) {
+  var els = document.querySelectorAll(selector);
+  els.forEach(function(el, i) {
+    el.style.opacity    = '0';
+    el.style.transform  = 'translateY(14px)';
+    el.style.transition = '';
+    var delay = (baseDelay || 0) + i * 65;
+    setTimeout(function() {
+      el.style.transition = 'opacity 340ms cubic-bezier(0.16,1,0.3,1), transform 340ms cubic-bezier(0.16,1,0.3,1)';
+      el.style.opacity    = '1';
+      el.style.transform  = 'translateY(0)';
+    }, delay);
+  });
+}
+
+function animShake(el) {
+  if (!el) return;
+  el.classList.remove('anim-shake');
+  void el.offsetWidth;
+  el.classList.add('anim-shake');
+  el.addEventListener('animationend', function h() {
+    el.classList.remove('anim-shake');
+    el.removeEventListener('animationend', h);
+  }, { once: true });
+}
+
+function animPop(el) {
+  if (!el) return;
+  el.classList.remove('anim-pop');
+  void el.offsetWidth;
+  el.classList.add('anim-pop');
+  el.addEventListener('animationend', function h() {
+    el.classList.remove('anim-pop');
+    el.removeEventListener('animationend', h);
+  }, { once: true });
+}
+
+function triggerViewEnter(viewId) {
+  var el = document.getElementById(viewId);
+  if (!el) return;
+  el.classList.remove('view-enter');
+  void el.offsetWidth;
+  el.classList.add('view-enter');
+}
+
 function switchTab(tab) {
   document.querySelectorAll('.view').forEach(function(v) { v.style.display = 'none'; });
   document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
@@ -4723,16 +4788,17 @@ function switchTab(tab) {
 
   if (tab === 'inicio') {
     var v = document.getElementById('view-inicio');
-    if (v) v.style.display = 'flex';
+    if (v) { v.style.display = 'flex'; triggerViewEnter('view-inicio'); }
     renderInicio();
   } else if (tab === 'personal') {
     var v = document.getElementById('view-personal');
-    if (v) v.style.display = 'flex';
+    if (v) { v.style.display = 'flex'; triggerViewEnter('view-personal'); }
     renderPersonal();
   } else if (tab === 'dash') {
     window.location.href = 'dashboard.html';
   } else if (WIP_TABS.indexOf(tab) !== -1) {
     showWipView(tab);
+    triggerViewEnter('view-wip');
   }
 }
 
@@ -4912,9 +4978,9 @@ async function guardarOperario() {
   var rol       = document.getElementById('mpRol').value;
   var activo    = document.getElementById('mpActivo').checked;
 
-  if (!nombre)    { showToast('⚠️ Nombre requerido', '#B83232'); return; }
-  if (!iniciales) { showToast('⚠️ Iniciales requeridas', '#B83232'); return; }
-  if (!codigo)    { showToast('⚠️ Código requerido', '#B83232'); return; }
+  if (!nombre)    { showToast('⚠️ Nombre requerido', '#B83232');    animShake(document.getElementById('modalPersonal')); return; }
+  if (!iniciales) { showToast('⚠️ Iniciales requeridas', '#B83232'); animShake(document.getElementById('modalPersonal')); return; }
+  if (!codigo)    { showToast('⚠️ Código requerido', '#B83232');    animShake(document.getElementById('modalPersonal')); return; }
 
   var payload = {
     nombre: nombre, iniciales: iniciales, area: 'serig',
@@ -4967,6 +5033,7 @@ function renderPersonal() {
   var inactivos = personalData.serig.filter(function(p) { return !p.activo; });
   var ordered  = activos.concat(inactivos);
   g.innerHTML = '<div class="pg">' + ordered.map(buildPersonalCard).join('') + '</div>';
+  staggerEls('#personalGrid .op-card', 0);
 }
 
 // ════════════════════════════════════════════════════════════
