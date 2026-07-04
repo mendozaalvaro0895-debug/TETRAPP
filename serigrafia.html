@@ -289,9 +289,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ag-th-name{position:sticky;left:0;z-index:3;min-width:130px;text-align:left;padding:4px 10px;background:var(--card);border-right:1.5px solid var(--border)}
 .ag-td-name{position:sticky;left:0;z-index:1;background:var(--bg);padding:5px 10px;font-size:11px;font-weight:600;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1.5px solid var(--border);min-width:130px}
 .ag-cell{width:26px;min-width:26px;height:26px;text-align:center;vertical-align:middle;cursor:pointer;border:1px solid rgba(0,0,0,.06);font-size:9px;font-weight:700;transition:opacity .1s;user-select:none;position:relative}
-.ag-vel-btn{position:absolute;bottom:0;right:0;font-size:7px;line-height:1;cursor:pointer;opacity:0;padding:1px 1px 0 0;transition:opacity .12s;z-index:1}
-.ag-cell:hover .ag-vel-btn{opacity:.45}
-.ag-vel-btn.vel-on{opacity:1!important}
+.ag-cell.velada{background:#ede9fe;color:#6d28d9}
 .ag-cell:hover{opacity:.7}
 .ag-cell.presente{background:#dcfce7;color:#15803d}
 .ag-cell.ausente{background:#fee2e2;color:#b91c1c}
@@ -2630,7 +2628,7 @@ function renderAsistHoy() {
   function buildRows(grupo) {
     return grupo.map(function(p) {
       var est = asistHoyCache[p.codigo] || 'presente';
-      var dot = est === 'ausente' ? '#dc2626' : est === 'tarde' ? '#d97706' : '#16a34a';
+      var dot = est === 'ausente' ? '#dc2626' : est === 'tarde' ? '#d97706' : est === 'velada' ? '#7c3aed' : '#16a34a';
       var tachado = est === 'ausente' ? 'color:var(--gray-l);text-decoration:line-through' : '';
       var cod = p.codigo.replace(/'/g, "\\'");
       return '<div class="asist-hoy-row">' +
@@ -2861,22 +2859,17 @@ async function renderAsistGrid() {
       var ultimoDia = new Date(año, mesN, 0).getDate();
       var fin = mesStr + '-' + (ultimoDia < 10 ? '0'+ultimoDia : ultimoDia);
       var rr  = await db.from('asistencia_diaria')
-        .select('fecha,operador_codigo,estado,turno')
-        .eq('area','serig').in('turno',['dia','noche'])
+        .select('fecha,operador_codigo,estado')
+        .eq('area','serig').eq('turno','dia')
         .gte('fecha', inicio).lte('fecha', fin);
-      var byPD = {}, velByPD = {};
+      var byPD = {};
       if (rr.data && !rr.error) {
         rr.data.forEach(function(row) {
-          if (row.turno === 'dia') {
-            if (!byPD[row.operador_codigo]) byPD[row.operador_codigo] = {};
-            byPD[row.operador_codigo][row.fecha] = row.estado;
-          } else {
-            if (!velByPD[row.operador_codigo]) velByPD[row.operador_codigo] = {};
-            velByPD[row.operador_codigo][row.fecha] = true;
-          }
+          if (!byPD[row.operador_codigo]) byPD[row.operador_codigo] = {};
+          byPD[row.operador_codigo][row.fecha] = row.estado;
         });
       }
-      asistGridCache = { _mes: mesStr, byPersonDay: byPD, velByPersonDay: velByPD };
+      asistGridCache = { _mes: mesStr, byPersonDay: byPD };
     } catch(e) { asistGridCache = { _mes: mesStr, byPersonDay: {}, velByPersonDay: {} }; }
   }
 
@@ -2904,14 +2897,11 @@ async function renderAsistGrid() {
     return '<th class="' + cls + '">' + lbl + '</th>';
   }).join('');
 
-  var velByPD = (asistGridCache && asistGridCache.velByPersonDay) || {};
-
   function buildRows(lista, secLabel) {
     var html = '';
     if (secLabel) html += '<tr class="ag-section-hdr"><td colspan="' + (dias.length+1) + '">' + secLabel + '</td></tr>';
     lista.forEach(function(p) {
       var daysByP = byPD[p.codigo] || {};
-      var velByP  = velByPD[p.codigo] || {};
       var isFullGreen = true;
       dias.forEach(function(f) {
         if (f > hoy) return;
@@ -2929,12 +2919,10 @@ async function renderAsistGrid() {
         if (esFuturo) {
           html += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + '"></td>';
         } else {
-          var est    = daysByP[f] || 'presente';
-          var hasVel = !!velByP[f];
-          var lbl    = est === 'ausente' ? '✗' : est === 'tarde' ? '!' : '';
-          var cod    = p.codigo.replace(/'/g, "\\'");
-          var velBtn = '<span class="ag-vel-btn' + (hasVel ? ' vel-on' : '') + '" onclick="event.stopPropagation();toggleVeladaCell(\'' + cod + '\',\'' + f + '\')" title="Velada">🌙</span>';
-          html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + '" onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + escHtml(p.nombre || p.codigo) + ' · ' + f + '">' + lbl + velBtn + '</td>';
+          var est = daysByP[f] || 'presente';
+          var lbl = est === 'ausente' ? '✗' : est === 'tarde' ? '!' : est === 'velada' ? '🌙' : '';
+          var cod = p.codigo.replace(/'/g, "\\'");
+          html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + '" onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + escHtml(p.nombre || p.codigo) + ' · ' + f + '">' + lbl + '</td>';
         }
       });
       html += '</tr>';
@@ -2980,7 +2968,7 @@ async function toggleAsistCell(codigo, fecha) {
   if (!asistGridCache) return;
   var byPD = asistGridCache.byPersonDay;
   var cur  = (byPD[codigo] && byPD[codigo][fecha]) || 'presente';
-  var next = cur === 'presente' ? 'ausente' : cur === 'ausente' ? 'tarde' : 'presente';
+  var next = cur === 'presente' ? 'ausente' : cur === 'ausente' ? 'tarde' : cur === 'tarde' ? 'velada' : 'presente';
 
   if (!byPD[codigo]) byPD[codigo] = {};
   byPD[codigo][fecha] = next;
@@ -3012,40 +3000,6 @@ async function toggleAsistCell(codigo, fecha) {
   }
 }
 
-async function toggleVeladaCell(codigo, fecha) {
-  if (!asistGridCache) return;
-  if (!asistGridCache.velByPersonDay) asistGridCache.velByPersonDay = {};
-  var velByPD = asistGridCache.velByPersonDay;
-  var cur = !!(velByPD[codigo] && velByPD[codigo][fecha]);
-  var next = !cur;
-
-  if (!velByPD[codigo]) velByPD[codigo] = {};
-  if (next) velByPD[codigo][fecha] = true;
-  else delete velByPD[codigo][fecha];
-
-  renderAsistGrid();
-  try {
-    var r;
-    if (next) {
-      r = await db.from(ASIST_TABLE).upsert({
-        fecha: fecha, operador_codigo: codigo,
-        operador_nombre: getNombreOperario(codigo),
-        area: 'serig', turno: 'noche', estado: 'presente',
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'fecha,operador_codigo,area,turno' });
-    } else {
-      r = await db.from(ASIST_TABLE).delete()
-        .eq('fecha', fecha).eq('operador_codigo', codigo)
-        .eq('area', 'serig').eq('turno', 'noche');
-    }
-    if (r.error) throw r.error;
-    showToast(next ? '🌙 Velada registrada' : '🌙 Velada quitada');
-  } catch(e) {
-    if (cur) velByPD[codigo][fecha] = true; else delete (velByPD[codigo] || {})[fecha];
-    renderAsistGrid();
-    showToast('❌ Error al guardar velada', '#B83232');
-  }
-}
 
 function exportarAsistGridPDF() {
   if (!asistGridCache) { showToast('Sin datos cargados', '#92400e'); return; }
