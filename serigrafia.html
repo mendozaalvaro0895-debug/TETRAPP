@@ -3137,33 +3137,84 @@ function exportarBoardPDF() {
     else { sinAsignar.push(s); }
   });
 
-  // Ordenar Sin Asignar por cliente A→Z luego FIFO
-  sinAsignar.sort(function(a,b){
-    var ca=(a.cliente||'').toLowerCase(), cb=(b.cliente||'').toLowerCase();
-    if(ca<cb) return -1; if(ca>cb) return 1;
-    return (a.created_at||'')<(b.created_at||'') ? -1 : 1;
-  });
   completados.sort(function(a,b){ return (b.created_at||'')<(a.created_at||'') ? -1 : 1; });
+
+  // Tier de entrega real por pedido — misma lógica que el board en pantalla (0=rojo,1=amarillo,2=verde)
+  function getTier(s) {
+    var ent = entregadoMap[s.id] || 0;
+    var tot = s.cant || 0;
+    if (ent > 0 && ent >= tot) return 2;
+    if (ent > 0) return 1;
+    return 0;
+  }
+  var TIER_INFO = [
+    { bg:'#fee2e2', clr:'#991b1b', lbl:'🔴 ROJO' },
+    { bg:'#fef3c7', clr:'#92400e', lbl:'🟡 AMARILLO' },
+    { bg:'#dcfce7', clr:'#166534', lbl:'🟢 VERDE' }
+  ];
 
   var fecha = new Date().toLocaleDateString('es-GT', {day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
 
-  var totalPedidos = solicitudes.filter(function(s){
-    return ['nueva','programada','proceso','parcial','lista'].indexOf(s.estado)>=0;
-  }).length;
-  var enProcN = solicitudes.filter(function(s){ return s.estado==='proceso'; }).length;
-  var parcialN = solicitudes.filter(function(s){
-    var ent = entregadoMap[s.id] || 0, tot = s.cant || 0;
-    return s.estado === 'parcial' || (s.estado !== 'lista' && ent > 0 && ent < tot);
-  }).length;
-  var listaN  = solicitudes.filter(function(s){ return s.estado==='lista'; }).length;
+  var enCursoTotal = LINEAS_PRODUCCION.reduce(function(sum, ln){ return sum + (enCurso[ln.id]||[]).length; }, 0);
+  var rojoN   = sinAsignar.filter(function(s){ return getTier(s) === 0; }).length;
+  var ambN    = sinAsignar.filter(function(s){ return getTier(s) === 1; }).length;
+  var verdeN  = sinAsignar.filter(function(s){ return getTier(s) === 2; }).length;
+  var totalPedidos = enCursoTotal + sinAsignar.length + completados.length;
 
   function estadoBadge(s, ent, total) {
-    var esParcial = s.estado === 'parcial' || (s.estado !== 'lista' && ent > 0 && ent < total);
-    var e = esParcial ? 'parcial' : (s.estado || 'nueva');
+    var e = s.estado || 'nueva';
     var m = { lista:'LISTA', proceso:'EN PROCESO', parcial:'PARCIAL', programada:'PROGRAMADA', nueva:'NUEVA' };
     var c = { lista:'#166534', proceso:'#1e40af', parcial:'#92400e', programada:'#92400e', nueva:'#374151' };
     var b = { lista:'#dcfce7', proceso:'#dbeafe', parcial:'#fef3c7', programada:'#fef3c7', nueva:'#f3f4f6' };
     return '<span style="background:'+(b[e]||'#f3f4f6')+';color:'+(c[e]||'#374151')+';border-radius:3px;padding:1px 6px;font-size:8px;font-weight:800">'+(m[e]||e.toUpperCase())+'</span>';
+  }
+
+  function buildSinRow(s) {
+    var ent = entregadoMap[s.id] || 0;
+    var total = s.cant || 0;
+    var entTxt = ent > 0 ? ent.toLocaleString() + ' / ' + total.toLocaleString() : total.toLocaleString();
+    var tier = TIER_INFO[getTier(s)];
+    var desc = (s.lineas && s.lineas.length)
+      ? s.lineas.map(function(l){ return (l.sku?l.sku+' · ':'')+escHtml(l.desc||''); }).join('<br>')
+      : escHtml(s.desc||'—');
+    return '<tr>' +
+      '<td style="font-family:monospace;font-size:9px;font-weight:700;color:#6d28d9;white-space:nowrap">' + escHtml(s.id_display||s.id.slice(0,8)) + '</td>' +
+      '<td style="font-size:9px;color:#374151">' + desc + '</td>' +
+      '<td style="text-align:right;font-weight:700;font-size:10px">' + entTxt + ' und</td>' +
+      '<td style="text-align:center"><span style="background:'+tier.bg+';color:'+tier.clr+';border-radius:3px;padding:1px 6px;font-size:8px;font-weight:800">'+tier.lbl+'</span></td>' +
+      '</tr>';
+  }
+
+  function buildSinAsignarHtml(items) {
+    if (!items.length) return '<p style="color:#9ca3af;font-size:10px;font-style:italic">Sin pedidos</p>';
+    var grupoMap = {}, grupoKeys = [];
+    items.forEach(function(s) {
+      var cli = s.cliente || '(Sin cliente)';
+      if (!grupoMap[cli]) { grupoMap[cli] = []; grupoKeys.push(cli); }
+      grupoMap[cli].push(s);
+    });
+    grupoKeys.sort(function(a,b){ return a.toLowerCase() < b.toLowerCase() ? -1 : 1; });
+    return grupoKeys.map(function(cli) {
+      var gItems = grupoMap[cli].slice().sort(function(a,b){
+        var ta = getTier(a), tb = getTier(b);
+        if (ta !== tb) return ta - tb;
+        return (a.created_at||'')<(b.created_at||'') ? -1 : 1;
+      });
+      var nRojo  = gItems.filter(function(s){ return getTier(s)===0; }).length;
+      var nAmb   = gItems.filter(function(s){ return getTier(s)===1; }).length;
+      var nVerde = gItems.filter(function(s){ return getTier(s)===2; }).length;
+      var totalUnd = gItems.reduce(function(sum,s){ return sum+(s.cant||0); }, 0);
+      var rows = gItems.map(buildSinRow).join('');
+      return '<div class="seccion">' +
+        '<h3>' + escHtml(cli) + ' <span class="badge-count">' + gItems.length + ' pedidos · ' + totalUnd.toLocaleString() + ' und' +
+          (nRojo  ? ' · 🔴 ' + nRojo  : '') +
+          (nAmb   ? ' · 🟡 ' + nAmb   : '') +
+          (nVerde ? ' · 🟢 ' + nVerde : '') +
+        '</span></h3>' +
+        '<table><thead><tr><th>Código</th><th>Descripción</th><th style="text-align:right">Cant.</th><th style="text-align:center">Estado real</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody></table>' +
+        '</div>';
+    }).join('');
   }
 
   function buildRow(s, showLinea) {
@@ -3234,14 +3285,16 @@ function exportarBoardPDF() {
     '<div style="font-size:9px;color:#6b7280">Generado: ' + fecha + '</div>' +
     '<div class="resumen">' +
       '<div><strong>' + totalPedidos + '</strong>Pedidos activos</div>' +
-      '<div><strong>' + enProcN + '</strong>En proceso</div>' +
-      '<div><strong>' + parcialN + '</strong>Parciales</div>' +
+      '<div><strong>' + enCursoTotal + '</strong>En curso (líneas)</div>' +
       '<div><strong>' + sinAsignar.length + '</strong>Sin asignar</div>' +
-      '<div><strong>' + listaN + '</strong>Completados</div>' +
+      '<div><strong style="color:#991b1b">' + rojoN  + '</strong>🔴 Rojo</div>' +
+      '<div><strong style="color:#92400e">' + ambN   + '</strong>🟡 Amarillo</div>' +
+      '<div><strong style="color:#166534">' + verdeN + '</strong>🟢 Verde</div>' +
+      '<div><strong>' + completados.length + '</strong>Completados</div>' +
     '</div>' +
 
-    '<h2>📥 Sin Asignar (' + sinAsignar.length + ' pedidos · ' + sinTotal.toLocaleString() + ' und)</h2>' +
-    buildTable(sinAsignar, false) +
+    '<h2>📥 Sin Asignar (' + sinAsignar.length + ' pedidos · ' + sinTotal.toLocaleString() + ' und · 🔴 ' + rojoN + ' · 🟡 ' + ambN + ' · 🟢 ' + verdeN + ')</h2>' +
+    buildSinAsignarHtml(sinAsignar) +
 
     '<h2>⚙️ En Curso</h2>' +
     enCursoHtml +
