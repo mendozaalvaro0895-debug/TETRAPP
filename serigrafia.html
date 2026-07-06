@@ -1901,12 +1901,21 @@ function boardBuildSinBlock(items) {
           if (ia !== ib) return ia - ib;
           return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
         });
-        var totalG = gItems.reduce(function(s,i){ return s+(i.cant||0); }, 0);
-        var pedidosTxt = gItems.length + ' pedido' + (gItems.length !== 1 ? 's' : '');
+        var totalG     = gItems.reduce(function(s,i){ return s+(i.cant||0); }, 0);
+        var nTotal     = gItems.length;
+        var nListos    = gItems.filter(function(i){ return i.estado === 'lista' || getTier(i) === 2; }).length;
+        var nParciales = gItems.filter(function(i){ return getTier(i) === 1 && i.estado !== 'lista'; }).length;
+        var nPendientes= gItems.filter(function(i){ return getTier(i) === 0 && i.estado !== 'lista'; }).length;
+        var pedidosTxt = nTotal + ' pedido' + (nTotal !== 1 ? 's' : '') +
+          (nListos    > 0 ? ' · <span style="color:#15803d;font-weight:700">' + nListos + ' ✓</span>' : '') +
+          (nParciales > 0 ? ' · <span style="color:#d97706;font-weight:700">' + nParciales + ' ~</span>' : '') +
+          (nPendientes > 0 ? ' · <span style="color:#b91c1c;font-weight:700">' + nPendientes + ' ●</span>' : '');
         var undTxt = totalG > 0 ? totalG.toLocaleString() + ' und' : '';
-        var horasG = gItems.reduce(function(sum, s) {
-          var allProcs = (s.lineas || []).reduce(function(acc, l) { return acc.concat(l.procs || []); }, []);
-          return sum + calcularHoras(s.cant, 1, allProcs, s.tiros || 1);
+        // Solo calcular tiempo para fichas amarillas (parcial) y rojas (sin entrega) — excluir LISTA y verde
+        var horasG = gItems.reduce(function(sum, item) {
+          if (item.estado === 'lista' || getTier(item) === 2) return sum;
+          var allProcs = (item.lineas || []).reduce(function(acc, l) { return acc.concat(l.procs || []); }, []);
+          return sum + calcularHoras(item.cant, 1, allProcs, item.tiros || 1);
         }, 0);
         var tiempoTxt = (function(h) {
           if (!h) return '';
