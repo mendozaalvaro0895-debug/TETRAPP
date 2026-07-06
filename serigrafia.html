@@ -3514,10 +3514,10 @@ function vincularPedidoLinea(solId, i) {
   if (ed && !ed.value.trim() && s.desc) { ed.value = s.desc; eEntregadoSkus[i] = s.sku || null; }
 }
 
-function abrirFormEntregado() {
+function abrirFormEntregado(prefill) {
   var el = document.getElementById('formEntregadoInline');
   if (!el) return;
-  if (el.style.display !== 'none') { cerrarFormEntregado(); return; }
+  if (!prefill && el.style.display !== 'none') { cerrarFormEntregado(); return; }
   eEntregadoSkus = {}; eLineasCount = 0; eEntregadoSolId = null; eEntregadoSolCod = '';
   var usage = getCliUsage();
   var sorted = CLIENTES.slice().sort(function(a, b) {
@@ -3559,7 +3559,18 @@ function abrirFormEntregado() {
       // Fila 4: Nota
       '<input id="eNota" placeholder="Nota / observaciones (opcional)" style="' + inputSty + '">' +
     '</div>';
-  agregarLineaEntregado();
+
+  var sPre = prefill && prefill.solId ? solicitudes.find(function(x){ return x.id === prefill.solId; }) : null;
+  if (sPre) {
+    agregarLineaEntregado(sPre.desc, sPre.sku, null, sPre.cliente, sPre.id);
+    setTimeout(function() {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var c = document.getElementById('eCant-0');
+      if (c) c.focus();
+    }, 50);
+  } else {
+    agregarLineaEntregado();
+  }
 }
 
 function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal, solIdVal) {
@@ -4280,6 +4291,7 @@ function abrirEstadoSin(event, solId, lineaDbId) {
     { val: 'nueva',      label: 'Nueva',      bg: '#f1f5f9', clr: '#64748b' },
     { val: 'programada', label: 'Programada', bg: '#fef3c7', clr: '#92400e' },
     { val: 'proceso',    label: 'En proceso', bg: 'var(--serig-l)', clr: 'var(--serig-m)' },
+    { val: 'parcial',    label: '🟡 Registrar entrega parcial', bg: '#fef9c3', clr: '#92400e' },
     { val: 'lista',      label: 'Lista ✓',    bg: '#dcfce7', clr: '#15803d' }
   ];
 
@@ -4297,6 +4309,10 @@ function abrirEstadoSin(event, solId, lineaDbId) {
     btn.onclick = function(e) {
       e.stopPropagation();
       pop.remove();
+      if (op.val === 'parcial') {
+        abrirFormEntregado({ solId: solId });
+        return;
+      }
       if (lineaDbId) {
         cambiarEstadoLinea(lineaDbId, solId, op.val);
       } else {
