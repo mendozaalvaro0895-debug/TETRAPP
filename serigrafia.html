@@ -1906,10 +1906,11 @@ function boardBuildSinBlock(items) {
         var nListos    = gItems.filter(function(i){ return i.estado === 'lista' || getTier(i) === 2; }).length;
         var nParciales = gItems.filter(function(i){ return getTier(i) === 1 && i.estado !== 'lista'; }).length;
         var nPendientes= gItems.filter(function(i){ return getTier(i) === 0 && i.estado !== 'lista'; }).length;
+        var _pill = 'display:inline-block;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:800;margin-left:4px';
         var pedidosTxt = nTotal + ' pedido' + (nTotal !== 1 ? 's' : '') +
-          (nListos    > 0 ? ' · <span style="color:#15803d;font-weight:700">' + nListos + ' ✓</span>' : '') +
-          (nParciales > 0 ? ' · <span style="color:#d97706;font-weight:700">' + nParciales + ' ~</span>' : '') +
-          (nPendientes > 0 ? ' · <span style="color:#b91c1c;font-weight:700">' + nPendientes + ' ●</span>' : '');
+          (nListos    > 0 ? '<span style="' + _pill + ';background:rgba(21,128,61,.25);color:#bbf7d0;border:1px solid rgba(21,128,61,.45)">' + nListos + ' ✓</span>' : '') +
+          (nParciales > 0 ? '<span style="' + _pill + ';background:rgba(217,119,6,.25);color:#fde68a;border:1px solid rgba(217,119,6,.45)">' + nParciales + ' ~</span>' : '') +
+          (nPendientes > 0 ? '<span style="' + _pill + ';background:rgba(185,28,28,.25);color:#fca5a5;border:1px solid rgba(185,28,28,.45)">' + nPendientes + ' ●</span>' : '');
         var undTxt = totalG > 0 ? totalG.toLocaleString() + ' und' : '';
         // Solo calcular tiempo para fichas amarillas (parcial) y rojas (sin entrega) — excluir LISTA y verde
         var horasG = gItems.reduce(function(sum, item) {
