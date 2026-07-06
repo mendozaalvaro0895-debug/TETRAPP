@@ -473,6 +473,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="tab" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
     <div class="tab" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
     <div class="tabs-r">
+      <button class="btn btn-g btn-sm" onclick="exportarBoardPDF()" title="Imprimir estado del board">🖨 Imprimir</button>
       <button class="btn btn-s btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>
     </div>
   </div>
@@ -3099,6 +3100,149 @@ function exportarAsistGridPDF() {
       '<span><span class="leg-dot" style="background:#fef3c7;border:1px solid #fde68a"></span>T = Tarde</span>' +
       '<span><span class="leg-dot" style="background:#dcfce7;border:1px solid #86efac"></span>Fila verde = asistencia completa</span>' +
     '</div>' +
+    '<script>window.onload=function(){window.print();}<\/script>' +
+    '</body></html>';
+
+  var w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+  else showToast('Activa las ventanas emergentes para exportar', '#92400e');
+}
+
+function exportarBoardPDF() {
+  if (!solicitudes || !solicitudes.length) { showToast('Sin datos cargados', '#92400e'); return; }
+
+  var manuales = getEntregasManuales() || [];
+  var entregadoMap = {};
+  manuales.forEach(function(m) {
+    if (m.lineas && m.lineas.length) {
+      m.lineas.forEach(function(l) { if (l.solId) entregadoMap[l.solId] = (entregadoMap[l.solId]||0)+(l.cant||0); });
+    } else if (m.solId) {
+      entregadoMap[m.solId] = (entregadoMap[m.solId]||0)+(m.cant||0);
+    }
+  });
+
+  // Clasificar solicitudes
+  var sinAsignar = [], completados = [];
+  var enCurso = {}; // linea_id → []
+  LINEAS_PRODUCCION.forEach(function(ln){ enCurso[ln.id] = []; });
+
+  solicitudes.forEach(function(s) {
+    if (s.estado === 'lista' && s.linea_id) { completados.push(s); return; }
+    var esActiva   = ['nueva','programada','proceso'].indexOf(s.estado) >= 0;
+    var esListaSin = s.estado === 'lista' && !s.linea_id;
+    if (!esActiva && !esListaSin) return;
+    if (!s.linea_id) { sinAsignar.push(s); }
+    else if (enCurso[s.linea_id]) { enCurso[s.linea_id].push(s); }
+    else { sinAsignar.push(s); }
+  });
+
+  // Ordenar Sin Asignar por cliente A→Z luego FIFO
+  sinAsignar.sort(function(a,b){
+    var ca=(a.cliente||'').toLowerCase(), cb=(b.cliente||'').toLowerCase();
+    if(ca<cb) return -1; if(ca>cb) return 1;
+    return (a.created_at||'')<(b.created_at||'') ? -1 : 1;
+  });
+  completados.sort(function(a,b){ return (b.created_at||'')<(a.created_at||'') ? -1 : 1; });
+
+  var fecha = new Date().toLocaleDateString('es-GT', {day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  var totalPedidos = solicitudes.filter(function(s){
+    return ['nueva','programada','proceso','lista'].indexOf(s.estado)>=0;
+  }).length;
+  var enProcN = solicitudes.filter(function(s){ return s.estado==='proceso'; }).length;
+  var listaN  = solicitudes.filter(function(s){ return s.estado==='lista'; }).length;
+
+  function estadoBadge(s) {
+    var m = { lista:'LISTA', proceso:'EN PROCESO', programada:'PROGRAMADA', nueva:'NUEVA' };
+    var c = { lista:'#166534', proceso:'#1e40af', programada:'#92400e', nueva:'#374151' };
+    var b = { lista:'#dcfce7', proceso:'#dbeafe', programada:'#fef3c7', nueva:'#f3f4f6' };
+    var e = s.estado || 'nueva';
+    return '<span style="background:'+(b[e]||'#f3f4f6')+';color:'+(c[e]||'#374151')+';border-radius:3px;padding:1px 6px;font-size:8px;font-weight:800">'+(m[e]||e.toUpperCase())+'</span>';
+  }
+
+  function buildRow(s, showLinea) {
+    var ent = entregadoMap[s.id] || 0;
+    var total = s.cant || 0;
+    var entTxt = ent > 0 ? ent.toLocaleString() + ' / ' + total.toLocaleString() : total.toLocaleString();
+    var entClr = ent >= total && total > 0 ? '#15803d' : ent > 0 ? '#92400e' : '#111';
+    var progTxt = s.prog > 0 ? s.prog + '%' : '—';
+    var lineaTxt = showLinea
+      ? (s.linea_id ? (LINEAS_PRODUCCION.find(function(l){return l.id===s.linea_id;})||{nombre:'?'}).nombre : '—')
+      : '';
+    var desc = (s.lineas && s.lineas.length)
+      ? s.lineas.map(function(l){ return (l.sku?l.sku+' · ':'')+escHtml(l.desc||''); }).join('<br>')
+      : escHtml(s.desc||'—');
+    var fila = '<tr>' +
+      '<td style="font-family:monospace;font-size:9px;font-weight:700;color:#6d28d9;white-space:nowrap">' + escHtml(s.id_display||s.id.slice(0,8)) + '</td>' +
+      '<td style="font-weight:700;font-size:10px">' + escHtml(s.cliente||'—') + '</td>' +
+      '<td style="font-size:9px;color:#374151">' + desc + '</td>' +
+      '<td style="text-align:right;font-weight:700;font-size:10px;color:'+entClr+'">' + entTxt + '</td>' +
+      '<td style="text-align:center;font-size:9px;color:#6b7280">' + progTxt + '</td>' +
+      '<td style="text-align:center">' + estadoBadge(s) + '</td>' +
+      (showLinea ? '<td style="font-size:9px;color:#374151">' + lineaTxt + '</td>' : '') +
+      '</tr>';
+    return fila;
+  }
+
+  function buildTable(items, showLinea) {
+    if (!items.length) return '<p style="color:#9ca3af;font-size:10px;font-style:italic">Sin pedidos</p>';
+    var thLinea = showLinea ? '<th>Línea</th>' : '';
+    var rows = items.map(function(s){ return buildRow(s, showLinea); }).join('');
+    return '<table>' +
+      '<thead><tr><th>Código</th><th>Cliente</th><th>Descripción</th><th style="text-align:right">Cant.</th><th style="text-align:center">Prog.</th><th style="text-align:center">Estado</th>' + thLinea + '</tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>';
+  }
+
+  // Secciones En Curso por línea
+  var enCursoHtml = LINEAS_PRODUCCION.map(function(ln) {
+    var items = enCurso[ln.id] || [];
+    var totalUnd = items.reduce(function(s,i){return s+(i.cant||0);},0);
+    return '<div class="seccion">' +
+      '<h3>' + escHtml(ln.nombre) + ' <span class="badge-count">' + items.length + ' pedidos · ' + totalUnd.toLocaleString() + ' und</span></h3>' +
+      buildTable(items, false) +
+      '</div>';
+  }).join('');
+
+  var sinTotal = sinAsignar.reduce(function(s,i){return s+(i.cant||0);},0);
+  var compTotal = completados.reduce(function(s,i){return s+(i.cant||0);},0);
+
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Board Serigrafía</title><style>' +
+    '@page{size:A4 portrait;margin:12mm}' +
+    'body{font-family:Arial,sans-serif;font-size:10px;color:#111;margin:0}' +
+    '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+    'h1{font-size:16px;margin:0 0 2px;color:#1e293b}' +
+    'h2{font-size:13px;margin:18px 0 6px;color:#1A6B5B;border-bottom:2px solid #1A6B5B;padding-bottom:4px}' +
+    'h3{font-size:11px;margin:10px 0 4px;color:#374151}' +
+    '.badge-count{font-size:9px;font-weight:400;color:#6b7280;background:#f3f4f6;border-radius:3px;padding:1px 6px;margin-left:6px}' +
+    '.resumen{display:flex;gap:20px;margin:8px 0 14px;font-size:9px;color:#6b7280}' +
+    '.resumen strong{font-size:13px;color:#111;display:block}' +
+    'table{border-collapse:collapse;width:100%;margin-bottom:6px}' +
+    'th{background:#f8fafc;font-size:8px;font-weight:700;text-align:left;padding:4px 6px;border:1px solid #e2e8f0;white-space:nowrap}' +
+    'td{padding:4px 6px;border:1px solid #e2e8f0;vertical-align:top}' +
+    'tr:nth-child(even) td{background:#fafafa}' +
+    '.seccion{margin-bottom:8px}' +
+    '.footer{margin-top:16px;font-size:8px;color:#9ca3af;border-top:1px solid #e2e8f0;padding-top:6px}' +
+    '@media print{.no-print{display:none}}' +
+    '</style></head><body>' +
+    '<h1>Tetraplastic · Serigrafía — Estado de Producción</h1>' +
+    '<div style="font-size:9px;color:#6b7280">Generado: ' + fecha + '</div>' +
+    '<div class="resumen">' +
+      '<div><strong>' + totalPedidos + '</strong>Pedidos activos</div>' +
+      '<div><strong>' + enProcN + '</strong>En proceso</div>' +
+      '<div><strong>' + sinAsignar.length + '</strong>Sin asignar</div>' +
+      '<div><strong>' + listaN + '</strong>Completados</div>' +
+    '</div>' +
+
+    '<h2>📥 Sin Asignar (' + sinAsignar.length + ' pedidos · ' + sinTotal.toLocaleString() + ' und)</h2>' +
+    buildTable(sinAsignar, false) +
+
+    '<h2>⚙️ En Curso</h2>' +
+    enCursoHtml +
+
+    '<h2>✅ Completados (' + completados.length + ' pedidos · ' + compTotal.toLocaleString() + ' und)</h2>' +
+    buildTable(completados, true) +
+
+    '<div class="footer">TETRAPP · Tetraplastic Guatemala</div>' +
     '<script>window.onload=function(){window.print();}<\/script>' +
     '</body></html>';
 
