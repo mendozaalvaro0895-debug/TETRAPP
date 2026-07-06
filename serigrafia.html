@@ -3152,14 +3152,22 @@ function exportarBoardPDF() {
   var totalPedidos = solicitudes.filter(function(s){
     return ['nueva','programada','proceso','lista'].indexOf(s.estado)>=0;
   }).length;
-  var enProcN = solicitudes.filter(function(s){ return s.estado==='proceso'; }).length;
+  var enProcN = solicitudes.filter(function(s){
+    var ent = entregadoMap[s.id] || 0, tot = s.cant || 0;
+    return s.estado==='proceso' && !(ent > 0 && ent < tot);
+  }).length;
+  var parcialN = solicitudes.filter(function(s){
+    var ent = entregadoMap[s.id] || 0, tot = s.cant || 0;
+    return s.estado !== 'lista' && ent > 0 && ent < tot;
+  }).length;
   var listaN  = solicitudes.filter(function(s){ return s.estado==='lista'; }).length;
 
-  function estadoBadge(s) {
-    var m = { lista:'LISTA', proceso:'EN PROCESO', programada:'PROGRAMADA', nueva:'NUEVA' };
-    var c = { lista:'#166534', proceso:'#1e40af', programada:'#92400e', nueva:'#374151' };
-    var b = { lista:'#dcfce7', proceso:'#dbeafe', programada:'#fef3c7', nueva:'#f3f4f6' };
-    var e = s.estado || 'nueva';
+  function estadoBadge(s, ent, total) {
+    var esParcial = s.estado !== 'lista' && ent > 0 && ent < total;
+    var e = esParcial ? 'parcial' : (s.estado || 'nueva');
+    var m = { lista:'LISTA', proceso:'EN PROCESO', parcial:'PARCIAL', programada:'PROGRAMADA', nueva:'NUEVA' };
+    var c = { lista:'#166534', proceso:'#1e40af', parcial:'#92400e', programada:'#92400e', nueva:'#374151' };
+    var b = { lista:'#dcfce7', proceso:'#dbeafe', parcial:'#fef3c7', programada:'#fef3c7', nueva:'#f3f4f6' };
     return '<span style="background:'+(b[e]||'#f3f4f6')+';color:'+(c[e]||'#374151')+';border-radius:3px;padding:1px 6px;font-size:8px;font-weight:800">'+(m[e]||e.toUpperCase())+'</span>';
   }
 
@@ -3181,7 +3189,7 @@ function exportarBoardPDF() {
       '<td style="font-size:9px;color:#374151">' + desc + '</td>' +
       '<td style="text-align:right;font-weight:700;font-size:10px;color:'+entClr+'">' + entTxt + '</td>' +
       '<td style="text-align:center;font-size:9px;color:#6b7280">' + progTxt + '</td>' +
-      '<td style="text-align:center">' + estadoBadge(s) + '</td>' +
+      '<td style="text-align:center">' + estadoBadge(s, ent, total) + '</td>' +
       (showLinea ? '<td style="font-size:9px;color:#374151">' + lineaTxt + '</td>' : '') +
       '</tr>';
     return fila;
@@ -3232,6 +3240,7 @@ function exportarBoardPDF() {
     '<div class="resumen">' +
       '<div><strong>' + totalPedidos + '</strong>Pedidos activos</div>' +
       '<div><strong>' + enProcN + '</strong>En proceso</div>' +
+      '<div><strong>' + parcialN + '</strong>Parciales</div>' +
       '<div><strong>' + sinAsignar.length + '</strong>Sin asignar</div>' +
       '<div><strong>' + listaN + '</strong>Completados</div>' +
     '</div>' +
