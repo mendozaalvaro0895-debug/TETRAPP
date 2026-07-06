@@ -1347,9 +1347,9 @@ function boardBuildCard(item) {
     }
   });
   var progColor = item.prog >= 80 ? 'var(--green)' : item.prog >= 40 ? 'var(--amber)' : 'var(--serig-m)';
-  var badgeBg   = item.estado === 'proceso'    ? 'var(--serig-l)' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
-  var badgeClr  = item.estado === 'proceso'    ? 'var(--serig-m)' : item.estado === 'programada' ? '#92400e' : '#64748b';
-  var badgeTxt  = item.estado === 'proceso'    ? 'EN PROCESO'     : item.estado === 'programada' ? 'PROG'    : 'NUEVA';
+  var badgeBg   = item.estado === 'proceso'    ? 'var(--serig-l)' : item.estado === 'parcial' ? '#fef9c3' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
+  var badgeClr  = item.estado === 'proceso'    ? 'var(--serig-m)' : item.estado === 'parcial' ? '#92400e' : item.estado === 'programada' ? '#92400e' : '#64748b';
+  var badgeTxt  = item.estado === 'proceso'    ? 'EN PROCESO'     : item.estado === 'parcial' ? 'PARCIAL' : item.estado === 'programada' ? 'PROG'    : 'NUEVA';
   var badge = '<span style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:4px;padding:1px 5px;font-size:8px;font-weight:800">' + badgeTxt + '</span>';
   var skuTxt  = item.sku  ? '<span style="color:var(--gray-l);font-family:var(--mono);font-size:10px">' + item.sku + '</span> · ' : '';
   var descTxt = skuTxt + '<span style="font-weight:700;color:var(--ink)">' + (item.desc || '—') + '</span>';
@@ -1409,9 +1409,9 @@ function boardBuildCard(item) {
 }
 
 function boardBuildCardCompact(item) {
-  var badgeBg  = item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
-  var badgeClr = item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'programada' ? '#92400e' : '#64748b';
-  var badgeTxt = item.estado === 'proceso' ? 'PROC' : item.estado === 'programada' ? 'PROG' : 'NEW';
+  var badgeBg  = item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'parcial' ? '#fef9c3' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
+  var badgeClr = item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'parcial' ? '#92400e' : item.estado === 'programada' ? '#92400e' : '#64748b';
+  var badgeTxt = item.estado === 'proceso' ? 'PROC' : item.estado === 'parcial' ? 'PARC' : item.estado === 'programada' ? 'PROG' : 'NEW';
   var badge = '<span style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:3px;padding:1px 4px;font-size:8px;font-weight:800;flex-shrink:0">' + badgeTxt + '</span>';
   var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var descFull = (item.sku ? item.sku + ' · ' : '') + (item.desc || '—');
@@ -1448,10 +1448,10 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
       requis.push({ cant: m.cant, fecha: m.fecha, requi: m.requi });
     }
   });
-  var badgeBg  = item.estado === 'lista' ? '#dcfce7' : item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
-  var badgeClr = item.estado === 'lista' ? '#15803d' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'programada' ? '#92400e' : '#64748b';
-  var badgeBdr = item.estado === 'lista' ? '#86efac' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'programada' ? '#fde68a' : '#cbd5e1';
-  var badgeTxt = item.estado === 'lista' ? 'LISTA' : item.estado === 'proceso' ? 'EN PROC.' : item.estado === 'programada' ? 'PROGRAMADA' : 'NUEVA';
+  var badgeBg  = item.estado === 'lista' ? '#dcfce7' : item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'parcial' ? '#fef9c3' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
+  var badgeClr = item.estado === 'lista' ? '#15803d' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'parcial' ? '#92400e' : item.estado === 'programada' ? '#92400e' : '#64748b';
+  var badgeBdr = item.estado === 'lista' ? '#86efac' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'parcial' ? '#fde68a' : item.estado === 'programada' ? '#fde68a' : '#cbd5e1';
+  var badgeTxt = item.estado === 'lista' ? 'LISTA' : item.estado === 'proceso' ? 'EN PROC.' : item.estado === 'parcial' ? 'PARCIAL' : item.estado === 'programada' ? 'PROGRAMADA' : 'NUEVA';
   var dragArg    = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var total      = item.cant || 0;
   var isComplete = entregado > 0 && entregado >= total;
@@ -1977,7 +1977,7 @@ function boardBuildSinBlock(items) {
 
 function boardBuildLane(laneId, items, label, active) {
   var total   = items.reduce(function(s,i){ return s + (i.cant||0); }, 0);
-  var procIts = items.filter(function(i){ return i.estado === 'proceso'; });
+  var procIts = items.filter(function(i){ return i.estado === 'proceso' || i.estado === 'parcial'; });
   var avg     = procIts.length > 0
     ? Math.round(procIts.reduce(function(s,i){ return s+i.prog; },0)/procIts.length)
     : 0;
@@ -2010,7 +2010,7 @@ function renderBoard() {
   if (!contSin || !contLines) return;
   var items = [];
   solicitudes.forEach(function(s) {
-    var esActiva   = ['nueva','programada','proceso'].indexOf(s.estado) >= 0;
+    var esActiva   = ['nueva','programada','proceso','parcial'].indexOf(s.estado) >= 0;
     var esListaSin = s.estado === 'lista' && !s.linea_id;
     if (!esActiva && !esListaSin) return;
     var sTiros = s.tiros || Math.max.apply(null, (s.lineas.length ? s.lineas.map(function(l){ return l.tiros || 1; }) : [1]));
@@ -2135,12 +2135,11 @@ async function boardDrop(e, targetLaneId) {
 // ════════════════════════════════════════════════════════════
 
 function verDetalleKpiProceso() {
-  var enLinea = solicitudes.filter(function(s) { return s.estado === 'proceso' && s.lineas.some(function(l){ return l.linea_id; }); });
+  var enLinea = solicitudes.filter(function(s) { return (s.estado === 'proceso' || s.estado === 'parcial') && s.lineas.some(function(l){ return l.linea_id; }); });
   var entMap    = _buildEntregadoMap();
   var parciales = solicitudes.filter(function(s) {
-    return ['nueva','programada','proceso'].indexOf(s.estado) >= 0
-      && (entMap[s.id] || 0) > 0
-      && (entMap[s.id] || 0) < (s.cant || 1);
+    return ['nueva','programada','proceso','parcial'].indexOf(s.estado) >= 0
+      && ((entMap[s.id] || 0) > 0 && (entMap[s.id] || 0) < (s.cant || 1) || s.estado === 'parcial');
   });
 
   function filasSol(lista, mostrarEntregado) {
@@ -2303,17 +2302,17 @@ function _buildEntregadoMap() {
 }
 
 function renderInicio() {
-  var enProceso  = solicitudes.filter(function(s) { return s.estado === 'proceso'; });
+  var enProceso  = solicitudes.filter(function(s) { return s.estado === 'proceso' || s.estado === 'parcial'; });
   var enLinea    = enProceso.filter(function(s) { return s.lineas.some(function(l){ return l.linea_id; }); });
   var pendientesCount = 0;
   solicitudes.forEach(function(s) {
     if (s.lineas.length === 0) {
       var e0 = s.estado;
-      if (e0 === 'nueva' || e0 === 'programada' || e0 === 'proceso') pendientesCount++;
+      if (e0 === 'nueva' || e0 === 'programada' || e0 === 'proceso' || e0 === 'parcial') pendientesCount++;
     } else {
       s.lineas.forEach(function(l) {
         var e0 = l.estado || s.estado;
-        if (e0 === 'nueva' || e0 === 'programada' || e0 === 'proceso') pendientesCount++;
+        if (e0 === 'nueva' || e0 === 'programada' || e0 === 'proceso' || e0 === 'parcial') pendientesCount++;
       });
     }
   });
@@ -2323,9 +2322,8 @@ function renderInicio() {
 
   var entMap = _buildEntregadoMap();
   var parciales = solicitudes.filter(function(s) {
-    return ['nueva','programada','proceso'].indexOf(s.estado) >= 0
-      && (entMap[s.id] || 0) > 0
-      && (entMap[s.id] || 0) < (s.cant || 1);
+    return ['nueva','programada','proceso','parcial'].indexOf(s.estado) >= 0
+      && ((entMap[s.id] || 0) > 0 && (entMap[s.id] || 0) < (s.cant || 1) || s.estado === 'parcial');
   });
 
   // KPIs — count-up animado
@@ -3131,7 +3129,7 @@ function exportarBoardPDF() {
 
   solicitudes.forEach(function(s) {
     if (s.estado === 'lista' && s.linea_id) { completados.push(s); return; }
-    var esActiva   = ['nueva','programada','proceso'].indexOf(s.estado) >= 0;
+    var esActiva   = ['nueva','programada','proceso','parcial'].indexOf(s.estado) >= 0;
     var esListaSin = s.estado === 'lista' && !s.linea_id;
     if (!esActiva && !esListaSin) return;
     if (!s.linea_id) { sinAsignar.push(s); }
@@ -3150,20 +3148,17 @@ function exportarBoardPDF() {
   var fecha = new Date().toLocaleDateString('es-GT', {day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
 
   var totalPedidos = solicitudes.filter(function(s){
-    return ['nueva','programada','proceso','lista'].indexOf(s.estado)>=0;
+    return ['nueva','programada','proceso','parcial','lista'].indexOf(s.estado)>=0;
   }).length;
-  var enProcN = solicitudes.filter(function(s){
-    var ent = entregadoMap[s.id] || 0, tot = s.cant || 0;
-    return s.estado==='proceso' && !(ent > 0 && ent < tot);
-  }).length;
+  var enProcN = solicitudes.filter(function(s){ return s.estado==='proceso'; }).length;
   var parcialN = solicitudes.filter(function(s){
     var ent = entregadoMap[s.id] || 0, tot = s.cant || 0;
-    return s.estado !== 'lista' && ent > 0 && ent < tot;
+    return s.estado === 'parcial' || (s.estado !== 'lista' && ent > 0 && ent < tot);
   }).length;
   var listaN  = solicitudes.filter(function(s){ return s.estado==='lista'; }).length;
 
   function estadoBadge(s, ent, total) {
-    var esParcial = s.estado !== 'lista' && ent > 0 && ent < total;
+    var esParcial = s.estado === 'parcial' || (s.estado !== 'lista' && ent > 0 && ent < total);
     var e = esParcial ? 'parcial' : (s.estado || 'nueva');
     var m = { lista:'LISTA', proceso:'EN PROCESO', parcial:'PARCIAL', programada:'PROGRAMADA', nueva:'NUEVA' };
     var c = { lista:'#166534', proceso:'#1e40af', parcial:'#92400e', programada:'#92400e', nueva:'#374151' };
@@ -3487,15 +3482,15 @@ var eEntregadoSolIds  = {};  // { lineaIdx: solId UUID }
 
 function buildPedidoOpts(selectedId) {
   var candidatos = solicitudes.filter(function(s) {
-    return s.estado === 'proceso' || s.estado === 'programada' || s.estado === 'entregada' || s.estado === 'nueva';
+    return s.estado === 'proceso' || s.estado === 'parcial' || s.estado === 'programada' || s.estado === 'entregada' || s.estado === 'nueva';
   }).sort(function(a, b) {
-    var ord = { proceso: 0, programada: 1, nueva: 2, entregada: 3 };
+    var ord = { proceso: 0, parcial: 1, programada: 2, nueva: 3, entregada: 4 };
     return (ord[a.estado] || 9) - (ord[b.estado] || 9);
   });
   if (!candidatos.length) return '<option value="">— Sin vincular —</option>';
   var opts = '<option value="">— Sin vincular —</option>';
   candidatos.forEach(function(s) {
-    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'programada' ? '🟡' : s.estado === 'nueva' ? '⚪' : '✅';
+    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'parcial' ? '🟡' : s.estado === 'programada' ? '🟡' : s.estado === 'nueva' ? '⚪' : '✅';
     var lbl = ico + ' ' + (s.id_display || '') + ' · ' + (s.cliente || '').slice(0, 12);
     var sel = selectedId && selectedId === s.id ? ' selected' : '';
     opts += '<option value="' + escHtml(s.id) + '"' + sel + '>' + escHtml(lbl) + '</option>';
@@ -3514,10 +3509,10 @@ function vincularPedidoLinea(solId, i) {
   if (ed && !ed.value.trim() && s.desc) { ed.value = s.desc; eEntregadoSkus[i] = s.sku || null; }
 }
 
-function abrirFormEntregado(prefill) {
+function abrirFormEntregado() {
   var el = document.getElementById('formEntregadoInline');
   if (!el) return;
-  if (!prefill && el.style.display !== 'none') { cerrarFormEntregado(); return; }
+  if (el.style.display !== 'none') { cerrarFormEntregado(); return; }
   eEntregadoSkus = {}; eLineasCount = 0; eEntregadoSolId = null; eEntregadoSolCod = '';
   var usage = getCliUsage();
   var sorted = CLIENTES.slice().sort(function(a, b) {
@@ -3559,18 +3554,7 @@ function abrirFormEntregado(prefill) {
       // Fila 4: Nota
       '<input id="eNota" placeholder="Nota / observaciones (opcional)" style="' + inputSty + '">' +
     '</div>';
-
-  var sPre = prefill && prefill.solId ? solicitudes.find(function(x){ return x.id === prefill.solId; }) : null;
-  if (sPre) {
-    agregarLineaEntregado(sPre.desc, sPre.sku, null, sPre.cliente, sPre.id);
-    setTimeout(function() {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      var c = document.getElementById('eCant-0');
-      if (c) c.focus();
-    }, 50);
-  } else {
-    agregarLineaEntregado();
-  }
+  agregarLineaEntregado();
 }
 
 function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal, solIdVal) {
@@ -3677,14 +3661,14 @@ function entregadoSolInput(val, i) {
   eEntregadoSolIds[i] = null;
   var v = val.trim().toLowerCase();
   var candidatos = solicitudes.filter(function(s) {
-    return s.estado === 'proceso' || s.estado === 'programada' || s.estado === 'nueva' || s.estado === 'lista' || s.estado === 'entregada';
+    return s.estado === 'proceso' || s.estado === 'parcial' || s.estado === 'programada' || s.estado === 'nueva' || s.estado === 'lista' || s.estado === 'entregada';
   });
   var matches = v.length === 0 ? candidatos.slice(0, 12) : candidatos.filter(function(s) {
     return (s.id_display || '').toLowerCase().includes(v) || (s.cliente || '').toLowerCase().includes(v) || (s.desc || '').toLowerCase().includes(v);
   }).slice(0, 12);
   if (!matches.length) { drop.classList.remove('open'); return; }
   drop.innerHTML = matches.map(function(s) {
-    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'programada' ? '🟡' : s.estado === 'nueva' ? '⚪' : s.estado === 'lista' ? '✅' : '📦';
+    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'parcial' ? '🟡' : s.estado === 'programada' ? '🟡' : s.estado === 'nueva' ? '⚪' : s.estado === 'lista' ? '✅' : '📦';
     var lbl = escHtml((s.id_display || '') + ' · ' + (s.cliente || ''));
     var sub = escHtml((s.desc || '').slice(0, 40));
     var sid = s.id.replace(/'/g, "\\'");
@@ -3790,7 +3774,7 @@ async function autoCompletarSiCorresponde(lineasGuardadas) {
   for (var i = 0; i < solIds.length; i++) {
     var solId = solIds[i];
     var s = solicitudes.find(function(x) { return x.id === solId; });
-    if (!s || ['nueva','programada','proceso'].indexOf(s.estado) < 0) continue;
+    if (!s || ['nueva','programada','proceso','parcial'].indexOf(s.estado) < 0) continue;
     var entregado = 0;
     (getEntregasManuales() || []).forEach(function(m) {
       if (m.lineas && m.lineas.length) {
@@ -4291,7 +4275,7 @@ function abrirEstadoSin(event, solId, lineaDbId) {
     { val: 'nueva',      label: 'Nueva',      bg: '#f1f5f9', clr: '#64748b' },
     { val: 'programada', label: 'Programada', bg: '#fef3c7', clr: '#92400e' },
     { val: 'proceso',    label: 'En proceso', bg: 'var(--serig-l)', clr: 'var(--serig-m)' },
-    { val: 'parcial',    label: '🟡 Registrar entrega parcial', bg: '#fef9c3', clr: '#92400e' },
+    { val: 'parcial',    label: 'Parcial', bg: '#fef9c3', clr: '#92400e' },
     { val: 'lista',      label: 'Lista ✓',    bg: '#dcfce7', clr: '#15803d' }
   ];
 
@@ -4309,10 +4293,6 @@ function abrirEstadoSin(event, solId, lineaDbId) {
     btn.onclick = function(e) {
       e.stopPropagation();
       pop.remove();
-      if (op.val === 'parcial') {
-        abrirFormEntregado({ solId: solId });
-        return;
-      }
       if (lineaDbId) {
         cambiarEstadoLinea(lineaDbId, solId, op.val);
       } else {
@@ -4669,7 +4649,7 @@ function seleccionarLineaSkuBase(idx, sku) {
   var existencia = item ? (item.existencia || 0) : 0;
 
   // Sumar lo ya comprometido en solicitudes activas (no entregadas ni lista)
-  var estadosActivos = ['nueva', 'programada', 'proceso'];
+  var estadosActivos = ['nueva', 'programada', 'proceso', 'parcial'];
   var comprometido = 0;
   solicitudes.forEach(function(sol) {
     if (estadosActivos.indexOf(sol.estado) < 0) return;
