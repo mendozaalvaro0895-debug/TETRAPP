@@ -543,7 +543,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
                   <span class="mtx-hdr-title">👥 Personal y Roles</span>
                   <span class="mtx-hdr-sub">Arrastra cada operador a su rol y línea</span>
                 </div>
-                <button class="btn btn-g btn-xs" onclick="abrirRegistroVelada()" style="white-space:nowrap">🌙 Registrar Velada</button>
               </div>
               <div id="matrizPersonal"></div>
             </div>
@@ -586,7 +585,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div style="display:flex;gap:4px">
             <button class="ptab ptab-act" id="ptab-ops"   onclick="switchPersonalTab('ops')">👥 Operadores</button>
             <button class="ptab"          id="ptab-asist" onclick="switchPersonalTab('asist')">📋 Asistencia</button>
-            <button class="ptab"          id="ptab-vel"   onclick="switchPersonalTab('vel')">🌙 Veladas</button>
           </div>
           <div id="ph-ops-btns" style="display:flex;gap:6px">
             <button class="btn btn-g btn-sm" onclick="sincronizarPersonalSerig()">🔄 Sincronizar</button>
@@ -598,8 +596,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div id="personalGrid" style="flex:1;overflow-y:auto"></div>
       <!-- Asistencia -->
       <div id="personalAsist" style="display:none;flex:1;overflow-y:auto;padding:16px"></div>
-      <!-- Veladas -->
-      <div id="personalVeladas" style="display:none;flex:1;overflow-y:auto;padding:16px"></div>
     </div>
 
     <!-- ══ WIP (Movimientos y otros pendientes) ═════════════ -->
@@ -5120,14 +5116,7 @@ function poblarClientes() {
 // ════════════════════════════════════════════════════════════
 
 var asistFecha = new Date().toISOString().slice(0,10);
-var velFecha   = new Date().toISOString().slice(0,10);
 var asistCache = {}; // { codigo: estado }
-var velCache   = {}; // { codigo: { activo, horas } }
-
-// ── REGISTRO DE VELADA (desde Inicio) ─────────────────────────
-var _veladaState = { fecha: '', partic: {}, trabajos: {} };
-// partic: { codigo: true }
-// trabajos: { codigo: { sku, desc, cant } }
 var ASIST_TABLE = 'asistencia_diaria';
 
 // localStorage — caché de sesión para velocidad (no es almacenamiento permanente)
@@ -5135,10 +5124,7 @@ function getAsistLocal() {
   try { return JSON.parse(localStorage.getItem('tetra_asist_s') || '{}'); } catch(e) { return {}; }
 }
 function saveAsistLocal(obj) { localStorage.setItem('tetra_asist_s', JSON.stringify(obj)); }
-function getVelLocal() {
-  try { return JSON.parse(localStorage.getItem('tetra_vel_s') || '{}'); } catch(e) { return {}; }
-}
-function saveVelLocal(obj) { localStorage.setItem('tetra_vel_s', JSON.stringify(obj)); }
+
 
 function asistErrorTabla(err) {
   var msg = (err && (err.message || err.details || '')).toLowerCase();
@@ -5157,16 +5143,14 @@ function getNombreOperario(codigo) {
 }
 
 function switchPersonalTab(tab) {
-  ['ops','asist','vel'].forEach(function(t) {
+  ['ops','asist'].forEach(function(t) {
     var btn = document.getElementById('ptab-' + t);
     if (btn) btn.className = 'ptab' + (t === tab ? ' ptab-act' : '');
   });
-  document.getElementById('personalGrid').style.display     = tab === 'ops'   ? '' : 'none';
-  document.getElementById('personalAsist').style.display    = tab === 'asist' ? '' : 'none';
-  document.getElementById('personalVeladas').style.display  = tab === 'vel'   ? '' : 'none';
-  document.getElementById('ph-ops-btns').style.display      = tab === 'ops'   ? 'flex' : 'none';
+  document.getElementById('personalGrid').style.display  = tab === 'ops'   ? '' : 'none';
+  document.getElementById('personalAsist').style.display = tab === 'asist' ? '' : 'none';
+  document.getElementById('ph-ops-btns').style.display   = tab === 'ops'   ? 'flex' : 'none';
   if (tab === 'asist') renderAsistGrid();
-  if (tab === 'vel')   renderVeladas();
 }
 
 function formatFechaLarga(iso) {
@@ -5332,333 +5316,6 @@ async function asistCambiarFecha(delta) {
     asistFecha = d.toISOString().slice(0,10);
   }
   renderAsistencia();
-}
-
-// ── VELADAS ───────────────────────────────────────────────────
-
-async function cargarVeladas(fecha) {
-  velCache = {};
-  var local = getVelLocal();
-  if (local[fecha]) {
-    Object.keys(local[fecha]).forEach(function(cod){ velCache[cod] = Object.assign({}, local[fecha][cod]); });
-  }
-  try {
-    var r = await db.from(ASIST_TABLE)
-      .select('operador_codigo,horas')
-      .eq('fecha', fecha).eq('area','serig').eq('turno','noche').eq('estado','presente');
-    if (r.error) { asistErrorTabla(r.error); return; }
-    velCache = {};
-    (r.data || []).forEach(function(row){ velCache[row.operador_codigo] = { activo: true, horas: row.horas || '' }; });
-    var loc2 = getVelLocal();
-    loc2[fecha] = Object.assign({}, velCache);
-    saveVelLocal(loc2);
-  } catch(e) { asistErrorTabla(e); }
-}
-
-async function toggleVelada(codigo) {
-  var prev = velCache[codigo];
-  var adding = !(prev && prev.activo);
-  if (adding) velCache[codigo] = { activo: true, horas: '' };
-  else delete velCache[codigo];
-  renderVeladasRows();
-  try {
-    var r;
-    if (adding) {
-      r = await db.from(ASIST_TABLE).upsert({
-        fecha: velFecha,
-        operador_codigo: codigo,
-        operador_nombre: getNombreOperario(codigo),
-        area: 'serig', turno: 'noche', estado: 'presente', horas: null,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'fecha,operador_codigo,area,turno' });
-    } else {
-      r = await db.from(ASIST_TABLE).delete()
-        .eq('fecha', velFecha).eq('operador_codigo', codigo)
-        .eq('area','serig').eq('turno','noche');
-    }
-    if (r.error) { asistErrorTabla(r.error); if (adding) delete velCache[codigo]; else velCache[codigo] = prev; renderVeladasRows(); return; }
-    var local = getVelLocal();
-    if (!local[velFecha]) local[velFecha] = {};
-    if (adding) local[velFecha][codigo] = Object.assign({}, velCache[codigo]);
-    else delete local[velFecha][codigo];
-    saveVelLocal(local);
-    showToast('✅ Guardado');
-  } catch(e) {
-    showToast('❌ ' + (e.message || e), '#B83232');
-    if (adding) delete velCache[codigo]; else velCache[codigo] = prev;
-    renderVeladasRows();
-  }
-}
-
-async function guardarHorasVelada(codigo, horas) {
-  var h = parseFloat(horas) || null;
-  if (velCache[codigo]) velCache[codigo].horas = h;
-  try {
-    var r = await db.from(ASIST_TABLE).upsert({
-      fecha: velFecha,
-      operador_codigo: codigo,
-      operador_nombre: getNombreOperario(codigo),
-      area: 'serig', turno: 'noche', estado: 'presente', horas: h,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'fecha,operador_codigo,area,turno' });
-    if (r.error) { showToast('❌ ' + r.error.message, '#B83232'); return; }
-    var local = getVelLocal();
-    if (!local[velFecha]) local[velFecha] = {};
-    if (local[velFecha][codigo]) local[velFecha][codigo].horas = h;
-    saveVelLocal(local);
-  } catch(e) { showToast('❌ ' + (e.message || e), '#B83232'); }
-}
-
-function renderVeladasRows() {
-  var lista = (personalData && personalData.serig) ? personalData.serig : [];
-  var count = Object.keys(velCache).length;
-  var resEl = document.getElementById('vel-resumen');
-  if (resEl) resEl.innerHTML = count > 0
-    ? '<span class="asist-res-chip" style="background:#ede9fe;color:var(--serig-m)">🌙 ' + count + ' operario' + (count>1?'s':'') + ' velaron esta noche</span>'
-    : '<span style="font-size:12px;color:var(--gray-l)">Ningún operario marcado por esta noche</span>';
-  var cont = document.getElementById('vel-rows');
-  if (!cont) return;
-  cont.innerHTML = lista.map(function(p) {
-    var v = velCache[p.codigo];
-    var activo = v && v.activo;
-    return '<div class="vel-op-row">' +
-      '<div class="vel-op-nm">' + p.nombre +
-        (p.activo ? '' : ' <span style="font-size:9px;color:var(--gray-l)">(inactivo)</span>') +
-      '</div>' +
-      '<button class="vel-toggle' + (activo?' active':'') + '" onclick="toggleVelada(\'' + p.codigo + '\')">' +
-        (activo ? '🌙 Veló' : '— No veló') +
-      '</button>' +
-      (activo
-        ? '<input class="vel-horas" type="number" min="1" max="16" placeholder="h" value="' + (v.horas||'') + '"' +
-            ' title="Horas trabajadas"' +
-            ' onchange="guardarHorasVelada(\'' + p.codigo + '\',this.value)"' +
-            ' onblur="guardarHorasVelada(\'' + p.codigo + '\',this.value)">' +
-          '<span style="font-size:10px;color:var(--gray-l)">hrs</span>'
-        : '<span style="width:72px"></span>') +
-    '</div>';
-  }).join('');
-}
-
-async function renderVeladas() {
-  var el = document.getElementById('personalVeladas');
-  if (!el) return;
-  el.innerHTML = '<div style="color:var(--gray-l);padding:20px">Cargando…</div>';
-  await cargarVeladas(velFecha);
-  el.innerHTML =
-    '<div class="asist-nav">' +
-      '<button onclick="velCambiarFecha(-1)">◀</button>' +
-      '<span class="asist-fecha-txt">Noche del ' + formatFechaLarga(velFecha) + '</span>' +
-      '<button onclick="velCambiarFecha(1)">▶</button>' +
-      '<button class="asist-hoy" onclick="velCambiarFecha(0)">Hoy</button>' +
-    '</div>' +
-    '<div class="asist-resumen" id="vel-resumen"></div>' +
-    '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden" id="vel-rows"></div>';
-  renderVeladasRows();
-}
-
-async function velCambiarFecha(delta) {
-  if (delta === 0) {
-    velFecha = new Date().toISOString().slice(0,10);
-  } else {
-    var d = new Date(velFecha + 'T12:00:00');
-    d.setDate(d.getDate() + delta);
-    velFecha = d.toISOString().slice(0,10);
-  }
-  renderVeladas();
-}
-
-// ── MODAL REGISTRAR VELADA ────────────────────────────────────
-
-function abrirRegistroVelada() {
-  var hoy = new Date().toISOString().slice(0,10);
-  _veladaState = { fecha: hoy, partic: {}, trabajos: {} };
-  if (!document.getElementById('velada-modal-overlay')) {
-    var ov = document.createElement('div');
-    ov.id = 'velada-modal-overlay';
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9990;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto';
-    ov.onclick = function(e) { if (e.target === ov) cerrarVeladaModal(); };
-    var card = document.createElement('div');
-    card.id = 'velada-modal-card';
-    card.style.cssText = 'background:var(--card);border-radius:14px;width:100%;max-width:560px;box-shadow:0 12px 40px rgba(0,0,0,.25);overflow:hidden';
-    ov.appendChild(card);
-    document.body.appendChild(ov);
-  }
-  _renderVeladaModal();
-}
-
-function cerrarVeladaModal() {
-  var ov = document.getElementById('velada-modal-overlay');
-  if (ov) ov.remove();
-}
-
-function _renderVeladaModal() {
-  var card = document.getElementById('velada-modal-card');
-  if (!card) return;
-  var lista = (personalData && personalData.serig ? personalData.serig : []).filter(function(p){ return p.activo; });
-
-  var participChips = lista.map(function(p) {
-    var checked = !!_veladaState.partic[p.codigo];
-    var ini = (p.nombre || '?')[0].toUpperCase();
-    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:7px;cursor:pointer;background:' + (checked ? 'var(--serig-l)' : 'var(--bg)') + ';border:1.5px solid ' + (checked ? 'var(--serig-m)' : 'var(--border)') + ';user-select:none">' +
-      '<input type="checkbox" style="display:none" ' + (checked ? 'checked' : '') + ' onchange="toggleVeladaPartic(\'' + p.codigo.replace(/'/g,"\\'") + '\')">' +
-      '<span style="width:22px;height:22px;border-radius:50%;background:' + (p.color_hex || 'var(--serig-m)') + ';color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + ini + '</span>' +
-      '<span style="font-size:11px;font-weight:' + (checked?'700':'500') + ';color:var(--ink)">' + escHtml(p.nombre || p.codigo) + '</span>' +
-    '</label>';
-  }).join('');
-
-  var trabajoRows = '';
-  lista.filter(function(p){ return !!_veladaState.partic[p.codigo]; }).forEach(function(p) {
-    var t = _veladaState.trabajos[p.codigo] || {};
-    var cod = p.codigo.replace(/'/g,"\\'");
-    var ini = (p.nombre || '?')[0].toUpperCase();
-    var safeId = p.codigo.replace(/[^a-zA-Z0-9]/g,'_');
-    trabajoRows +=
-      '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">' +
-        '<span style="width:22px;height:22px;border-radius:50%;background:' + (p.color_hex||'var(--serig-m)') + ';color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + ini + '</span>' +
-        '<span style="font-size:11px;font-weight:700;min-width:100px;color:var(--ink)">' + escHtml(p.nombre||p.codigo) + '</span>' +
-        '<div style="flex:1;position:relative">' +
-          '<input id="vel-sku-' + safeId + '" autocomplete="off" placeholder="SKU o descripción…"' +
-            ' value="' + escHtml(t.sku || '') + '"' +
-            ' style="width:100%;box-sizing:border-box;padding:4px 7px;font-size:11px;border:1px solid var(--border);border-radius:5px;background:var(--bg)"' +
-            ' oninput="veladaSkuInput(\'' + cod + '\',this.value)"' +
-            ' onblur="setTimeout(function(){_cerrarVeladaDrop(\'' + cod + '\')},200)">' +
-          '<div id="vel-drop-' + safeId + '" class="sku-drop-s"></div>' +
-        '</div>' +
-        '<input id="vel-cant-' + safeId + '" type="number" min="1" placeholder="Cant"' +
-          ' value="' + (t.cant || '') + '"' +
-          ' style="width:70px;padding:4px 7px;font-size:11px;border:1px solid var(--border);border-radius:5px;background:var(--bg)"' +
-          ' oninput="veladaSetCant(\'' + cod + '\',this.value)">' +
-        '<span style="font-size:10px;color:var(--gray-l);flex-shrink:0">und</span>' +
-      '</div>';
-    if (t.desc) {
-      trabajoRows += '<div style="font-size:10px;color:var(--gray);padding:1px 0 4px 30px;font-style:italic">' + escHtml(t.desc) + '</div>';
-    }
-  });
-
-  var hasPartic = Object.keys(_veladaState.partic).length > 0;
-
-  card.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1.5px solid var(--border)">' +
-      '<span style="font-size:13px;font-weight:800;color:var(--ink)">🌙 Registrar Velada</span>' +
-      '<button onclick="cerrarVeladaModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--gray-l);line-height:1">✕</button>' +
-    '</div>' +
-    '<div style="padding:16px 18px;display:flex;flex-direction:column;gap:16px">' +
-      '<div>' +
-        '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-l);margin-bottom:6px">Fecha</div>' +
-        '<input type="date" value="' + _veladaState.fecha + '" max="' + new Date().toISOString().slice(0,10) + '"' +
-          ' onchange="_veladaState.fecha=this.value"' +
-          ' style="padding:6px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:7px;background:var(--bg);color:var(--ink)">' +
-      '</div>' +
-      '<div>' +
-        '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-l);margin-bottom:8px">Participantes</div>' +
-        '<div style="display:flex;flex-wrap:wrap;gap:6px">' + participChips + '</div>' +
-      '</div>' +
-      (hasPartic ?
-        '<div>' +
-          '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-l);margin-bottom:8px">Trabajo Asignado</div>' +
-          '<div>' + trabajoRows + '</div>' +
-        '</div>'
-      : '') +
-    '</div>' +
-    '<div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--border)">' +
-      '<button onclick="cerrarVeladaModal()" class="btn btn-g btn-xs">Cancelar</button>' +
-      '<button onclick="guardarVelada()" class="btn btn-xs" style="background:var(--serig-m);color:#fff;border:none">💾 Guardar Velada</button>' +
-    '</div>';
-}
-
-function toggleVeladaPartic(codigo) {
-  if (_veladaState.partic[codigo]) {
-    delete _veladaState.partic[codigo];
-    delete _veladaState.trabajos[codigo];
-  } else {
-    _veladaState.partic[codigo] = true;
-  }
-  _renderVeladaModal();
-}
-
-function veladaSkuInput(codigo, val) {
-  if (!_veladaState.trabajos[codigo]) _veladaState.trabajos[codigo] = {};
-  _veladaState.trabajos[codigo].sku = val;
-  _veladaState.trabajos[codigo].desc = '';
-  var safeId = codigo.replace(/[^a-zA-Z0-9]/g,'_');
-  var drop = document.getElementById('vel-drop-' + safeId);
-  if (!drop) return;
-  var v = val.trim().toLowerCase();
-  if (v.length < 2) { drop.classList.remove('open'); return; }
-  var matches = inventarioCache.filter(function(it) {
-    return it.sku.toLowerCase().includes(v) || (it.descripcion||'').toLowerCase().includes(v);
-  }).slice(0, 8);
-  drop.innerHTML = matches.map(function(it) {
-    var esc = it.sku.replace(/'/g,"\\'");
-    return '<div class="sku-item-s" onmousedown="seleccionarVeladaSku(\'' + codigo.replace(/'/g,"\\'") + '\',\'' + esc + '\')">' +
-      '<div class="sku-code-s">' + escHtml(it.sku) + '</div>' +
-      '<div class="sku-desc-s">' + escHtml(it.descripcion||'') + '</div>' +
-    '</div>';
-  }).join('');
-  var inp = document.getElementById('vel-sku-' + safeId);
-  if (inp) {
-    var r = inp.getBoundingClientRect();
-    drop.style.top  = (r.bottom + window.scrollY + 2) + 'px';
-    drop.style.left = r.left + 'px';
-    drop.style.width = r.width + 'px';
-    drop.style.position = 'fixed';
-    drop.style.top = (r.bottom + 2) + 'px';
-  }
-  drop.classList.add('open');
-}
-
-function seleccionarVeladaSku(codigo, sku) {
-  var item = inventarioCache.find(function(it){ return it.sku === sku; });
-  if (!item) return;
-  if (!_veladaState.trabajos[codigo]) _veladaState.trabajos[codigo] = {};
-  _veladaState.trabajos[codigo].sku  = sku;
-  _veladaState.trabajos[codigo].desc = item.descripcion || '';
-  var safeId = codigo.replace(/[^a-zA-Z0-9]/g,'_');
-  var inp = document.getElementById('vel-sku-' + safeId);
-  if (inp) inp.value = sku;
-  _cerrarVeladaDrop(codigo);
-  _renderVeladaModal();
-}
-
-function _cerrarVeladaDrop(codigo) {
-  var safeId = codigo.replace(/[^a-zA-Z0-9]/g,'_');
-  var drop = document.getElementById('vel-drop-' + safeId);
-  if (drop) drop.classList.remove('open');
-}
-
-function veladaSetCant(codigo, val) {
-  if (!_veladaState.trabajos[codigo]) _veladaState.trabajos[codigo] = {};
-  _veladaState.trabajos[codigo].cant = parseInt(val) || 0;
-}
-
-async function guardarVelada() {
-  var partics = Object.keys(_veladaState.partic);
-  if (!partics.length) { showToast('Selecciona al menos un participante', '#92400e'); return; }
-  if (!_veladaState.fecha) { showToast('Ingresa la fecha', '#92400e'); return; }
-  var btn = document.querySelector('#velada-modal-card button[onclick="guardarVelada()"]');
-  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
-  try {
-    var rows = partics.map(function(cod) {
-      var t = _veladaState.trabajos[cod] || {};
-      var p = (personalData && personalData.serig ? personalData.serig : []).find(function(x){ return x.codigo === cod; });
-      return {
-        fecha: _veladaState.fecha,
-        operador_codigo: cod,
-        operador_nombre: p ? (p.nombre || cod) : cod,
-        sku: t.sku || null,
-        descripcion: t.desc || null,
-        cantidad: t.cant || null,
-        area: 'serig'
-      };
-    });
-    var r = await db.from('veladas').insert(rows);
-    if (r.error) throw r.error;
-    cerrarVeladaModal();
-    showToast('✅ Velada registrada — ' + partics.length + ' operario' + (partics.length>1?'s':''));
-  } catch(e) {
-    if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar Velada'; }
-    showToast('❌ Error: ' + (e.message || e), '#B83232');
-  }
 }
 
 // ════════════════════════════════════════════════════════════
