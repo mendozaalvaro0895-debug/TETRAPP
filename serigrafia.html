@@ -297,6 +297,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ag-cell.futuro{background:#f8fafc;cursor:default;color:transparent}
 .ag-cell.finde{opacity:.45}
 .ag-row-full .ag-td-name{color:#15803d;font-weight:700}
+.ag-row-inactivo .ag-td-name{opacity:.55}
+.ag-row-inactivo .ag-cell{opacity:.55}
 .ag-section-hdr td{background:var(--bg2);padding:3px 10px;font-size:9px;font-weight:800;color:var(--gray-l);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border)}
 .prod-mens-hdr{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .prod-mens-hdr span:first-child{font-size:12px;font-weight:800;color:var(--ink)}
@@ -2886,7 +2888,11 @@ async function renderAsistGrid() {
     dias.push(mesStr + '-' + (dd < 10 ? '0'+dd : dd));
   }
 
-  var todaLista = (personalData && personalData.serig ? personalData.serig : []).filter(function(p){ return p.activo; });
+  var todaLista = (personalData && personalData.serig ? personalData.serig : []).filter(function(p) {
+    if (p.activo) return true;
+    // Inactivo pero tiene registros en este mes → incluir para no perder historial
+    return byPD[p.codigo] && Object.keys(byPD[p.codigo]).length > 0;
+  });
   var plazaFija = todaLista.filter(function(p){ return (p.proceso_hab || '') !== 'Prestado'; });
   var prestados  = todaLista.filter(function(p){ return (p.proceso_hab || '') === 'Prestado'; });
 
@@ -2916,8 +2922,10 @@ async function renderAsistGrid() {
         var est = daysByP[f] || 'presente';
         if (est !== 'presente') isFullGreen = false;
       });
-      html += '<tr class="ag-row' + (isFullGreen ? ' ag-row-full' : '') + '">';
-      html += '<td class="ag-td-name">' + escHtml(p.nombre || p.codigo) + '</td>';
+      html += '<tr class="ag-row' + (isFullGreen ? ' ag-row-full' : '') + (!p.activo ? ' ag-row-inactivo' : '') + '">';
+      html += '<td class="ag-td-name">' + escHtml(p.nombre || p.codigo) +
+        (!p.activo ? '<span style="font-size:9px;font-weight:500;color:#9ca3af;margin-left:4px">(inactivo)</span>' : '') +
+        '</td>';
       dias.forEach(function(f) {
         var esFuturo = f > hoy;
         var dow = new Date(f + 'T12:00:00').getDay();
