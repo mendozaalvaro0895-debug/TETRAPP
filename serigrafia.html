@@ -4628,6 +4628,7 @@ async function insertarLineas(base, full) {
 async function guardarNuevo(lineasValidas, cliente) {
   var codigo = await generarCodigo('serig');
   var notasFinal = encodeMeta(0, 0, 0, document.getElementById('fNotas').value);
+  var nuevaId = null;
   try {
     var r = await db.from('solicitudes').insert({
       codigo: codigo, area: 'serig',
@@ -4638,7 +4639,8 @@ async function guardarNuevo(lineasValidas, cliente) {
       estado: 'nueva', progreso_pct: 0, notas: notasFinal
     }).select().single();
     if (r.error) throw r.error;
-    var payload = buildLineasPayload(lineasValidas, r.data.id);
+    nuevaId = r.data.id;
+    var payload = buildLineasPayload(lineasValidas, nuevaId);
     await insertarLineas(payload.base, payload.full);
     registrarUsoCliente(cliente);
     cerrarForm();
@@ -4646,6 +4648,8 @@ async function guardarNuevo(lineasValidas, cliente) {
     showToast('✅ ' + codigo + ' guardada');
   } catch(e) {
     console.error('Error guardando:', e);
+    // Si la solicitud ya se creó pero las líneas fallaron, eliminar para evitar huérfano
+    if (nuevaId) db.from('solicitudes').delete().eq('id', nuevaId).then(function(){});
     showToast('❌ Error: ' + e.message, '#B83232');
   }
 }
