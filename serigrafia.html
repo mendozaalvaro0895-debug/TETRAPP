@@ -5163,15 +5163,12 @@ function setMovVista(tipo) {
     btnReg.textContent = tipo === 'salida' ? '+ Registrar Salida' : '⛔ Registrar Rechazo';
   }
   if (toolbar) toolbar.style.display = 'flex';
-  if (kpis) kpis.style.display = '';
+  if (kpis) kpis.style.display = tipo === 'salida' ? 'none' : '';
   if (scrollSalRech) scrollSalRech.style.display = 'block';
   if (scrollIngresos) scrollIngresos.style.display = 'none';
 
-  function setLbl(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; }
-  if (tipo === 'salida') {
-    setLbl('mkpi-l1','Unidades salidas'); setLbl('mkpi-l2','Documentos');
-    setLbl('mkpi-l3','SKUs distintos');   setLbl('mkpi-l4','Último registro');
-  } else {
+  if (tipo === 'rechazos') {
+    function setLbl(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; }
     setLbl('mkpi-l1','Unidades rechazadas'); setLbl('mkpi-l2','Recuperadas');
     setLbl('mkpi-l3','Pérdida neta');        setLbl('mkpi-l4','Tiempo total');
   }
