@@ -4100,17 +4100,52 @@ function editarEntregadoManual(id) {
 
 function renderProduccionActual() {
   try {
-    var targets = ['produccionActual', 'produccionActualMov'].map(function(id) {
-      return document.getElementById(id);
-    }).filter(Boolean);
-    if (!targets.length) return;
+    var elIn  = document.getElementById('produccionActual');
+    var elMov = document.getElementById('produccionActualMov');
+    if (!elIn && !elMov) return;
 
     var entregadasSistema = solicitudes.filter(function(s){ return s.estado === 'entregada'; });
     var manuales = getEntregasManuales();
 
+    if (elIn) elIn.innerHTML = buildProduccionHtml(entregadasSistema, manuales);
+
+    if (elMov) {
+      var desde  = (document.getElementById('movDesde')  || {}).value || '';
+      var hasta  = (document.getElementById('movHasta')  || {}).value || '';
+      var buscar = ((document.getElementById('movBuscar') || {}).value || '').toLowerCase();
+
+      var entFiltradas = entregadasSistema.filter(function(s) {
+        var f = (s.created_at || '').slice(0,10);
+        if (desde && f < desde) return false;
+        if (hasta && f > hasta) return false;
+        if (!buscar) return true;
+        return (s.cliente||'').toLowerCase().indexOf(buscar) >= 0
+          || (s.desc||'').toLowerCase().indexOf(buscar) >= 0
+          || (s.sku||'').toLowerCase().indexOf(buscar) >= 0;
+      });
+      var manFiltradas = manuales.filter(function(m) {
+        var f = m.fecha || '';
+        if (desde && f < desde) return false;
+        if (hasta && f > hasta) return false;
+        if (!buscar) return true;
+        var lineas = (m.lineas && m.lineas.length) ? m.lineas : [{ cliente: m.cliente, desc: m.desc, sku: m.sku }];
+        return (m.requi||'').toLowerCase().indexOf(buscar) >= 0
+          || lineas.some(function(l) {
+               return (l.cliente || m.cliente || '').toLowerCase().indexOf(buscar) >= 0
+                 || (l.desc||'').toLowerCase().indexOf(buscar) >= 0
+                 || (l.sku||'').toLowerCase().indexOf(buscar) >= 0;
+             });
+      });
+      elMov.innerHTML = buildProduccionHtml(entFiltradas, manFiltradas);
+    }
+  } catch(e) {
+    console.error('renderProduccionActual:', e);
+  }
+}
+
+function buildProduccionHtml(entregadasSistema, manuales) {
     if (entregadasSistema.length === 0 && manuales.length === 0) {
-      targets.forEach(function(t) { t.innerHTML = '<div class="prod-empty">No hay entregados registrados aún</div>'; });
-      return;
+      return '<div class="prod-empty">No hay entregados registrados aún</div>';
     }
 
     // Filas del sistema
@@ -4160,17 +4195,13 @@ function renderProduccionActual() {
       }).join('');
     }).join('');
 
-    var tablaHtml = '<table class="prod-table">' +
+    return '<table class="prod-table">' +
       '<thead><tr>' +
         '<th>No. Requi</th><th>Cliente</th><th>Pedido</th><th>Producto</th>' +
         '<th>Unidades</th><th>Fecha</th><th>Origen</th><th></th>' +
       '</tr></thead>' +
       '<tbody>' + rowsManuales + rowsSistema + '</tbody>' +
       '</table>';
-    targets.forEach(function(t) { t.innerHTML = tablaHtml; });
-  } catch(e) {
-    console.error('renderProduccionActual:', e);
-  }
 }
 
 function calcularHoras(cantidad, opsCount, procs, tiros) {
@@ -5150,7 +5181,7 @@ function setMovVista(tipo) {
 
   if (tipo === 'ingreso') {
     if (btnReg) btnReg.style.display = 'none';
-    if (toolbar) toolbar.style.display = 'none';
+    if (toolbar) toolbar.style.display = 'flex';
     if (kpis) kpis.style.display = 'none';
     if (scrollSalRech) scrollSalRech.style.display = 'none';
     if (scrollIngresos) scrollIngresos.style.display = 'block';
@@ -5210,6 +5241,8 @@ async function cargarMovimientosSerig() {
 }
 
 function filtrarMovActual() {
+  if (movVistaActual === 'ingreso') { renderProduccionActual(); return; }
+
   var desde  = (document.getElementById('movDesde')  || {}).value || '';
   var hasta  = (document.getElementById('movHasta')  || {}).value || '';
   var buscar = ((document.getElementById('movBuscar') || {}).value || '').toLowerCase();
