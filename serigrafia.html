@@ -5399,6 +5399,9 @@ async function renderResumenFichas() {
       id: id,
       codigo: s ? (s.id_display || id.slice(0,8)) : id.slice(0,8),
       cliente: s ? (s.cliente || '—') : '(pedido eliminado)',
+      sku: s ? (s.sku || '—') : '—',
+      desc: s ? (s.desc || '—') : '—',
+      cant: s ? (s.cant || 0) : 0,
       salida: salidaMap[id] || 0,
       entrada: entradaMap[id] || 0
     };
@@ -5418,6 +5421,9 @@ async function renderResumenFichas() {
     return '<tr onclick="mostrarDetalle(\'' + f.id + '\')" style="cursor:pointer">' +
       '<td class="mov-doc">' + escHtml(f.codigo) + '</td>' +
       '<td style="font-weight:600;font-size:11px">' + escHtml(f.cliente) + '</td>' +
+      '<td><span class="mov-sku">' + escHtml(f.sku) + '</span></td>' +
+      '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(f.desc) + '</td>' +
+      '<td class="mov-cant">' + f.cant.toLocaleString() + '</td>' +
       '<td class="mov-cant" style="color:var(--teal)">' + f.salida.toLocaleString() + '</td>' +
       '<td class="mov-cant" style="color:var(--green)">' + f.entrada.toLocaleString() + '</td>' +
       '<td style="text-align:center;font-size:11px;font-weight:700;color:' + difColor + '">' + difTxt + '</td>' +
@@ -5426,8 +5432,9 @@ async function renderResumenFichas() {
   }
 
   cont.innerHTML = '<table class="mov-table"><thead><tr>' +
-    '<th>Ficha</th><th>Cliente</th><th style="text-align:right">Salida bodega</th>' +
-    '<th style="text-align:right">Entrada PT</th><th style="text-align:center">Diferencia</th><th style="text-align:center">Rendimiento</th>' +
+    '<th>Ficha</th><th>Cliente</th><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th>' +
+    '<th style="text-align:right">Salida de bodega</th><th style="text-align:right">Entrada PT</th>' +
+    '<th style="text-align:center">Diferencia</th><th style="text-align:center">Rendimiento</th>' +
     '</tr></thead><tbody>' + fichas.map(buildRow).join('') + '</tbody></table>';
 }
 
