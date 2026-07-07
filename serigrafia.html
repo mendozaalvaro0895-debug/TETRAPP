@@ -843,7 +843,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 <!-- ══════════════════ MODAL SALIDA DE BODEGA (Serig) ══════ -->
 <div class="overlay" id="modalMovSerig">
-  <div class="modal" style="max-width:580px">
+  <div class="modal" style="max-width:640px">
     <div class="mh">
       <div class="mh-title">📤 Registrar Salida de Bodega</div>
       <button class="m-close" onclick="cerrarModalMovSerig()">✕</button>
@@ -851,42 +851,22 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="mb">
       <div class="fr">
         <div class="fg">
-          <div class="fl">Nº Documento (Requi) *</div>
-          <input class="fi" id="movSNumDoc" placeholder="Ej: R-2024-001">
+          <div class="fl">No. DE REQUI *</div>
+          <input class="fi" id="movSRequi" placeholder="Ej. R-2024-001">
         </div>
         <div class="fg">
-          <div class="fl">Fecha del documento *</div>
+          <div class="fl">FECHA ENTREGA</div>
           <input class="fi" id="movSFecha" type="date">
         </div>
       </div>
-      <div class="fg full" style="margin-bottom:12px">
-        <div class="fl">SKU del Producto *</div>
-        <div class="sku-wrap-s">
-          <input class="fi" id="movSSku" placeholder="Escribe el código SKU..." autocomplete="off"
-            oninput="movSSkuInput(this.value)" onblur="setTimeout(cerrarMovSSkuDrop,200)" style="width:100%">
-          <div class="sku-drop-s" id="movSSkuDrop"></div>
-        </div>
+      <div class="fg full" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div class="fl" style="margin-bottom:0">PRODUCTOS *</div>
+        <button onclick="agregarLineaMovS()" style="background:var(--serig-l);color:var(--serig-m);border:1px solid var(--serig-m);border-radius:5px;padding:2px 9px;font-size:11px;font-weight:700;cursor:pointer">+ Agregar</button>
       </div>
-      <div class="fg full" style="margin-bottom:12px">
-        <div class="fl">Descripción</div>
-        <input class="fi" id="movSDesc" placeholder="Se completa automáticamente al seleccionar SKU" readonly
-          style="background:var(--bg);color:var(--gray)">
-      </div>
-      <div class="fr">
-        <div class="fg">
-          <div class="fl">Cantidad (unidades) *</div>
-          <input class="fi" id="movSCant" type="number" min="1" placeholder="0">
-        </div>
-        <div class="fg">
-          <div class="fl">Pedido vinculado (opcional)</div>
-          <select class="fs" id="movSSolicitud" style="font-size:12px">
-            <option value="">— Sin vincular —</option>
-          </select>
-        </div>
-      </div>
+      <div id="movSLineasContainer" style="margin-bottom:6px"></div>
       <div class="fg full">
-        <div class="fl">Observaciones</div>
-        <textarea class="fta" id="movSObs" rows="2" placeholder="Notas adicionales..."></textarea>
+        <div class="fl">Nota / observaciones (opcional)</div>
+        <input class="fi" id="movSNota" placeholder="Nota / observaciones (opcional)">
       </div>
     </div>
     <div class="mf">
@@ -5350,51 +5330,103 @@ function actualizarKPIsMov(data) {
   }
 }
 
-// ── Modal Salida de Bodega ────────────────────────────────────
+// ── Modal Salida de Bodega (mismos campos que Registrar entregado,
+//    ya que ambos documentan una Requi) ────────────────────────
+var movSLineasCount   = 0;
+var movSSkus          = {}; // { lineaIdx: sku }
+var movSSolIds        = {}; // { lineaIdx: solId }
+var movSClientesOptsHtml = '';
+
 function abrirModalMovSerig() {
   var modal = document.getElementById('modalMovSerig');
   if (!modal) return;
-  ['movSNumDoc','movSSku','movSDesc','movSCant','movSObs'].forEach(function(id) {
-    var el = document.getElementById(id); if (el) el.value = '';
-  });
+  movSLineasCount = 0; movSSkus = {}; movSSolIds = {};
+  document.getElementById('movSRequi').value = '';
+  document.getElementById('movSNota').value  = '';
   document.getElementById('movSFecha').value = new Date().toISOString().slice(0,10);
-  cerrarMovSSkuDrop();
-  var sel = document.getElementById('movSSolicitud');
-  if (sel) {
-    sel.innerHTML = '<option value="">— Sin vincular —</option>';
-    solicitudes.filter(function(s){ return s.estado !== 'entregada'; }).forEach(function(s) {
-      var opt = document.createElement('option');
-      opt.value = s.id;
-      opt.textContent = (s.id_display || s.id.slice(0,8)) + ' — ' + s.cliente;
-      sel.appendChild(opt);
-    });
-  }
+  var usage = getCliUsage();
+  var sorted = CLIENTES.slice().sort(function(a, b) {
+    var diff = (usage[b] || 0) - (usage[a] || 0);
+    return diff !== 0 ? diff : a.localeCompare(b);
+  });
+  movSClientesOptsHtml = '<option value="">— Seleccionar cliente —</option>' +
+    sorted.map(function(c) { return '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>'; }).join('');
+  var container = document.getElementById('movSLineasContainer');
+  if (container) container.innerHTML = '';
+  agregarLineaMovS();
   modal.classList.add('open');
 }
 
 function cerrarModalMovSerig() {
   var modal = document.getElementById('modalMovSerig');
   if (modal) modal.classList.remove('open');
-  cerrarMovSSkuDrop();
 }
 
-function movSSkuInput(val) {
-  var drop = document.getElementById('movSSkuDrop');
+function agregarLineaMovS(descVal, skuVal, cantVal, clienteVal, solIdVal) {
+  var container = document.getElementById('movSLineasContainer');
+  if (!container) return;
+  var i = movSLineasCount++;
+  movSSkus[i] = skuVal || null;
+  if (!clienteVal && i > 0) {
+    var prevCli = document.getElementById('movSCli-' + (i - 1));
+    if (prevCli) clienteVal = prevCli.value;
+  }
+  var bSty = 'padding:5px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box;width:100%';
+  var row = document.createElement('div');
+  row.id = 'movSLinea-' + i;
+  row.style.cssText = 'display:grid;grid-template-columns:150px 185px 1fr 90px 28px;gap:5px;margin-bottom:5px;align-items:start';
+  var cliOpts = movSClientesOptsHtml.replace(
+    'value="' + escHtml(clienteVal || '') + '"',
+    'value="' + escHtml(clienteVal || '') + '" selected'
+  );
+  if (solIdVal) movSSolIds[i] = solIdVal;
+  var solLabel = '';
+  if (solIdVal) {
+    var solPre = solicitudes.find(function(x) { return x.id === solIdVal; });
+    if (solPre) solLabel = (solPre.id_display || '') + ' · ' + (solPre.cliente || '').slice(0, 14);
+  }
+  row.innerHTML =
+    '<select id="movSCli-' + i + '" style="' + bSty + ';background:var(--card);color:var(--text)">' + cliOpts + '</select>' +
+    '<div class="sku-wrap-s">' +
+      '<input id="movSSol-' + i + '" placeholder="🔗 Buscar pedido…" autocomplete="off" style="' + bSty + '" value="' + escHtml(solLabel) + '"' +
+        ' oninput="movSSolInput(this.value,' + i + ')" onfocus="movSSolInput(this.value,' + i + ')" onblur="setTimeout(function(){cerrarMovSSolDrop(' + i + ')},200)">' +
+      '<div class="sku-drop-s" id="movS-sol-drop-' + i + '"></div>' +
+    '</div>' +
+    '<div class="sku-wrap-s">' +
+      '<input id="movSDesc-' + i + '" placeholder="🔍 SKU o descripción…" autocomplete="off" style="' + bSty + '"' +
+        ' oninput="movSDescInput(this.value,' + i + ')" onblur="setTimeout(function(){cerrarMovSSkuDrop(' + i + ')},200)"' +
+        ' value="' + escHtml(descVal || '') + '">' +
+      '<div class="sku-drop-s" id="movS-sku-drop-' + i + '"></div>' +
+    '</div>' +
+    '<input id="movSCant-' + i + '" type="number" min="1" placeholder="Cant." style="' + bSty + '" value="' + (cantVal || '') + '">' +
+    '<button onclick="eliminarLineaMovS(' + i + ')" title="Quitar" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--gray-l);font-size:13px;cursor:pointer;padding:3px 5px;line-height:1">✕</button>';
+  container.appendChild(row);
+}
+
+function eliminarLineaMovS(i) {
+  var row = document.getElementById('movSLinea-' + i);
+  if (row) row.remove();
+  delete movSSkus[i];
+}
+
+function movSDescInput(val, i) {
+  var drop = document.getElementById('movS-sku-drop-' + i);
   if (!drop) return;
+  movSSkus[i] = null;
   var v = val.trim().toLowerCase();
   if (v.length < 2) { drop.classList.remove('open'); return; }
-  var matches = inventarioCache.filter(function(i) {
-    return i.sku.toLowerCase().indexOf(v) >= 0 || (i.descripcion||'').toLowerCase().indexOf(v) >= 0;
-  }).slice(0, 10);
+  var matches = inventarioCache.filter(function(item) {
+    return item.sku.toLowerCase().indexOf(v) >= 0 || (item.descripcion||'').toLowerCase().indexOf(v) >= 0;
+  }).slice(0, 8);
   if (!matches.length) { drop.classList.remove('open'); return; }
-  drop.innerHTML = matches.map(function(i) {
-    var esc = i.sku.replace(/'/g, "\\'");
-    return '<div class="sku-item-s" onmousedown="seleccionarMovSSku(\'' + esc + '\')">' +
-      '<div class="sku-code-s">' + escHtml(i.sku) + '</div>' +
-      '<div class="sku-desc-s">' + escHtml(i.descripcion||'') + '</div>' +
+  drop.innerHTML = matches.map(function(item) {
+    var esc = item.sku.replace(/'/g, "\\'");
+    return '<div class="sku-item-s" onmousedown="seleccionarMovSDesc(\'' + esc + '\',' + i + ')">' +
+      '<div class="sku-code-s">' + escHtml(item.sku) + '</div>' +
+      '<div class="sku-desc-s">' + escHtml(item.descripcion||'') + '</div>' +
       '</div>';
   }).join('');
-  var inp = document.getElementById('movSSku');
+  var inp = document.getElementById('movSDesc-' + i);
   if (inp) {
     var r = inp.getBoundingClientRect();
     drop.style.top = (r.bottom+2) + 'px'; drop.style.left = r.left + 'px'; drop.style.width = r.width + 'px';
@@ -5402,47 +5434,105 @@ function movSSkuInput(val) {
   drop.classList.add('open');
 }
 
-function seleccionarMovSSku(sku) {
-  var item = inventarioCache.find(function(i){ return i.sku === sku; });
-  document.getElementById('movSSku').value = sku;
-  document.getElementById('movSDesc').value = item ? (item.descripcion||'') : '';
-  cerrarMovSSkuDrop();
+function seleccionarMovSDesc(sku, i) {
+  var item = inventarioCache.find(function(x) { return x.sku === sku; });
+  movSSkus[i] = sku;
+  var inp = document.getElementById('movSDesc-' + i);
+  if (inp) inp.value = (item ? item.descripcion : '') || sku;
+  cerrarMovSSkuDrop(i);
 }
 
-function cerrarMovSSkuDrop() {
-  var d = document.getElementById('movSSkuDrop');
+function cerrarMovSSkuDrop(i) {
+  var d = document.getElementById('movS-sku-drop-' + i);
+  if (d) d.classList.remove('open');
+}
+
+function movSSolInput(val, i) {
+  var drop = document.getElementById('movS-sol-drop-' + i);
+  if (!drop) return;
+  movSSolIds[i] = null;
+  var v = val.trim().toLowerCase();
+  var candidatos = solicitudes.filter(function(s) { return s.estado !== 'entregada'; });
+  var matches = v.length === 0 ? candidatos.slice(0, 12) : candidatos.filter(function(s) {
+    return (s.id_display || '').toLowerCase().indexOf(v) >= 0 || (s.cliente || '').toLowerCase().indexOf(v) >= 0;
+  }).slice(0, 12);
+  if (!matches.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(function(s) {
+    var lbl = escHtml((s.id_display || '') + ' · ' + (s.cliente || ''));
+    var sid = s.id.replace(/'/g, "\\'");
+    return '<div class="sku-item-s" onmousedown="seleccionarMovSSol(\'' + sid + '\',' + i + ')">' +
+      '<div class="sku-code-s">' + lbl + '</div>' +
+      '</div>';
+  }).join('');
+  var inp = document.getElementById('movSSol-' + i);
+  if (inp) {
+    var r = inp.getBoundingClientRect();
+    drop.style.top = (r.bottom+2) + 'px'; drop.style.left = r.left + 'px'; drop.style.width = r.width + 'px';
+  }
+  drop.classList.add('open');
+}
+
+function seleccionarMovSSol(solId, i) {
+  var s = solicitudes.find(function(x) { return x.id === solId; });
+  if (!s) return;
+  movSSolIds[i] = solId;
+  var inp = document.getElementById('movSSol-' + i);
+  if (inp) inp.value = (s.id_display || '') + ' · ' + (s.cliente || '').slice(0, 14);
+  cerrarMovSSolDrop(i);
+  var cliEl = document.getElementById('movSCli-' + i);
+  if (cliEl && s.cliente) cliEl.value = s.cliente;
+}
+
+function cerrarMovSSolDrop(i) {
+  var d = document.getElementById('movS-sol-drop-' + i);
   if (d) d.classList.remove('open');
 }
 
 async function confirmarMovSerig() {
-  var numDoc = (document.getElementById('movSNumDoc').value || '').trim();
-  var fecha  = document.getElementById('movSFecha').value;
-  var sku    = (document.getElementById('movSSku').value || '').trim();
-  var cant   = parseInt(document.getElementById('movSCant').value);
-  var solId  = document.getElementById('movSSolicitud').value || null;
-  var obs    = (document.getElementById('movSObs').value || '').trim();
+  var requi = (document.getElementById('movSRequi').value || '').trim();
+  var fecha = document.getElementById('movSFecha').value;
+  var nota  = (document.getElementById('movSNota').value || '').trim();
 
-  if (!numDoc)         { showToast('⚠️ Nº de documento requerido', '#B83232'); return; }
-  if (!sku)            { showToast('⚠️ SKU requerido', '#B83232'); return; }
-  if (!cant || cant<1) { showToast('⚠️ Cantidad debe ser mayor a 0', '#B83232'); return; }
+  if (!requi) { showToast('⚠️ El No. de Requi es obligatorio', '#92400e'); return; }
 
-  var obsFinal = 'FECHA:' + fecha + (obs ? ' | ' + obs : '');
+  var lineas = [];
+  var container = document.getElementById('movSLineasContainer');
+  if (container) {
+    var rows = container.querySelectorAll('[id^="movSLinea-"]');
+    for (var ri = 0; ri < rows.length; ri++) {
+      var idx = parseInt(rows[ri].id.replace('movSLinea-', ''));
+      var dInp = document.getElementById('movSDesc-' + idx);
+      var cInp = document.getElementById('movSCant-' + idx);
+      var dv = dInp ? dInp.value.trim() : '';
+      var cv = cInp ? parseInt(cInp.value || '0') : 0;
+      if (!dv)           { showToast('⚠️ Completá el SKU del producto ' + (ri + 1), '#92400e'); if (dInp) dInp.focus(); return; }
+      if (!cv || cv < 1) { showToast('⚠️ Cantidad inválida en producto ' + (ri + 1), '#92400e'); if (cInp) cInp.focus(); return; }
+      lineas.push({ sku: movSSkus[idx] || dv, cant: cv, solId: movSSolIds[idx] || null });
+    }
+  }
+  if (!lineas.length) { showToast('⚠️ Agregá al menos un producto', '#92400e'); return; }
+
+  var obsFinal = 'FECHA:' + fecha + (nota ? ' | ' + nota : '');
   var btn = document.getElementById('movSBtnOk');
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
 
   try {
-    var r = await db.from('movimientos_materiales').insert({
-      solicitud_id:  solId,
-      sku_original:  sku,
-      cantidad:      cant,
-      tipo:          'salida_bodega',
-      num_documento: numDoc,
-      observaciones: obsFinal,
-      area:          'serig'
+    var payload = lineas.map(function(l) {
+      return {
+        solicitud_id:  l.solId,
+        sku_original:  l.sku,
+        cantidad:      l.cant,
+        tipo:          'salida_bodega',
+        num_documento: requi,
+        observaciones: obsFinal,
+        area:          'serig'
+      };
     });
+    var r = await db.from('movimientos_materiales').insert(payload);
     if (r.error) throw r.error;
-    await ajustarExistencia(sku, -cant);
-    showToast('✅ Salida registrada: Doc ' + numDoc + ' · ' + cant.toLocaleString() + ' und');
+    for (var i = 0; i < lineas.length; i++) { await ajustarExistencia(lineas[i].sku, -lineas[i].cant); }
+    var totalCant = lineas.reduce(function(s, l) { return s + l.cant; }, 0);
+    showToast('✅ Salida registrada: Requi ' + requi + ' · ' + totalCant.toLocaleString() + ' und');
     cerrarModalMovSerig();
     await cargarMovimientosSerig();
   } catch(e) {
