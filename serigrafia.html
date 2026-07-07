@@ -3122,18 +3122,26 @@ function exportarBoardPDF() {
     }
   });
 
+  // Línea real asignada a un pedido: viene de solicitud_lineas.linea_id (por línea),
+  // no del campo s.linea_id (meta heredado a nivel de solicitud, no confiable)
+  function lineaAsignadaDe(s) {
+    var conLinea = (s.lineas || []).find(function(l){ return l.linea_id; });
+    return conLinea ? conLinea.linea_id : null;
+  }
+
   // Clasificar solicitudes
   var sinAsignar = [], completados = [];
   var enCurso = {}; // linea_id → []
   LINEAS_PRODUCCION.forEach(function(ln){ enCurso[ln.id] = []; });
 
   solicitudes.forEach(function(s) {
-    if (s.estado === 'lista' && s.linea_id) { completados.push(s); return; }
+    var lineaAsignada = lineaAsignadaDe(s);
+    if (s.estado === 'lista' && lineaAsignada) { completados.push(s); return; }
     var esActiva   = ['nueva','programada','proceso','parcial'].indexOf(s.estado) >= 0;
-    var esListaSin = s.estado === 'lista' && !s.linea_id;
+    var esListaSin = s.estado === 'lista' && !lineaAsignada;
     if (!esActiva && !esListaSin) return;
-    if (!s.linea_id) { sinAsignar.push(s); }
-    else if (enCurso[s.linea_id]) { enCurso[s.linea_id].push(s); }
+    if (!lineaAsignada) { sinAsignar.push(s); }
+    else if (enCurso[lineaAsignada]) { enCurso[lineaAsignada].push(s); }
     else { sinAsignar.push(s); }
   });
 
@@ -3223,8 +3231,9 @@ function exportarBoardPDF() {
     var entTxt = ent > 0 ? ent.toLocaleString() + ' / ' + total.toLocaleString() : total.toLocaleString();
     var entClr = ent >= total && total > 0 ? '#15803d' : ent > 0 ? '#92400e' : '#111';
     var progTxt = s.prog > 0 ? s.prog + '%' : '—';
+    var lineaAsignada = lineaAsignadaDe(s);
     var lineaTxt = showLinea
-      ? (s.linea_id ? (LINEAS_PRODUCCION.find(function(l){return l.id===s.linea_id;})||{nombre:'?'}).nombre : '—')
+      ? (lineaAsignada ? (LINEAS_PRODUCCION.find(function(l){return l.id===lineaAsignada;})||{nombre:'?'}).nombre : '—')
       : '';
     var desc = (s.lineas && s.lineas.length)
       ? s.lineas.map(function(l){ return (l.sku?l.sku+' · ':'')+escHtml(l.desc||''); }).join('<br>')
