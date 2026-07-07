@@ -624,7 +624,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <input class="fi" type="date" id="movDesde" style="font-size:11px;padding:4px 8px" onchange="filtrarMovActual()">
         <span style="font-size:11px;color:var(--gray)">→</span>
         <input class="fi" type="date" id="movHasta" style="font-size:11px;padding:4px 8px" onchange="filtrarMovActual()">
-        <input class="fi" type="text" placeholder="🔍 Buscar SKU o documento..." id="movBuscar" oninput="filtrarMovActual()" style="font-size:12px;min-width:200px">
+        <input class="fi" type="text" placeholder="🔍 Buscar SKU, cliente o documento..." id="movBuscar" oninput="filtrarMovActual()" style="font-size:12px;min-width:200px">
         <div style="flex:1"></div>
       </div>
 
@@ -5255,10 +5255,13 @@ function filtrarMovActual() {
     if (movVistaActual === 'rechazos') {
       return (r.sku||'').toLowerCase().indexOf(buscar) >= 0
         || (r.descripcion||'').toLowerCase().indexOf(buscar) >= 0
-        || (r.motivo||'').toLowerCase().indexOf(buscar) >= 0;
+        || (r.motivo||'').toLowerCase().indexOf(buscar) >= 0
+        || (r.cliente||'').toLowerCase().indexOf(buscar) >= 0;
     }
+    var sol = r.solicitud_id ? solicitudes.find(function(s){ return s.id === r.solicitud_id; }) : null;
     return (r.sku_original||'').toLowerCase().indexOf(buscar) >= 0
-      || (r.num_documento||'').toLowerCase().indexOf(buscar) >= 0;
+      || (r.num_documento||'').toLowerCase().indexOf(buscar) >= 0
+      || (sol && (sol.cliente||'').toLowerCase().indexOf(buscar) >= 0);
   });
 
   renderMovTabla(data);
