@@ -5251,15 +5251,17 @@ function filtrarMovActual() {
 function buildSalidaRow(r) {
   var fecha = r.created_at ? r.created_at.slice(0,10) : '—';
   var sol = r.solicitud_id ? solicitudes.find(function(s){ return s.id === r.solicitud_id; }) : null;
-  var solTxt = sol ? (sol.id_display || sol.id.slice(0,8)) + ' · ' + (sol.cliente||'') : '—';
+  var invItem = r.sku_original ? inventarioCache.find(function(i){ return i.sku === r.sku_original; }) : null;
   var obsLimpia = (r.observaciones || '').replace(/^FECHA:\S*\s*\|?\s*/, '');
   return '<tr>' +
-    '<td><span class="mov-badge-sal">SALIDA</span></td>' +
     '<td class="mov-doc">' + escHtml(r.num_documento || '—') + '</td>' +
-    '<td style="font-size:11px;color:var(--gray)">' + escHtml(fecha) + '</td>' +
+    '<td style="font-size:11px">' + escHtml(sol ? (sol.cliente||'—') : '—') + '</td>' +
+    '<td style="font-size:11px">' + escHtml(sol ? (sol.id_display || sol.id.slice(0,8)) : '—') + '</td>' +
     '<td><span class="mov-sku">' + escHtml(r.sku_original || '—') + '</span></td>' +
+    '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(invItem ? (invItem.descripcion||'—') : '—') + '</td>' +
     '<td class="mov-cant">' + (r.cantidad||0).toLocaleString() + '</td>' +
-    '<td style="font-size:11px">' + escHtml(solTxt) + '</td>' +
+    '<td style="font-size:11px;color:var(--gray)">' + escHtml(fecha) + '</td>' +
+    '<td><span class="mov-badge-sal">SALIDA</span></td>' +
     '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(obsLimpia) + '</td>' +
     '</tr>';
 }
@@ -5302,8 +5304,8 @@ function renderMovTabla(data) {
       '</tr></thead><tbody>' + data.map(buildRechazoRowSerig).join('') + '</tbody></table>';
   } else {
     tabla.innerHTML = '<table class="mov-table"><thead><tr>' +
-      '<th></th><th>Documento</th><th>Fecha</th><th>SKU / Producto</th>' +
-      '<th style="text-align:right">Cantidad</th><th>Pedido vinculado</th><th>Observaciones</th>' +
+      '<th>No. Requi</th><th>Cliente vinculado</th><th>Pedido vinculado</th><th>SKU</th><th>Descripción</th>' +
+      '<th style="text-align:right">Cantidad</th><th>Fecha</th><th>Origen</th><th>Observaciones</th>' +
       '</tr></thead><tbody>' + data.map(buildSalidaRow).join('') + '</tbody></table>';
   }
 }
