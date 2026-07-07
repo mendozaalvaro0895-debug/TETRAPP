@@ -4333,9 +4333,17 @@ async function mostrarDetalle(id) {
       fugas.salidas  = r.data.filter(function(m){return m.tipo==='salida_bodega';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
       fugas.entradas = r.data.filter(function(m){return m.tipo==='entrada_pt';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
       fugas.perdidas = r.data.filter(function(m){return m.tipo==='perdida';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
-      fugas.fugaTotal = fugas.salidas - fugas.entradas - fugas.perdidas;
     }
   } catch(e) {}
+  // Ingresos PT registrados como entregas manuales (Movimientos > Ingresos PT / bloque Entregados)
+  (getEntregasManuales() || []).forEach(function(m) {
+    if (m.lineas && m.lineas.length) {
+      m.lineas.forEach(function(l) { if (l.solId === s.id) fugas.entradas += (l.cant || 0); });
+    } else if (m.solId === s.id) {
+      fugas.entradas += (m.cant || 0);
+    }
+  });
+  fugas.fugaTotal = fugas.salidas - fugas.entradas - fugas.perdidas;
 
   var det = document.getElementById('modalDetalleBody');
   if (!det) return;
