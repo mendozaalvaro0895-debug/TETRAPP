@@ -159,6 +159,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .prod-pr-row{display:flex;align-items:center;gap:6px}
 .prod-empty{text-align:center;padding:32px;color:var(--gray-l);font-size:13px;background:var(--card);border:1px solid var(--border);border-radius:12px}
 
+/* ── MOVIMIENTOS (Salidas / Ingresos PT / Rechazos) ───────── */
+.seg-btn{background:transparent;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;color:var(--gray);cursor:pointer;transition:all .15s;font-family:var(--sans)}
+.seg-btn:hover{color:var(--ink)}
+.seg-active{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.mov-toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+.mov-scroll{flex:1;overflow-y:auto;padding:16px}
+.mov-table{width:100%;border-collapse:collapse}
+.mov-table th{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);padding:8px 10px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
+.mov-table td{padding:9px 10px;font-size:12px;border-bottom:1px solid var(--bg);vertical-align:middle}
+.mov-table tr:hover td{background:var(--serig-l)}
+.mov-doc{font-family:var(--mono);font-weight:700;color:var(--ink);font-size:12px}
+.mov-sku{font-family:var(--mono);font-size:11px;color:var(--serig-m)}
+.mov-cant{font-family:var(--mono);font-weight:700;color:var(--serig-m);text-align:right}
+.mov-badge-sal{background:#FFF3D6;color:#92400E;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
+.mov-badge-rech-int{background:#FEE2E2;color:#991B1B;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
+.mov-badge-rech-cli{background:#EDE9FE;color:#5b21b6;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
+.rech-origen-tog{display:inline-flex;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;padding:3px;gap:2px}
+
 /* ── BOARD DE ASIGNACIÓN ──────────────────────────────────── */
 /* Bloque principal "Sin asignar" */
 .board-sin{border-radius:12px;border:2px solid var(--serig-m);overflow:hidden;background:var(--card);margin-bottom:18px;transition:box-shadow .15s}
@@ -583,6 +601,54 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
     </div><!-- /view-inicio -->
 
+    <!-- ══ MOVIMIENTOS ═══════════════════════════════════════ -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-movimientos">
+      <div class="ph" style="flex-wrap:wrap;gap:8px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="ph-title">Movimientos · Serigrafía</div>
+          <div style="display:inline-flex;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;padding:3px;gap:2px">
+            <button id="seg-sal"  class="seg-btn seg-active" onclick="setMovVista('salida')">📤 Salidas de Bodega</button>
+            <button id="seg-ing"  class="seg-btn"            onclick="setMovVista('ingreso')">📦 Ingresos PT</button>
+            <button id="seg-rech" class="seg-btn"            onclick="setMovVista('rechazos')">⛔ Rechazos</button>
+          </div>
+        </div>
+        <div class="ph-r">
+          <button class="btn btn-t btn-sm" id="movRegistrarBtn" onclick="movRegistrar()">+ Registrar Salida</button>
+        </div>
+      </div>
+
+      <!-- KPI strip -->
+      <div class="kpi-strip" id="movKPIs">
+        <div class="kpi"><div class="kpi-l" id="mkpi-l1">Unidades salidas</div><div class="kpi-v" id="mkpi-v1" style="color:var(--amber)">—</div><div class="kpi-s" id="mkpi-s1">total período</div></div>
+        <div class="kpi"><div class="kpi-l" id="mkpi-l2">Documentos</div><div class="kpi-v" id="mkpi-v2">—</div><div class="kpi-s" id="mkpi-s2">registros únicos</div></div>
+        <div class="kpi"><div class="kpi-l" id="mkpi-l3">SKUs distintos</div><div class="kpi-v" id="mkpi-v3">—</div><div class="kpi-s" id="mkpi-s3">materias primas</div></div>
+        <div class="kpi"><div class="kpi-l" id="mkpi-l4">Último registro</div><div class="kpi-v" id="mkpi-v4" style="font-size:14px">—</div><div class="kpi-s" id="mkpi-s4">fecha</div></div>
+      </div>
+
+      <!-- Toolbar (Salidas / Rechazos) -->
+      <div class="mov-toolbar" id="movToolbar">
+        <span style="font-size:11px;font-weight:700;color:var(--gray)">Período:</span>
+        <input class="fi" type="date" id="movDesde" style="font-size:11px;padding:4px 8px" onchange="filtrarMovActual()">
+        <span style="font-size:11px;color:var(--gray)">→</span>
+        <input class="fi" type="date" id="movHasta" style="font-size:11px;padding:4px 8px" onchange="filtrarMovActual()">
+        <input class="fi" type="text" placeholder="🔍 Buscar SKU o documento..." id="movBuscar" oninput="filtrarMovActual()" style="font-size:12px;min-width:200px">
+        <div style="flex:1"></div>
+      </div>
+
+      <!-- Contenido: Salidas / Rechazos -->
+      <div class="mov-scroll" id="movScrollSalRech">
+        <div id="movTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
+      </div>
+
+      <!-- Contenido: Ingresos PT (mismos registros del bloque Entregados de Inicio) -->
+      <div class="mov-scroll" id="movScrollIngresos" style="display:none">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+          <button class="btn btn-s btn-sm" onclick="switchTab('inicio');setTimeout(abrirFormEntregado,250)">+ Registrar entregado</button>
+        </div>
+        <div id="produccionActualMov"></div>
+      </div>
+    </div><!-- /view-movimientos -->
+
     <!-- ══ PERSONAL ══════════════════════════════════════════ -->
     <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
       <div class="ph" style="flex-wrap:wrap;gap:8px">
@@ -775,6 +841,147 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="mf">
       <button class="btn btn-g" onclick="cerrarModalPerdida()">Cancelar</button>
       <button class="btn btn-s" onclick="confirmarPerdida()">Registrar pérdida</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL SALIDA DE BODEGA (Serig) ══════ -->
+<div class="overlay" id="modalMovSerig">
+  <div class="modal" style="max-width:580px">
+    <div class="mh">
+      <div class="mh-title">📤 Registrar Salida de Bodega</div>
+      <button class="m-close" onclick="cerrarModalMovSerig()">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Nº Documento (Requi) *</div>
+          <input class="fi" id="movSNumDoc" placeholder="Ej: R-2024-001">
+        </div>
+        <div class="fg">
+          <div class="fl">Fecha del documento *</div>
+          <input class="fi" id="movSFecha" type="date">
+        </div>
+      </div>
+      <div class="fg full" style="margin-bottom:12px">
+        <div class="fl">SKU del Producto *</div>
+        <div class="sku-wrap-s">
+          <input class="fi" id="movSSku" placeholder="Escribe el código SKU..." autocomplete="off"
+            oninput="movSSkuInput(this.value)" onblur="setTimeout(cerrarMovSSkuDrop,200)" style="width:100%">
+          <div class="sku-drop-s" id="movSSkuDrop"></div>
+        </div>
+      </div>
+      <div class="fg full" style="margin-bottom:12px">
+        <div class="fl">Descripción</div>
+        <input class="fi" id="movSDesc" placeholder="Se completa automáticamente al seleccionar SKU" readonly
+          style="background:var(--bg);color:var(--gray)">
+      </div>
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Cantidad (unidades) *</div>
+          <input class="fi" id="movSCant" type="number" min="1" placeholder="0">
+        </div>
+        <div class="fg">
+          <div class="fl">Pedido vinculado (opcional)</div>
+          <select class="fs" id="movSSolicitud" style="font-size:12px">
+            <option value="">— Sin vincular —</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg full">
+        <div class="fl">Observaciones</div>
+        <textarea class="fta" id="movSObs" rows="2" placeholder="Notas adicionales..."></textarea>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cerrarModalMovSerig()">Cancelar</button>
+      <button class="btn btn-t" id="movSBtnOk" onclick="confirmarMovSerig()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL RECHAZO (Serig) ═══════════════ -->
+<div class="overlay" id="modalRechazoSerig">
+  <div class="modal" style="max-width:500px">
+    <div class="mh">
+      <div class="mh-title">⛔ Registrar Rechazo</div>
+      <button class="m-close" onclick="cerrarModalRechazoSerig()">✕</button>
+    </div>
+    <div class="mb">
+
+      <div class="fg full" style="margin-bottom:12px">
+        <div class="fl">Origen del rechazo *</div>
+        <div class="rech-origen-tog">
+          <button type="button" id="rechSOrigenInt" class="seg-btn seg-active" onclick="setRechSOrigen('interno')">🏭 Interno</button>
+          <button type="button" id="rechSOrigenCli" class="seg-btn"            onclick="setRechSOrigen('cliente')">👤 Cliente</button>
+        </div>
+      </div>
+
+      <div class="fg full" id="rechSClienteWrap" style="display:none">
+        <div class="fl">Cliente *</div>
+        <input class="fi" id="rechSCliente" placeholder="Nombre del cliente que rechazó">
+      </div>
+
+      <div class="fg full">
+        <div class="fl">SKU / Producto *</div>
+        <div class="sku-wrap-s">
+          <input class="fi" id="rechSSku" placeholder="Código SKU del producto rechazado…" autocomplete="off"
+            oninput="rechSSkuInput(this.value)" onblur="setTimeout(cerrarRechSSkuDrop,200)" style="width:100%">
+          <div class="sku-drop-s" id="rechSSkuDrop"></div>
+        </div>
+      </div>
+
+      <div class="fg full">
+        <div class="fl">Descripción</div>
+        <input class="fi" id="rechSDesc" placeholder="Se completa al seleccionar SKU" readonly
+          style="background:var(--bg);color:var(--gray)">
+      </div>
+
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Cantidad rechazada *</div>
+          <input class="fi" id="rechSCantRech" type="number" min="0" placeholder="0" oninput="actualizarPerdidaNetaSerig()">
+        </div>
+        <div class="fg">
+          <div class="fl">Cantidad recuperada</div>
+          <input class="fi" id="rechSCantRec" type="number" min="0" placeholder="0" oninput="actualizarPerdidaNetaSerig()">
+        </div>
+      </div>
+
+      <div class="fg full">
+        <div class="fl">Pérdida neta</div>
+        <div class="fi" id="rechSNeta" style="background:var(--bg);color:var(--red);font-weight:700;cursor:default">—</div>
+      </div>
+
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Motivo *</div>
+          <select class="fs" id="rechSMotivo">
+            <option value="">— Selecciona motivo —</option>
+            <option value="defecto_material">Defecto de material</option>
+            <option value="defecto_proceso">Defecto de proceso / impresión</option>
+            <option value="contaminacion">Contaminación / suciedad</option>
+            <option value="color_incorrecto">Color incorrecto</option>
+            <option value="registro_desalineado">Registro desalineado</option>
+            <option value="danado_transporte">Dañado en transporte</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="fg">
+          <div class="fl">Tiempo de selección (min)</div>
+          <input class="fi" id="rechSTiempo" type="number" min="0" placeholder="0">
+        </div>
+      </div>
+
+      <div class="fg full">
+        <div class="fl">Observaciones</div>
+        <textarea class="fta" id="rechSObs" rows="2" placeholder="Descripción del rechazo, acciones tomadas…"></textarea>
+      </div>
+
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cerrarModalRechazoSerig()">Cancelar</button>
+      <button class="btn" style="background:var(--red);color:#fff" id="rechSBtnOk" onclick="confirmarRechazoSerig()">⛔ Guardar rechazo</button>
     </div>
   </div>
 </div>
@@ -3892,14 +4099,16 @@ function editarEntregadoManual(id) {
 
 function renderProduccionActual() {
   try {
-    var el = document.getElementById('produccionActual');
-    if (!el) return;
+    var targets = ['produccionActual', 'produccionActualMov'].map(function(id) {
+      return document.getElementById(id);
+    }).filter(Boolean);
+    if (!targets.length) return;
 
     var entregadasSistema = solicitudes.filter(function(s){ return s.estado === 'entregada'; });
     var manuales = getEntregasManuales();
 
     if (entregadasSistema.length === 0 && manuales.length === 0) {
-      el.innerHTML = '<div class="prod-empty">No hay entregados registrados aún</div>';
+      targets.forEach(function(t) { t.innerHTML = '<div class="prod-empty">No hay entregados registrados aún</div>'; });
       return;
     }
 
@@ -3950,13 +4159,14 @@ function renderProduccionActual() {
       }).join('');
     }).join('');
 
-    el.innerHTML = '<table class="prod-table">' +
+    var tablaHtml = '<table class="prod-table">' +
       '<thead><tr>' +
         '<th>No. Requi</th><th>Cliente</th><th>Pedido</th><th>Producto</th>' +
         '<th>Unidades</th><th>Fecha</th><th>Origen</th><th></th>' +
       '</tr></thead>' +
       '<tbody>' + rowsManuales + rowsSistema + '</tbody>' +
       '</table>';
+    targets.forEach(function(t) { t.innerHTML = tablaHtml; });
   } catch(e) {
     console.error('renderProduccionActual:', e);
   }
@@ -4914,21 +5124,425 @@ async function guardarEdicion(lineasValidas, cliente) {
 }
 
 // ════════════════════════════════════════════════════════════
+// MOVIMIENTOS — Salidas de Bodega / Ingresos PT / Rechazos
+// ════════════════════════════════════════════════════════════
+
+var movVistaActual = 'salida';
+var movDataCache = [];
+var rechSOrigenActual = 'interno';
+
+function setMovVista(tipo) {
+  movVistaActual = tipo;
+  ['seg-sal','seg-ing','seg-rech'].forEach(function(id) {
+    var btn = document.getElementById(id);
+    if (btn) btn.classList.remove('seg-active');
+  });
+  var activeId = tipo === 'salida' ? 'seg-sal' : tipo === 'ingreso' ? 'seg-ing' : 'seg-rech';
+  var activeBtn = document.getElementById(activeId);
+  if (activeBtn) activeBtn.classList.add('seg-active');
+
+  var btnReg          = document.getElementById('movRegistrarBtn');
+  var toolbar          = document.getElementById('movToolbar');
+  var kpis              = document.getElementById('movKPIs');
+  var scrollSalRech = document.getElementById('movScrollSalRech');
+  var scrollIngresos = document.getElementById('movScrollIngresos');
+
+  if (tipo === 'ingreso') {
+    if (btnReg) btnReg.style.display = 'none';
+    if (toolbar) toolbar.style.display = 'none';
+    if (kpis) kpis.style.display = 'none';
+    if (scrollSalRech) scrollSalRech.style.display = 'none';
+    if (scrollIngresos) scrollIngresos.style.display = 'block';
+    renderProduccionActual();
+    return;
+  }
+
+  if (btnReg) {
+    btnReg.style.display = '';
+    btnReg.textContent = tipo === 'salida' ? '+ Registrar Salida' : '⛔ Registrar Rechazo';
+  }
+  if (toolbar) toolbar.style.display = 'flex';
+  if (kpis) kpis.style.display = '';
+  if (scrollSalRech) scrollSalRech.style.display = 'block';
+  if (scrollIngresos) scrollIngresos.style.display = 'none';
+
+  function setLbl(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; }
+  if (tipo === 'salida') {
+    setLbl('mkpi-l1','Unidades salidas'); setLbl('mkpi-l2','Documentos');
+    setLbl('mkpi-l3','SKUs distintos');   setLbl('mkpi-l4','Último registro');
+  } else {
+    setLbl('mkpi-l1','Unidades rechazadas'); setLbl('mkpi-l2','Recuperadas');
+    setLbl('mkpi-l3','Pérdida neta');        setLbl('mkpi-l4','Tiempo total');
+  }
+
+  cargarMovimientosSerig();
+}
+
+function movRegistrar() {
+  if (movVistaActual === 'rechazos') abrirModalRechazoSerig();
+  else abrirModalMovSerig();
+}
+
+async function cargarMovimientosSerig() {
+  var tabla = document.getElementById('movTabla');
+  if (tabla) tabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando...</div></div>';
+  try {
+    if (movVistaActual === 'rechazos') {
+      var r = await db.from('rechazos').select('*').eq('area','serig').order('created_at', { ascending: false }).limit(500);
+      if (r.error) {
+        if (r.error.code === 'PGRST205' || r.error.code === '42P01') {
+          movDataCache = [];
+          if (tabla) tabla.innerHTML = '<div class="empty" style="padding:40px;text-align:center;color:var(--gray)">⚠️ La tabla <code>rechazos</code> no existe aún.<br><span style="font-size:11px">Ejecuta el SQL de creación en el dashboard de Supabase.</span></div>';
+          actualizarKPIsMov([]);
+          return;
+        }
+        throw r.error;
+      }
+      movDataCache = r.data || [];
+    } else {
+      var r2 = await db.from('movimientos_materiales').select('*').eq('area','serig').eq('tipo','salida_bodega').order('created_at', { ascending: false }).limit(500);
+      if (r2.error) throw r2.error;
+      movDataCache = r2.data || [];
+    }
+  } catch(e) {
+    console.error('cargarMovimientosSerig:', e);
+    movDataCache = [];
+  }
+  filtrarMovActual();
+}
+
+function filtrarMovActual() {
+  var desde  = (document.getElementById('movDesde')  || {}).value || '';
+  var hasta  = (document.getElementById('movHasta')  || {}).value || '';
+  var buscar = ((document.getElementById('movBuscar') || {}).value || '').toLowerCase();
+
+  var data = movDataCache.filter(function(r) {
+    var fecha = (r.created_at || '').slice(0,10);
+    if (desde && fecha < desde) return false;
+    if (hasta && fecha > hasta) return false;
+    if (!buscar) return true;
+    if (movVistaActual === 'rechazos') {
+      return (r.sku||'').toLowerCase().indexOf(buscar) >= 0
+        || (r.descripcion||'').toLowerCase().indexOf(buscar) >= 0
+        || (r.motivo||'').toLowerCase().indexOf(buscar) >= 0;
+    }
+    return (r.sku_original||'').toLowerCase().indexOf(buscar) >= 0
+      || (r.num_documento||'').toLowerCase().indexOf(buscar) >= 0;
+  });
+
+  renderMovTabla(data);
+  actualizarKPIsMov(data);
+}
+
+function buildSalidaRow(r) {
+  var fecha = r.created_at ? r.created_at.slice(0,10) : '—';
+  var sol = r.solicitud_id ? solicitudes.find(function(s){ return s.id === r.solicitud_id; }) : null;
+  var solTxt = sol ? (sol.id_display || sol.id.slice(0,8)) + ' · ' + (sol.cliente||'') : '—';
+  var obsLimpia = (r.observaciones || '').replace(/^FECHA:\S*\s*\|?\s*/, '');
+  return '<tr>' +
+    '<td><span class="mov-badge-sal">SALIDA</span></td>' +
+    '<td class="mov-doc">' + escHtml(r.num_documento || '—') + '</td>' +
+    '<td style="font-size:11px;color:var(--gray)">' + escHtml(fecha) + '</td>' +
+    '<td><span class="mov-sku">' + escHtml(r.sku_original || '—') + '</span></td>' +
+    '<td class="mov-cant">' + (r.cantidad||0).toLocaleString() + '</td>' +
+    '<td style="font-size:11px">' + escHtml(solTxt) + '</td>' +
+    '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(obsLimpia) + '</td>' +
+    '</tr>';
+}
+
+function buildRechazoRowSerig(r) {
+  var fecha  = r.created_at ? r.created_at.slice(0,10) : '—';
+  var motivo = r.motivo ? r.motivo.replace(/_/g,' ') : '—';
+  var rech   = r.cantidad_rechazada  || 0;
+  var rec    = r.cantidad_recuperada || 0;
+  var neta   = rech - rec;
+  var origenBadge = r.origen === 'cliente'
+    ? '<span class="mov-badge-rech-cli">CLIENTE</span>'
+    : '<span class="mov-badge-rech-int">INTERNO</span>';
+  return '<tr>' +
+    '<td>' + origenBadge + '</td>' +
+    '<td style="font-size:11px;color:var(--gray)">' + escHtml(fecha) + '</td>' +
+    '<td><span class="mov-sku">' + escHtml(r.sku||'—') + '</span><div style="font-size:10px;color:var(--gray-l)">' + escHtml(r.descripcion||'') + '</div></td>' +
+    '<td style="font-size:12px;text-transform:capitalize">' + escHtml(motivo) + '</td>' +
+    '<td class="mov-cant" style="color:var(--red)">' + rech.toLocaleString() + '</td>' +
+    '<td class="mov-cant" style="color:var(--green)">' + rec.toLocaleString() + '</td>' +
+    '<td class="mov-cant" style="color:var(--amber)">' + neta.toLocaleString() + '</td>' +
+    '<td style="font-size:11px">' + escHtml(r.cliente || '—') + '</td>' +
+    '<td style="font-size:12px">' + escHtml(r.operador_id || '—') + '</td>' +
+    '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(r.observaciones || '') + '</td>' +
+    '</tr>';
+}
+
+function renderMovTabla(data) {
+  var tabla = document.getElementById('movTabla');
+  if (!tabla) return;
+  if (!data.length) {
+    tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin registros en este período</div>';
+    return;
+  }
+  if (movVistaActual === 'rechazos') {
+    tabla.innerHTML = '<table class="mov-table"><thead><tr>' +
+      '<th></th><th>Fecha</th><th>SKU / Producto</th><th>Motivo</th>' +
+      '<th style="text-align:right">Rechazado</th><th style="text-align:right">Recuperado</th>' +
+      '<th style="text-align:right">Pérdida neta</th><th>Cliente</th><th>Operador</th><th>Notas</th>' +
+      '</tr></thead><tbody>' + data.map(buildRechazoRowSerig).join('') + '</tbody></table>';
+  } else {
+    tabla.innerHTML = '<table class="mov-table"><thead><tr>' +
+      '<th></th><th>Documento</th><th>Fecha</th><th>SKU / Producto</th>' +
+      '<th style="text-align:right">Cantidad</th><th>Pedido vinculado</th><th>Observaciones</th>' +
+      '</tr></thead><tbody>' + data.map(buildSalidaRow).join('') + '</tbody></table>';
+  }
+}
+
+function actualizarKPIsMov(data) {
+  function setV(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+  if (movVistaActual === 'rechazos') {
+    var rech = data.reduce(function(a,r){ return a + (r.cantidad_rechazada||0); }, 0);
+    var rec  = data.reduce(function(a,r){ return a + (r.cantidad_recuperada||0); }, 0);
+    var mins = data.reduce(function(a,r){ return a + (r.tiempo_min||0); }, 0);
+    setV('mkpi-v1', rech.toLocaleString());
+    setV('mkpi-v2', rec.toLocaleString());
+    setV('mkpi-v3', (rech-rec).toLocaleString());
+    setV('mkpi-v4', mins ? mins + ' min' : '—');
+  } else {
+    var totalUnd = data.reduce(function(a,r){ return a + (r.cantidad||0); }, 0);
+    var docs = {}; data.forEach(function(r){ if (r.num_documento) docs[r.num_documento] = 1; });
+    var skus = {}; data.forEach(function(r){ if (r.sku_original)  skus[r.sku_original]  = 1; });
+    var ultimo = data.length ? (data[0].created_at || '').slice(0,10) : '—';
+    setV('mkpi-v1', totalUnd.toLocaleString());
+    setV('mkpi-v2', Object.keys(docs).length);
+    setV('mkpi-v3', Object.keys(skus).length);
+    setV('mkpi-v4', ultimo);
+  }
+}
+
+// ── Modal Salida de Bodega ────────────────────────────────────
+function abrirModalMovSerig() {
+  var modal = document.getElementById('modalMovSerig');
+  if (!modal) return;
+  ['movSNumDoc','movSSku','movSDesc','movSCant','movSObs'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('movSFecha').value = new Date().toISOString().slice(0,10);
+  cerrarMovSSkuDrop();
+  var sel = document.getElementById('movSSolicitud');
+  if (sel) {
+    sel.innerHTML = '<option value="">— Sin vincular —</option>';
+    solicitudes.filter(function(s){ return s.estado !== 'entregada'; }).forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = (s.id_display || s.id.slice(0,8)) + ' — ' + s.cliente;
+      sel.appendChild(opt);
+    });
+  }
+  modal.classList.add('open');
+}
+
+function cerrarModalMovSerig() {
+  var modal = document.getElementById('modalMovSerig');
+  if (modal) modal.classList.remove('open');
+  cerrarMovSSkuDrop();
+}
+
+function movSSkuInput(val) {
+  var drop = document.getElementById('movSSkuDrop');
+  if (!drop) return;
+  var v = val.trim().toLowerCase();
+  if (v.length < 2) { drop.classList.remove('open'); return; }
+  var matches = inventarioCache.filter(function(i) {
+    return i.sku.toLowerCase().indexOf(v) >= 0 || (i.descripcion||'').toLowerCase().indexOf(v) >= 0;
+  }).slice(0, 10);
+  if (!matches.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(function(i) {
+    var esc = i.sku.replace(/'/g, "\\'");
+    return '<div class="sku-item-s" onmousedown="seleccionarMovSSku(\'' + esc + '\')">' +
+      '<div class="sku-code-s">' + escHtml(i.sku) + '</div>' +
+      '<div class="sku-desc-s">' + escHtml(i.descripcion||'') + '</div>' +
+      '</div>';
+  }).join('');
+  var inp = document.getElementById('movSSku');
+  if (inp) {
+    var r = inp.getBoundingClientRect();
+    drop.style.top = (r.bottom+2) + 'px'; drop.style.left = r.left + 'px'; drop.style.width = r.width + 'px';
+  }
+  drop.classList.add('open');
+}
+
+function seleccionarMovSSku(sku) {
+  var item = inventarioCache.find(function(i){ return i.sku === sku; });
+  document.getElementById('movSSku').value = sku;
+  document.getElementById('movSDesc').value = item ? (item.descripcion||'') : '';
+  cerrarMovSSkuDrop();
+}
+
+function cerrarMovSSkuDrop() {
+  var d = document.getElementById('movSSkuDrop');
+  if (d) d.classList.remove('open');
+}
+
+async function confirmarMovSerig() {
+  var numDoc = (document.getElementById('movSNumDoc').value || '').trim();
+  var fecha  = document.getElementById('movSFecha').value;
+  var sku    = (document.getElementById('movSSku').value || '').trim();
+  var cant   = parseInt(document.getElementById('movSCant').value);
+  var solId  = document.getElementById('movSSolicitud').value || null;
+  var obs    = (document.getElementById('movSObs').value || '').trim();
+
+  if (!numDoc)         { showToast('⚠️ Nº de documento requerido', '#B83232'); return; }
+  if (!sku)            { showToast('⚠️ SKU requerido', '#B83232'); return; }
+  if (!cant || cant<1) { showToast('⚠️ Cantidad debe ser mayor a 0', '#B83232'); return; }
+
+  var obsFinal = 'FECHA:' + fecha + (obs ? ' | ' + obs : '');
+  var btn = document.getElementById('movSBtnOk');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  try {
+    var r = await db.from('movimientos_materiales').insert({
+      solicitud_id:  solId,
+      sku_original:  sku,
+      cantidad:      cant,
+      tipo:          'salida_bodega',
+      num_documento: numDoc,
+      observaciones: obsFinal,
+      area:          'serig'
+    });
+    if (r.error) throw r.error;
+    await ajustarExistencia(sku, -cant);
+    showToast('✅ Salida registrada: Doc ' + numDoc + ' · ' + cant.toLocaleString() + ' und');
+    cerrarModalMovSerig();
+    await cargarMovimientosSerig();
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Registrar'; }
+  }
+}
+
+// ── Modal Rechazo (Interno / Cliente) ─────────────────────────
+function setRechSOrigen(origen) {
+  rechSOrigenActual = origen;
+  var bInt = document.getElementById('rechSOrigenInt');
+  var bCli = document.getElementById('rechSOrigenCli');
+  if (bInt) bInt.classList.toggle('seg-active', origen === 'interno');
+  if (bCli) bCli.classList.toggle('seg-active', origen === 'cliente');
+  var wrap = document.getElementById('rechSClienteWrap');
+  if (wrap) wrap.style.display = origen === 'cliente' ? '' : 'none';
+}
+
+function abrirModalRechazoSerig() {
+  var m = document.getElementById('modalRechazoSerig');
+  if (!m) return;
+  ['rechSSku','rechSDesc','rechSCantRech','rechSCantRec','rechSTiempo','rechSCliente','rechSObs'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  var neta = document.getElementById('rechSNeta'); if (neta) neta.textContent = '—';
+  var mot  = document.getElementById('rechSMotivo'); if (mot) mot.value = '';
+  setRechSOrigen('interno');
+  m.classList.add('open');
+}
+
+function cerrarModalRechazoSerig() {
+  var m = document.getElementById('modalRechazoSerig');
+  if (m) m.classList.remove('open');
+}
+
+function actualizarPerdidaNetaSerig() {
+  var rech = parseInt(document.getElementById('rechSCantRech').value) || 0;
+  var rec  = parseInt(document.getElementById('rechSCantRec').value)  || 0;
+  var el = document.getElementById('rechSNeta');
+  if (el) el.textContent = (rech - rec).toLocaleString() + ' und';
+}
+
+function rechSSkuInput(val) {
+  var drop = document.getElementById('rechSSkuDrop');
+  if (!drop) return;
+  var v = val.trim().toLowerCase();
+  if (v.length < 2) { drop.classList.remove('open'); return; }
+  var matches = inventarioCache.filter(function(i) {
+    return i.sku.toLowerCase().indexOf(v) >= 0 || (i.descripcion||'').toLowerCase().indexOf(v) >= 0;
+  }).slice(0, 10);
+  if (!matches.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(function(i) {
+    var esc = i.sku.replace(/'/g, "\\'");
+    return '<div class="sku-item-s" onmousedown="seleccionarRechSSku(\'' + esc + '\')">' +
+      '<div class="sku-code-s">' + escHtml(i.sku) + '</div>' +
+      '<div class="sku-desc-s">' + escHtml(i.descripcion||'') + '</div>' +
+      '</div>';
+  }).join('');
+  var inp = document.getElementById('rechSSku');
+  if (inp) {
+    var r = inp.getBoundingClientRect();
+    drop.style.top = (r.bottom+2) + 'px'; drop.style.left = r.left + 'px'; drop.style.width = r.width + 'px';
+  }
+  drop.classList.add('open');
+}
+
+function seleccionarRechSSku(sku) {
+  var item = inventarioCache.find(function(i){ return i.sku === sku; });
+  document.getElementById('rechSSku').value = sku;
+  document.getElementById('rechSDesc').value = item ? (item.descripcion||'') : '';
+  cerrarRechSSkuDrop();
+}
+
+function cerrarRechSSkuDrop() {
+  var d = document.getElementById('rechSSkuDrop');
+  if (d) d.classList.remove('open');
+}
+
+async function confirmarRechazoSerig() {
+  var sku     = (document.getElementById('rechSSku').value || '').trim();
+  var rech    = parseInt(document.getElementById('rechSCantRech').value) || 0;
+  var rec     = parseInt(document.getElementById('rechSCantRec').value)  || 0;
+  var motivo  = document.getElementById('rechSMotivo').value;
+  var tiempo  = parseInt(document.getElementById('rechSTiempo').value) || null;
+  var cliente = (document.getElementById('rechSCliente').value || '').trim();
+  var obs     = (document.getElementById('rechSObs').value || '').trim();
+
+  if (!sku)    { showToast('⚠️ SKU requerido', '#B83232'); return; }
+  if (!rech)   { showToast('⚠️ Cantidad rechazada requerida', '#B83232'); return; }
+  if (!motivo) { showToast('⚠️ Motivo requerido', '#B83232'); return; }
+  if (rechSOrigenActual === 'cliente' && !cliente) { showToast('⚠️ Cliente requerido para rechazo de cliente', '#B83232'); return; }
+
+  var item = inventarioCache.find(function(i){ return i.sku === sku; });
+  var btn = document.getElementById('rechSBtnOk');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  try {
+    var r = await db.from('rechazos').insert({
+      sku: sku,
+      descripcion: item ? item.descripcion : '',
+      motivo: motivo,
+      cantidad_rechazada: rech,
+      cantidad_recuperada: rec,
+      tiempo_min: tiempo,
+      operador_id: 'operador',
+      observaciones: obs,
+      origen: rechSOrigenActual,
+      cliente: rechSOrigenActual === 'cliente' ? cliente : null,
+      area: 'serig'
+    });
+    if (r.error) {
+      if (r.error.code === 'PGRST205' || r.error.code === '42P01') {
+        showToast('⚠️ Tabla rechazos no existe — ejecuta el SQL en Supabase', '#92400e');
+        return;
+      }
+      throw r.error;
+    }
+    showToast('✅ Rechazo registrado: ' + rech.toLocaleString() + ' und de ' + sku);
+    cerrarModalRechazoSerig();
+    await cargarMovimientosSerig();
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⛔ Guardar rechazo'; }
+  }
+}
+
+// ════════════════════════════════════════════════════════════
 // NAVEGACIÓN
 // ════════════════════════════════════════════════════════════
 
-var WIP_CONFIG = {
-  movimientos: {
-    icon: '⬇⬆',
-    title: 'Movimientos · Serigrafía',
-    sub: 'Registro unificado de Salidas de Bodega, Ingresos de Producto Terminado y Rechazos. En construcción.',
-    chips: [
-      { text: '📤 Salidas de Bodega', tag: 'Próximamente' },
-      { text: '📦 Ingresos PT', tag: 'Próximamente' },
-      { text: '⛔ Rechazos', tag: 'Próximamente' }
-    ]
-  }
-};
+var WIP_CONFIG = {};
 
 function buildWipChip(chip) {
   return '<div class="wip-chip">' + chip.text + '<span>' + chip.tag + '</span></div>';
@@ -5018,7 +5632,7 @@ function switchTab(tab) {
   var tabEl = document.getElementById('tab-' + tab);
   if (tabEl) tabEl.classList.add('active');
 
-  var WIP_TABS = ['movimientos'];
+  var WIP_TABS = [];
 
   if (tab === 'inicio') {
     var v = document.getElementById('view-inicio');
@@ -5028,6 +5642,10 @@ function switchTab(tab) {
     var v = document.getElementById('view-personal');
     if (v) { v.style.display = 'flex'; triggerViewEnter('view-personal'); }
     renderPersonal();
+  } else if (tab === 'movimientos') {
+    var v = document.getElementById('view-movimientos');
+    if (v) { v.style.display = 'flex'; triggerViewEnter('view-movimientos'); }
+    setMovVista(movVistaActual || 'salida');
   } else if (tab === 'dash') {
     window.location.href = 'dashboard.html';
   } else if (WIP_TABS.indexOf(tab) !== -1) {
