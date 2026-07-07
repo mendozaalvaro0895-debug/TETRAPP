@@ -485,7 +485,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 <div class="main">
 
   <!-- TABS (navegación — oculta en Inicio, visible en otras vistas) -->
-  <div class="tabs" id="mainTabs" style="display:none">
+  <div class="tabs" id="mainTabs">
     <div class="tab active" id="tab-inicio" onclick="switchTab('inicio')">🏠 Inicio</div>
     <div class="tab" id="tab-movimientos" onclick="switchTab('movimientos')">⬇⬆ Movimientos</div>
     <div class="tab" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
@@ -575,12 +575,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
 
         <!-- Board: carriles línea 1-4 (con pipeline de procesos integrado) -->
-        <div class="sec-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-          <div>
-            <div class="sec-title">Líneas de Producción</div>
-            <div class="sec-sub">Arrastra los pedidos desde "Sin asignar" · 🔥 Flameado › 🖨️ Impresión › 💨 Secado › 📦 Empaque</div>
-          </div>
-          <button class="btn btn-g" style="white-space:nowrap;font-size:12px;padding:6px 14px;border-radius:8px;cursor:pointer" onclick="exportarBoardPDF()">🖨 Imprimir</button>
+        <div class="sec-hdr">
+          <div class="sec-title">Líneas de Producción</div>
+          <div class="sec-sub">Arrastra los pedidos desde "Sin asignar" · 🔥 Flameado › 🖨️ Impresión › 💨 Secado › 📦 Empaque</div>
         </div>
         <div class="board-lines-row" id="boardLines"></div>
 
@@ -5624,10 +5621,6 @@ function triggerViewEnter(viewId) {
 function switchTab(tab) {
   document.querySelectorAll('.view').forEach(function(v) { v.style.display = 'none'; });
   document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-
-  // Barra de tabs oculta en Inicio (la navegación está en las hub-cards), visible en otras vistas
-  var mt = document.getElementById('mainTabs');
-  if (mt) mt.style.display = (tab === 'inicio') ? 'none' : 'flex';
 
   var tabEl = document.getElementById('tab-' + tab);
   if (tabEl) tabEl.classList.add('active');
