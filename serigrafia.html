@@ -603,6 +603,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div style="display:flex;flex-direction:column;gap:8px">
           <div class="ph-title">Movimientos · Serigrafía</div>
           <div style="display:inline-flex;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;padding:3px;gap:2px">
+            <button id="seg-resumen" class="seg-btn" onclick="setMovVista('resumen')">📊 Resumen</button>
             <button id="seg-sal"  class="seg-btn seg-active" onclick="setMovVista('salida')">📤 Salidas de Bodega</button>
             <button id="seg-ing"  class="seg-btn"            onclick="setMovVista('ingreso')">📦 Ingresos PT</button>
             <button id="seg-rech" class="seg-btn"            onclick="setMovVista('rechazos')">⛔ Rechazos</button>
@@ -642,6 +643,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <button class="btn btn-s btn-sm" onclick="abrirFormEntregado()">+ Registrar entregado</button>
         </div>
         <div id="produccionActualMov"></div>
+      </div>
+
+      <!-- Contenido: Resumen (Salida bodega vs Entrada PT por ficha) -->
+      <div class="mov-scroll" id="movScrollResumen" style="display:none">
+        <div id="movResumenTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
       </div>
     </div><!-- /view-movimientos -->
 
@@ -5153,19 +5159,31 @@ var rechSOrigenActual = 'interno';
 
 function setMovVista(tipo) {
   movVistaActual = tipo;
-  ['seg-sal','seg-ing','seg-rech'].forEach(function(id) {
+  ['seg-resumen','seg-sal','seg-ing','seg-rech'].forEach(function(id) {
     var btn = document.getElementById(id);
     if (btn) btn.classList.remove('seg-active');
   });
-  var activeId = tipo === 'salida' ? 'seg-sal' : tipo === 'ingreso' ? 'seg-ing' : 'seg-rech';
+  var activeId = tipo === 'resumen' ? 'seg-resumen' : tipo === 'salida' ? 'seg-sal' : tipo === 'ingreso' ? 'seg-ing' : 'seg-rech';
   var activeBtn = document.getElementById(activeId);
   if (activeBtn) activeBtn.classList.add('seg-active');
 
-  var btnReg          = document.getElementById('movRegistrarBtn');
-  var toolbar          = document.getElementById('movToolbar');
-  var kpis              = document.getElementById('movKPIs');
-  var scrollSalRech = document.getElementById('movScrollSalRech');
+  var btnReg           = document.getElementById('movRegistrarBtn');
+  var toolbar           = document.getElementById('movToolbar');
+  var kpis               = document.getElementById('movKPIs');
+  var scrollSalRech  = document.getElementById('movScrollSalRech');
   var scrollIngresos = document.getElementById('movScrollIngresos');
+  var scrollResumen  = document.getElementById('movScrollResumen');
+
+  if (tipo === 'resumen') {
+    if (btnReg) btnReg.style.display = 'none';
+    if (toolbar) toolbar.style.display = 'none';
+    if (kpis) kpis.style.display = 'none';
+    if (scrollSalRech) scrollSalRech.style.display = 'none';
+    if (scrollIngresos) scrollIngresos.style.display = 'none';
+    if (scrollResumen) scrollResumen.style.display = 'block';
+    renderResumenFichas();
+    return;
+  }
 
   if (tipo === 'ingreso') {
     if (btnReg) btnReg.style.display = 'none';
@@ -5173,6 +5191,7 @@ function setMovVista(tipo) {
     if (kpis) kpis.style.display = 'none';
     if (scrollSalRech) scrollSalRech.style.display = 'none';
     if (scrollIngresos) scrollIngresos.style.display = 'block';
+    if (scrollResumen) scrollResumen.style.display = 'none';
     renderProduccionActual();
     return;
   }
@@ -5185,6 +5204,7 @@ function setMovVista(tipo) {
   if (kpis) kpis.style.display = tipo === 'salida' ? 'none' : '';
   if (scrollSalRech) scrollSalRech.style.display = 'block';
   if (scrollIngresos) scrollIngresos.style.display = 'none';
+  if (scrollResumen) scrollResumen.style.display = 'none';
 
   if (tipo === 'rechazos') {
     function setLbl(id, txt) { var el = document.getElementById(id); if (el) el.textContent = txt; }
@@ -5338,6 +5358,77 @@ function actualizarKPIsMov(data) {
     setV('mkpi-v3', Object.keys(skus).length);
     setV('mkpi-v4', ultimo);
   }
+}
+
+// ── Resumen: Salida de Bodega vs Entrada PT por ficha ─────────
+async function renderResumenFichas() {
+  var cont = document.getElementById('movResumenTabla');
+  if (!cont) return;
+  cont.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando...</div></div>';
+
+  var salidaMap = {};
+  try {
+    var r = await db.from('movimientos_materiales').select('solicitud_id,cantidad')
+      .eq('area','serig').eq('tipo','salida_bodega').not('solicitud_id','is',null).limit(2000);
+    if (r.error) throw r.error;
+    (r.data || []).forEach(function(m) {
+      salidaMap[m.solicitud_id] = (salidaMap[m.solicitud_id] || 0) + (m.cantidad || 0);
+    });
+  } catch(e) {
+    console.error('renderResumenFichas (salidas):', e);
+    cont.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">⚠️ Error al cargar el resumen</div>';
+    return;
+  }
+
+  var entradaMap = {};
+  (getEntregasManuales() || []).forEach(function(m) {
+    if (m.lineas && m.lineas.length) {
+      m.lineas.forEach(function(l) { if (l.solId) entradaMap[l.solId] = (entradaMap[l.solId] || 0) + (l.cant || 0); });
+    } else if (m.solId) {
+      entradaMap[m.solId] = (entradaMap[m.solId] || 0) + (m.cant || 0);
+    }
+  });
+
+  var solIds = [];
+  Object.keys(salidaMap).forEach(function(id) { if (solIds.indexOf(id) < 0) solIds.push(id); });
+  Object.keys(entradaMap).forEach(function(id) { if (solIds.indexOf(id) < 0) solIds.push(id); });
+
+  var fichas = solIds.map(function(id) {
+    var s = solicitudes.find(function(x) { return x.id === id; });
+    return {
+      id: id,
+      codigo: s ? (s.id_display || id.slice(0,8)) : id.slice(0,8),
+      cliente: s ? (s.cliente || '—') : '(pedido eliminado)',
+      salida: salidaMap[id] || 0,
+      entrada: entradaMap[id] || 0
+    };
+  });
+  fichas.sort(function(a, b) { return a.codigo < b.codigo ? 1 : -1; });
+
+  if (!fichas.length) {
+    cont.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin salidas ni entradas registradas aún</div>';
+    return;
+  }
+
+  function buildRow(f) {
+    var dif = f.salida - f.entrada;
+    var difColor = dif > 0 ? 'var(--amber)' : dif < 0 ? 'var(--red)' : 'var(--green)';
+    var difTxt   = dif > 0 ? ('⏳ ' + dif.toLocaleString() + ' pendiente') : dif < 0 ? ('⚠️ ' + Math.abs(dif).toLocaleString() + ' de más') : '✓ Completo';
+    var pct = f.salida > 0 ? Math.round((f.entrada / f.salida) * 100) : (f.entrada > 0 ? 100 : 0);
+    return '<tr onclick="mostrarDetalle(\'' + f.id + '\')" style="cursor:pointer">' +
+      '<td class="mov-doc">' + escHtml(f.codigo) + '</td>' +
+      '<td style="font-weight:600;font-size:11px">' + escHtml(f.cliente) + '</td>' +
+      '<td class="mov-cant" style="color:var(--teal)">' + f.salida.toLocaleString() + '</td>' +
+      '<td class="mov-cant" style="color:var(--green)">' + f.entrada.toLocaleString() + '</td>' +
+      '<td style="text-align:center;font-size:11px;font-weight:700;color:' + difColor + '">' + difTxt + '</td>' +
+      '<td style="text-align:center;font-size:11px;font-weight:700">' + pct + '%</td>' +
+      '</tr>';
+  }
+
+  cont.innerHTML = '<table class="mov-table"><thead><tr>' +
+    '<th>Ficha</th><th>Cliente</th><th style="text-align:right">Salida bodega</th>' +
+    '<th style="text-align:right">Entrada PT</th><th style="text-align:center">Diferencia</th><th style="text-align:center">Rendimiento</th>' +
+    '</tr></thead><tbody>' + fichas.map(buildRow).join('') + '</tbody></table>';
 }
 
 // ── Modal Salida de Bodega (mismos campos que Registrar entregado,
