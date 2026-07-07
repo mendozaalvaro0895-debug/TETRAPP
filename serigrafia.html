@@ -592,7 +592,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
           <button class="btn btn-s" style="background:var(--serig-m);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="abrirFormEntregado()">+ Registrar entregado</button>
         </div>
-        <div id="formEntregadoInline" style="display:none;margin-bottom:12px"></div>
         <div id="produccionActual"></div>
 
       </div>
@@ -640,7 +639,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <!-- Contenido: Ingresos PT (mismos registros del bloque Entregados de Inicio) -->
       <div class="mov-scroll" id="movScrollIngresos" style="display:none">
         <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-          <button class="btn btn-s btn-sm" onclick="switchTab('inicio');setTimeout(abrirFormEntregado,250)">+ Registrar entregado</button>
+          <button class="btn btn-s btn-sm" onclick="abrirFormEntregado()">+ Registrar entregado</button>
         </div>
         <div id="produccionActualMov"></div>
       </div>
@@ -982,6 +981,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     </div>
   </div>
 </div>
+
+<!-- ══════════════════ MODAL REGISTRAR ENTREGADO ═══════════ -->
+<!-- Overlay global (no vive dentro de view-inicio) para poder abrirse
+     tanto desde Inicio > Entregados como desde Movimientos > Ingresos PT -->
+<div class="overlay" id="formEntregadoInline"></div>
 
 <!-- ══════════════════ MODAL PARO MÁQUINA ═════════════════ -->
 <div class="overlay" id="modalParo">
@@ -3778,7 +3782,7 @@ function vincularPedidoLinea(solId, i) {
 function abrirFormEntregado() {
   var el = document.getElementById('formEntregadoInline');
   if (!el) return;
-  if (el.style.display !== 'none') { cerrarFormEntregado(); return; }
+  if (el.classList.contains('open')) { cerrarFormEntregado(); return; }
   eEntregadoSkus = {}; eLineasCount = 0; eEntregadoSolId = null; eEntregadoSolCod = '';
   var usage = getCliUsage();
   var sorted = CLIENTES.slice().sort(function(a, b) {
@@ -3789,12 +3793,12 @@ function abrirFormEntregado() {
     sorted.map(function(c) { return '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>'; }).join('');
   var inputSty = 'width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box';
   eClientesOptsHtml = optsHtml;
-  el.style.display = 'block';
+  el.classList.add('open');
   el.innerHTML =
-    '<div style="background:var(--card);border:1.5px solid var(--serig-m);border-radius:10px;padding:10px 14px">' +
+    '<div class="modal" style="max-width:640px;padding:14px 16px">' +
       // Fila 1: título + botones
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
-        '<span style="font-size:12px;font-weight:800;color:var(--serig-m)">📦 Registrar entregado</span>' +
+        '<span style="font-size:14px;font-weight:800;color:var(--serig-m)">📦 Registrar entregado</span>' +
         '<div style="display:flex;gap:6px">' +
           '<button onclick="guardarEntregadoManual()" style="background:var(--serig-m);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>' +
           '<button onclick="cerrarFormEntregado()" style="background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">✕</button>' +
@@ -3876,7 +3880,7 @@ function eliminarLineaEntregado(i) {
 
 function cerrarFormEntregado() {
   var el = document.getElementById('formEntregadoInline');
-  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+  if (el) { el.classList.remove('open'); el.innerHTML = ''; }
   eEntregadoSkus = {}; eEntregadoSolIds = {}; eLineasCount = 0; eEntregadoSolId = null; eEntregadoSolCod = ''; eEditandoId = null;
 }
 
