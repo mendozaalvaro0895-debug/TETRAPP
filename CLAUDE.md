@@ -31,7 +31,7 @@ Los `.js` en shared/ eran huérfanos y se borraron (jul/2026).
 | `tapas.html` | ✅ Activo | Módulo completo Tapas (hub + pedidos + movimientos + personal) |
 | `serigrafia.html` | ⚠️ Parcial | Solo Personal activo; resto muestra "En construcción" |
 | `comandas.html` | ✅ Activo | Registro de producción diaria por operario (vista admin) |
-| `registro-tapas.html` | ✅ Activo | Formulario móvil para rol `operativo` (tapas@tetrapp.app): el operario elige su nombre y registra su comanda; correlativo CMD-### lo asigna trigger DB |
+| `registro-tapas.html` | ✅ Activo | Formulario móvil para rol `operativo` (tapas@tetrapp.app): el operario elige su nombre y registra su comanda ya concluida (sin campo Estado, sin devolución de material); correlativo CMD-### lo asigna trigger DB; supervisor se lee en vivo de `personal` (rol='supervisor', area='tapas', activo=true) — nunca hardcodeado |
 | `dashboard.html` | ✅ Activo | KPIs ejecutivos globales |
 | `inventario.html` | ✅ Activo | Gestión de SKUs, existencias, importación Excel |
 | `produccion.html` | 🔒 Placeholder | "En desarrollo" — sin funcionalidad real |
@@ -122,7 +122,7 @@ switchTab() revisa WIP_TABS array antes de renderizar
 | `solicitud_lineas` | Líneas de producto (operadores_ids TEXT[]) |
 | `solicitud_operadores` | Asignación de operadores |
 | `solicitud_historial` | Historial de cambios de estado |
-| `personal` | Operarios/supervisores (codigo UNIQUE, proceso_hab, color_hex) |
+| `personal` | Operarios/supervisores (codigo UNIQUE, proceso_hab, color_hex, rol: 'operador'\|'supervisor') — fuente única de verdad; registro-tapas.html lee el supervisor activo de aquí, no lo hardcodea |
 | `inventario` | 2358 SKUs activos (sku, descripcion, existencia, facturable, activo) |
 | `movimientos_materiales` | Trazabilidad (tipo: 'salida_bodega' \| 'entrada_pt') |
 | `rechazos` | ✅ Existe (la creó movimientos_serigrafia_v1.sql) — RLS pendiente: correr sql/rechazos_rls_fix.sql |
@@ -156,6 +156,15 @@ animPop y CSS huérfano (.rechazo-*, .rbadge, --serig-m, --gold).
 - `master` → todo · `visor` → solo lectura (banner Modo Visual)
 - `operativo` → enjaulado en registro-tapas.html; RLS solo le permite INSERT en comandas/comanda_tareas
 
+### Metas de productividad — DOS tablas distintas, no confundir
+1. `CAPACIDADES` en registro-tapas.html (y su copia en comandas.html) — und/hora por tarea
+   individual de una comanda. Actualizada jul/2026: armado/liner/banda/encajado manual = 1000,
+   flameado/impresión = 1167, máquinas = 2500, default = 1000. Incluye las 5 tareas nuevas
+   (Revisado, Limpiar pestaña, Apoyo Serigrafía, Apoyo Producción, Otra tarea) a 1000.
+   ⚠️ La copia en comandas.html sigue en 833 — pendiente de sincronizar si se pide.
+2. `METAS` en tapas.html — und/hora por proceso, usada solo para estimar tiempo de entrega de
+   solicitudes/pedidos (armado=1500, liner=1500, etc.). Sistema aparte, no se tocó esta sesión.
+
 ---
 
 ## Reglas de trabajo OBLIGATORIAS
@@ -170,5 +179,9 @@ animPop y CSS huérfano (.rechazo-*, .rbadge, --serig-m, --gold).
 ---
 
 ## Personal (referencia — datos reales viven en la tabla `personal`)
-- Tapas: T0 Heidy (supervisora), T1-T9 operadores
+- Tapas: T0 Heidy (supervisora en tabla `personal`, aún sin actualizar), T1-T9 operadores
+  - ⚠️ Supervisora actual real: **Yenifer** — la tabla `personal` sigue sin actualizar (pendiente,
+    lo hará Álvaro). registro-tapas.html YA lee el supervisor en vivo de esta tabla
+    (rol='supervisor', activo=true), así que en cuanto se actualice el registro de Heidy→Yenifer
+    el formulario lo reflejará automáticamente, sin tocar código.
 - Serigrafía: S0 Luis Cordova (supervisor), S1-S7 operadores
