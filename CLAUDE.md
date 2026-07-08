@@ -30,7 +30,8 @@ Los `.js` en shared/ eran huérfanos y se borraron (jul/2026).
 | `index.html` | ✅ Activo | Fachada principal — 6 cards de módulo |
 | `tapas.html` | ✅ Activo | Módulo completo Tapas (hub + pedidos + movimientos + personal) |
 | `serigrafia.html` | ⚠️ Parcial | Solo Personal activo; resto muestra "En construcción" |
-| `comandas.html` | ✅ Activo | Registro de producción diaria por operario |
+| `comandas.html` | ✅ Activo | Registro de producción diaria por operario (vista admin) |
+| `registro-tapas.html` | ✅ Activo | Formulario móvil para rol `operativo` (tapas@tetrapp.app): el operario elige su nombre y registra su comanda; correlativo CMD-### lo asigna trigger DB |
 | `dashboard.html` | ✅ Activo | KPIs ejecutivos globales |
 | `inventario.html` | ✅ Activo | Gestión de SKUs, existencias, importación Excel |
 | `produccion.html` | 🔒 Placeholder | "En desarrollo" — sin funcionalidad real |
@@ -91,8 +92,8 @@ view-movimientos (Módulo UNIFICADO con segmented control de 3)
   Comparten: movDesde/movHasta, movBuscar, kpi-strip (mkpi-v1..v4), movTabla
   setMovVista('salida'|'ingreso'|'rechazos') actualiza todo
   movRegistrar() delega a abrirModalMov() o abrirModalRechazo()
-view-dash       (mini-dashboard área)
 view-personal   (grid de operadores)
+(view-dash y el modal de paro de máquina se eliminaron jul/2026 — eran código muerto)
 ```
 
 ### Botones de acción rápida (tabs-r en tapas.html)
@@ -124,7 +125,8 @@ switchTab() revisa WIP_TABS array antes de renderizar
 | `personal` | Operarios/supervisores (codigo UNIQUE, proceso_hab, color_hex) |
 | `inventario` | 2358 SKUs activos (sku, descripcion, existencia, facturable, activo) |
 | `movimientos_materiales` | Trazabilidad (tipo: 'salida_bodega' \| 'entrada_pt') |
-| `rechazos` | ⚠️ PENDIENTE DE CREAR en Supabase (SQL disponible) |
+| `rechazos` | ✅ Existe (la creó movimientos_serigrafia_v1.sql) — RLS pendiente: correr sql/rechazos_rls_fix.sql |
+| `perfiles` | Roles de acceso: master / visor / operativo (ver sql/operativo_tapas_v1.sql) |
 | `paros_maquina` | Registro de paros |
 | `comandas` + `comanda_tareas` | Producción diaria |
 | `clientes`, `cat_procesos`, `asistencia` | Catálogos |
@@ -136,25 +138,23 @@ switchTab() revisa WIP_TABS array antes de renderizar
 
 ---
 
-## Bugs activos (pendientes de corregir)
+## Bugs y pendientes
 
-### Bug #1 — ALTA prioridad · tapas.html
-Algunas funciones de movimientos usan nombres de campo incorrectos.
-- `sku` en lugar de `sku_original`
-- `usuario` en lugar de `operador_id`
-Causa: copias antiguas del código antes de la migración del schema.
+### Bugs históricos #1/#2/#3 — RESUELTOS (verificado jul/2026)
+- #1 nombres de campo: corregido; incluía `rechSkuInput()` usando `inventario` en vez de `inventarioCache`
+- #2 paginación: `cargarInventario()` ya pagina con `.range()` en lotes de 1000
+- #3 race conditions: `ajustarExistencia()` ya usa las RPCs atómicas
+Limpieza jul/2026 en tapas.html: eliminados view-dash/renderDash, modal paro máquina completo,
+animPop y CSS huérfano (.rechazo-*, .rbadge, --serig-m, --gold).
 
-### Bug #2 — ALTA prioridad · tapas.html
-`cargarInventario()` puede tener `.limit()` sin paginación → solo carga una fracción de los 2358 SKUs.
-Fix correcto: paginar con `.range()` en lotes de 1000 hasta agotar resultados.
+### SQL pendiente de correr en Supabase (dashboard → SQL Editor)
+1. `sql/rechazos_rls_fix.sql` — activa RLS en la tabla rechazos
+2. `sql/operativo_tapas_v1.sql` — rol `operativo` + usuario tapas@tetrapp.app (crearlo antes
+   en Auth → Users) + políticas INSERT en comandas/comanda_tareas + trigger correlativo CMD-###
 
-### Bug #3 — MEDIA prioridad · tapas.html
-`ajustarExistencia()` hace select+update manual en JS en vez de llamar a las RPCs atómicas.
-Esto genera race conditions bajo carga simultánea.
-
-### Tabla rechazos — PENDIENTE
-La tabla `rechazos` no existe aún en Supabase. El módulo la detecta y muestra aviso.
-SQL de creación disponible (solicitarlo al asistente si se necesita).
+### Roles de acceso (shared/auth.js v1.1)
+- `master` → todo · `visor` → solo lectura (banner Modo Visual)
+- `operativo` → enjaulado en registro-tapas.html; RLS solo le permite INSERT en comandas/comanda_tareas
 
 ---
 

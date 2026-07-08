@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TETRAPLASTIC — Registro de Producción · Tapas</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="shared/auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:#0C0C0B;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #1E7D6A;gap:10px}
+.logo{font-family:'Playfair Display',serif;font-size:16px;font-weight:900;color:#fff}
+.logo span{color:#7ECEC0}
+.logo-sub{font-size:11px;color:rgba(255,255,255,.6)}
+.user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:4px 12px;border-radius:20px}
+.uavatar{width:26px;height:26px;border-radius:50%;background:#1A6B5B;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
+
+/* LAYOUT */
+.wrap{max-width:680px;margin:0 auto;padding:20px 14px 60px}
+.pantalla{display:none;animation:ds-slideUp .3s ease both}
+.pantalla.vis{display:block}
+@keyframes ds-slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+.titulo{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;text-align:center;margin-bottom:4px}
+.subtitulo{font-size:13px;color:#6B6B6A;text-align:center;margin-bottom:22px}
+
+/* SELECCIÓN DE OPERARIO */
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.op-sel-card{background:#fff;border:1.5px solid #E0DED8;border-radius:14px;padding:18px 12px;text-align:center;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.op-sel-card:hover,.op-sel-card:active{border-color:#1A6B5B;box-shadow:0 4px 16px rgba(26,107,91,.15);transform:translateY(-2px)}
+.op-sel-av{width:52px;height:52px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#fff}
+.op-sel-nombre{font-size:14px;font-weight:700;line-height:1.3}
+.op-sel-cod{font-family:'DM Mono',monospace;font-size:10px;color:#6B6B6A;margin-top:3px}
+
+/* FORM */
+.quien{display:flex;align-items:center;gap:12px;background:#0C0C0B;border-radius:14px;padding:12px 16px;margin-bottom:16px}
+.quien-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0}
+.quien-nombre{font-size:15px;font-weight:700;color:#fff;flex:1}
+.quien-corr{font-family:'DM Mono',monospace;font-size:10px;color:#7ECEC0}
+.btn-cambiar{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer}
+
+.sec{background:#fff;border:1.5px solid #D8D6D0;border-radius:14px;padding:16px;margin-bottom:14px}
+.sec-label{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#1A6B5B;border-bottom:2px solid #C8EDE7;padding-bottom:8px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.paso-num{background:#1A6B5B;color:#fff;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;font-weight:700;color:#3A3A38}
+.field input,.field select,.field textarea{border:1.5px solid #C8C6C0;border-radius:10px;padding:11px 12px;font-size:16px;font-family:'DM Sans',sans-serif;background:#fff;width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#1A6B5B}
+
+/* TAREAS */
+.tarea-card{border:1.5px solid #E0DED8;border-radius:12px;padding:12px;margin-bottom:10px;background:#FDFDFC;position:relative}
+.tarea-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.tarea-num{font-size:11px;font-weight:800;color:#1A6B5B}
+.btn-rm{background:#FEE2E2;border:none;color:#B83232;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer}
+.btn-add{background:#EBF7F4;border:1.5px dashed #1A6B5B;color:#1A6B5B;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;width:100%;margin-top:4px}
+.btn-add:active{background:#C8EDE7}
+
+/* AUTOCOMPLETE */
+.ac-wrap{position:relative}
+.ac-drop{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #1A6B5B;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.15);z-index:999;max-height:220px;overflow-y:auto;margin-top:3px}
+.ac-item{padding:10px 12px;cursor:pointer;border-bottom:1px solid #F0EDE8}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover,.ac-item:active{background:#EBF7F4}
+.ac-sku{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:#1A6B5B}
+.ac-desc{font-size:12px;color:#3A3A38;margin-top:2px}
+
+/* TOTAL */
+.total-bar{background:#0C0C0B;border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.total-bar-lbl{font-size:11px;color:rgba(255,255,255,.5)}
+.total-bar-val{font-family:'DM Mono',monospace;font-size:24px;font-weight:700;color:#7ECEC0}
+
+/* BOTONES PRINCIPALES */
+.btn-guardar{background:#1A6B5B;color:#fff;border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;width:100%;font-family:'DM Sans',sans-serif;letter-spacing:.3px}
+.btn-guardar:hover{background:#0D4035}
+.btn-guardar:active{transform:scale(.98)}
+.btn-guardar:disabled{opacity:.5;cursor:wait}
+
+/* ÉXITO */
+.exito-box{background:#fff;border:1.5px solid #1A6B5B;border-radius:16px;padding:36px 24px;text-align:center}
+.exito-ico{font-size:56px;margin-bottom:12px}
+.exito-corr{font-family:'DM Mono',monospace;font-size:26px;font-weight:700;color:#1A6B5B;margin:10px 0}
+.exito-det{font-size:13px;color:#6B6B6A;margin-bottom:24px;line-height:1.7}
+
+.toast-msg{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1A6B5B;color:#fff;padding:12px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+.cargando{text-align:center;padding:50px 20px;color:#6B6B6A;font-size:13px}
+.spinner{display:inline-block;width:26px;height:26px;border:3px solid #C8EDE7;border-top-color:#1A6B5B;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:480px){
+  .grid-3{grid-template-columns:1fr 1fr}
+  .op-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="logo">TETRA<span>PLASTIC</span></div>
+    <div class="logo-sub">📝 Registro de Producción · Tapas</div>
+  </div>
+  <div class="user-pill">
+    <div class="uavatar">OT</div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- PANTALLA 1: SELECCIÓN DE OPERARIO -->
+  <div class="pantalla vis" id="scrSel">
+    <div class="titulo">¿Quién registra su producción?</div>
+    <div class="subtitulo">Toca tu nombre para comenzar</div>
+    <div id="opGrid" class="op-grid">
+      <div class="cargando" style="grid-column:1/-1"><div class="spinner"></div><div>Cargando operarios…</div></div>
+    </div>
+  </div>
+
+  <!-- PANTALLA 2: FORMULARIO -->
+  <div class="pantalla" id="scrForm">
+    <div class="quien">
+      <div class="quien-av" id="qAv">?</div>
+      <div>
+        <div class="quien-nombre" id="qNombre">—</div>
+        <div class="quien-corr">Correlativo: automático al guardar</div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn-cambiar" onclick="volverSeleccion()">↩ Cambiar</button>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">1</span> Datos del día</div>
+      <div class="grid-3">
+        <div class="field"><label>Fecha</label><input type="date" id="fFecha"></div>
+        <div class="field"><label>Hora de inicio</label><input type="time" id="fHoraInicio"></div>
+        <div class="field"><label>Hora de cierre</label><input type="time" id="fHoraCierre"></div>
+      </div>
+      <div class="field"><label>Supervisor</label><input type="text" value="Heidy (T0)" readonly style="background:#F7F6F2;color:#6B6B6A"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">2</span> Tareas realizadas</div>
+      <div id="tareasWrap"></div>
+      <button type="button" class="btn-add" onclick="addTarea()">+ Agregar tarea</button>
+    </div>
+
+    <div class="total-bar">
+      <div>
+        <div class="total-bar-lbl">Total unidades PT del día</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.3)">Solo tareas marcadas "Terminada"</div>
+      </div>
+      <div class="total-bar-val" id="totalVal">0</div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">3</span> Material devuelto a bodega</div>
+      <div id="devWrap"></div>
+      <button type="button" class="btn-add" onclick="addDev()">+ Agregar material</button>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">4</span> Observaciones</div>
+      <div class="field"><textarea id="fObs" rows="2" placeholder="Notas del día (opcional)…"></textarea></div>
+    </div>
+
+    <button class="btn-guardar" id="btnGuardar" onclick="guardarRegistro()">💾 Guardar mi producción</button>
+  </div>
+
+  <!-- PANTALLA 3: ÉXITO -->
+  <div class="pantalla" id="scrOk">
+    <div class="exito-box">
+      <div class="exito-ico">✅</div>
+      <div class="titulo">¡Producción registrada!</div>
+      <div class="exito-corr" id="okCorr">CMD-—</div>
+      <div class="exito-det" id="okDet">—</div>
+      <button class="btn-guardar" onclick="volverSeleccion()">👤 Registrar otro operario</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// SUPA_URL, SUPA_KEY, db y escHtml vienen de shared/auth.js
+
+// ── Estado ────────────────────────────────────────────────────
+var operarios = [];
+var inventarioCache = [];
+var opActual = null;
+var tareaCount = 0;
+var devCount = 0;
+
+var PROCS_LIST = ['Armado','Banda','Liner','Impresión','Encajado','Flameado','Otra tarea'];
+var ESTADOS_TAREA = ['Asignada','En proceso','Terminada'];
+
+var CAPACIDADES = {
+  maquina_liner: 2500, maquina_armado: 2500, flameado: 1167, impresion: 1167,
+  armado: 833, liner: 833, banda: 833, encajado: 833, manual: 833, otro: 833
+};
+
+function getCapacidad(proceso, metodo) {
+  if (metodo === 'maquina_liner') return CAPACIDADES.maquina_liner;
+  if (metodo === 'maquina_armado') return CAPACIDADES.maquina_armado;
+  var p = (proceso || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, '');
+  return CAPACIDADES[p] || CAPACIDADES.manual;
+}
+
+// ── Carga de datos ────────────────────────────────────────────
+async function cargarOperarios() {
+  try {
+    var r = await db.from('personal')
+      .select('codigo, nombre, iniciales, color_hex, rol')
+      .eq('area', 'tapas').eq('activo', true).order('codigo');
+    if (r.error) throw r.error;
+    var todos = r.data || [];
+    // Solo operadores (la supervisora firma, no registra producción propia)
+    operarios = todos.filter(function(p){ return p.rol !== 'supervisor'; });
+    if (!operarios.length) operarios = todos;
+    renderSeleccion();
+  } catch(e) {
+    console.error('cargarOperarios:', e);
+    document.getElementById('opGrid').innerHTML =
+      '<div class="cargando" style="grid-column:1/-1">❌ No se pudieron cargar los operarios.<br>Revisa tu conexión y recarga la página.</div>';
+  }
+}
+
+async function cargarInventario() {
+  try {
+    var todos = [];
+    var desde = 0;
+    var BATCH = 1000;
+    while (true) {
+      var r = await db.from('inventario')
+        .select('sku, descripcion, existencia')
+        .eq('activo', true).range(desde, desde + BATCH - 1);
+      if (r.error) throw r.error;
+      todos = todos.concat(r.data || []);
+      if (!r.data || r.data.length < BATCH) break;
+      desde += BATCH;
+    }
+    inventarioCache = todos;
+  } catch(e) { console.error('cargarInventario:', e); }
+}
+
+// ── Pantalla 1: selección ─────────────────────────────────────
+function buildOpCard(op) {
+  var color = op.color_hex || '#1A6B5B';
+  var ini = op.iniciales || (op.nombre || '?').slice(0, 2).toUpperCase();
+  return '<div class="op-sel-card" onclick="elegirOperario(\'' + escHtml(op.codigo) + '\')">'
+    + '<div class="op-sel-av" style="background:' + escHtml(color) + '">' + escHtml(ini) + '</div>'
+    + '<div class="op-sel-nombre">' + escHtml(op.nombre) + '</div>'
+    + '<div class="op-sel-cod">' + escHtml(op.codigo) + '</div>'
+    + '</div>';
+}
+
+function renderSeleccion() {
+  var g = document.getElementById('opGrid');
+  if (!operarios.length) {
+    g.innerHTML = '<div class="cargando" style="grid-column:1/-1">📭 No hay operarios activos en Tapas.</div>';
+    return;
+  }
+  g.innerHTML = operarios.map(buildOpCard).join('');
+}
+
+function elegirOperario(codigo) {
+  opActual = operarios.find(function(o){ return o.codigo === codigo; });
+  if (!opActual) return;
+
+  document.getElementById('qAv').textContent = opActual.iniciales || '?';
+  document.getElementById('qAv').style.background = opActual.color_hex || '#1A6B5B';
+  document.getElementById('qNombre').textContent = opActual.nombre;
+
+  // Reset del formulario
+  tareaCount = 0; devCount = 0;
+  document.getElementById('tareasWrap').innerHTML = '';
+  document.getElementById('devWrap').innerHTML = '';
+  document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fHoraInicio').value = '06:00';
+  document.getElementById('fHoraCierre').value = new Date().toTimeString().slice(0, 5);
+  document.getElementById('fObs').value = '';
+  document.getElementById('totalVal').textContent = '0';
+  addTarea();
+
+  mostrarPantalla('scrForm');
+  window.scrollTo(0, 0);
+}
+
+function volverSeleccion() {
+  opActual = null;
+  mostrarPantalla('scrSel');
+  window.scrollTo(0, 0);
+}
+
+function mostrarPantalla(id) {
+  ['scrSel','scrForm','scrOk'].forEach(function(s){
+    document.getElementById(s).classList.toggle('vis', s === id);
+  });
+}
+
+// ── Pantalla 2: tareas ────────────────────────────────────────
+function buildTareaCard(n) {
+  var procsOpts = PROCS_LIST.map(function(p){ return '<option value="' + p + '">' + p + '</option>'; }).join('');
+  var estOpts = ESTADOS_TAREA.map(function(e2){
+    return '<option value="' + e2 + '"' + (e2 === 'Terminada' ? ' selected' : '') + '>' + e2 + '</option>';
+  }).join('');
+  return '<div class="tarea-card" id="tarea_' + n + '">'
+    + '<div class="tarea-head"><span class="tarea-num">Tarea ' + n + '</span>'
+    + '<button type="button" class="btn-rm" onclick="rmTarea(' + n + ')">✕ Quitar</button></div>'
+    + '<div class="grid-2">'
+    +   '<div class="field"><label>Proceso</label><select id="tarea_' + n + '_proc">' + procsOpts + '</select></div>'
+    +   '<div class="field"><label>Cantidad</label><input type="number" inputmode="numeric" id="tarea_' + n + '_cant" min="0" placeholder="0" oninput="recalcTotal()"></div>'
+    + '</div>'
+    + '<div class="field" style="margin-bottom:10px"><label>Tapa trabajada</label>'
+    +   '<div class="ac-wrap">'
+    +     '<input type="text" id="tarea_' + n + '_tapa" placeholder="Escribe SKU o descripción…" autocomplete="off" oninput="acBuscar(\'tarea_' + n + '_tapa\',\'tarea_' + n + '_drop\',this.value)" data-sku="">'
+    +     '<div class="ac-drop" id="tarea_' + n + '_drop"></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="grid-2" style="margin-bottom:0">'
+    +   '<div class="field"><label>Método</label><select id="tarea_' + n + '_met">'
+    +     '<option value="manual">✋ Manual</option>'
+    +     '<option value="maquina_liner">⚙ Máq. Liner PP33</option>'
+    +     '<option value="maquina_armado">⚙ Máq. Armado PP28</option>'
+    +   '</select></div>'
+    +   '<div class="field"><label>Estado</label><select id="tarea_' + n + '_est" onchange="recalcTotal()">' + estOpts + '</select></div>'
+    + '</div>'
+    + '</div>';
+}
+
+function addTarea() {
+  tareaCount++;
+  document.getElementById('tareasWrap').insertAdjacentHTML('beforeend', buildTareaCard(tareaCount));
+}
+
+function rmTarea(n) {
+  var el = document.getElementById('tarea_' + n);
+  if (el) el.remove();
+  recalcTotal();
+}
+
+function recalcTotal() {
+  var total = 0;
+  document.querySelectorAll('#tareasWrap .tarea-card').forEach(function(card){
+    var n = card.id.replace('tarea_', '');
+    var est = (document.getElementById('tarea_' + n + '_est') || {}).value;
+    if (est === 'Terminada') {
+      total += parseInt((document.getElementById('tarea_' + n + '_cant') || {}).value || 0) || 0;
+    }
+  });
+  document.getElementById('totalVal').textContent = total.toLocaleString();
+}
+
+// ── Pantalla 2: material devuelto ─────────────────────────────
+function buildDevCard(n) {
+  return '<div class="tarea-card" id="dev_' + n + '">'
+    + '<div class="tarea-head"><span class="tarea-num">Material ' + n + '</span>'
+    + '<button type="button" class="btn-rm" onclick="rmDev(' + n + ')">✕ Quitar</button></div>'
+    + '<div class="field" style="margin-bottom:10px"><label>Material / SKU</label>'
+    +   '<div class="ac-wrap">'
+    +     '<input type="text" id="dev_' + n + '_mat" placeholder="Escribe SKU o descripción…" autocomplete="off" oninput="acBuscar(\'dev_' + n + '_mat\',\'dev_' + n + '_drop\',this.value)" data-sku="">'
+    +     '<div class="ac-drop" id="dev_' + n + '_drop"></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="field"><label>Cantidad devuelta</label><input type="number" inputmode="numeric" id="dev_' + n + '_cant" min="0" placeholder="0"></div>'
+    + '</div>';
+}
+
+function addDev() {
+  devCount++;
+  document.getElementById('devWrap').insertAdjacentHTML('beforeend', buildDevCard(devCount));
+}
+
+function rmDev(n) {
+  var el = document.getElementById('dev_' + n);
+  if (el) el.remove();
+}
+
+// ── Autocomplete compartido (tareas + devoluciones) ───────────
+function buildAcItem(inputId, dropId, item) {
+  var sku = String(item.sku || '');
+  var desc = String(item.descripcion || '');
+  return '<div class="ac-item" onmousedown="acElegir(\'' + inputId + '\',\'' + dropId + '\',\''
+    + escHtml(sku.replace(/'/g, '')) + '\',\'' + escHtml(desc.replace(/'/g, '')) + '\')">'
+    + '<div class="ac-sku">' + escHtml(sku) + '</div>'
+    + '<div class="ac-desc">' + escHtml(desc.slice(0, 60)) + '</div>'
+    + '</div>';
+}
+
+function acBuscar(inputId, dropId, query) {
+  var drop = document.getElementById(dropId);
+  if (!drop) return;
+  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
+  var q = query.toLowerCase();
+  var results = inventarioCache.filter(function(i){
+    return ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().indexOf(q) !== -1;
+  }).slice(0, 7);
+  if (!results.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = results.map(function(i){ return buildAcItem(inputId, dropId, i); }).join('');
+  drop.style.display = 'block';
+}
+
+function acElegir(inputId, dropId, sku, desc) {
+  var inp = document.getElementById(inputId);
+  if (inp) {
+    inp.value = sku + ' — ' + desc;
+    inp.dataset.sku = sku;
+  }
+  var drop = document.getElementById(dropId);
+  if (drop) drop.style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.ac-wrap')) {
+    document.querySelectorAll('.ac-drop').forEach(function(d){ d.style.display = 'none'; });
+  }
+});
+
+// ── Guardar ───────────────────────────────────────────────────
+function recopilarTareas() {
+  var tareas = [];
+  document.querySelectorAll('#tareasWrap .tarea-card').forEach(function(card){
+    var n = card.id.replace('tarea_', '');
+    var proceso = (document.getElementById('tarea_' + n + '_proc') || {}).value || '';
+    var tapaInp = document.getElementById('tarea_' + n + '_tapa');
+    var cantidad = parseInt((document.getElementById('tarea_' + n + '_cant') || {}).value || 0) || 0;
+    var metodo = (document.getElementById('tarea_' + n + '_met') || {}).value || 'manual';
+    var estado = (document.getElementById('tarea_' + n + '_est') || {}).value || 'Asignada';
+    var cap = getCapacidad(proceso, metodo);
+    if (cantidad > 0 || proceso) {
+      tareas.push({
+        proceso: proceso,
+        tapa_desc: tapaInp ? tapaInp.value : '',
+        tapa_sku: (tapaInp && tapaInp.dataset.sku) || '',
+        cantidad: cantidad,
+        metodo: metodo,
+        capacidad_hora: cap,
+        horas_efectivas: cantidad > 0 ? Math.round((cantidad / cap) * 100) / 100 : 0,
+        estado: estado,
+        unidades_completadas: estado === 'Terminada' ? cantidad : 0
+      });
+    }
+  });
+  return tareas;
+}
+
+function recopilarDevolucion() {
+  var lineas = [];
+  document.querySelectorAll('#devWrap .tarea-card').forEach(function(card){
+    var n = card.id.replace('dev_', '');
+    var inp = document.getElementById('dev_' + n + '_mat');
+    var cant = parseInt((document.getElementById('dev_' + n + '_cant') || {}).value || 0) || 0;
+    if (inp && (inp.value || cant > 0)) {
+      lineas.push({ sku: inp.dataset.sku || '', desc: inp.value, cantidad: cant });
+    }
+  });
+  return JSON.stringify(lineas);
+}
+
+async function guardarRegistro() {
+  if (!opActual) { volverSeleccion(); return; }
+
+  var fecha = document.getElementById('fFecha').value;
+  if (!fecha) { showToast('⚠️ Selecciona la fecha', '#B83232'); return; }
+
+  var tareas = recopilarTareas();
+  var tareasConCant = tareas.filter(function(t){ return t.cantidad > 0; });
+  if (!tareasConCant.length) { showToast('⚠️ Agrega al menos una tarea con cantidad', '#B83232'); return; }
+
+  var totalPT = tareas.filter(function(t){ return t.estado === 'Terminada'; })
+                      .reduce(function(s, t){ return s + t.cantidad; }, 0);
+
+  var cabecera = {
+    // correlativo lo asigna la base de datos (trigger CMD-###)
+    fecha: fecha,
+    operario_id: opActual.codigo,
+    operario_nombre: opActual.nombre || '',
+    supervisor_id: 'T0',
+    supervisor_nombre: 'Heidy',
+    hora_inicio: document.getElementById('fHoraInicio').value,
+    hora_cierre: document.getElementById('fHoraCierre').value,
+    total_unidades: totalPT,
+    material_devuelto: recopilarDevolucion(),
+    observaciones: document.getElementById('fObs').value
+  };
+
+  var btn = document.getElementById('btnGuardar');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+
+  try {
+    var rCab = await db.from('comandas').insert(cabecera).select('id, correlativo').single();
+    if (rCab.error) throw rCab.error;
+
+    var tareasData = tareas.map(function(t, i) {
+      return {
+        comanda_id: rCab.data.id,
+        orden: i + 1,
+        proceso: t.proceso,
+        tapa_desc: t.tapa_desc,
+        tapa_sku: t.tapa_sku,
+        cantidad: t.cantidad,
+        metodo: t.metodo,
+        capacidad_hora: t.capacidad_hora,
+        horas_efectivas: t.horas_efectivas,
+        unidades_completadas: t.unidades_completadas,
+        estado: t.estado
+      };
+    });
+    var rTar = await db.from('comanda_tareas').insert(tareasData);
+    if (rTar.error) throw rTar.error;
+
+    document.getElementById('okCorr').textContent = rCab.data.correlativo || '—';
+    document.getElementById('okDet').innerHTML =
+      escHtml(opActual.nombre) + ' · ' + escHtml(fecha)
+      + '<br>' + tareas.length + ' tarea(s) · <strong>' + totalPT.toLocaleString() + ' und PT</strong>';
+    mostrarPantalla('scrOk');
+    window.scrollTo(0, 0);
+  } catch(e) {
+    console.error('guardarRegistro:', e);
+    showToast('❌ Error al guardar: ' + (e.message || e), '#B83232');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Guardar mi producción';
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function showToast(msg, color) {
+  var existing = document.querySelector('.toast-msg');
+  if (existing) existing.remove();
+  var t = document.createElement('div');
+  t.className = 'toast-msg';
+  t.textContent = msg;
+  if (color) t.style.background = color;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 3500);
+}
+
+// ── Init ──────────────────────────────────────────────────────
+async function init() {
+  await cargarOperarios();
+  await cargarInventario();
+}
+init();
+</script>
+</body>
+</html>

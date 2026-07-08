@@ -14,8 +14,6 @@
   --teal: #1A6B5B;
   --teal-l: #C8EDE7;
   --teal-xl: #EBF7F4;
-  --serig-m: #5A2D9E;
-  --gold: #B07D2A;
   --red: #B83232;
   --red-l: #FEE2E2;
   --amber: #B87200;
@@ -243,14 +241,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sub-card-arrow{position:absolute;top:16px;right:16px;color:var(--gray-l);font-size:18px;transition:all .15s}
 .sub-card:hover .sub-card-arrow{color:var(--teal);transform:translateX(3px)}
 
-/* ── Vista Rechazos ────────────────────────────────────────── */
-.rechazo-toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
-.rechazo-scroll{flex:1;overflow-y:auto;padding:16px}
-.rechazo-table{width:100%;border-collapse:collapse}
-.rechazo-table th{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);padding:8px 10px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
-.rechazo-table td{padding:9px 10px;font-size:12px;border-bottom:1px solid var(--bg);vertical-align:middle}
-.rechazo-table tr:hover td{background:var(--red-l)}
-.rbadge{font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;background:#FFF3D6;color:#92400E;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -508,11 +498,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
 
     </div><!-- /view-movimientos -->
-
-    <!-- DASHBOARD VIEW -->
-    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-dash">
-      <div class="dash" id="dashGrid" style="padding:20px"></div>
-    </div>
 
     <!-- PERSONAL VIEW -->
     <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
@@ -793,52 +778,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="mf">
       <button class="btn btn-g" onclick="cerrarModalMov()">Cancelar</button>
       <button class="btn btn-t" id="movBtnOk" onclick="confirmarMov()">Registrar</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL PARO MÁQUINA -->
-<div class="overlay" id="modalParo">
-  <div class="modal" style="max-width:400px">
-    <div class="mh">
-      <div class="mh-title">⏸ Reportar paro de máquina</div>
-      <button class="m-close" onclick="cerrarModalParo()">✕</button>
-    </div>
-    <div class="mb">
-      <div class="fg full">
-        <div class="fl">Máquina / Área</div>
-        <select class="fs" id="paroMaquina">
-          <option value="armado_28">Máquina Armado (Press Top 28)</option>
-          <option value="liner_33">Máquina Liner (Press Top 33)</option>
-          <option value="impresion">Máquina Impresión</option>
-          <option value="banda">Banda termoencogible</option>
-          <option value="otra">Otra</option>
-        </select>
-      </div>
-      <div class="fg full">
-        <div class="fl">Motivo del paro</div>
-        <select class="fs" id="paroMotivo">
-          <option value="mantenimiento">Mantenimiento</option>
-          <option value="falta_material">Falta de material</option>
-          <option value="cambio_molde">Cambio de molde</option>
-          <option value="operador_ausente">Operador ausente</option>
-          <option value="energia">Problema eléctrico</option>
-          <option value="calidad">Problema de calidad</option>
-          <option value="otro">Otro</option>
-        </select>
-      </div>
-      <div class="fg full">
-        <div class="fl">Duración (minutos)</div>
-        <input class="fi" id="paroDuracion" type="number" placeholder="minutos" value="30">
-      </div>
-      <div class="fg full">
-        <div class="fl">Observaciones</div>
-        <textarea class="fta" id="paroObs" rows="2"></textarea>
-      </div>
-    </div>
-    <div class="mf">
-      <button class="btn btn-g" onclick="cerrarModalParo()">Cancelar</button>
-      <button class="btn btn-t" onclick="confirmarParo()">Registrar paro</button>
     </div>
   </div>
 </div>
@@ -1184,21 +1123,6 @@ async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
   }
 }
 
-async function registrarParoMaquina(maquinaId, motivo, duracion, usuario, obs) {
-  try {
-    const { error } = await db.from('paros_maquina').insert({
-      maquina_id: maquinaId,
-      motivo: motivo,
-      duracion_minutos: duracion,
-      usuario: usuario,
-      observaciones: obs
-    });
-    return { ok: !error, error: error?.message };
-  } catch(e) {
-    return { ok: false, error: e.message };
-  }
-}
-
 // ══ MOSTRAR DETALLE ═════════════════════════════════════════
 async function mostrarDetalle(id) {
   const s = solicitudes.find(x => x.id === id);
@@ -1431,34 +1355,6 @@ async function confirmarBorrar(id) {
   }
 }
 
-function reportarParo() {
-  document.getElementById('modalParo').classList.add('open');
-}
-
-function cerrarModalParo() {
-  document.getElementById('modalParo').classList.remove('open');
-}
-
-async function confirmarParo() {
-  const maquina = document.getElementById('paroMaquina').value;
-  const motivo = document.getElementById('paroMotivo').value;
-  const duracion = parseInt(document.getElementById('paroDuracion').value);
-  const obs = document.getElementById('paroObs').value;
-  
-  if (!duracion || duracion <= 0) {
-    showToast('⚠️ Duración válida requerida', '#B83232');
-    return;
-  }
-  
-  const result = await registrarParoMaquina(maquina, motivo, duracion, 'supervisor', obs);
-  if (result.ok) {
-    showToast(`✅ Paro registrado: ${duracion} min por ${motivo}`);
-    cerrarModalParo();
-  } else {
-    showToast(`❌ Error: ${result.error}`, '#B83232');
-  }
-}
-
 // ══ FORMULARIO ══════════════════════════════════════════════
 function abrirForm() {
   lineas = [];
@@ -1645,17 +1541,6 @@ function animShake(el) {
   }, { once: true });
 }
 
-function animPop(el) {
-  if (!el) return;
-  el.classList.remove('anim-pop');
-  void el.offsetWidth;
-  el.classList.add('anim-pop');
-  el.addEventListener('animationend', function h() {
-    el.classList.remove('anim-pop');
-    el.removeEventListener('animationend', h);
-  }, { once: true });
-}
-
 function triggerViewEnter(viewId) {
   var el = document.getElementById(viewId);
   if (!el) return;
@@ -1683,14 +1568,12 @@ function switchTab(tab) {
     inicio:       'view-inicio',
     tapas:        'view-tapas',
     movimientos:  'view-movimientos',
-    dash:         'view-dash',
     personal:     'view-personal'
   };
   var tabMap = {
     inicio:       'tab-inicio',
     tapas:        'tab-tapas',
     movimientos:  'tab-movimientos',
-    dash:         'tab-dash',
     personal:     'tab-personal'
   };
 
@@ -1703,27 +1586,9 @@ function switchTab(tab) {
   }
   if (tabId)  document.getElementById(tabId).classList.add('active');
 
-  if (tab === 'dash')         renderDash();
   if (tab === 'personal')     renderPersonal();
   if (tab === 'movimientos')  cargarMovimientos();
   if (tab === 'inicio')       renderInicio();
-}
-
-function renderDash() {
-  const g = document.getElementById('dashGrid');
-  if (!g) return;
-  const activas = solicitudes.filter(s => s.estado === 'proceso').length;
-  const pendientes = solicitudes.filter(s => ['nueva', 'programada'].includes(s.estado)).length;
-  g.innerHTML = `
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px">
-      <div style="font-family:var(--display);font-size:18px;font-weight:700;margin-bottom:12px">Resumen Tapas</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-        <div><div style="font-size:9px;color:var(--gray)">Activas</div><div style="font-size:24px;font-weight:700;color:var(--teal)">${activas}</div></div>
-        <div><div style="font-size:9px;color:var(--gray)">Pendientes</div><div style="font-size:24px;font-weight:700;color:var(--amber)">${pendientes}</div></div>
-        <div><div style="font-size:9px;color:var(--gray)">Completadas</div><div style="font-size:24px;font-weight:700;color:var(--green)">${solicitudes.filter(s => s.estado === 'entregada').length}</div></div>
-      </div>
-    </div>
-  `;
 }
 
 function renderPersonal() {
@@ -1930,7 +1795,7 @@ function rechSkuInput(val) {
   if (!drop) return;
   if (!val || val.length < 2) { drop.style.display = 'none'; return; }
   var term = val.toLowerCase();
-  var matches = inventario.filter(function(i){
+  var matches = inventarioCache.filter(function(i){
     return (i.sku && i.sku.toLowerCase().includes(term))
       || (i.descripcion && i.descripcion.toLowerCase().includes(term));
   }).slice(0, 8);

@@ -1,24 +1,30 @@
 // ═══════════════════════════════════════════════════════════════
-// TETRAPP — shared/auth.js · Guardián de sesión y roles v1.0
+// TETRAPP — shared/auth.js · Guardián de sesión y roles v1.1
 // Se carga en TODOS los HTML (excepto login.html), justo después
 // del CDN de supabase-js y ANTES del <script> propio de la página.
 //
 // Provee a cada página (reemplaza sus declaraciones locales):
 //   SUPA_URL, SUPA_KEY, db (cliente único), HEADERS (con token vivo)
-//   TETRA = { rol, nombre, email, esVisor }
+//   TETRA = { rol, nombre, email, esVisor, esOperativo }
 //
 // Reglas:
 //   - Sin sesión → redirige a login.html
 //   - Sesión sin perfil → cierra sesión y redirige (usuario no autorizado)
 //   - Rol visor → banner "Modo Visual" + bloqueo de escrituras en cliente
 //     (la protección REAL es el RLS en Supabase; esto es solo UX)
+//   - Rol operativo → solo puede estar en registro-tapas.html; cualquier
+//     otra página lo redirige ahí (el RLS limita sus escrituras a
+//     INSERT en comandas/comanda_tareas del lado servidor)
 // ═══════════════════════════════════════════════════════════════
 
 var SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
 var SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
 var db = supabase.createClient(SUPA_URL, SUPA_KEY);
 var HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
-var TETRA = { rol: null, nombre: '', email: null, esVisor: false };
+var TETRA = { rol: null, nombre: '', email: null, esVisor: false, esOperativo: false };
+
+// Única página permitida para el rol operativo (sin extensión por cleanUrls)
+var TETRA_PAGINA_OPERATIVO = 'registro-tapas';
 
 // ── Escape universal anti-XSS para texto dinámico en innerHTML ──
 // (serigrafia.html tiene su propia copia equivalente; misma firma)
@@ -129,7 +135,17 @@ function tetraPintarUsuario() {
 
     TETRA.rol = r.data.rol;
     TETRA.nombre = r.data.nombre || session.user.email;
-    TETRA.esVisor = r.data.rol !== 'master';
+    TETRA.esVisor = r.data.rol === 'visor';
+    TETRA.esOperativo = r.data.rol === 'operativo';
+
+    // Jaula operativo: solo el formulario de registro de producción
+    if (TETRA.esOperativo) {
+      var ruta = location.pathname.replace(/\.html$/, '').replace(/\/+$/, '');
+      if (ruta.slice(-TETRA_PAGINA_OPERATIVO.length) !== TETRA_PAGINA_OPERATIVO) {
+        location.replace(TETRA_PAGINA_OPERATIVO + '.html');
+        return;
+      }
+    }
 
     var pintar = function () {
       if (TETRA.esVisor) tetraBannerVisor();
