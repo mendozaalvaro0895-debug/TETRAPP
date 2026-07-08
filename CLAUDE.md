@@ -156,14 +156,30 @@ animPop y CSS huérfano (.rechazo-*, .rbadge, --serig-m, --gold).
 - `master` → todo · `visor` → solo lectura (banner Modo Visual)
 - `operativo` → enjaulado en registro-tapas.html; RLS solo le permite INSERT en comandas/comanda_tareas
 
-### Metas de productividad — DOS tablas distintas, no confundir
-1. `CAPACIDADES` en registro-tapas.html (y su copia en comandas.html) — und/hora por tarea
-   individual de una comanda. Actualizada jul/2026: armado/liner/banda/encajado manual = 1000,
-   flameado/impresión = 1167, máquinas = 2500, default = 1000. Incluye las 5 tareas nuevas
-   (Revisado, Limpiar pestaña, Apoyo Serigrafía, Apoyo Producción, Otra tarea) a 1000.
-   ⚠️ La copia en comandas.html sigue en 833 — pendiente de sincronizar si se pide.
-2. `METAS` en tapas.html — und/hora por proceso, usada solo para estimar tiempo de entrega de
-   solicitudes/pedidos (armado=1500, liner=1500, etc.). Sistema aparte, no se tocó esta sesión.
+### Metas de productividad — CUATRO tablas, sincronizadas jul/2026
+Valores oficiales (und/hora), idénticos en las 4 copias:
+- Armado, Liner, Banda (manual): **1500**
+- Encajado: **3000**
+- Flameado, Impresión: **1500**
+- Armado, Liner (máquina — Press Top 28/33): **2500**
+- Otras tareas (Revisado, Limpiar pestaña, Apoyo Serigrafía, Apoyo Producción, Otra tarea,
+  y cualquier proceso sin meta explícita): **1200**
+
+Dónde viven las 4 copias (misma lógica, 4 archivos porque cada HTML es autónomo — ver
+Arquitectura actual):
+1. `CAPACIDADES` en registro-tapas.html — und/hora por tarea individual (rol operativo)
+2. `CAPACIDADES` en comandas.html — misma tabla, vista admin (su PROCS_LIST no incluye las
+   4 tareas nuevas, solo necesita el default `manual`/`otro` en 1200)
+3. `METAS` + `META_DEFAULT` en tapas.html — estima tiempo de entrega de solicitudes/pedidos
+   (metaParaProcesos). Tiene claves muertas sin tocar (armado_pushpull=700, separar cavidad,
+   limpiar grasa, armadora tapa 28, liner tapa 33) — inalcanzables desde el chip-selector de
+   ALL_PROCS_TAPAS, se dejaron igual por ser reglas de negocio históricas no mencionadas.
+4. `METAS` + `META_DEFAULT` en dashboard.html — calcula la eficiencia real mostrada en KPIs
+   ejecutivos (metaProc), lee `comanda_tareas.proceso` tal cual se guardó desde 1/2.
+
+⚠️ Si se agrega una tarea nueva a futuro, hay que agregarla en las 4 tablas (o al menos
+confirmar que cae bien en el default de 1200) — no hay fuente única, es duplicación
+intencional por la arquitectura autónoma de cada HTML.
 
 ---
 
