@@ -3116,7 +3116,8 @@ async function renderAsistGrid() {
         if (f > hoy) return;
         var dow = new Date(f + 'T12:00:00').getDay();
         if (dow === 0) return;
-        if (f === hoy && !daysByP[f]) return; // pendiente — aún no se toma asistencia hoy
+        if (daysByP[f] === 'pendiente') return; // explícito (ej. antes de ingresar) — no cuenta
+        if (f === hoy && !daysByP[f]) return; // pendiente implícito — aún no se toma asistencia hoy
         var est = daysByP[f] || 'presente';
         if (est !== 'presente') isFullGreen = false;
       });
@@ -3135,7 +3136,8 @@ async function renderAsistGrid() {
           var est = esPendiente ? 'pendiente' : (daysByP[f] || 'presente');
           var lbl = est === 'ausente' ? '✗' : est === 'tarde' ? '!' : est === 'velada' ? '🌙' : '';
           var cod = p.codigo.replace(/'/g, "\\'");
-          var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esPendiente ? ' · Aún no se toma asistencia' : '');
+          var notaPend = esPendiente ? ' · Aún no se toma asistencia' : (est === 'pendiente' ? ' · Sin registrar (ej. antes de ingresar)' : '');
+          var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + notaPend;
           html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + '" onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + '</td>';
         }
       });
@@ -3168,7 +3170,7 @@ async function renderAsistGrid() {
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#fee2e2;border:1px solid #fca5a5"></span>Ausente (✗)</span>' +
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#fef3c7;border:1px solid #fde68a"></span>Tarde (!)</span>' +
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ede9fe;border:1px solid #ddd6fe"></span>Velada (🌙)</span>' +
-        '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#e2e8f0;border:1px solid #cbd5e1"></span>Pendiente (hoy, sin tomar)</span>' +
+        '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#e2e8f0;border:1px solid #cbd5e1"></span>Pendiente (hoy sin tomar, o antes de ingresar)</span>' +
         '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Fila verde = asistencia completa · Domingo no cuenta para racha</span>' +
       '</div>' +
     '</div>';
@@ -3185,8 +3187,12 @@ async function toggleAsistCell(codigo, fecha) {
   var byPD   = asistGridCache.byPersonDay;
   var curRaw = byPD[codigo] && byPD[codigo][fecha]; // undefined si no hay registro guardado
   var cur    = curRaw || 'presente';
-  // Ciclo: (sin marcar) → ausente → tarde → velada → (sin marcar, borra el registro)
-  var next = cur === 'presente' ? 'ausente' : cur === 'ausente' ? 'tarde' : cur === 'tarde' ? 'velada' : null;
+  // Ciclo: (sin marcar) → ausente → tarde → velada → pendiente (gris, ej. antes de ingresar) → (sin marcar, borra el registro)
+  var next = cur === 'presente' ? 'ausente'
+           : cur === 'ausente'  ? 'tarde'
+           : cur === 'tarde'    ? 'velada'
+           : cur === 'velada'   ? 'pendiente'
+           : null;
 
   if (!byPD[codigo]) byPD[codigo] = {};
   if (next === null) delete byPD[codigo][fecha];
@@ -3265,7 +3271,8 @@ function exportarAsistGridPDF() {
         if (f > hoy) return true;
         var dow = new Date(f+'T12:00:00').getDay();
         if (dow === 0) return true;
-        if (f === hoy && !daysByP[f]) return true; // pendiente, no cuenta aún
+        if (daysByP[f] === 'pendiente') return true; // explícito (ej. antes de ingresar) — no cuenta
+        if (f === hoy && !daysByP[f]) return true; // pendiente implícito, no cuenta aún
         return (daysByP[f] || 'presente') === 'presente';
       });
       var nameBg  = isFullGreen ? '#dcfce7' : '#fff';
