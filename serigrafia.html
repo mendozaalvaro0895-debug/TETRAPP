@@ -803,6 +803,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="fl">Rol</div>
         <select class="fs" id="mpRol" style="width:100%"></select>
       </div>
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">Fecha de inicio</div>
+          <input class="fi" id="mpFechaInicio" type="date">
+        </div>
+        <div class="fg">
+          <div class="fl">Fecha de baja</div>
+          <input class="fi" id="mpFechaBaja" type="date" onchange="if(this.value)document.getElementById('mpActivo').checked=false">
+        </div>
+      </div>
       <div class="fg full">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:500">
           <input type="checkbox" id="mpActivo" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--serig-m)">
@@ -3090,7 +3100,8 @@ async function renderAsistGrid() {
     // Inactivo pero tiene registros en este mes → incluir para no perder historial
     return byPD[p.codigo] && Object.keys(byPD[p.codigo]).length > 0;
   });
-  var plazaFija = todaLista.filter(function(p){ return (p.proceso_hab || '') !== 'Prestado'; });
+  var plazaFija = todaLista.filter(function(p){ return (p.proceso_hab || '') !== 'Prestado'; })
+    .sort(function(a, b){ return (a.activo ? 0 : 1) - (b.activo ? 0 : 1); }); // baja al final, antes de Prestados
   var prestados  = todaLista.filter(function(p){ return (p.proceso_hab || '') === 'Prestado'; });
 
   var mesNombre = new Date(año, mesN-1, 1).toLocaleDateString('es-GT', { month:'long', year:'numeric' });
@@ -5927,6 +5938,10 @@ function buildPersonalCard(p) {
     ? '<span style="background:' + (rolColor[rolActual] || '#666') + '22;color:' + (rolColor[rolActual] || '#666') + ';font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">' + rolActual + '</span>'
     : '<span style="font-size:10px;color:var(--gray-l)">Sin rol</span>';
   var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-lista' : 'pill-entregada') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>';
+  var fechasTxt = '';
+  if (p.fecha_inicio) fechasTxt += 'Desde ' + p.fecha_inicio;
+  if (p.fecha_baja)   fechasTxt += (fechasTxt ? ' · ' : '') + 'Baja ' + p.fecha_baja;
+  var fechasRow = fechasTxt ? '<div style="font-size:10px;color:var(--gray-l);margin-top:4px">' + fechasTxt + '</div>' : '';
   var codEsc = String(p.codigo).replace(/'/g, "\\'");
   var roleSelect = '<select onchange="cambiarRolOperador(\'' + codEsc + '\',this.value)" ' +
     'style="width:100%;margin-top:10px;padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--bg);cursor:pointer">' +
@@ -5947,6 +5962,7 @@ function buildPersonalCard(p) {
       '</div>' +
     '</div>' +
     '<div style="margin-top:8px;display:flex;gap:6px;align-items:center">' + estadoBadge + '</div>' +
+    fechasRow +
     roleSelect +
     '</div>';
 }
@@ -6044,6 +6060,8 @@ function abrirModalNuevoOperario() {
   document.getElementById('mpCodigo').value = '';
   document.getElementById('mpCodigo').disabled = false;
   document.getElementById('mpColor').value = '#5A2D9E';
+  document.getElementById('mpFechaInicio').value = new Date().toISOString().slice(0,10);
+  document.getElementById('mpFechaBaja').value = '';
   document.getElementById('mpActivo').checked = true;
   poblarRolesModal('');
   document.getElementById('modalPersonal').classList.add('open');
@@ -6061,6 +6079,8 @@ function abrirModalEditarOperario(codigo) {
   document.getElementById('mpCodigo').value = p.codigo || '';
   document.getElementById('mpCodigo').disabled = true;
   document.getElementById('mpColor').value = p.color_hex || '#5A2D9E';
+  document.getElementById('mpFechaInicio').value = p.fecha_inicio || '';
+  document.getElementById('mpFechaBaja').value = p.fecha_baja || '';
   document.getElementById('mpActivo').checked = !!p.activo;
   poblarRolesModal(p.proceso_hab || '');
   document.getElementById('modalPersonal').classList.add('open');
@@ -6080,9 +6100,11 @@ async function guardarOperario() {
   var nombre    = (document.getElementById('mpNombre').value    || '').trim();
   var iniciales = (document.getElementById('mpIniciales').value || '').trim().toUpperCase();
   var codigo    = (document.getElementById('mpCodigo').value    || '').trim();
-  var color     = document.getElementById('mpColor').value;
-  var rol       = document.getElementById('mpRol').value;
-  var activo    = document.getElementById('mpActivo').checked;
+  var color       = document.getElementById('mpColor').value;
+  var rol         = document.getElementById('mpRol').value;
+  var fechaInicio = document.getElementById('mpFechaInicio').value || null;
+  var fechaBaja   = document.getElementById('mpFechaBaja').value || null;
+  var activo      = fechaBaja ? false : document.getElementById('mpActivo').checked;
 
   if (!nombre)    { showToast('⚠️ Nombre requerido', '#B83232');    animShake(document.getElementById('modalPersonal')); return; }
   if (!iniciales) { showToast('⚠️ Iniciales requeridas', '#B83232'); animShake(document.getElementById('modalPersonal')); return; }
@@ -6090,7 +6112,8 @@ async function guardarOperario() {
 
   var payload = {
     nombre: nombre, iniciales: iniciales, area: 'serig',
-    activo: activo, color_hex: color, proceso_hab: rol || ''
+    activo: activo, color_hex: color, proceso_hab: rol || '',
+    fecha_inicio: fechaInicio, fecha_baja: fechaBaja
   };
 
   try {
