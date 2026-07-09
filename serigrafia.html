@@ -3308,20 +3308,21 @@ async function renderAsistGrid() {
 async function toggleAsistCell(codigo, fecha) {
   if (!asistGridCache) return;
   var byPD   = asistGridCache.byPersonDay;
-  var curRaw = byPD[codigo] && byPD[codigo][fecha]; // undefined si no hay registro guardado
-  var cur    = curRaw || 'presente';
-  // Ciclo: (sin marcar) → ausente → tarde → velada → pendiente (gris, ej. antes de ingresar) → (sin marcar, borra el registro)
-  var next = cur === 'presente' ? 'ausente'
-           : cur === 'ausente'  ? 'tarde'
-           : cur === 'tarde'    ? 'velada'
-           : cur === 'velada'   ? 'pendiente'
+  var curRaw = byPD[codigo] && byPD[codigo][fecha];
+  var hoy = new Date().toISOString().slice(0,10);
+  // Para hoy sin registro = 'pendiente' (gris); para días pasados sin registro = 'presente'
+  var cur = curRaw !== undefined ? curRaw : (fecha === hoy ? 'pendiente' : 'presente');
+  // Ciclo: pendiente(gris) → presente(verde) → ausente → tarde → velada → (borra registro)
+  var next = cur === 'pendiente' ? 'presente'
+           : cur === 'presente'  ? 'ausente'
+           : cur === 'ausente'   ? 'tarde'
+           : cur === 'tarde'     ? 'velada'
            : null;
 
   if (!byPD[codigo]) byPD[codigo] = {};
   if (next === null) delete byPD[codigo][fecha];
   else byPD[codigo][fecha] = next;
 
-  var hoy = new Date().toISOString().slice(0,10);
   if (fecha === hoy) {
     if (next === null) delete asistHoyCache[codigo];
     else asistHoyCache[codigo] = next;
