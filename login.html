@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0C0C0B">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>TETRAPLASTIC — Ingreso</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -64,6 +67,15 @@ db.auth.getSession().then(function (s) {
 // Aviso si el guardián expulsó por falta de perfil
 if (location.search.indexOf('e=noperfil') !== -1) {
   mostrarError('Tu usuario no tiene un perfil autorizado. Contacta al administrador.');
+}
+// Aviso si la sesión se cerró por inactividad
+if (location.search.indexOf('e=inactividad') !== -1) {
+  mostrarError('Tu sesión se cerró por inactividad. Vuelve a ingresar.');
+}
+
+// PWA: registrar service worker también desde el login
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function () {});
 }
 
 function mostrarError(msg) {

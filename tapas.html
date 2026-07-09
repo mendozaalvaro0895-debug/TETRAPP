@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0C0C0B">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>TETRAPLASTIC — Tapas</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="shared/auth.js"></script>
@@ -241,6 +244,32 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sub-card-arrow{position:absolute;top:16px;right:16px;color:var(--gray-l);font-size:18px;transition:all .15s}
 .sub-card:hover .sub-card-arrow{color:var(--teal);transform:translateX(3px)}
 
+
+/* ── Responsive móvil — complementa shared/styles.css ────────── */
+@media(max-width:768px){
+  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 8px;gap:10px}
+  .tab{white-space:nowrap;font-size:12px;padding:10px 6px}
+  .tabs-r{flex:none;margin-left:auto}
+  .inicio-wrap{padding:12px}
+  .inicio-kpi-row{grid-template-columns:repeat(2,1fr)}
+  .sub-grid{grid-template-columns:1fr}
+  .sub-grid-b{grid-template-columns:1fr}
+  .mov-scroll{padding:10px}
+  #movTabla{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .mov-table{min-width:640px}
+  .dc-b{overflow-x:auto}
+  .dt{min-width:420px}
+  .det-scroll{padding:12px}
+  .pg{grid-template-columns:1fr 1fr;padding:12px}
+  .btn{min-height:38px}
+}
+@media(max-width:480px){
+  .pg{grid-template-columns:1fr}
+  .kpi-strip{padding:10px 12px;gap:8px}
+  .ph{flex-wrap:wrap;gap:8px}
+  /* filas del formulario de líneas (grid con anchos fijos inline) */
+  #lineasPedido div[style*="grid-template-columns:110px"]{grid-template-columns:90px 1fr 64px 56px 24px !important;gap:4px !important}
+}
 </style>
 </head>
 <body>

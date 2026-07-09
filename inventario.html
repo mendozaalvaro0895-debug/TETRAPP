@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0C0C0B">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>TETRAPLASTIC — Inventario</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="shared/auth.js"></script>
@@ -140,6 +143,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.ok{background:var(--green)}
 .toast.err{background:var(--red)}
+
+/* ── Responsive móvil (inventario no usa shared/styles.css) ───── */
+@media(max-width:768px){
+  .topbar{padding:8px 12px;height:auto;min-height:52px;flex-wrap:wrap;gap:8px}
+  .page{padding:14px}
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tbl{min-width:640px}
+  .desc-cell{max-width:220px}
+  .stats-strip .stat-chip{flex:1;min-width:calc(50% - 5px)}
+  .pagination{flex-wrap:wrap;gap:8px}
+  .btn{min-height:38px}
+}
+@media(max-width:480px){
+  .page-title{font-size:20px}
+  .search-wrap{min-width:100%}
+  .user-pill span{display:none}
+}
 </style>
 </head>
 <body>

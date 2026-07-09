@@ -119,6 +119,39 @@ function tetraPintarUsuario() {
   };
 }
 
+// ── Cierre de sesión por inactividad (60 min) ────────────────────
+// Cualquier interacción reinicia el contador; el timestamp vive en
+// localStorage para compartirse entre pestañas. El rol operativo
+// (pantallas de planta) está exento.
+var TETRA_IDLE_MIN = 60;
+var TETRA_IDLE_KEY = 'tetra_last_activity';
+
+function tetraSesionVencida() {
+  var last = parseInt(localStorage.getItem(TETRA_IDLE_KEY) || '0', 10);
+  return last > 0 && (Date.now() - last) > TETRA_IDLE_MIN * 60 * 1000;
+}
+
+function tetraMarcarActividad() {
+  try { localStorage.setItem(TETRA_IDLE_KEY, String(Date.now())); } catch (e) {}
+}
+
+function tetraCerrarPorInactividad() {
+  try { localStorage.removeItem(TETRA_IDLE_KEY); } catch (e) {}
+  db.auth.signOut().then(function () { location.replace('login.html?e=inactividad'); });
+}
+
+function tetraVigilarInactividad() {
+  if (TETRA.esOperativo) return; // pantallas de planta: sesión persistente
+  if (tetraSesionVencida()) { tetraCerrarPorInactividad(); return; }
+  tetraMarcarActividad();
+  ['click', 'keydown', 'touchstart', 'scroll', 'pointerdown'].forEach(function (ev) {
+    window.addEventListener(ev, tetraMarcarActividad, { passive: true });
+  });
+  setInterval(function () {
+    if (tetraSesionVencida()) tetraCerrarPorInactividad();
+  }, 60 * 1000);
+}
+
 // ── Validación de sesión y carga de rol ──────────────────────────
 (async function tetraGuard() {
   try {
@@ -152,6 +185,8 @@ function tetraPintarUsuario() {
       }
     }
 
+    tetraVigilarInactividad();
+
     var pintar = function () {
       if (TETRA.esVisor) tetraBannerVisor();
       tetraPintarUsuario();
@@ -164,6 +199,13 @@ function tetraPintarUsuario() {
     location.replace('login.html');
   }
 })();
+
+// ── PWA: registrar service worker ────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function (e) {
+    console.warn('SW no registrado:', e);
+  });
+}
 
 // ── Mantener HEADERS con el token renovado ───────────────────────
 db.auth.onAuthStateChange(function (evento, session) {
