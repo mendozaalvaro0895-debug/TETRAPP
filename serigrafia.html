@@ -3234,13 +3234,15 @@ async function renderAsistGrid() {
     if (secLabel) html += '<tr class="ag-section-hdr"><td colspan="' + (dias.length+1) + '">' + secLabel + '</td></tr>';
     lista.forEach(function(p) {
       var daysByP = byPD[p.codigo] || {};
+      var fechaInicio = p.fecha_inicio || (p.created_at ? p.created_at.slice(0,10) : null);
       var isFullGreen = true;
       dias.forEach(function(f) {
         if (f > hoy) return;
+        if (fechaInicio && f < fechaInicio) return; // antes de ingreso — no cuenta para racha
         var dow = new Date(f + 'T12:00:00').getDay();
         if (dow === 0) return;
-        if (daysByP[f] === 'pendiente') return; // explícito (ej. antes de ingresar) — no cuenta
-        if (f === hoy && !daysByP[f]) return; // pendiente implícito — aún no se toma asistencia hoy
+        if (daysByP[f] === 'pendiente') return;
+        if (f === hoy && !daysByP[f]) return;
         var est = daysByP[f] || 'presente';
         if (est !== 'presente') isFullGreen = false;
       });
@@ -3250,10 +3252,12 @@ async function renderAsistGrid() {
         '</td>';
       dias.forEach(function(f) {
         var esFuturo = f > hoy;
+        var esAntesIngreso = fechaInicio && f < fechaInicio;
         var dow = new Date(f + 'T12:00:00').getDay();
         var esFinde = dow === 0;
-        if (esFuturo) {
-          html += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + '"></td>';
+        if (esFuturo || esAntesIngreso) {
+          var titAnt = esAntesIngreso ? 'Antes de ingreso (' + fechaInicio + ')' : '';
+          html += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + '" title="' + titAnt + '"></td>';
         } else {
           var esPendiente = f === hoy && !daysByP[f];
           var est = esPendiente ? 'pendiente' : (daysByP[f] || 'presente');
@@ -3307,6 +3311,10 @@ async function renderAsistGrid() {
 
 async function toggleAsistCell(codigo, fecha) {
   if (!asistGridCache) return;
+  // Bloquear clic en días antes de la fecha de ingreso del operador
+  var op = matrizOpByCodigo(codigo);
+  var fechaInicio = op && (op.fecha_inicio || (op.created_at ? op.created_at.slice(0,10) : null));
+  if (fechaInicio && fecha < fechaInicio) return;
   var byPD   = asistGridCache.byPersonDay;
   var curRaw = byPD[codigo] && byPD[codigo][fecha];
   var hoy = new Date().toISOString().slice(0,10);
