@@ -3182,16 +3182,20 @@ async function renderAsistGrid() {
 
 async function toggleAsistCell(codigo, fecha) {
   if (!asistGridCache) return;
-  var byPD = asistGridCache.byPersonDay;
-  var cur  = (byPD[codigo] && byPD[codigo][fecha]) || 'presente';
-  var next = cur === 'presente' ? 'ausente' : cur === 'ausente' ? 'tarde' : cur === 'tarde' ? 'velada' : 'presente';
+  var byPD   = asistGridCache.byPersonDay;
+  var curRaw = byPD[codigo] && byPD[codigo][fecha]; // undefined si no hay registro guardado
+  var cur    = curRaw || 'presente';
+  // Ciclo: (sin marcar) → ausente → tarde → velada → (sin marcar, borra el registro)
+  var next = cur === 'presente' ? 'ausente' : cur === 'ausente' ? 'tarde' : cur === 'tarde' ? 'velada' : null;
 
   if (!byPD[codigo]) byPD[codigo] = {};
-  byPD[codigo][fecha] = next;
+  if (next === null) delete byPD[codigo][fecha];
+  else byPD[codigo][fecha] = next;
 
   var hoy = new Date().toISOString().slice(0,10);
   if (fecha === hoy) {
-    asistHoyCache[codigo] = next;
+    if (next === null) delete asistHoyCache[codigo];
+    else asistHoyCache[codigo] = next;
     if (next === 'ausente') ausentesHoy[codigo] = true;
     else delete ausentesHoy[codigo];
     renderMatriz();
@@ -3199,18 +3203,25 @@ async function toggleAsistCell(codigo, fecha) {
   renderAsistGrid();
 
   try {
-    var r = await db.from(ASIST_TABLE).upsert({
-      fecha: fecha,
-      operador_codigo: codigo,
-      operador_nombre: getNombreOperario(codigo),
-      area: 'serig', turno: 'dia',
-      estado: next,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'fecha,operador_codigo,area,turno' });
+    var r;
+    if (next === null) {
+      r = await db.from(ASIST_TABLE).delete()
+        .eq('fecha', fecha).eq('operador_codigo', codigo).eq('area', 'serig').eq('turno', 'dia');
+    } else {
+      r = await db.from(ASIST_TABLE).upsert({
+        fecha: fecha,
+        operador_codigo: codigo,
+        operador_nombre: getNombreOperario(codigo),
+        area: 'serig', turno: 'dia',
+        estado: next,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'fecha,operador_codigo,area,turno' });
+    }
     if (r.error) throw r.error;
     faltasMesCache = null;
   } catch(e) {
-    byPD[codigo][fecha] = cur;
+    if (curRaw === undefined) delete byPD[codigo][fecha];
+    else byPD[codigo][fecha] = curRaw;
     renderAsistGrid();
     showToast('❌ Error al guardar asistencia', '#B83232');
   }
