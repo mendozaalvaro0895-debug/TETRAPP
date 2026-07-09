@@ -1536,6 +1536,12 @@ async function matrizDrop(e, targetKey) {
 var boardDragId = null;
 var boardDragSolId = null;
 
+function fmtFechaCorta(iso) {
+  if (!iso) return '—';
+  var d = iso.slice(0, 10).split('-');
+  return d.length === 3 ? d[2] + '/' + d[1] + '/' + d[0] : iso;
+}
+
 function boardBuildCard(item) {
   // Entregas parciales vinculadas a este pedido — busca en lineas[] por solId
   var entregado = 0;
@@ -1560,6 +1566,12 @@ function boardBuildCard(item) {
   var badge = '<span style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:4px;padding:1px 5px;font-size:8px;font-weight:800">' + badgeTxt + '</span>';
   var skuTxt  = item.sku  ? '<span style="color:var(--gray-l);font-family:var(--mono);font-size:10px">' + item.sku + '</span> · ' : '';
   var descTxt = skuTxt + '<span style="font-weight:700;color:var(--ink)">' + (item.desc || '—') + '</span>';
+  var isCompleteEntrega = entregado > 0 && entregado >= (item.cant || 0);
+  var fechaEntregado = isCompleteEntrega && requis.length ? requis[0].fecha : null;
+  var fechasRow = '<div style="margin-top:3px;font-size:9px;color:var(--gray-l);display:flex;gap:8px;flex-wrap:wrap">' +
+    '<span>📅 Ingreso: ' + fmtFechaCorta(item.createdAt) + '</span>' +
+    (fechaEntregado ? '<span style="color:#15803d;font-weight:700">✅ Entregado: ' + fmtFechaCorta(fechaEntregado) + '</span>' : '') +
+    '</div>';
   var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var procRow = item.linea_id ? buildCardProcRow(item) : '';
   var tiroMax = Math.max(item.tiros || 1, item.tiro_actual || 1);
@@ -1609,6 +1621,7 @@ function boardBuildCard(item) {
     '<div style="font-size:12px;font-weight:700;color:var(--ink);line-height:1.2;margin-bottom:2px">' + item.cliente + '</div>' +
     '<div style="font-size:11px;line-height:1.4;margin-bottom:4px;word-break:break-word">' + descTxt + '</div>' +
     cantAndProg +
+    fechasRow +
     tiroRow +
     procRow +
     (item.linea_id ? buildComentarioRow(item) : '') +
@@ -1696,6 +1709,11 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
         '💬 ' + escHtml(notasTxt) +
       '</div>'
     : '';
+  var fechaEntregado = isComplete && requis.length ? requis[0].fecha : null;
+  var fechasRow = '<div style="margin-top:3px;font-size:9px;color:' + (isComplete ? 'var(--gray)' : '#6b7280') + ';display:flex;gap:8px;flex-wrap:wrap">' +
+    '<span>📅 Ingreso: ' + fmtFechaCorta(item.createdAt) + '</span>' +
+    (fechaEntregado ? '<span style="color:#15803d;font-weight:700">✅ Entregado: ' + fmtFechaCorta(fechaEntregado) + '</span>' : '') +
+    '</div>';
   return '<div class="board-card" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
@@ -1709,6 +1727,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
       '<span style="flex-shrink:0;text-align:right;white-space:nowrap">' + cantHtml + '</span>' +
     '</div>' +
     '<div style="margin-top:3px;font-size:10px;color:' + descClr + ';font-weight:' + descWt + ';line-height:1.35">' + escHtml(desc) + '</div>' +
+    fechasRow +
     notasRow +
     requiRow +
   '</div>';
