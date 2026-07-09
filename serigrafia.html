@@ -4118,6 +4118,8 @@ async function guardarEntregadoManual() {
     await autoCompletarSiCorresponde(lineas);
     renderProduccionActual();
     renderBoard();
+    refreshKPIs();
+    _refreshDetalleIfOpen(lineas.map(function(l){return l.solId;}).filter(Boolean));
     showToast('✅ Entregado actualizado');
   } else {
     var dup = entregasCache.find(function(m) { return m.requi && m.requi.trim().toLowerCase() === requi.toLowerCase(); });
@@ -4133,6 +4135,8 @@ async function guardarEntregadoManual() {
     await autoCompletarSiCorresponde(lineas);
     renderProduccionActual();
     renderBoard();
+    refreshKPIs();
+    _refreshDetalleIfOpen(lineas.map(function(l){return l.solId;}).filter(Boolean));
     showToast('✅ Entregado registrado (' + lineas.length + ' producto' + (lineas.length > 1 ? 's' : '') + ')');
   }
 }
@@ -4160,11 +4164,19 @@ async function autoCompletarSiCorresponde(lineasGuardadas) {
 
 async function eliminarEntregadoManual(id) {
   if (!confirm('¿Eliminar este registro manual?')) return;
+  var deleted = entregasCache.find(function(e) { return e.id === id; });
+  var delSolIds = deleted
+    ? (deleted.lineas && deleted.lineas.length
+        ? deleted.lineas.map(function(l) { return l.solId; }).filter(Boolean)
+        : (deleted.solId ? [deleted.solId] : []))
+    : [];
   var r = await db.from('entregas_serig').delete().eq('id', id);
   if (r.error) { showToast('⚠️ Error al eliminar: ' + r.error.message, '#b91c1c'); return; }
   entregasCache = entregasCache.filter(function(e) { return e.id !== id; });
   renderProduccionActual();
   renderBoard();
+  refreshKPIs();
+  _refreshDetalleIfOpen(delSolIds);
 }
 
 function editarEntregadoManual(id) {
@@ -4630,6 +4642,13 @@ function cerrarDetalleModal() {
 }
 function cerrarSiOverlayDetalle(e) {
   if (e.target.id === 'overlayDetalle') cerrarDetalleModal();
+}
+
+// Refresca el detalle modal si está abierto y el pedido afectado coincide con el actual
+function _refreshDetalleIfOpen(solIds) {
+  var overlay = document.getElementById('overlayDetalle');
+  if (!overlay || !overlay.classList.contains('open') || !selId) return;
+  if (!solIds || !solIds.length || solIds.indexOf(selId) >= 0) mostrarDetalle(selId);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -5943,8 +5962,12 @@ async function confirmarMovSerig() {
     var totalCant = lineas.reduce(function(s, l) { return s + l.cant; }, 0);
     showToast('✅ Salida registrada: Requi ' + requi + ' · ' + totalCant.toLocaleString() + ' und');
     cerrarModalMovSerig();
-    cargarSalidaRequiMap();
+    await cargarSalidaRequiMap();
     await cargarMovimientosSerig();
+    renderProduccionActual();
+    renderBoard();
+    refreshKPIs();
+    _refreshDetalleIfOpen(lineas.map(function(l){return l.solId;}).filter(Boolean));
   } catch(e) {
     showToast('❌ Error: ' + e.message, '#B83232');
   } finally {
@@ -6065,6 +6088,7 @@ async function confirmarRechazoSerig() {
     showToast('✅ Rechazo registrado: ' + rech.toLocaleString() + ' und de ' + sku);
     cerrarModalRechazoSerig();
     await cargarMovimientosSerig();
+    refreshKPIs();
   } catch(e) {
     showToast('❌ Error: ' + e.message, '#B83232');
   } finally {
