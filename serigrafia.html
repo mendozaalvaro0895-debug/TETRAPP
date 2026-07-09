@@ -3772,6 +3772,7 @@ function buildProcNode(proc, estado) {
 // ── Entregados ────────────────────────────────────────────────
 
 var entregasCache = [];
+var salidaRequiMap = {}; // solicitud_id → [num_documento] de salidas de bodega serig
 
 function getEntregasManuales() { return entregasCache; }
 
@@ -3779,6 +3780,33 @@ function _rowToEntrega(r) {
   return { id: r.id, cliente: r.cliente || '', requi: r.requi || '',
            lineas: r.lineas || [], cant: r.cant || 0, fecha: r.fecha || '',
            nota: r.nota || '', solId: r.sol_id || '', solCodigo: r.sol_codigo || '' };
+}
+
+// Devuelve la Requi de Ingreso PT vinculada a una solicitud_id (busca en entregasCache)
+function getIngresoRequi(solId) {
+  if (!solId) return null;
+  var match = entregasCache.find(function(m) {
+    if (m.solId === solId) return true;
+    return m.lineas && m.lineas.some(function(l) { return l.solId === solId; });
+  });
+  return match ? match.requi : null;
+}
+
+// Carga mapa solicitud_id → [num_documento] para cross-reference en Ingresos PT
+async function cargarSalidaRequiMap() {
+  try {
+    var r = await db.from('movimientos_materiales')
+      .select('solicitud_id,num_documento')
+      .eq('area','serig').eq('tipo','salida_bodega')
+      .not('solicitud_id','is',null).not('num_documento','is',null).limit(2000);
+    salidaRequiMap = {};
+    (r.data || []).forEach(function(m) {
+      if (!m.solicitud_id || !m.num_documento) return;
+      if (!salidaRequiMap[m.solicitud_id]) salidaRequiMap[m.solicitud_id] = [];
+      if (salidaRequiMap[m.solicitud_id].indexOf(m.num_documento) < 0)
+        salidaRequiMap[m.solicitud_id].push(m.num_documento);
+    });
+  } catch(e) { console.error('cargarSalidaRequiMap:', e); }
 }
 
 async function cargarEntregasSerig() {
@@ -4221,6 +4249,7 @@ function buildProduccionHtml(entregadasSistema, manuales) {
 
     // Filas del sistema
     var rowsSistema = entregadasSistema.map(function(s) {
+      var requiSal = salidaRequiMap[s.id] ? salidaRequiMap[s.id].join(', ') : '—';
       return '<tr onclick="mostrarDetalle(\'' + s.id + '\')" style="cursor:pointer">' +
         '<td><span style="font-family:var(--mono);font-weight:700;color:var(--serig-m)">' + escHtml(s.id_display || s.id.slice(0,8)) + '</span></td>' +
         '<td style="font-weight:600">' + escHtml(s.cliente || '—') + '</td>' +
@@ -4229,6 +4258,7 @@ function buildProduccionHtml(entregadasSistema, manuales) {
         '<td style="font-family:var(--mono);font-weight:600">' + (s.cant||0).toLocaleString() + '</td>' +
         '<td style="font-size:11px;color:var(--gray)">' + (s.created || '—') + '</td>' +
         '<td><span style="font-size:9px;background:#E0E7FF;color:#3730a3;border-radius:4px;padding:2px 6px;font-weight:700">SISTEMA</span></td>' +
+        '<td style="font-size:11px;font-family:var(--mono);color:' + (requiSal !== '—' ? 'var(--serig-m)' : 'var(--gray-l)') + '">' + escHtml(requiSal) + '</td>' +
         '<td></td>' +
       '</tr>';
     }).join('');
@@ -4250,6 +4280,8 @@ function buildProduccionHtml(entregadasSistema, manuales) {
               : '<span style="font-family:var(--mono);font-size:9px;font-weight:700;background:#fee2e2;color:#b91c1c;border-radius:3px;padding:1px 5px;text-decoration:line-through" title="Pedido eliminado — editar para limpiar">' + escHtml(l.solCodigo) + '</span>')
           : '';
         var rowSty = 'background:' + grpBg + ';' + (isFirst ? sepBdr : '');
+        var requiSalLinea = l.solId ? (salidaRequiMap[l.solId] ? salidaRequiMap[l.solId].join(', ') : '—')
+                          : (m.solId ? (salidaRequiMap[m.solId] ? salidaRequiMap[m.solId].join(', ') : '—') : '—');
         return '<tr style="' + rowSty + '">' +
           '<td>' + requiCell + '</td>' +
           '<td style="font-weight:600;font-size:11px">' + escHtml(l.cliente || m.cliente || '—') + '</td>' +
@@ -4261,6 +4293,7 @@ function buildProduccionHtml(entregadasSistema, manuales) {
           '<td style="font-family:var(--mono);font-weight:600">' + (l.cant||0).toLocaleString() + '</td>' +
           (isFirst ? '<td style="font-size:11px;color:var(--gray)">' + escHtml(m.fecha || '—') + '</td>' : '<td></td>') +
           (isFirst ? '<td><span style="font-size:9px;background:#FEF3C7;color:#92400e;border-radius:4px;padding:2px 6px;font-weight:700">MANUAL</span>' + (m.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(m.nota) + '</span>' : '') + '</td>' : '<td></td>') +
+          (isFirst ? '<td style="font-size:11px;font-family:var(--mono);color:' + (requiSalLinea !== '—' ? 'var(--serig-m)' : 'var(--gray-l)') + '">' + escHtml(requiSalLinea) + '</td>' : '<td></td>') +
           (isFirst ? '<td style="white-space:nowrap"><button onclick="event.stopPropagation();editarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--serig-m);font-size:13px;padding:2px 4px" title="Editar">✏️</button><button onclick="event.stopPropagation();eliminarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 4px" title="Eliminar">✕</button></td>' : '<td></td>') +
         '</tr>';
       }).join('');
@@ -4269,7 +4302,7 @@ function buildProduccionHtml(entregadasSistema, manuales) {
     return '<table class="prod-table">' +
       '<thead><tr>' +
         '<th>No. Requi</th><th>Cliente</th><th>Pedido</th><th>Producto</th>' +
-        '<th>Unidades</th><th>Fecha</th><th>Origen</th><th></th>' +
+        '<th>Unidades</th><th>Fecha</th><th>Origen</th><th>Requi Salida Bodega</th><th></th>' +
       '</tr></thead>' +
       '<tbody>' + rowsManuales + rowsSistema + '</tbody>' +
       '</table>';
@@ -5366,6 +5399,7 @@ function buildSalidaRow(r) {
   var sol = r.solicitud_id ? solicitudes.find(function(s){ return s.id === r.solicitud_id; }) : null;
   var invItem = r.sku_original ? inventarioCache.find(function(i){ return i.sku === r.sku_original; }) : null;
   var obsLimpia = (r.observaciones || '').replace(/^FECHA:\S*\s*\|?\s*/, '');
+  var requiPT = getIngresoRequi(r.solicitud_id);
   return '<tr>' +
     '<td class="mov-doc">' + escHtml(r.num_documento || '—') + '</td>' +
     '<td style="font-size:11px">' + escHtml(sol ? (sol.cliente||'—') : '—') + '</td>' +
@@ -5375,6 +5409,7 @@ function buildSalidaRow(r) {
     '<td class="mov-cant">' + (r.cantidad||0).toLocaleString() + '</td>' +
     '<td style="font-size:11px;color:var(--gray)">' + escHtml(fecha) + '</td>' +
     '<td><span class="mov-badge-sal">SALIDA</span></td>' +
+    '<td style="font-size:11px;font-family:var(--mono);color:' + (requiPT ? 'var(--serig-m)' : 'var(--gray-l)') + '">' + escHtml(requiPT || '—') + '</td>' +
     '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(obsLimpia) + '</td>' +
     '</tr>';
 }
@@ -5418,7 +5453,7 @@ function renderMovTabla(data) {
   } else {
     tabla.innerHTML = '<table class="mov-table"><thead><tr>' +
       '<th>No. Requi</th><th>Cliente vinculado</th><th>Pedido vinculado</th><th>SKU</th><th>Descripción</th>' +
-      '<th style="text-align:right">Cantidad</th><th>Fecha</th><th>Origen</th><th>Observaciones</th>' +
+      '<th style="text-align:right">Cantidad</th><th>Fecha</th><th>Origen</th><th>Requi Ingreso PT</th><th>Observaciones</th>' +
       '</tr></thead><tbody>' + data.map(buildSalidaRow).join('') + '</tbody></table>';
   }
 }
@@ -5883,6 +5918,7 @@ async function confirmarMovSerig() {
     var totalCant = lineas.reduce(function(s, l) { return s + l.cant; }, 0);
     showToast('✅ Salida registrada: Requi ' + requi + ' · ' + totalCant.toLocaleString() + ' und');
     cerrarModalMovSerig();
+    cargarSalidaRequiMap();
     await cargarMovimientosSerig();
   } catch(e) {
     showToast('❌ Error: ' + e.message, '#B83232');
@@ -6728,7 +6764,7 @@ async function init() {
   if (fi) fi.value = d.toISOString().split('T')[0];
 
   // Carga paralela de datos
-  await Promise.all([cargarInventario(), cargarPersonal(), cargarEntregasSerig(), cargarOrdenSinAsignar()]);
+  await Promise.all([cargarInventario(), cargarPersonal(), cargarEntregasSerig(), cargarOrdenSinAsignar(), cargarSalidaRequiMap()]);
   await cargarAusentesHoy(); // filtra ausentes de la matriz (llama renderMatriz internamente)
   await cargarSolicitudes(); // llama renderInicio() internamente
 
