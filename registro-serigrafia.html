@@ -211,12 +211,18 @@ var META_LINEA = 10000;
 async function cargarOperarios() {
   try {
     var r = await db.from('personal')
-      .select('codigo, nombre, iniciales, color_hex, rol')
+      .select('codigo, nombre, iniciales, color_hex, rol, proceso_hab')
       .eq('area', 'serig').eq('activo', true).order('codigo');
     if (r.error) throw r.error;
     var todos = r.data || [];
     operarios = todos.filter(function(p){ return p.rol !== 'supervisor'; });
     if (!operarios.length) operarios = todos;
+    // Primero quienes imprimen a diario (rol de máquina), para que no busquen su nombre
+    operarios.sort(function(a, b) {
+      var ia = (a.proceso_hab === 'Impresión') ? 0 : 1;
+      var ib = (b.proceso_hab === 'Impresión') ? 0 : 1;
+      return ia - ib;
+    });
     renderSeleccion();
   } catch(e) {
     console.error('cargarOperarios:', e);
