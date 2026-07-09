@@ -1595,8 +1595,10 @@ function boardBuildCard(item) {
   var descTxt = skuTxt + '<span style="font-weight:700;color:var(--ink)">' + (item.desc || '—') + '</span>';
   var isCompleteEntrega = entregado > 0 && entregado >= (item.cant || 0);
   var fechaEntregado = isCompleteEntrega && requis.length ? requis[0].fecha : null;
+  var salidaRequis = salidaRequiMap[item.solId] || [];
   var fechasRow = '<div style="margin-top:3px;font-size:9px;color:var(--gray-l);display:flex;gap:8px;flex-wrap:wrap">' +
     '<span>📅 Ingreso: ' + fmtFechaCorta(item.createdAt) + '</span>' +
+    (salidaRequis.length ? '<span style="color:var(--teal-dark);font-weight:700">📤 Salida: ' + escHtml(salidaRequis[0]) + (salidaRequis.length > 1 ? ' +' + (salidaRequis.length - 1) : '') + '</span>' : '') +
     (fechaEntregado ? '<span style="color:#15803d;font-weight:700">✅ Entregado: ' + fmtFechaCorta(fechaEntregado) + '</span>' : '') +
     '</div>';
   var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
@@ -1737,8 +1739,10 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
       '</div>'
     : '';
   var fechaEntregado = isComplete && requis.length ? requis[0].fecha : null;
+  var salidaRequisSin = salidaRequiMap[item.solId] || [];
   var fechasRow = '<div style="margin-top:3px;font-size:9px;color:' + (isComplete ? 'var(--gray)' : '#6b7280') + ';display:flex;gap:8px;flex-wrap:wrap">' +
     '<span>📅 Ingreso: ' + fmtFechaCorta(item.createdAt) + '</span>' +
+    (salidaRequisSin.length ? '<span style="color:var(--teal-dark);font-weight:700">📤 Salida: ' + escHtml(salidaRequisSin[0]) + (salidaRequisSin.length > 1 ? ' +' + (salidaRequisSin.length - 1) : '') + '</span>' : '') +
     (fechaEntregado ? '<span style="color:#15803d;font-weight:700">✅ Entregado: ' + fmtFechaCorta(fechaEntregado) + '</span>' : '') +
     '</div>';
   return '<div class="board-card" draggable="true"' +
