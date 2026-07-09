@@ -489,6 +489,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   <div class="tabs" id="mainTabs">
     <div class="tab active" id="tab-inicio" onclick="switchTab('inicio')">🏠 Inicio</div>
     <div class="tab" id="tab-movimientos" onclick="switchTab('movimientos')">⬇⬆ Movimientos</div>
+    <div class="tab" id="tab-productividad" onclick="switchTab('productividad')">🖨 Productividad</div>
     <div class="tab" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
     <div class="tab" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
     <div class="tabs-r">
@@ -651,6 +652,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div id="movResumenTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
       </div>
     </div><!-- /view-movimientos -->
+
+    <!-- ══ PRODUCTIVIDAD (tiros de máquina por línea/diseño) ══ -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-productividad">
+      <div class="ph" style="flex-wrap:wrap;gap:8px">
+        <div><div class="ph-title">Productividad · Serigrafía</div>
+          <div class="ph-sub">Meta por línea: 10,000 tiros/día</div>
+        </div>
+        <div class="ph-r">
+          <input class="fi" type="date" id="prodFecha" style="font-size:12px;padding:6px 10px" onchange="renderProductividad()">
+        </div>
+      </div>
+
+      <div class="kpi-strip" id="prodKPIs"></div>
+
+      <div class="mov-scroll" id="prodScroll">
+        <div id="prodTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
+      </div>
+    </div><!-- /view-productividad -->
 
     <!-- ══ PERSONAL ══════════════════════════════════════════ -->
     <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
@@ -5418,6 +5437,110 @@ function actualizarKPIsMov(data) {
   }
 }
 
+// ── Productividad: tiros de máquina por línea/diseño ──────────
+var META_TIROS_LINEA = 10000;
+
+async function renderProductividad() {
+  var kpis = document.getElementById('prodKPIs');
+  var tabla = document.getElementById('prodTabla');
+  if (!kpis || !tabla) return;
+  tabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando...</div></div>';
+
+  var fecha = (document.getElementById('prodFecha') || {}).value || new Date().toISOString().slice(0,10);
+
+  var lecturas = [];
+  try {
+    var r = await db.from('registro_tiros_serig')
+      .select('*').eq('area', 'serig').eq('fecha', fecha)
+      .order('linea_id', { ascending: true }).order('created_at', { ascending: true });
+    if (r.error) {
+      if (r.error.code === 'PGRST205' || r.error.code === '42P01') {
+        kpis.innerHTML = '';
+        tabla.innerHTML = '<div class="empty" style="padding:40px;text-align:center;color:var(--gray)">⚠️ La tabla <code>registro_tiros_serig</code> no existe aún.<br><span style="font-size:11px">Ejecuta sql/operativo_serigrafia_v1.sql en el dashboard de Supabase.</span></div>';
+        return;
+      }
+      throw r.error;
+    }
+    lecturas = r.data || [];
+  } catch(e) {
+    console.error('renderProductividad:', e);
+    tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">⚠️ Error al cargar productividad</div>';
+    return;
+  }
+
+  // Agrupar por línea
+  var porLinea = {};
+  LINEAS_PRODUCCION.forEach(function(ln){ porLinea[ln.id] = []; });
+  lecturas.forEach(function(l) {
+    if (!porLinea[l.linea_id]) porLinea[l.linea_id] = [];
+    porLinea[l.linea_id].push(l);
+  });
+
+  function deltaDe(lista) {
+    if (!lista.length) return 0;
+    var contadores = lista.map(function(l){ return l.contador || 0; });
+    return Math.max.apply(null, contadores) - Math.min.apply(null, contadores);
+  }
+
+  // KPI strip: una tarjeta por línea con avance vs meta
+  kpis.innerHTML = LINEAS_PRODUCCION.map(function(ln) {
+    var lista = porLinea[ln.id] || [];
+    var tiros = deltaDe(lista);
+    var pct = Math.min(100, Math.round((tiros / META_TIROS_LINEA) * 100));
+    var color = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--serig-m)' : pct > 0 ? 'var(--amber)' : 'var(--gray-l)';
+    return '<div class="kpi">' +
+      '<div class="kpi-l">' + escHtml(ln.nombre) + '</div>' +
+      '<div class="kpi-v" style="color:' + color + '">' + tiros.toLocaleString() + '</div>' +
+      '<div class="kpi-s">de ' + META_TIROS_LINEA.toLocaleString() + ' · ' + pct + '%</div>' +
+      '<div style="margin-top:6px;background:var(--border);border-radius:3px;height:5px">' +
+        '<div style="background:' + color + ';height:5px;border-radius:3px;width:' + pct + '%"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  if (!lecturas.length) {
+    tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin lecturas registradas para esta fecha</div>';
+    return;
+  }
+
+  // Tabla: desglose por línea + diseño
+  function buildLineaBlock(ln) {
+    var lista = porLinea[ln.id] || [];
+    if (!lista.length) return '';
+    var porDiseno = {};
+    var ordenDiseno = [];
+    lista.forEach(function(l) {
+      var key = l.diseno || l.sku || '(sin diseño)';
+      if (!porDiseno[key]) { porDiseno[key] = []; ordenDiseno.push(key); }
+      porDiseno[key].push(l);
+    });
+    var filas = ordenDiseno.map(function(key) {
+      var sub = porDiseno[key];
+      var tirosDiseno = deltaDe(sub);
+      var lecturasTxt = sub.map(function(l) {
+        return (MOMENTO_LBL_ADMIN[l.momento] || l.momento) + ' ' + (l.contador||0).toLocaleString();
+      }).join(' · ');
+      return '<tr>' +
+        '<td style="font-size:11px;font-weight:600">' + escHtml(key) + '</td>' +
+        '<td class="mov-cant">' + tirosDiseno.toLocaleString() + '</td>' +
+        '<td style="font-size:10px;color:var(--gray-l)">' + escHtml(lecturasTxt) + '</td>' +
+        '<td style="font-size:11px">' + escHtml(sub[0].operador_nombre || sub[0].operador_codigo || '—') + '</td>' +
+        '</tr>';
+    }).join('');
+    var totalLinea = deltaDe(lista);
+    return '<div class="seccion">' +
+      '<h3>' + escHtml(ln.nombre) + ' <span class="badge-count">' + totalLinea.toLocaleString() + ' tiros · ' + lista.length + ' lecturas</span></h3>' +
+      '<table class="mov-table"><thead><tr><th>Diseño / SKU</th><th style="text-align:right">Tiros</th><th>Lecturas</th><th>Operador</th></tr></thead>' +
+      '<tbody>' + filas + '</tbody></table>' +
+      '</div>';
+  }
+
+  tabla.innerHTML = LINEAS_PRODUCCION.map(buildLineaBlock).join('') ||
+    '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin lecturas registradas para esta fecha</div>';
+}
+
+var MOMENTO_LBL_ADMIN = { inicio: '🌅', mediodia: '🕐', fin: '🌇' };
+
 // ── Resumen: Salida de Bodega vs Entrada PT por ficha ─────────
 async function renderResumenFichas() {
   var cont = document.getElementById('movResumenTabla');
@@ -5932,6 +6055,12 @@ function switchTab(tab) {
     var v = document.getElementById('view-movimientos');
     if (v) { v.style.display = 'flex'; triggerViewEnter('view-movimientos'); }
     setMovVista(movVistaActual || 'salida');
+  } else if (tab === 'productividad') {
+    var v = document.getElementById('view-productividad');
+    if (v) { v.style.display = 'flex'; triggerViewEnter('view-productividad'); }
+    var fEl = document.getElementById('prodFecha');
+    if (fEl && !fEl.value) fEl.value = new Date().toISOString().slice(0,10);
+    renderProductividad();
   } else if (tab === 'dash') {
     window.location.href = 'dashboard.html';
   } else if (WIP_TABS.indexOf(tab) !== -1) {

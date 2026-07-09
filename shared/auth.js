@@ -23,8 +23,12 @@ var db = supabase.createClient(SUPA_URL, SUPA_KEY);
 var HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
 var TETRA = { rol: null, nombre: '', email: null, esVisor: false, esOperativo: false };
 
-// Única página permitida para el rol operativo (sin extensión por cleanUrls)
-var TETRA_PAGINA_OPERATIVO = 'registro-tapas';
+// Página permitida por cada rol operativo (sin extensión por cleanUrls).
+// Cada área tiene su propio rol + página; ninguno puede salirse de la suya.
+var TETRA_PAGINAS_OPERATIVO = {
+  'operativo':       'registro-tapas',
+  'operativo_serig': 'registro-serigrafia'
+};
 
 // ── Escape universal anti-XSS para texto dinámico en innerHTML ──
 // (serigrafia.html tiene su propia copia equivalente; misma firma)
@@ -136,13 +140,14 @@ function tetraPintarUsuario() {
     TETRA.rol = r.data.rol;
     TETRA.nombre = r.data.nombre || session.user.email;
     TETRA.esVisor = r.data.rol === 'visor';
-    TETRA.esOperativo = r.data.rol === 'operativo';
+    var paginaPermitida = TETRA_PAGINAS_OPERATIVO[r.data.rol];
+    TETRA.esOperativo = !!paginaPermitida;
 
-    // Jaula operativo: solo el formulario de registro de producción
-    if (TETRA.esOperativo) {
+    // Jaula operativo: solo el formulario de registro de producción de su área
+    if (paginaPermitida) {
       var ruta = location.pathname.replace(/\.html$/, '').replace(/\/+$/, '');
-      if (ruta.slice(-TETRA_PAGINA_OPERATIVO.length) !== TETRA_PAGINA_OPERATIVO) {
-        location.replace(TETRA_PAGINA_OPERATIVO + '.html');
+      if (ruta.slice(-paginaPermitida.length) !== paginaPermitida) {
+        location.replace(paginaPermitida + '.html');
         return;
       }
     }

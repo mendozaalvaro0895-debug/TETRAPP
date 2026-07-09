@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TETRAPLASTIC — Registro de Producción · Serigrafía</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="shared/auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:#0C0C0B;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #7C3AED;gap:10px}
+.logo{font-family:'Playfair Display',serif;font-size:16px;font-weight:900;color:#fff}
+.logo span{color:#C4B5FD}
+.logo-sub{font-size:11px;color:rgba(255,255,255,.6)}
+.user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:4px 12px;border-radius:20px}
+.uavatar{width:26px;height:26px;border-radius:50%;background:#5B21B6;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
+
+/* LAYOUT */
+.wrap{max-width:680px;margin:0 auto;padding:20px 14px 60px}
+.pantalla{display:none;animation:ds-slideUp .3s ease both}
+.pantalla.vis{display:block}
+@keyframes ds-slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+
+.titulo{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;text-align:center;margin-bottom:4px}
+.subtitulo{font-size:13px;color:#6B6B6A;text-align:center;margin-bottom:22px}
+
+/* SELECCIÓN DE OPERARIO */
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.op-sel-card{background:#fff;border:1.5px solid #E0DED8;border-radius:14px;padding:18px 12px;text-align:center;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.op-sel-card:hover,.op-sel-card:active{border-color:#7C3AED;box-shadow:0 4px 16px rgba(124,58,237,.15);transform:translateY(-2px)}
+.op-sel-av{width:52px;height:52px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#fff}
+.op-sel-nombre{font-size:14px;font-weight:700;line-height:1.3}
+.op-sel-cod{font-family:'DM Mono',monospace;font-size:10px;color:#6B6B6A;margin-top:3px}
+
+/* FORM */
+.quien{display:flex;align-items:center;gap:12px;background:#0C0C0B;border-radius:14px;padding:12px 16px;margin-bottom:16px}
+.quien-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0}
+.quien-nombre{font-size:15px;font-weight:700;color:#fff;flex:1}
+.quien-corr{font-family:'DM Mono',monospace;font-size:10px;color:#C4B5FD}
+.btn-cambiar{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer}
+
+.sec{background:#fff;border:1.5px solid #D8D6D0;border-radius:14px;padding:16px;margin-bottom:14px}
+.sec-label{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#5B21B6;border-bottom:2px solid #E9D8FD;padding-bottom:8px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.paso-num{background:#5B21B6;color:#fff;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;font-weight:700;color:#3A3A38}
+.field input,.field select,.field textarea{border:1.5px solid #C8C6C0;border-radius:10px;padding:11px 12px;font-size:16px;font-family:'DM Sans',sans-serif;background:#fff;width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#7C3AED}
+
+/* MOMENTO (toggle 3 botones) */
+.momento-tog{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+.momento-btn{border:1.5px solid #C8C6C0;background:#fff;border-radius:10px;padding:12px 6px;text-align:center;cursor:pointer;font-size:12px;font-weight:700;color:#6B6B6A}
+.momento-btn.act{border-color:#7C3AED;background:#F5F3FF;color:#5B21B6}
+
+/* AUTOCOMPLETE */
+.ac-wrap{position:relative}
+.ac-drop{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #7C3AED;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.15);z-index:999;max-height:220px;overflow-y:auto;margin-top:3px}
+.ac-item{padding:10px 12px;cursor:pointer;border-bottom:1px solid #F0EDE8}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover,.ac-item:active{background:#F5F3FF}
+.ac-sku{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:#5B21B6}
+.ac-desc{font-size:12px;color:#3A3A38;margin-top:2px}
+
+/* HOY EN ESTA LÍNEA */
+.hoy-box{background:#0C0C0B;border-radius:12px;padding:14px 18px;margin-bottom:14px}
+.hoy-lbl{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:8px}
+.hoy-row{display:flex;justify-content:space-between;font-size:12px;color:#fff;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.hoy-row:last-child{border-bottom:none}
+.hoy-meta{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.15);display:flex;justify-content:space-between;align-items:center}
+.hoy-meta-val{font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:#C4B5FD}
+.hoy-meta-lbl{font-size:10px;color:rgba(255,255,255,.5)}
+
+/* BOTONES PRINCIPALES */
+.btn-guardar{background:#5B21B6;color:#fff;border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;width:100%;font-family:'DM Sans',sans-serif;letter-spacing:.3px}
+.btn-guardar:hover{background:#4C1D95}
+.btn-guardar:active{transform:scale(.98)}
+.btn-guardar:disabled{opacity:.5;cursor:wait}
+
+/* ÉXITO */
+.exito-box{background:#fff;border:1.5px solid #7C3AED;border-radius:16px;padding:36px 24px;text-align:center}
+.exito-ico{font-size:56px;margin-bottom:12px}
+.exito-corr{font-family:'DM Mono',monospace;font-size:26px;font-weight:700;color:#5B21B6;margin:10px 0}
+.exito-det{font-size:13px;color:#6B6B6A;margin-bottom:24px;line-height:1.7}
+
+.toast-msg{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#5B21B6;color:#fff;padding:12px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+.cargando{text-align:center;padding:50px 20px;color:#6B6B6A;font-size:13px}
+.spinner{display:inline-block;width:26px;height:26px;border:3px solid #E9D8FD;border-top-color:#7C3AED;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:480px){
+  .grid-3{grid-template-columns:1fr 1fr}
+  .op-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="logo">TETRA<span>PLASTIC</span></div>
+    <div class="logo-sub">🖨 Registro de Producción · Serigrafía</div>
+  </div>
+  <div class="user-pill">
+    <div class="uavatar">OS</div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- PANTALLA 1: SELECCIÓN DE OPERARIO -->
+  <div class="pantalla vis" id="scrSel">
+    <div class="titulo">¿Quién registra el contador?</div>
+    <div class="subtitulo">Toca tu nombre para comenzar</div>
+    <div id="opGrid" class="op-grid">
+      <div class="cargando" style="grid-column:1/-1"><div class="spinner"></div><div>Cargando operarios…</div></div>
+    </div>
+  </div>
+
+  <!-- PANTALLA 2: FORMULARIO -->
+  <div class="pantalla" id="scrForm">
+    <div class="quien">
+      <div class="quien-av" id="qAv">?</div>
+      <div>
+        <div class="quien-nombre" id="qNombre">—</div>
+        <div class="quien-corr">Lectura de contador de máquina</div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn-cambiar" onclick="volverSeleccion()">↩ Cambiar</button>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">1</span> Línea y momento</div>
+      <div class="grid-2">
+        <div class="field"><label>Fecha</label><input type="date" id="fFecha"></div>
+        <div class="field"><label>Línea</label>
+          <select id="fLinea" onchange="cargarHoyLinea()">
+            <option value="1">Línea 1</option>
+            <option value="2">Línea 2</option>
+            <option value="3">Línea 3</option>
+            <option value="4">Línea 4</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:6px"><label>Momento del turno</label></div>
+      <div class="momento-tog" id="momentoTog">
+        <div class="momento-btn" data-m="inicio" onclick="elegirMomento('inicio')">🌅 Inicio</div>
+        <div class="momento-btn" data-m="mediodia" onclick="elegirMomento('mediodia')">🕐 Mediodía</div>
+        <div class="momento-btn" data-m="fin" onclick="elegirMomento('fin')">🌇 Fin</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">2</span> Diseño e impresión</div>
+      <div class="field" style="margin-bottom:10px"><label>Diseño / SKU que se está imprimiendo</label>
+        <div class="ac-wrap">
+          <input type="text" id="fDiseno" placeholder="Escribe SKU o descripción…" autocomplete="off" oninput="acBuscar(this.value)" data-sku="">
+          <div class="ac-drop" id="acDrop"></div>
+        </div>
+      </div>
+      <div class="field"><label>Contador de la máquina (tiros acumulados)</label>
+        <input type="number" inputmode="numeric" id="fContador" min="0" placeholder="Ej: 145820">
+      </div>
+    </div>
+
+    <div class="hoy-box" id="hoyBox" style="display:none">
+      <div class="hoy-lbl">Lecturas de hoy en esta línea</div>
+      <div id="hoyFilas"></div>
+      <div class="hoy-meta">
+        <span class="hoy-meta-lbl">Tiros producidos hoy / meta 10,000</span>
+        <span class="hoy-meta-val" id="hoyDelta">—</span>
+      </div>
+    </div>
+
+    <button class="btn-guardar" id="btnGuardar" onclick="guardarRegistro()">💾 Guardar lectura</button>
+  </div>
+
+  <!-- PANTALLA 3: ÉXITO -->
+  <div class="pantalla" id="scrOk">
+    <div class="exito-box">
+      <div class="exito-ico">✅</div>
+      <div class="titulo">¡Lectura registrada!</div>
+      <div class="exito-corr" id="okCorr">—</div>
+      <div class="exito-det" id="okDet">—</div>
+      <button class="btn-guardar" onclick="volverSeleccion()">👤 Registrar otro operario</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// SUPA_URL, SUPA_KEY, db y escHtml vienen de shared/auth.js
+
+// ── Estado ────────────────────────────────────────────────────
+var operarios = [];
+var inventarioCache = [];
+var opActual = null;
+var momentoActual = 'inicio';
+var lecturasHoyLinea = [];
+
+var MOMENTO_LBL = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '🌇 Fin' };
+var META_LINEA = 10000;
+
+// ── Carga de datos ────────────────────────────────────────────
+async function cargarOperarios() {
+  try {
+    var r = await db.from('personal')
+      .select('codigo, nombre, iniciales, color_hex, rol')
+      .eq('area', 'serig').eq('activo', true).order('codigo');
+    if (r.error) throw r.error;
+    var todos = r.data || [];
+    operarios = todos.filter(function(p){ return p.rol !== 'supervisor'; });
+    if (!operarios.length) operarios = todos;
+    renderSeleccion();
+  } catch(e) {
+    console.error('cargarOperarios:', e);
+    document.getElementById('opGrid').innerHTML =
+      '<div class="cargando" style="grid-column:1/-1">❌ No se pudieron cargar los operarios.<br>Revisa tu conexión y recarga la página.</div>';
+  }
+}
+
+async function cargarInventario() {
+  try {
+    var todos = [];
+    var desde = 0;
+    var BATCH = 1000;
+    while (true) {
+      var r = await db.from('inventario')
+        .select('sku, descripcion, existencia')
+        .eq('activo', true).range(desde, desde + BATCH - 1);
+      if (r.error) throw r.error;
+      todos = todos.concat(r.data || []);
+      if (!r.data || r.data.length < BATCH) break;
+      desde += BATCH;
+    }
+    inventarioCache = todos;
+  } catch(e) { console.error('cargarInventario:', e); }
+}
+
+// ── Pantalla 1: selección ─────────────────────────────────────
+function buildOpCard(op) {
+  var color = op.color_hex || '#5B21B6';
+  var ini = op.iniciales || (op.nombre || '?').slice(0, 2).toUpperCase();
+  return '<div class="op-sel-card" onclick="elegirOperario(\'' + escHtml(op.codigo) + '\')">'
+    + '<div class="op-sel-av" style="background:' + escHtml(color) + '">' + escHtml(ini) + '</div>'
+    + '<div class="op-sel-nombre">' + escHtml(op.nombre) + '</div>'
+    + '<div class="op-sel-cod">' + escHtml(op.codigo) + '</div>'
+    + '</div>';
+}
+
+function renderSeleccion() {
+  var g = document.getElementById('opGrid');
+  if (!operarios.length) {
+    g.innerHTML = '<div class="cargando" style="grid-column:1/-1">📭 No hay operarios activos en Serigrafía.</div>';
+    return;
+  }
+  g.innerHTML = operarios.map(buildOpCard).join('');
+}
+
+function elegirOperario(codigo) {
+  opActual = operarios.find(function(o){ return o.codigo === codigo; });
+  if (!opActual) return;
+
+  cargarInventario();
+
+  document.getElementById('qAv').textContent = opActual.iniciales || '?';
+  document.getElementById('qAv').style.background = opActual.color_hex || '#5B21B6';
+  document.getElementById('qNombre').textContent = opActual.nombre;
+
+  document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fLinea').value = '1';
+  document.getElementById('fDiseno').value = '';
+  document.getElementById('fDiseno').dataset.sku = '';
+  document.getElementById('fContador').value = '';
+  elegirMomento('inicio');
+  cargarHoyLinea();
+
+  mostrarPantalla('scrForm');
+  window.scrollTo(0, 0);
+}
+
+function volverSeleccion() {
+  opActual = null;
+  mostrarPantalla('scrSel');
+  window.scrollTo(0, 0);
+}
+
+function mostrarPantalla(id) {
+  ['scrSel','scrForm','scrOk'].forEach(function(s){
+    document.getElementById(s).classList.toggle('vis', s === id);
+  });
+}
+
+function elegirMomento(m) {
+  momentoActual = m;
+  document.querySelectorAll('.momento-btn').forEach(function(b){
+    b.classList.toggle('act', b.dataset.m === m);
+  });
+}
+
+// ── Autocomplete de diseño/SKU ─────────────────────────────────
+function buildAcItem(item) {
+  var sku = String(item.sku || '');
+  var desc = String(item.descripcion || '');
+  return '<div class="ac-item" onmousedown="acElegir(\'' + escHtml(sku.replace(/'/g, '')) + '\',\'' + escHtml(desc.replace(/'/g, '')) + '\')">'
+    + '<div class="ac-sku">' + escHtml(sku) + '</div>'
+    + '<div class="ac-desc">' + escHtml(desc.slice(0, 60)) + '</div>'
+    + '</div>';
+}
+
+function acBuscar(query) {
+  var drop = document.getElementById('acDrop');
+  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
+  var q = query.toLowerCase();
+  var results = inventarioCache.filter(function(i){
+    return ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().indexOf(q) !== -1;
+  }).slice(0, 7);
+  if (!results.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = results.map(buildAcItem).join('');
+  drop.style.display = 'block';
+}
+
+function acElegir(sku, desc) {
+  var inp = document.getElementById('fDiseno');
+  inp.value = sku + ' — ' + desc;
+  inp.dataset.sku = sku;
+  document.getElementById('acDrop').style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.ac-wrap')) {
+    document.getElementById('acDrop').style.display = 'none';
+  }
+});
+
+// ── Lecturas de hoy en la línea seleccionada ───────────────────
+async function cargarHoyLinea() {
+  var box = document.getElementById('hoyBox');
+  var linea = parseInt(document.getElementById('fLinea').value) || 1;
+  var fecha = document.getElementById('fFecha').value || new Date().toISOString().slice(0,10);
+  try {
+    var r = await db.from('registro_tiros_serig')
+      .select('momento, contador, diseno, sku, created_at')
+      .eq('area', 'serig').eq('linea_id', linea).eq('fecha', fecha)
+      .order('created_at', { ascending: true });
+    if (r.error) throw r.error;
+    lecturasHoyLinea = r.data || [];
+    renderHoyLinea();
+  } catch(e) {
+    console.error('cargarHoyLinea:', e);
+    lecturasHoyLinea = [];
+    box.style.display = 'none';
+  }
+}
+
+function renderHoyLinea() {
+  var box = document.getElementById('hoyBox');
+  if (!lecturasHoyLinea.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  document.getElementById('hoyFilas').innerHTML = lecturasHoyLinea.map(function(l){
+    return '<div class="hoy-row"><span>' + (MOMENTO_LBL[l.momento] || l.momento) + (l.sku ? ' · ' + escHtml(l.sku) : '') + '</span><span>' + (l.contador||0).toLocaleString() + '</span></div>';
+  }).join('');
+  var contadores = lecturasHoyLinea.map(function(l){ return l.contador || 0; });
+  var delta = Math.max.apply(null, contadores) - Math.min.apply(null, contadores);
+  document.getElementById('hoyDelta').textContent = delta.toLocaleString() + ' / ' + META_LINEA.toLocaleString();
+}
+
+// ── Guardar ───────────────────────────────────────────────────
+async function guardarRegistro() {
+  if (!opActual) { volverSeleccion(); return; }
+
+  var fecha = document.getElementById('fFecha').value;
+  if (!fecha) { showToast('⚠️ Selecciona la fecha', '#B83232'); return; }
+
+  var linea = parseInt(document.getElementById('fLinea').value) || 1;
+  var disenoInp = document.getElementById('fDiseno');
+  var diseno = disenoInp.value.trim();
+  var sku = disenoInp.dataset.sku || '';
+  var contador = parseInt(document.getElementById('fContador').value);
+
+  if (!diseno) { showToast('⚠️ Indica el diseño que se está imprimiendo', '#B83232'); return; }
+  if (!contador && contador !== 0) { showToast('⚠️ Ingresa la lectura del contador', '#B83232'); return; }
+
+  var payload = {
+    fecha: fecha,
+    linea_id: linea,
+    sku: sku,
+    diseno: diseno,
+    operador_codigo: opActual.codigo,
+    operador_nombre: opActual.nombre || '',
+    momento: momentoActual,
+    contador: contador,
+    area: 'serig'
+  };
+
+  var btn = document.getElementById('btnGuardar');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+
+  try {
+    var r = await db.from('registro_tiros_serig').insert(payload);
+    if (r.error) throw r.error;
+
+    document.getElementById('okCorr').textContent = 'Línea ' + linea + ' · ' + (MOMENTO_LBL[momentoActual] || momentoActual);
+    document.getElementById('okDet').innerHTML =
+      escHtml(opActual.nombre) + ' · ' + escHtml(fecha)
+      + '<br>Contador: <strong>' + contador.toLocaleString() + '</strong> · ' + escHtml(diseno);
+    mostrarPantalla('scrOk');
+    window.scrollTo(0, 0);
+  } catch(e) {
+    console.error('guardarRegistro:', e);
+    showToast('❌ Error al guardar: ' + (e.message || e), '#B83232');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Guardar lectura';
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function showToast(msg, color) {
+  var existing = document.querySelector('.toast-msg');
+  if (existing) existing.remove();
+  var t = document.createElement('div');
+  t.className = 'toast-msg';
+  t.textContent = msg;
+  if (color) t.style.background = color;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 3500);
+}
+
+// ── Init ──────────────────────────────────────────────────────
+async function init() {
+  await cargarOperarios();
+  await cargarInventario();
+}
+init();
+</script>
+</body>
+</html>
