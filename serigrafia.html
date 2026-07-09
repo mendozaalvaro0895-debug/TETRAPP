@@ -2331,6 +2331,33 @@ function renderBoard() {
   contLines.innerHTML = html;
 }
 
+// ── Auto-scroll al arrastrar fichas cerca del borde de pantalla ──
+var _dragScrollTimer = null;
+var _dragScrollDir   = 0;
+
+function _stopDragScroll() {
+  _dragScrollDir = 0;
+  if (_dragScrollTimer) { clearInterval(_dragScrollTimer); _dragScrollTimer = null; }
+}
+
+document.addEventListener('dragover', function(e) {
+  var ZONE = 110, y = e.clientY, h = window.innerHeight;
+  if (y < ZONE)        _dragScrollDir = -Math.max(1, Math.round((ZONE - y) / 20));
+  else if (y > h - ZONE) _dragScrollDir =  Math.max(1, Math.round((y - (h - ZONE)) / 20));
+  else                 _dragScrollDir = 0;
+
+  if (_dragScrollDir !== 0 && !_dragScrollTimer) {
+    _dragScrollTimer = setInterval(function() {
+      if (!_dragScrollDir) { _stopDragScroll(); return; }
+      window.scrollBy(0, _dragScrollDir * 14);
+    }, 20);
+  } else if (_dragScrollDir === 0 && _dragScrollTimer) {
+    _stopDragScroll();
+  }
+});
+document.addEventListener('dragend', _stopDragScroll);
+document.addEventListener('drop',    _stopDragScroll);
+
 function boardDragStart(e, lineaDbId, solId) {
   boardDragId = lineaDbId;
   boardDragSolId = solId;
@@ -4847,9 +4874,18 @@ function abrirForm() {
   calcular();
 }
 
+var _editFromDetailId = null;
+
 function abrirFormEditar(solId) {
   var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!s) return;
+  var detOverlay = document.getElementById('overlayDetalle');
+  if (detOverlay && detOverlay.classList.contains('open')) {
+    _editFromDetailId = selId;
+    cerrarDetalleModal();
+  } else {
+    _editFromDetailId = null;
+  }
   editandoSolicitudId = solId;
   document.getElementById('fCli').value = s.cliente || '';
   document.getElementById('fArea').value = s.area_sol || 'Ventas';
@@ -4876,6 +4912,7 @@ function abrirFormEditar(solId) {
 function cerrarForm() {
   document.getElementById('overlay').classList.remove('open');
   editandoSolicitudId = null;
+  _editFromDetailId = null;
   document.getElementById('mTitle').textContent = 'Nueva solicitud · Serigrafía';
   document.getElementById('btnSave').textContent = 'Guardar';
 }
@@ -5281,9 +5318,11 @@ async function guardarEdicion(lineasValidas, cliente) {
     var payload = buildLineasPayload(lineasValidas, s.dbId);
     await insertarLineas(payload.base, payload.full);
     registrarUsoCliente(cliente);
+    var reopenId = _editFromDetailId;
     cerrarForm();
     await cargarSolicitudes();
     showToast('✅ ' + (s.id_display || '') + ' actualizada');
+    if (reopenId) mostrarDetalle(reopenId);
   } catch(e) {
     console.error('Error editando:', e);
     showToast('❌ Error: ' + e.message, '#B83232');
