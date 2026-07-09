@@ -921,6 +921,39 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 </div>
 
+<!-- ══════════════ MODAL EDITAR SALIDA (solo vínculo pedido) ══ -->
+<div class="overlay" id="modalEditSalida">
+  <div class="modal" style="max-width:420px">
+    <div class="mh">
+      <div class="mh-title">✏️ Editar Salida</div>
+      <button class="m-close" onclick="cerrarEditSalidaModal()">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fr" style="margin-bottom:12px">
+        <div class="fg"><div class="fl">No. Requi</div><div id="esRequiLabel" style="font-weight:700;font-family:var(--mono);padding:6px 0"></div></div>
+        <div class="fg"><div class="fl">SKU</div><div id="esSkuLabel" style="font-family:var(--mono);padding:6px 0"></div></div>
+      </div>
+      <div class="fg full">
+        <div class="fl">Pedido vinculado</div>
+        <div class="sku-wrap-s">
+          <input class="fi" id="esSolInp" placeholder="🔗 Buscar pedido S-000…" autocomplete="off"
+            oninput="esSolInput(this.value)" onfocus="esSolInput(this.value)"
+            onblur="setTimeout(cerrarEsSolDrop,200)">
+          <div class="sku-drop-s" id="esSolDrop"></div>
+        </div>
+      </div>
+      <div class="fg full" style="margin-top:10px">
+        <div class="fl">No. Requi (corregir)</div>
+        <input class="fi" id="esRequiInp" placeholder="Número de Requi">
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cerrarEditSalidaModal()">Cancelar</button>
+      <button class="btn btn-t" id="esGuardarBtn" onclick="guardarEditSalida()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════ MODAL RECHAZO (Serig) ═══════════════ -->
 <div class="overlay" id="modalRechazoSerig">
   <div class="modal" style="max-width:500px">
@@ -5508,6 +5541,10 @@ function buildSalidaRow(r) {
       ? '<span onclick="event.stopPropagation();irAResumenFicha(\'' + r.solicitud_id + '\')" style="cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--serig-m);text-decoration:underline dotted">' + escHtml(requiPT) + '</span>'
       : '<span style="font-size:11px;color:var(--gray-l)">—</span>') + '</td>' +
     '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(obsLimpia) + '</td>' +
+    '<td style="white-space:nowrap;text-align:right">' +
+      '<button onclick="event.stopPropagation();editarSalidaVinculo(\'' + escHtml(r.id) + '\')" title="Editar vínculo" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 6px;cursor:pointer;font-size:12px;margin-right:3px">✏️</button>' +
+      '<button onclick="event.stopPropagation();eliminarSalidaRow(\'' + escHtml(r.id) + '\',\'' + escHtml(r.sku_original||'') + '\',' + (r.cantidad||0) + ')" title="Eliminar fila" style="background:none;border:1px solid #fca5a5;border-radius:5px;padding:2px 6px;cursor:pointer;font-size:12px;color:var(--red)">🗑</button>' +
+    '</td>' +
     '</tr>';
 }
 
@@ -5550,7 +5587,7 @@ function renderMovTabla(data) {
   } else {
     tabla.innerHTML = '<table class="mov-table"><thead><tr>' +
       '<th>No. Requi</th><th>Cliente vinculado</th><th>Pedido vinculado</th><th>SKU</th><th>Descripción</th>' +
-      '<th style="text-align:right">Cantidad</th><th>Fecha</th><th>Origen</th><th>Requi Ingreso PT</th><th>Observaciones</th>' +
+      '<th style="text-align:right">Cantidad</th><th>Fecha</th><th>Origen</th><th>Requi Ingreso PT</th><th>Observaciones</th><th></th>' +
       '</tr></thead><tbody>' + data.map(buildSalidaRow).join('') + '</tbody></table>';
   }
 }
@@ -5878,6 +5915,107 @@ function abrirModalMovSerig() {
 function cerrarModalMovSerig() {
   var modal = document.getElementById('modalMovSerig');
   if (modal) modal.classList.remove('open');
+}
+
+// ── Eliminar fila de Salida de Bodega ──────────────────────────
+async function eliminarSalidaRow(id, sku, cant) {
+  if (!confirm('¿Eliminar esta fila de salida?\nSe devolverán ' + cant.toLocaleString() + ' unds. de SKU ' + sku + ' al inventario.')) return;
+  var r = await db.from('movimientos_materiales').delete().eq('id', id);
+  if (r.error) { showToast('⚠️ Error: ' + r.error.message, '#b91c1c'); return; }
+  if (sku && cant > 0) await ajustarExistencia(sku, cant);
+  showToast('✅ Fila eliminada · inventario restaurado');
+  movDataCache = movDataCache.filter(function(m) { return m.id !== id; });
+  filtrarMovActual();
+  await cargarSalidaRequiMap();
+  renderProduccionActual();
+  renderBoard();
+  refreshKPIs();
+}
+
+// ── Editar vínculo de pedido en fila de Salida ─────────────────
+var _editSalidaId = null;
+var _editSalidaSolId = null;
+
+function editarSalidaVinculo(id) {
+  var row = movDataCache.find(function(m) { return m.id === id; });
+  if (!row) return;
+  _editSalidaId  = id;
+  _editSalidaSolId = row.solicitud_id || null;
+  var sol = row.solicitud_id ? solicitudes.find(function(s) { return s.id === row.solicitud_id; }) : null;
+  var lbl = document.getElementById('esRequiLabel');
+  var skuLbl = document.getElementById('esSkuLabel');
+  var inp = document.getElementById('esSolInp');
+  var rInp = document.getElementById('esRequiInp');
+  if (lbl) lbl.textContent = row.num_documento || '—';
+  if (skuLbl) skuLbl.textContent = row.sku_original || '—';
+  if (inp) inp.value = sol ? ((sol.id_display || '') + ' · ' + (sol.cliente || '').slice(0, 14)) : '';
+  if (rInp) rInp.value = row.num_documento || '';
+  var modal = document.getElementById('modalEditSalida');
+  if (modal) modal.classList.add('open');
+}
+
+function cerrarEditSalidaModal() {
+  var modal = document.getElementById('modalEditSalida');
+  if (modal) modal.classList.remove('open');
+  _editSalidaId = null; _editSalidaSolId = null;
+  cerrarEsSolDrop();
+}
+
+function esSolInput(val) {
+  var drop = document.getElementById('esSolDrop');
+  if (!drop) return;
+  _editSalidaSolId = null;
+  var v = val.trim().toLowerCase();
+  var matches = v.length === 0
+    ? solicitudes.filter(function(s) { return s.estado !== 'entregada'; }).slice(0, 12)
+    : solicitudes.filter(function(s) {
+        return (s.id_display || '').toLowerCase().indexOf(v) >= 0
+            || (s.cliente || '').toLowerCase().indexOf(v) >= 0;
+      }).slice(0, 10);
+  if (!matches.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = matches.map(function(s) {
+    return '<div class="sku-item-s" onmousedown="seleccionarEsSol(\'' + escHtml(s.id) + '\')">' +
+      '<strong>' + escHtml(s.id_display || '') + '</strong> · ' + escHtml(s.cliente || '') + '</div>';
+  }).join('');
+  var rect = document.getElementById('esSolInp').getBoundingClientRect();
+  drop.style.left = rect.left + 'px'; drop.style.top = (rect.bottom + 2) + 'px'; drop.style.width = rect.width + 'px';
+  drop.classList.add('open');
+}
+
+function seleccionarEsSol(solId) {
+  var s = solicitudes.find(function(x) { return x.id === solId; });
+  if (!s) return;
+  _editSalidaSolId = solId;
+  var inp = document.getElementById('esSolInp');
+  if (inp) inp.value = (s.id_display || '') + ' · ' + (s.cliente || '').slice(0, 14);
+  cerrarEsSolDrop();
+}
+
+function cerrarEsSolDrop() {
+  var d = document.getElementById('esSolDrop');
+  if (d) d.classList.remove('open');
+}
+
+async function guardarEditSalida() {
+  if (!_editSalidaId) return;
+  var rInp = document.getElementById('esRequiInp');
+  var nuevoRequi = rInp ? rInp.value.trim() : null;
+  var update = {};
+  if (_editSalidaSolId !== null) update.solicitud_id = _editSalidaSolId;
+  if (nuevoRequi) update.num_documento = nuevoRequi;
+  if (!Object.keys(update).length) { showToast('⚠️ Sin cambios', '#92400e'); return; }
+  var btn = document.getElementById('esGuardarBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+  var r = await db.from('movimientos_materiales').update(update).eq('id', _editSalidaId);
+  if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+  if (r.error) { showToast('⚠️ Error: ' + r.error.message, '#b91c1c'); return; }
+  showToast('✅ Salida actualizada');
+  cerrarEditSalidaModal();
+  await cargarSalidaRequiMap();
+  await cargarMovimientosSerig();
+  renderProduccionActual();
+  renderBoard();
+  refreshKPIs();
 }
 
 function agregarLineaMovS(descVal, skuVal, cantVal, clienteVal, solIdVal) {
