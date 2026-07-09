@@ -177,6 +177,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mov-badge-rech-cli{background:#EDE9FE;color:#5b21b6;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
 .rech-origen-tog{display:inline-flex;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;padding:3px;gap:2px}
 
+/* ── PRODUCTIVIDAD (tiros por línea/operario) ─────────────── */
+.prod-col{display:flex;flex-direction:column;gap:8px;min-width:0}
+.op-tiros-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:9px 11px}
+.op-tiros-name{font-size:12px;font-weight:800;color:var(--ink)}
+.op-tiros-diseno{font-size:10px;color:var(--gray-l);margin-top:1px;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.op-tiros-row{font-size:10.5px;color:var(--gray);padding:2px 0;line-height:1.5}
+.op-tiros-row.op-tiros-vacia{color:var(--gray-l);font-style:italic}
+
 /* ── BOARD DE ASIGNACIÓN ──────────────────────────────────── */
 /* Bloque principal "Sin asignar" */
 .board-sin{border-radius:12px;border:2px solid var(--serig-m);overflow:hidden;background:var(--card);margin-bottom:18px;transition:box-shadow .15s}
@@ -5504,52 +5512,60 @@ async function renderProductividad() {
     return;
   }
 
-  // Tabla: desglose por línea + diseño, con lecturas individuales
+  // Columnas: una por línea (debajo de su KPI), con una ficha por
+  // operario/diseño mostrando Inicio/Mediodía/Fin + hora
   var esMaster = typeof TETRA !== 'undefined' && TETRA.rol === 'master';
 
-  function buildLineaBlock(ln) {
-    var lista = porLinea[ln.id] || [];
-    if (!lista.length) return '';
-    var porDiseno = {};
-    var ordenDiseno = [];
-    lista.forEach(function(l) {
-      var key = l.diseno || l.sku || '(sin diseño)';
-      if (!porDiseno[key]) { porDiseno[key] = []; ordenDiseno.push(key); }
-      porDiseno[key].push(l);
-    });
-    var grupos = ordenDiseno.map(function(key) {
-      var sub = porDiseno[key];
-      var tirosDiseno = deltaDe(sub);
-      var filasLectura = sub.map(function(l) {
-        var acciones = esMaster
-          ? '<td style="white-space:nowrap">' +
-              '<button onclick="editarLecturaTiro(\'' + l.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--serig-m);font-size:13px;padding:2px 4px" title="Editar">✏️</button>' +
-              '<button onclick="eliminarLecturaTiro(\'' + l.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:13px;padding:2px 4px" title="Eliminar">🗑</button>' +
-            '</td>'
-          : '';
-        return '<tr>' +
-          '<td style="font-size:10px;color:var(--gray-l)">' + (MOMENTO_LBL_ADMIN[l.momento] || '') + ' ' + escHtml(l.momento || '') + '</td>' +
-          '<td class="mov-cant">' + (l.contador||0).toLocaleString() + '</td>' +
-          '<td style="font-size:11px">' + escHtml(l.operador_nombre || l.operador_codigo || '—') + '</td>' +
-          acciones +
-          '</tr>';
-      }).join('');
-      return '<div style="margin-bottom:10px">' +
-        '<div style="font-size:11px;font-weight:700;margin-bottom:4px">' + escHtml(key) + ' <span style="font-weight:400;color:var(--gray-l)">· ' + tirosDiseno.toLocaleString() + ' tiros</span></div>' +
-        '<table class="mov-table"><thead><tr><th>Momento</th><th style="text-align:right">Contador</th><th>Operador</th>' + (esMaster ? '<th></th>' : '') + '</tr></thead>' +
-        '<tbody>' + filasLectura + '</tbody></table>' +
-        '</div>';
-    }).join('');
-    var totalLinea = deltaDe(lista);
-    return '<div class="seccion">' +
-      '<h3>' + escHtml(ln.nombre) + ' <span class="badge-count">' + totalLinea.toLocaleString() + ' tiros · ' + lista.length + ' lecturas</span></h3>' +
-      grupos +
-      '</div>';
+  function fmtHora(iso) {
+    if (!iso) return null;
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
   }
 
-  tabla.innerHTML = LINEAS_PRODUCCION.map(buildLineaBlock).join('') ||
-    '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin lecturas registradas para esta fecha</div>';
+  function buildMomentoRow(l, m) {
+    var lbl = MOMENTO_LBL_ADMIN_TXT[m];
+    if (!l) return '<div class="op-tiros-row op-tiros-vacia">' + lbl + ': —</div>';
+    var hora = fmtHora(l.created_at) || '—';
+    var acciones = esMaster
+      ? '<span style="float:right">' +
+          '<button onclick="editarLecturaTiro(\'' + l.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--serig-m);font-size:11px;padding:0 3px" title="Editar">✏️</button>' +
+          '<button onclick="eliminarLecturaTiro(\'' + l.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:11px;padding:0 3px" title="Eliminar">🗑</button>' +
+        '</span>'
+      : '';
+    return '<div class="op-tiros-row">' + lbl + ': ' + hora + ' · ' + (l.contador||0).toLocaleString() + acciones + '</div>';
+  }
+
+  function buildLineaColumn(ln) {
+    var lista = porLinea[ln.id] || [];
+    if (!lista.length) return '<div class="prod-col"></div>';
+    // Agrupar por operario + diseño (una ficha por combinación)
+    var grupos = {};
+    var orden = [];
+    lista.forEach(function(l) {
+      var key = (l.operador_codigo || '') + '|' + (l.diseno || l.sku || '');
+      if (!grupos[key]) { grupos[key] = { operador: l.operador_nombre || l.operador_codigo || '—', diseno: l.diseno || l.sku || '', porMomento: {} }; orden.push(key); }
+      grupos[key].porMomento[l.momento] = l;
+    });
+    var fichas = orden.map(function(key) {
+      var g = grupos[key];
+      return '<div class="op-tiros-card">' +
+        '<div class="op-tiros-name">' + escHtml(g.operador) + '</div>' +
+        (g.diseno ? '<div class="op-tiros-diseno">' + escHtml(g.diseno) + '</div>' : '') +
+        buildMomentoRow(g.porMomento.inicio, 'inicio') +
+        buildMomentoRow(g.porMomento.mediodia, 'mediodia') +
+        buildMomentoRow(g.porMomento.fin, 'fin') +
+        '</div>';
+    }).join('');
+    return '<div class="prod-col">' + fichas + '</div>';
+  }
+
+  tabla.innerHTML = '<div style="display:grid;grid-template-columns:repeat(' + LINEAS_PRODUCCION.length + ',1fr);gap:12px">' +
+    LINEAS_PRODUCCION.map(buildLineaColumn).join('') +
+    '</div>';
 }
+
+var MOMENTO_LBL_ADMIN_TXT = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '🌇 Fin' };
 
 var MOMENTO_LBL_ADMIN = { inicio: '🌅', mediodia: '🕐', fin: '🌇' };
 var prodLecturasCache = [];
