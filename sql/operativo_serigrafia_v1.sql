@@ -71,6 +71,10 @@ create policy delete_master on public.registro_tiros_serig
 
 revoke all on public.registro_tiros_serig from anon;
 
+-- Grant base de tabla: sin esto, RLS ni siquiera llega a evaluarse
+-- (Postgres responde "permission denied for table" antes de la política).
+grant select, insert, update, delete on public.registro_tiros_serig to authenticated;
+
 -- ── Verificación final ────────────────────────────────────────────
 select u.email, p.rol, p.nombre
 from public.perfiles p join auth.users u on u.id = p.user_id
