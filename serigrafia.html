@@ -4258,7 +4258,9 @@ function buildProduccionHtml(entregadasSistema, manuales) {
         '<td style="font-family:var(--mono);font-weight:600">' + (s.cant||0).toLocaleString() + '</td>' +
         '<td style="font-size:11px;color:var(--gray)">' + (s.created || '—') + '</td>' +
         '<td><span style="font-size:9px;background:#E0E7FF;color:#3730a3;border-radius:4px;padding:2px 6px;font-weight:700">SISTEMA</span></td>' +
-        '<td style="font-size:11px;font-family:var(--mono);color:' + (requiSal !== '—' ? 'var(--serig-m)' : 'var(--gray-l)') + '">' + escHtml(requiSal) + '</td>' +
+        '<td>' + (requiSal !== '—'
+          ? '<span onclick="event.stopPropagation();irAResumenFicha(\'' + s.id + '\')" style="cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--serig-m);text-decoration:underline dotted">' + escHtml(requiSal) + '</span>'
+          : '<span style="font-size:11px;color:var(--gray-l)">—</span>') + '</td>' +
         '<td></td>' +
       '</tr>';
     }).join('');
@@ -4293,7 +4295,9 @@ function buildProduccionHtml(entregadasSistema, manuales) {
           '<td style="font-family:var(--mono);font-weight:600">' + (l.cant||0).toLocaleString() + '</td>' +
           (isFirst ? '<td style="font-size:11px;color:var(--gray)">' + escHtml(m.fecha || '—') + '</td>' : '<td></td>') +
           (isFirst ? '<td><span style="font-size:9px;background:#FEF3C7;color:#92400e;border-radius:4px;padding:2px 6px;font-weight:700">MANUAL</span>' + (m.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(m.nota) + '</span>' : '') + '</td>' : '<td></td>') +
-          (isFirst ? '<td style="font-size:11px;font-family:var(--mono);color:' + (requiSalLinea !== '—' ? 'var(--serig-m)' : 'var(--gray-l)') + '">' + escHtml(requiSalLinea) + '</td>' : '<td></td>') +
+          (isFirst ? '<td>' + (requiSalLinea !== '—' && (l.solId || m.solId)
+            ? '<span onclick="event.stopPropagation();irAResumenFicha(\'' + (l.solId || m.solId) + '\')" style="cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--serig-m);text-decoration:underline dotted">' + escHtml(requiSalLinea) + '</span>'
+            : '<span style="font-size:11px;color:var(--gray-l)">' + escHtml(requiSalLinea) + '</span>') + '</td>' : '<td></td>') +
           (isFirst ? '<td style="white-space:nowrap"><button onclick="event.stopPropagation();editarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--serig-m);font-size:13px;padding:2px 4px" title="Editar">✏️</button><button onclick="event.stopPropagation();eliminarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 4px" title="Eliminar">✕</button></td>' : '<td></td>') +
         '</tr>';
       }).join('');
@@ -5274,6 +5278,13 @@ async function guardarEdicion(lineasValidas, cliente) {
 var movVistaActual = 'salida';
 var movDataCache = [];
 var rechSOrigenActual = 'interno';
+var pendingResumenHighlight = null;
+
+function irAResumenFicha(solId) {
+  if (!solId) return;
+  pendingResumenHighlight = solId;
+  setMovVista('resumen');
+}
 
 function setMovVista(tipo) {
   movVistaActual = tipo;
@@ -5409,7 +5420,9 @@ function buildSalidaRow(r) {
     '<td class="mov-cant">' + (r.cantidad||0).toLocaleString() + '</td>' +
     '<td style="font-size:11px;color:var(--gray)">' + escHtml(fecha) + '</td>' +
     '<td><span class="mov-badge-sal">SALIDA</span></td>' +
-    '<td style="font-size:11px;font-family:var(--mono);color:' + (requiPT ? 'var(--serig-m)' : 'var(--gray-l)') + '">' + escHtml(requiPT || '—') + '</td>' +
+    '<td>' + (requiPT && r.solicitud_id
+      ? '<span onclick="event.stopPropagation();irAResumenFicha(\'' + r.solicitud_id + '\')" style="cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--serig-m);text-decoration:underline dotted">' + escHtml(requiPT) + '</span>'
+      : '<span style="font-size:11px;color:var(--gray-l)">—</span>') + '</td>' +
     '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(obsLimpia) + '</td>' +
     '</tr>';
 }
@@ -5694,7 +5707,7 @@ async function renderResumenFichas() {
     var difColor = dif > 0 ? 'var(--amber)' : dif < 0 ? 'var(--red)' : 'var(--green)';
     var difTxt   = dif > 0 ? ('⏳ ' + dif.toLocaleString() + ' pendiente') : dif < 0 ? ('⚠️ ' + Math.abs(dif).toLocaleString() + ' de más') : '✓ Completo';
     var pct = f.salida > 0 ? Math.round((f.entrada / f.salida) * 100) : (f.entrada > 0 ? 100 : 0);
-    return '<tr onclick="mostrarDetalle(\'' + f.id + '\')" style="cursor:pointer">' +
+    return '<tr id="resumen-row-' + escHtml(f.id) + '" onclick="mostrarDetalle(\'' + f.id + '\')" style="cursor:pointer;transition:background .4s">' +
       '<td class="mov-doc">' + escHtml(f.codigo) + '</td>' +
       '<td style="font-weight:600;font-size:11px">' + escHtml(f.cliente) + '</td>' +
       '<td><span class="mov-sku">' + escHtml(f.sku) + '</span></td>' +
@@ -5712,6 +5725,18 @@ async function renderResumenFichas() {
     '<th style="text-align:right">Salida de bodega</th><th style="text-align:right">Entrada PT</th>' +
     '<th style="text-align:center">Diferencia</th><th style="text-align:center">Rendimiento</th>' +
     '</tr></thead><tbody>' + fichas.map(buildRow).join('') + '</tbody></table>';
+
+  if (pendingResumenHighlight) {
+    var _hlId = pendingResumenHighlight;
+    pendingResumenHighlight = null;
+    setTimeout(function() {
+      var row = document.getElementById('resumen-row-' + _hlId);
+      if (!row) return;
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.style.background = 'var(--teal-xl)';
+      setTimeout(function() { row.style.background = ''; }, 1800);
+    }, 60);
+  }
 }
 
 // ── Modal Salida de Bodega (mismos campos que Registrar entregado,
