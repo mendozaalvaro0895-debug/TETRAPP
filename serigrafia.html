@@ -5675,12 +5675,19 @@ async function renderResumenFichas() {
   cont.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando...</div></div>';
 
   var salidaMap = {};
+  var fechaSalidaMap = {}; // solicitud_id → fecha más temprana de salida
   try {
-    var r = await db.from('movimientos_materiales').select('solicitud_id,cantidad')
-      .eq('area','serig').eq('tipo','salida_bodega').not('solicitud_id','is',null).limit(2000);
+    var r = await db.from('movimientos_materiales')
+      .select('solicitud_id,cantidad,created_at,observaciones')
+      .eq('area','serig').eq('tipo','salida_bodega').not('solicitud_id','is',null)
+      .order('created_at', { ascending: true }).limit(2000);
     if (r.error) throw r.error;
     (r.data || []).forEach(function(m) {
       salidaMap[m.solicitud_id] = (salidaMap[m.solicitud_id] || 0) + (m.cantidad || 0);
+      if (!fechaSalidaMap[m.solicitud_id]) {
+        var match = (m.observaciones || '').match(/^FECHA:(\d{4}-\d{2}-\d{2})/);
+        fechaSalidaMap[m.solicitud_id] = match ? match[1] : (m.created_at ? m.created_at.slice(0,10) : null);
+      }
     });
   } catch(e) {
     console.error('renderResumenFichas (salidas):', e);
@@ -5689,11 +5696,24 @@ async function renderResumenFichas() {
   }
 
   var entradaMap = {};
+  var fechaEntradaMap = {}; // solicitud_id → fecha más reciente de entrega PT
   (getEntregasManuales() || []).forEach(function(m) {
+    var solIds = [];
     if (m.lineas && m.lineas.length) {
-      m.lineas.forEach(function(l) { if (l.solId) entradaMap[l.solId] = (entradaMap[l.solId] || 0) + (l.cant || 0); });
+      m.lineas.forEach(function(l) {
+        if (l.solId) {
+          entradaMap[l.solId] = (entradaMap[l.solId] || 0) + (l.cant || 0);
+          if (solIds.indexOf(l.solId) < 0) solIds.push(l.solId);
+        }
+      });
     } else if (m.solId) {
       entradaMap[m.solId] = (entradaMap[m.solId] || 0) + (m.cant || 0);
+      solIds.push(m.solId);
+    }
+    if (m.fecha) {
+      solIds.forEach(function(id) {
+        if (!fechaEntradaMap[id] || m.fecha > fechaEntradaMap[id]) fechaEntradaMap[id] = m.fecha;
+      });
     }
   });
 
@@ -5711,7 +5731,9 @@ async function renderResumenFichas() {
       desc: s ? (s.desc || '—') : '—',
       cant: s ? (s.cant || 0) : 0,
       salida: salidaMap[id] || 0,
-      entrada: entradaMap[id] || 0
+      entrada: entradaMap[id] || 0,
+      fechaSalida: fechaSalidaMap[id] || null,
+      fechaEntrada: fechaEntradaMap[id] || null
     };
   });
   fichas.sort(function(a, b) { return a.codigo < b.codigo ? 1 : -1; });
@@ -5734,6 +5756,8 @@ async function renderResumenFichas() {
       '<td class="mov-cant">' + f.cant.toLocaleString() + '</td>' +
       '<td class="mov-cant" style="color:var(--teal)">' + f.salida.toLocaleString() + '</td>' +
       '<td class="mov-cant" style="color:var(--green)">' + f.entrada.toLocaleString() + '</td>' +
+      '<td style="text-align:center;font-size:11px;color:var(--teal-dark)">' + fmtFechaCorta(f.fechaSalida) + '</td>' +
+      '<td style="text-align:center;font-size:11px;color:var(--green)">' + fmtFechaCorta(f.fechaEntrada) + '</td>' +
       '<td style="text-align:center;font-size:11px;font-weight:700;color:' + difColor + '">' + difTxt + '</td>' +
       '<td style="text-align:center;font-size:11px;font-weight:700">' + pct + '%</td>' +
       '</tr>';
@@ -5741,7 +5765,8 @@ async function renderResumenFichas() {
 
   cont.innerHTML = '<table class="mov-table"><thead><tr>' +
     '<th>Ficha</th><th>Cliente</th><th>SKU</th><th>Descripción</th><th style="text-align:right">Cantidad</th>' +
-    '<th style="text-align:right">Salida de bodega</th><th style="text-align:right">Entrada PT</th>' +
+    '<th style="text-align:right">Salida bodega</th><th style="text-align:right">Entrada PT</th>' +
+    '<th style="text-align:center">Fecha salida</th><th style="text-align:center">Fecha entrega PT</th>' +
     '<th style="text-align:center">Diferencia</th><th style="text-align:center">Rendimiento</th>' +
     '</tr></thead><tbody>' + fichas.map(buildRow).join('') + '</tbody></table>';
 
