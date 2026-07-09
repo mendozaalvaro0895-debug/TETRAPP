@@ -795,13 +795,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <input class="fi" id="mpCodigo" placeholder="Ej: S11">
         </div>
         <div class="fg">
-          <div class="fl">Color de avatar</div>
-          <input type="color" id="mpColor" value="#5A2D9E" style="width:100%;height:36px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;padding:2px 4px">
+          <div class="fl">Color (estado)</div>
+          <input type="hidden" id="mpColor" value="#166534">
+          <div id="mpColorSwatches" style="display:flex;gap:8px;margin-top:2px"></div>
         </div>
       </div>
       <div class="fg full" style="margin-bottom:12px">
         <div class="fl">Rol</div>
-        <select class="fs" id="mpRol" style="width:100%"></select>
+        <select class="fs" id="mpRol" style="width:100%" onchange="actualizarMpColorPreview()"></select>
       </div>
       <div class="fr">
         <div class="fg">
@@ -810,12 +811,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
         <div class="fg">
           <div class="fl">Fecha de baja</div>
-          <input class="fi" id="mpFechaBaja" type="date" onchange="if(this.value)document.getElementById('mpActivo').checked=false">
+          <input class="fi" id="mpFechaBaja" type="date" onchange="if(this.value)document.getElementById('mpActivo').checked=false;actualizarMpColorPreview()">
         </div>
       </div>
       <div class="fg full">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:500">
-          <input type="checkbox" id="mpActivo" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--serig-m)">
+          <input type="checkbox" id="mpActivo" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--serig-m)" onchange="actualizarMpColorPreview()">
           Operario activo
         </label>
       </div>
@@ -1485,16 +1486,17 @@ async function matrizDrop(e, targetKey) {
   // Los Prestados conservan su proceso_hab='Prestado'; solo cambia mtx_rol/mtx_linea
   var esPrestado = op && (op.proceso_hab || '') === 'Prestado';
   var procHabFinal = esPrestado ? 'Prestado' : procHab;
+  var colorFinal = colorParaEstado(op ? !!op.activo : true, procHabFinal);
 
   // Guardar en Supabase para que sincronice entre equipos (un operador = una celda)
   if (matrizDbDisponible !== false) {
     try {
       var r = await db.from('personal')
-        .update({ mtx_rol: rol, mtx_linea: linea, proceso_hab: procHabFinal })
+        .update({ mtx_rol: rol, mtx_linea: linea, proceso_hab: procHabFinal, color_hex: colorFinal })
         .eq('codigo', codigo);
       if (r.error) throw r.error;
       matrizDbDisponible = true;
-      if (op) { op.mtx_rol = rol; op.mtx_linea = linea; op.proceso_hab = procHabFinal; }
+      if (op) { op.mtx_rol = rol; op.mtx_linea = linea; op.proceso_hab = procHabFinal; op.color_hex = colorFinal; }
       renderMatriz();
       renderPersonal();
       renderAsistHoy();
@@ -1514,8 +1516,8 @@ async function matrizDrop(e, targetKey) {
 
   // Respaldo: el ROL se sincroniza vía proceso_hab (BD); la LÍNEA en localStorage
   try {
-    var rp = await db.from('personal').update({ proceso_hab: procHabFinal }).eq('codigo', codigo);
-    if (!rp.error && op) op.proceso_hab = procHabFinal;
+    var rp = await db.from('personal').update({ proceso_hab: procHabFinal, color_hex: colorFinal }).eq('codigo', codigo);
+    if (!rp.error && op) { op.proceso_hab = procHabFinal; op.color_hex = colorFinal; }
   } catch(e2) { /* sin conexión: se queda local */ }
 
   var lines = getMatrizLines();
@@ -5973,7 +5975,8 @@ async function cambiarRolOperador(codigo, rol) {
     .find(function(x) { return x.codigo === codigo; });
 
   // Construir update: proceso_hab es la fuente del rol; mtx_* mantiene la matriz en sync
-  var update = { proceso_hab: rol || '' };
+  var colorFinal = colorParaEstado(op ? !!op.activo : true, rol || '');
+  var update = { proceso_hab: rol || '', color_hex: colorFinal };
   if (matrizDbDisponible !== false) {
     update.mtx_rol = matrixRol;
     // rol global o sin rol de matriz → sin línea; rol por línea → conserva la línea actual
@@ -5986,6 +5989,7 @@ async function cambiarRolOperador(codigo, rol) {
     matrizDbDisponible = true;
     if (op) {
       op.proceso_hab = rol || null;
+      op.color_hex = colorFinal;
       if ('mtx_rol' in update)   op.mtx_rol = update.mtx_rol;
       if ('mtx_linea' in update) op.mtx_linea = update.mtx_linea;
     }
@@ -5999,9 +6003,9 @@ async function cambiarRolOperador(codigo, rol) {
     if (/mtx_rol|mtx_linea|column|schema cache/i.test((e.message || '') + (e.details || ''))) {
       matrizDbDisponible = false;
       try {
-        var r2 = await db.from('personal').update({ proceso_hab: rol || '' }).eq('codigo', codigo).eq('area', 'serig');
+        var r2 = await db.from('personal').update({ proceso_hab: rol || '', color_hex: colorFinal }).eq('codigo', codigo).eq('area', 'serig');
         if (r2.error) throw r2.error;
-        if (op) op.proceso_hab = rol || null;
+        if (op) { op.proceso_hab = rol || null; op.color_hex = colorFinal; }
         if (!matrixRol) { var ln = getMatrizLines(); delete ln[codigo]; saveMatrizLines(ln); }
         renderPersonal();
         renderMatriz();
@@ -6040,6 +6044,41 @@ function cerrarTodosOpMenus() {
 
 var mpEditCodigo = null;
 
+var MP_COLORES = [
+  { hex: '#166534', lbl: 'Activo' },
+  { hex: '#B87200', lbl: 'Prestado' },
+  { hex: '#7CFC00', lbl: 'Supervisor / Auxiliar' },
+  { hex: '#6B6B6A', lbl: 'Inactivo / Ausente' }
+];
+
+// Color derivado del estado — misma regla usada en el modal, en la matriz
+// (Personal y Roles) y en el selector rápido de rol de cada ficha.
+function colorParaEstado(activo, procesoHab) {
+  if (!activo) return '#6B6B6A';
+  if (procesoHab === 'Prestado') return '#B87200';
+  if (procesoHab === 'Supervisor' || procesoHab === 'Apoyo') return '#7CFC00';
+  return '#166534';
+}
+
+function pintarMpColorSwatches(seleccionado) {
+  var cont = document.getElementById('mpColorSwatches');
+  if (!cont) return;
+  cont.innerHTML = MP_COLORES.map(function(c) {
+    var act = c.hex === seleccionado;
+    return '<div title="' + c.lbl + '" ' +
+      'style="width:28px;height:28px;border-radius:50%;background:' + c.hex + ';' +
+      'border:2.5px solid ' + (act ? 'var(--ink)' : 'transparent') + ';box-shadow:0 0 0 1.5px var(--border)"></div>';
+  }).join('');
+}
+
+function actualizarMpColorPreview() {
+  var rol    = document.getElementById('mpRol').value;
+  var activo = document.getElementById('mpActivo').checked;
+  var hex    = colorParaEstado(activo, rol);
+  document.getElementById('mpColor').value = hex;
+  pintarMpColorSwatches(hex);
+}
+
 function poblarRolesModal(seleccionado) {
   var sel = document.getElementById('mpRol');
   if (!sel) return;
@@ -6059,11 +6098,11 @@ function abrirModalNuevoOperario() {
   document.getElementById('mpIniciales').value = '';
   document.getElementById('mpCodigo').value = '';
   document.getElementById('mpCodigo').disabled = false;
-  document.getElementById('mpColor').value = '#5A2D9E';
   document.getElementById('mpFechaInicio').value = new Date().toISOString().slice(0,10);
   document.getElementById('mpFechaBaja').value = '';
   document.getElementById('mpActivo').checked = true;
   poblarRolesModal('');
+  actualizarMpColorPreview();
   document.getElementById('modalPersonal').classList.add('open');
   setTimeout(function() { document.getElementById('mpNombre').focus(); }, 50);
 }
@@ -6078,11 +6117,11 @@ function abrirModalEditarOperario(codigo) {
   document.getElementById('mpIniciales').value = p.iniciales || '';
   document.getElementById('mpCodigo').value = p.codigo || '';
   document.getElementById('mpCodigo').disabled = true;
-  document.getElementById('mpColor').value = p.color_hex || '#5A2D9E';
   document.getElementById('mpFechaInicio').value = p.fecha_inicio || '';
   document.getElementById('mpFechaBaja').value = p.fecha_baja || '';
   document.getElementById('mpActivo').checked = !!p.activo;
   poblarRolesModal(p.proceso_hab || '');
+  actualizarMpColorPreview();
   document.getElementById('modalPersonal').classList.add('open');
   setTimeout(function() { document.getElementById('mpNombre').focus(); }, 50);
 }
@@ -6100,11 +6139,11 @@ async function guardarOperario() {
   var nombre    = (document.getElementById('mpNombre').value    || '').trim();
   var iniciales = (document.getElementById('mpIniciales').value || '').trim().toUpperCase();
   var codigo    = (document.getElementById('mpCodigo').value    || '').trim();
-  var color       = document.getElementById('mpColor').value;
   var rol         = document.getElementById('mpRol').value;
   var fechaInicio = document.getElementById('mpFechaInicio').value || null;
   var fechaBaja   = document.getElementById('mpFechaBaja').value || null;
   var activo      = fechaBaja ? false : document.getElementById('mpActivo').checked;
+  var color       = colorParaEstado(activo, rol || '');
 
   if (!nombre)    { showToast('⚠️ Nombre requerido', '#B83232');    animShake(document.getElementById('modalPersonal')); return; }
   if (!iniciales) { showToast('⚠️ Iniciales requeridas', '#B83232'); animShake(document.getElementById('modalPersonal')); return; }
