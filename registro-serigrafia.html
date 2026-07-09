@@ -140,8 +140,9 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 
     <div class="sec">
       <div class="sec-label"><span class="paso-num">1</span> Línea y momento</div>
-      <div class="grid-2">
+      <div class="grid-3">
         <div class="field"><label>Fecha</label><input type="date" id="fFecha"></div>
+        <div class="field"><label>Hora del registro</label><input type="time" id="fHora"></div>
         <div class="field"><label>Línea</label>
           <select id="fLinea" onchange="cargarHoyLinea()">
             <option value="1">Línea 1</option>
@@ -283,6 +284,7 @@ function elegirOperario(codigo) {
   document.getElementById('qNombre').textContent = opActual.nombre;
 
   document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fHora').value = new Date().toTimeString().slice(0,5);
   document.getElementById('fLinea').value = '1';
   document.getElementById('fDiseno').value = '';
   document.getElementById('fDiseno').dataset.sku = '';
@@ -308,9 +310,10 @@ function mostrarPantalla(id) {
 
 function elegirMomento(m) {
   var btn = document.querySelector('.momento-btn[data-m="' + m + '"]');
-  if (btn && btn.classList.contains('disabled')) return; // ya se registró hoy en esta línea
+  if (btn && btn.classList.contains('disabled')) return;
 
   momentoActual = m;
+  document.getElementById('fHora').value = new Date().toTimeString().slice(0,5);
   document.querySelectorAll('.momento-btn').forEach(function(b){
     b.classList.toggle('act', b.dataset.m === m);
   });
@@ -366,7 +369,7 @@ async function cargarHoyLinea() {
   var fecha = document.getElementById('fFecha').value || new Date().toISOString().slice(0,10);
   try {
     var r = await db.from('registro_tiros_serig')
-      .select('momento, contador, diseno, sku, created_at')
+      .select('momento, contador, diseno, sku, hora, created_at')
       .eq('area', 'serig').eq('linea_id', linea).eq('fecha', fecha)
       .order('created_at', { ascending: true });
     if (r.error) throw r.error;
@@ -385,7 +388,14 @@ function renderHoyLinea() {
   if (!lecturasHoyLinea.length) { box.style.display = 'none'; return; }
   box.style.display = 'block';
   document.getElementById('hoyFilas').innerHTML = lecturasHoyLinea.map(function(l){
-    return '<div class="hoy-row"><span>' + (MOMENTO_LBL[l.momento] || l.momento) + (l.sku ? ' · ' + escHtml(l.sku) : '') + '</span><span>' + (l.contador||0).toLocaleString() + '</span></div>';
+    var horaLbl = l.hora ? l.hora.slice(0,5) : (l.created_at ? l.created_at.slice(11,16) : '');
+    return '<div class="hoy-row">'
+      + '<span>' + (MOMENTO_LBL[l.momento] || l.momento) + (l.sku ? ' · ' + escHtml(l.sku) : '') + '</span>'
+      + '<span style="display:flex;gap:12px;align-items:center">'
+      + (horaLbl ? '<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:#C4B5FD">⏰ ' + escHtml(horaLbl) + '</span>' : '')
+      + '<span>' + (l.contador||0).toLocaleString() + '</span>'
+      + '</span>'
+      + '</div>';
   }).join('');
   var contadores = lecturasHoyLinea.map(function(l){ return l.contador || 0; });
   var delta = Math.max.apply(null, contadores) - Math.min.apply(null, contadores);
@@ -433,6 +443,7 @@ async function guardarRegistro() {
   if (!diseno) { showToast('⚠️ Indica el diseño que se está imprimiendo', '#B83232'); return; }
   if (!contador && contador !== 0) { showToast('⚠️ Ingresa la lectura del contador', '#B83232'); return; }
 
+  var horaVal = document.getElementById('fHora').value || null;
   var payload = {
     fecha: fecha,
     linea_id: linea,
@@ -441,6 +452,7 @@ async function guardarRegistro() {
     operador_codigo: opActual.codigo,
     operador_nombre: opActual.nombre || '',
     momento: momentoActual,
+    hora: horaVal,
     contador: contador,
     area: 'serig'
   };
@@ -455,7 +467,7 @@ async function guardarRegistro() {
 
     document.getElementById('okCorr').textContent = 'Línea ' + linea + ' · ' + (MOMENTO_LBL[momentoActual] || momentoActual);
     document.getElementById('okDet').innerHTML =
-      escHtml(opActual.nombre) + ' · ' + escHtml(fecha)
+      escHtml(opActual.nombre) + ' · ' + escHtml(fecha) + (horaVal ? ' · ⏰ ' + escHtml(horaVal) : '')
       + '<br>Contador: <strong>' + contador.toLocaleString() + '</strong> · ' + escHtml(diseno);
     mostrarPantalla('scrOk');
     window.scrollTo(0, 0);
