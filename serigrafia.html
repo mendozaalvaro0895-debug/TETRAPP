@@ -3823,20 +3823,42 @@ function getIngresoRequi(solId) {
   return match ? match.requi : null;
 }
 
-// Carga mapa solicitud_id → [num_documento] para cross-reference en Ingresos PT
+// Carga mapa solicitud_id → [num_documento] para cross-reference en Ingresos PT.
+// También cruza filas con solicitud_id NULL contra entregasCache (mismo requi #).
+// IMPORTANTE: llamar DESPUÉS de cargarEntregasSerig() para que entregasCache esté listo.
 async function cargarSalidaRequiMap() {
   try {
     var r = await db.from('movimientos_materiales')
       .select('solicitud_id,num_documento')
       .eq('area','serig').eq('tipo','salida_bodega')
-      .not('solicitud_id','is',null).not('num_documento','is',null).limit(2000);
+      .not('num_documento','is',null).limit(2000);
     salidaRequiMap = {};
+    var orphanNums = {}; // requis que tienen al menos una fila sin solicitud_id
     (r.data || []).forEach(function(m) {
-      if (!m.solicitud_id || !m.num_documento) return;
-      if (!salidaRequiMap[m.solicitud_id]) salidaRequiMap[m.solicitud_id] = [];
-      if (salidaRequiMap[m.solicitud_id].indexOf(m.num_documento) < 0)
-        salidaRequiMap[m.solicitud_id].push(m.num_documento);
+      if (!m.num_documento) return;
+      if (m.solicitud_id) {
+        if (!salidaRequiMap[m.solicitud_id]) salidaRequiMap[m.solicitud_id] = [];
+        if (salidaRequiMap[m.solicitud_id].indexOf(m.num_documento) < 0)
+          salidaRequiMap[m.solicitud_id].push(m.num_documento);
+      } else {
+        orphanNums[m.num_documento] = true;
+      }
     });
+    // Cruce inverso: ingreso PT cuyo requi coincide con una salida huérfana
+    if (Object.keys(orphanNums).length && entregasCache.length) {
+      entregasCache.forEach(function(e) {
+        if (!e.requi || !orphanNums[e.requi]) return;
+        var solIds = [];
+        if (e.solId) solIds.push(e.solId);
+        if (e.lineas) e.lineas.forEach(function(l) {
+          if (l.solId && solIds.indexOf(l.solId) < 0) solIds.push(l.solId);
+        });
+        solIds.forEach(function(solId) {
+          if (!salidaRequiMap[solId]) salidaRequiMap[solId] = [];
+          if (salidaRequiMap[solId].indexOf(e.requi) < 0) salidaRequiMap[solId].push(e.requi);
+        });
+      });
+    }
   } catch(e) { console.error('cargarSalidaRequiMap:', e); }
 }
 
@@ -6889,7 +6911,8 @@ async function init() {
   if (fi) fi.value = d.toISOString().split('T')[0];
 
   // Carga paralela de datos
-  await Promise.all([cargarInventario(), cargarPersonal(), cargarEntregasSerig(), cargarOrdenSinAsignar(), cargarSalidaRequiMap()]);
+  await Promise.all([cargarInventario(), cargarPersonal(), cargarEntregasSerig(), cargarOrdenSinAsignar()]);
+  await cargarSalidaRequiMap(); // debe ir después de cargarEntregasSerig
   await cargarAusentesHoy(); // filtra ausentes de la matriz (llama renderMatriz internamente)
   await cargarSolicitudes(); // llama renderInicio() internamente
 
