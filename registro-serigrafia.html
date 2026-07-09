@@ -59,6 +59,8 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .momento-tog{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
 .momento-btn{border:1.5px solid #C8C6C0;background:#fff;border-radius:10px;padding:12px 6px;text-align:center;cursor:pointer;font-size:12px;font-weight:700;color:#6B6B6A}
 .momento-btn.act{border-color:#7C3AED;background:#F5F3FF;color:#5B21B6}
+.momento-btn.disabled{opacity:.4;cursor:not-allowed;background:#F0EDE8}
+.momento-btn.disabled.act{border-color:#C8C6C0;background:#F0EDE8;color:#6B6B6A}
 
 /* AUTOCOMPLETE */
 .ac-wrap{position:relative}
@@ -305,6 +307,9 @@ function mostrarPantalla(id) {
 }
 
 function elegirMomento(m) {
+  var btn = document.querySelector('.momento-btn[data-m="' + m + '"]');
+  if (btn && btn.classList.contains('disabled')) return; // ya se registró hoy en esta línea
+
   momentoActual = m;
   document.querySelectorAll('.momento-btn').forEach(function(b){
     b.classList.toggle('act', b.dataset.m === m);
@@ -376,6 +381,7 @@ async function cargarHoyLinea() {
 
 function renderHoyLinea() {
   var box = document.getElementById('hoyBox');
+  actualizarMomentosDisponibles();
   if (!lecturasHoyLinea.length) { box.style.display = 'none'; return; }
   box.style.display = 'block';
   document.getElementById('hoyFilas').innerHTML = lecturasHoyLinea.map(function(l){
@@ -384,6 +390,31 @@ function renderHoyLinea() {
   var contadores = lecturasHoyLinea.map(function(l){ return l.contador || 0; });
   var delta = Math.max.apply(null, contadores) - Math.min.apply(null, contadores);
   document.getElementById('hoyDelta').textContent = delta.toLocaleString() + ' / ' + META_LINEA.toLocaleString();
+}
+
+// Bloquea los momentos que ya tienen lectura hoy en esta línea (una vez
+// registrado Inicio/Mediodía/Fin, no debe volver a tomarse ese mismo momento)
+function actualizarMomentosDisponibles() {
+  var tomados = {};
+  lecturasHoyLinea.forEach(function(l){ tomados[l.momento] = true; });
+
+  document.querySelectorAll('.momento-btn').forEach(function(b){
+    var m = b.dataset.m;
+    b.classList.toggle('disabled', !!tomados[m]);
+  });
+
+  // Si el momento seleccionado ya quedó tomado, saltar al siguiente disponible
+  var siguiente = ['inicio','mediodia','fin'].find(function(m){ return !tomados[m]; });
+  if (tomados[momentoActual] && siguiente) elegirMomento(siguiente);
+
+  var btn = document.getElementById('btnGuardar');
+  if (!siguiente) {
+    btn.disabled = true;
+    btn.textContent = '✅ Ya se registraron los 3 momentos de hoy';
+  } else {
+    btn.disabled = false;
+    btn.textContent = '💾 Guardar lectura';
+  }
 }
 
 // ── Guardar ───────────────────────────────────────────────────
