@@ -141,7 +141,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
         <div class="field"><label>Hora de inicio</label><input type="time" id="fHoraInicio"></div>
         <div class="field"><label>Hora de cierre</label><input type="time" id="fHoraCierre"></div>
       </div>
-      <div class="field"><label>Supervisor</label><input type="text" id="fSupervisorDisplay" value="Cargando…" readonly style="background:#F7F6F2;color:#6B6B6A"></div>
+      <div class="field"><label>Supervisor</label><input type="text" value="Supervisor" readonly style="background:#F7F6F2;color:#6B6B6A"></div>
     </div>
 
     <div class="sec">
@@ -222,11 +222,11 @@ async function cargarOperarios() {
     operarios = todos.filter(function(p){ return p.rol !== 'supervisor'; });
     if (!operarios.length) operarios = todos;
 
-    // Supervisor vigente: se toma de la tabla personal, nunca hardcodeado
+    // Supervisor vigente: se toma de la tabla personal, nunca hardcodeado.
+    // No se muestra en pantalla (el operario no necesita verlo), solo se
+    // adjunta a la comanda al guardar.
     var sup = todos.find(function(p){ return p.rol === 'supervisor'; });
     supervisorActual = sup ? { nombre: sup.nombre, codigo: sup.codigo } : { nombre: '', codigo: '' };
-    var supEl = document.getElementById('fSupervisorDisplay');
-    if (supEl) supEl.value = supervisorActual.nombre || '— Sin definir —';
 
     renderSeleccion();
   } catch(e) {
