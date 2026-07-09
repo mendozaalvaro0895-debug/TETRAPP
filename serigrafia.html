@@ -6008,6 +6008,14 @@ async function confirmarMovSerig() {
   }
   if (!lineas.length) { showToast('⚠️ Agregá al menos un producto', '#92400e'); return; }
 
+  var sinPedido = lineas.filter(function(l) { return !l.solId; });
+  if (sinPedido.length > 0) {
+    var msg = sinPedido.length === lineas.length
+      ? '⚠️ Ninguna línea tiene pedido vinculado. La salida no aparecerá en las fichas del tablero. ¿Continuar de todas formas?'
+      : '⚠️ ' + sinPedido.length + ' línea(s) sin pedido vinculado. Esas filas no aparecerán en las fichas del tablero. ¿Continuar de todas formas?';
+    if (!window.confirm(msg)) return;
+  }
+
   var obsFinal = 'FECHA:' + fecha + (nota ? ' | ' + nota : '');
   var btn = document.getElementById('movSBtnOk');
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
