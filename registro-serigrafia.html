@@ -55,8 +55,8 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .field input[readonly]{background:#F7F6F2;color:#6B6B6A;font-weight:700}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#7C3AED}
 
-/* MOMENTO (toggle 3 botones) */
-.momento-tog{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+/* MOMENTO (toggle 4 botones) */
+.momento-tog{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px}
 .momento-btn{border:1.5px solid #C8C6C0;background:#fff;border-radius:10px;padding:12px 6px;text-align:center;cursor:pointer;font-size:12px;font-weight:700;color:#6B6B6A}
 .momento-btn.act{border-color:#7C3AED;background:#F5F3FF;color:#5B21B6}
 .momento-btn.disabled{opacity:.4;cursor:not-allowed;background:#F0EDE8}
@@ -99,6 +99,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 
 @media(max-width:480px){
   .grid-3{grid-template-columns:1fr 1fr}
+  .momento-tog{grid-template-columns:1fr 1fr}
   .op-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
 }
 </style>
@@ -157,6 +158,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
         <div class="momento-btn" data-m="inicio" onclick="elegirMomento('inicio')">🌅 Inicio</div>
         <div class="momento-btn" data-m="mediodia" onclick="elegirMomento('mediodia')">🕐 Mediodía</div>
         <div class="momento-btn" data-m="fin" onclick="elegirMomento('fin')">🌇 Fin</div>
+        <div class="momento-btn" data-m="velada" onclick="elegirMomento('velada')">🌙 Velada</div>
       </div>
     </div>
 
@@ -208,7 +210,7 @@ var opActual = null;
 var momentoActual = 'inicio';
 var lecturasHoyLinea = [];
 
-var MOMENTO_LBL = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '🌇 Fin' };
+var MOMENTO_LBL = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '🌇 Fin', velada: '🌙 Velada' };
 var META_LINEA = 10000;
 
 // ── Carga de datos ────────────────────────────────────────────
@@ -369,7 +371,7 @@ async function cargarHoyLinea() {
   var fecha = document.getElementById('fFecha').value || new Date().toISOString().slice(0,10);
   try {
     var r = await db.from('registro_tiros_serig')
-      .select('momento, contador, diseno, sku, hora, created_at')
+      .select('momento, contador, diseno, sku, hora, operador_codigo, created_at')
       .eq('area', 'serig').eq('linea_id', linea).eq('fecha', fecha)
       .order('created_at', { ascending: true });
     if (r.error) throw r.error;
@@ -405,22 +407,27 @@ function renderHoyLinea() {
 // Bloquea los momentos que ya tienen lectura hoy en esta línea (una vez
 // registrado Inicio/Mediodía/Fin, no debe volver a tomarse ese mismo momento)
 function actualizarMomentosDisponibles() {
+  // Solo bloquea momentos que YA registró ESTE operario hoy en esta línea
   var tomados = {};
-  lecturasHoyLinea.forEach(function(l){ tomados[l.momento] = true; });
+  if (opActual) {
+    lecturasHoyLinea.forEach(function(l){
+      if (l.operador_codigo === opActual.codigo) tomados[l.momento] = true;
+    });
+  }
 
   document.querySelectorAll('.momento-btn').forEach(function(b){
-    var m = b.dataset.m;
-    b.classList.toggle('disabled', !!tomados[m]);
+    b.classList.toggle('disabled', !!tomados[b.dataset.m]);
   });
 
-  // Si el momento seleccionado ya quedó tomado, saltar al siguiente disponible
-  var siguiente = ['inicio','mediodia','fin'].find(function(m){ return !tomados[m]; });
+  // Si el momento seleccionado ya está tomado, saltar al siguiente disponible
+  var orden = ['inicio','mediodia','fin','velada'];
+  var siguiente = orden.find(function(m){ return !tomados[m]; });
   if (tomados[momentoActual] && siguiente) elegirMomento(siguiente);
 
   var btn = document.getElementById('btnGuardar');
   if (!siguiente) {
     btn.disabled = true;
-    btn.textContent = '✅ Ya se registraron los 3 momentos de hoy';
+    btn.textContent = '✅ Ya se registraron todos los momentos de hoy';
   } else {
     btn.disabled = false;
     btn.textContent = '💾 Guardar lectura';
