@@ -5679,6 +5679,7 @@ async function renderProductividad() {
         buildMomentoRow(g.porMomento.inicio, 'inicio') +
         buildMomentoRow(g.porMomento.mediodia, 'mediodia') +
         buildMomentoRow(g.porMomento.fin, 'fin') +
+        (g.porMomento.velada ? buildMomentoRow(g.porMomento.velada, 'velada') : '') +
         '</div>';
     }).join('');
     return '<div class="prod-col">' + fichas + '</div>';
@@ -5689,9 +5690,9 @@ async function renderProductividad() {
     '</div>';
 }
 
-var MOMENTO_LBL_ADMIN_TXT = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '🌇 Fin' };
+var MOMENTO_LBL_ADMIN_TXT = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '🌇 Fin', velada: '🌙 Velada' };
 
-var MOMENTO_LBL_ADMIN = { inicio: '🌅', mediodia: '🕐', fin: '🌇' };
+var MOMENTO_LBL_ADMIN = { inicio: '🌅', mediodia: '🕐', fin: '🌇', velada: '🌙' };
 var prodLecturasCache = [];
 
 async function editarLecturaTiro(id) {
