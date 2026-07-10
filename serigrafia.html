@@ -5885,6 +5885,21 @@ function buildProdGrid(fechas, byDL, esMaster, operadorPorLinea) {
 var _prodChart = null;
 var _prodChartProds = {};
 var _prodChartPeriodo = 'mes';
+var _prodChartCtx = null; // { todasFechas, byDL } del último render (para el panel de día)
+
+// Tiros de la velada (turno nocturno) = contador de velada − máximo del turno diurno.
+// El inicio siempre es 0, así que el diurno máximo es el fin (o mediodía). Sin base
+// diurna no hay delta calculable → null.
+function prodVeladaDelta(datos) {
+  if (!datos || !datos.velada) return null;
+  var m = datos.momentos;
+  var diurnal = ['inicio','mediodia','fin']
+    .map(function(k){ return m[k]; })
+    .filter(Boolean).map(function(l){ return l.contador || 0; });
+  if (!diurnal.length) return null;
+  var d = (datos.velada.contador || 0) - Math.max.apply(null, diurnal);
+  return d > 0 ? d : null;
+}
 
 // Fechas (YYYY-MM-DD) del rango del gráfico según el periodo elegido.
 // Mes = mes del selector prodMes; Semana = últimos 7 días; Día = hoy (rel. a hoy).
@@ -5980,10 +5995,12 @@ async function renderProductividadChart(periodo) {
 
   var COLS = ['#2A8B75','#D97706','#1D4ED8','#16A34A'];
 
+  // Series de día (turno diurno) por línea
   var datasets = LINEAS_PRODUCCION.map(function(ln, i) {
     var op = operadorPorLinea && operadorPorLinea[ln.id];
     return {
       label: ln.nombre + (op ? ' · ' + op : ''),
+      _kind: 'dia', _linea: ln.id, _nombre: ln.nombre,
       data: todasFechas.map(function(f) {
         var d = byDL[f] && byDL[f][ln.id];
         if (!d) return null;
@@ -6004,8 +6021,29 @@ async function renderProductividadChart(periodo) {
     };
   });
 
+  // Series de velada (turno nocturno) por línea — punteadas
+  LINEAS_PRODUCCION.forEach(function(ln, i) {
+    datasets.push({
+      label: ln.nombre + ' 🌙',
+      _kind: 'velada', _linea: ln.id, _nombre: ln.nombre,
+      data: todasFechas.map(function(f) { return prodVeladaDelta(byDL[f] && byDL[f][ln.id]); }),
+      borderColor: COLS[i],
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [3,3],
+      pointRadius: 3,
+      pointHoverRadius: 6,
+      pointStyle: 'rectRot',
+      pointBackgroundColor: '#fff',
+      tension: 0.25,
+      fill: false,
+      spanGaps: false
+    });
+  });
+
   datasets.push({
     label: 'Meta (' + META_TIROS_LINEA.toLocaleString() + '/día)',
+    _kind: 'meta',
     data: todasFechas.map(function(){ return META_TIROS_LINEA; }),
     borderColor: '#EF4444',
     borderWidth: 1.5,
@@ -6016,6 +6054,7 @@ async function renderProductividadChart(periodo) {
   });
 
   container.style.display = '';
+  _prodChartCtx = { todasFechas: todasFechas, byDL: byDL };
 
   _prodChart = new Chart(canvas, {
     type: 'line',
@@ -6023,11 +6062,21 @@ async function renderProductividadChart(periodo) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
+      // Solo clic (no hover): el tooltip nativo aparece al hacer clic en un punto
+      events: ['click'],
+      interaction: { mode: 'nearest', intersect: true },
+      onClick: function(evt, elements, chart) {
+        if (elements && elements.length) return;         // clic en un punto → lo maneja el tooltip
+        var area = chart.chartArea;
+        if (!area || evt.y <= area.bottom) return;         // solo si el clic fue en la banda del eje X
+        var idx = Math.round(chart.scales.x.getValueForPixel(evt.x));
+        if (idx < 0 || idx >= todasFechas.length) return;
+        prodShowDayPanel(idx, evt.native);
+      },
       plugins: {
         legend: {
           position: 'top',
-          labels: { font: { family: 'DM Sans', size: 11 }, usePointStyle: true, boxWidth: 8, padding: 14 }
+          labels: { font: { family: 'DM Sans', size: 11 }, usePointStyle: true, boxWidth: 8, padding: 12 }
         },
         tooltip: {
           backgroundColor: '#0C0C0B',
@@ -6037,21 +6086,22 @@ async function renderProductividadChart(periodo) {
           callbacks: {
             title: function(items) { return todasFechas[items[0].dataIndex]; },
             label: function(ctx) {
-              if (ctx.datasetIndex >= LINEAS_PRODUCCION.length)
-                return '  Meta: ' + META_TIROS_LINEA.toLocaleString();
+              var ds = ctx.dataset || {};
+              if (ds._kind === 'meta') return '  Meta: ' + META_TIROS_LINEA.toLocaleString();
               var v = ctx.parsed.y;
               if (v === null || v === undefined) return '';
+              if (ds._kind === 'velada') return '  🌙 ' + ds._nombre + ' velada: ' + v.toLocaleString();
               var pct = Math.round((v / META_TIROS_LINEA) * 100);
               var ic  = pct >= 100 ? '✅' : pct >= 60 ? '🟡' : '🔴';
-              return '  ' + LINEAS_PRODUCCION[ctx.datasetIndex].nombre +
-                     ': ' + v.toLocaleString() + ' (' + pct + '%) ' + ic;
+              return '  ' + ds._nombre + ': ' + v.toLocaleString() + ' (' + pct + '%) ' + ic;
             },
             afterLabel: function(ctx) {
-              if (ctx.datasetIndex >= LINEAS_PRODUCCION.length) return '';
+              var ds = ctx.dataset || {};
+              if (ds._kind !== 'dia') return '';
               var v = ctx.parsed.y;
               if (v === null || v === undefined) return '';
               var f    = todasFechas[ctx.dataIndex];
-              var prod = _prodChartProds[f] && _prodChartProds[f][LINEAS_PRODUCCION[ctx.datasetIndex].id];
+              var prod = _prodChartProds[f] && _prodChartProds[f][ds._linea];
               return prod ? '    📦 ' + prod : '';
             }
           }
@@ -6074,6 +6124,68 @@ async function renderProductividadChart(periodo) {
       }
     }
   });
+}
+
+// Panel flotante con el detalle completo de un día (todas las líneas),
+// se abre al hacer clic en el número de fecha del eje X.
+function prodShowDayPanel(idx, nativeEvt) {
+  var ctx = _prodChartCtx; if (!ctx) return;
+  var f = ctx.todasFechas[idx]; if (!f) return;
+  var byDL = ctx.byDL;
+  var COLS = ['#2A8B75','#D97706','#1D4ED8','#16A34A'];
+  var fFmt = new Date(f + 'T12:00:00').toLocaleDateString('es-GT', { weekday:'long', day:'2-digit', month:'long' });
+
+  var filas = LINEAS_PRODUCCION.map(function(ln, i) {
+    var d = byDL[f] && byDL[f][ln.id];
+    var col = COLS[i];
+    if (!d) {
+      return '<div style="display:flex;justify-content:space-between;gap:16px;padding:5px 0;border-bottom:1px solid #F0EDE8;color:#B7B5B0">' +
+        '<span style="font-weight:700">' + escHtml(ln.nombre) + '</span><span>— sin registro</span></div>';
+    }
+    var cnts = ['inicio','mediodia','fin'].map(function(m){ return d.momentos[m]; }).filter(Boolean).map(function(l){ return l.contador || 0; });
+    var delta = cnts.length >= 2 ? Math.max.apply(null, cnts) - Math.min.apply(null, cnts) : null;
+    var pct = delta !== null ? Math.round((delta / META_TIROS_LINEA) * 100) : null;
+    var vd = prodVeladaDelta(d);
+    var envase = _prodChartProds[f] && _prodChartProds[f][ln.id];
+    var coment = (prodComentarioCache[f + '|' + ln.id] || {}).comentario;
+    return '<div style="padding:6px 0;border-bottom:1px solid #F0EDE8">' +
+      '<div style="display:flex;justify-content:space-between;gap:16px">' +
+        '<span style="font-weight:700;color:' + col + '">' + escHtml(ln.nombre) + '</span>' +
+        '<span style="font-family:var(--mono);font-weight:600">' + (delta !== null ? delta.toLocaleString() + ' · ' + pct + '%' : '—') + '</span>' +
+      '</div>' +
+      (vd !== null ? '<div style="font-size:11px;color:#6B21A8;margin-top:2px">🌙 velada: ' + vd.toLocaleString() + '</div>' : '') +
+      (envase ? '<div style="font-size:11px;color:#9A9A98;margin-top:1px">📦 ' + escHtml(envase) + '</div>' : '') +
+      (coment ? '<div style="font-size:11px;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:3px 6px;margin-top:4px">💬 ' + escHtml(coment) + '</div>' : '') +
+    '</div>';
+  }).join('');
+
+  var old = document.getElementById('prodDayPanel');
+  if (old) old.remove();
+  var panel = document.createElement('div');
+  panel.id = 'prodDayPanel';
+  panel.style.cssText = 'position:fixed;z-index:9998;background:#fff;border:1.5px solid var(--border);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.22);padding:12px 14px;width:280px;max-width:92vw;font-family:var(--sans)';
+  panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<span style="font-size:12px;font-weight:800;color:var(--serig-m);text-transform:capitalize">📅 ' + escHtml(fFmt) + '</span>' +
+      '<span onclick="var p=document.getElementById(\'prodDayPanel\');if(p)p.remove()" style="cursor:pointer;color:var(--gray-l);font-size:16px;line-height:1">✕</span>' +
+    '</div>' + filas;
+  document.body.appendChild(panel);
+
+  // Posicionar cerca del cursor, sin salirse de la pantalla
+  var px = (nativeEvt && nativeEvt.clientX != null) ? nativeEvt.clientX : window.innerWidth / 2;
+  var py = (nativeEvt && nativeEvt.clientY != null) ? nativeEvt.clientY : window.innerHeight / 2;
+  var rect = panel.getBoundingClientRect();
+  var left = Math.min(px + 12, window.innerWidth - rect.width - 10);
+  var top  = Math.min(Math.max(py - rect.height - 10, 10), window.innerHeight - rect.height - 10);
+  panel.style.left = Math.max(10, left) + 'px';
+  panel.style.top  = top + 'px';
+
+  // Cerrar al hacer clic fuera (en el siguiente tick para no capturar este mismo clic)
+  setTimeout(function() {
+    function cerrar(e) {
+      if (!panel.contains(e.target)) { panel.remove(); document.removeEventListener('click', cerrar); }
+    }
+    document.addEventListener('click', cerrar);
+  }, 0);
 }
 
 async function renderProductividad() {
