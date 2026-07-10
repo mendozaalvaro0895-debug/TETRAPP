@@ -522,9 +522,25 @@ function quitarFoto() {
 async function subirFoto(fecha, lineaId, momento) {
   if (!fotoBlob) return null;
   var path = 'serig/' + fecha + '/' + lineaId + '_' + momento + '.jpg';
-  var r = await db.storage.from('tiros').upload(path, fotoBlob, { upsert: true, contentType: 'image/jpeg' });
-  if (r.error) throw r.error;
-  return db.storage.from('tiros').getPublicUrl(path).data.publicUrl;
+  // Usar fetch directo — más confiable en iOS que el SDK de Storage
+  var sess = await db.auth.getSession();
+  var token = (sess && sess.data && sess.data.session) ? sess.data.session.access_token : SUPA_KEY;
+  var url = SUPA_URL + '/storage/v1/object/tiros/' + path;
+  var resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'apikey': SUPA_KEY,
+      'Content-Type': 'image/jpeg',
+      'x-upsert': 'true'
+    },
+    body: fotoBlob
+  });
+  if (!resp.ok) {
+    var txt = await resp.text();
+    throw new Error('HTTP ' + resp.status + ' — ' + txt);
+  }
+  return SUPA_URL + '/storage/v1/object/public/tiros/' + path;
 }
 
 // ── Guardar ───────────────────────────────────────────────────
