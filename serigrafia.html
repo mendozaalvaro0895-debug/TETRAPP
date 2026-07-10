@@ -5744,11 +5744,14 @@ function buildProdLineaCol(ln, fechas, byDL, esMaster) {
   return '<div class="prod-col">' + fichas + '</div>';
 }
 
-function buildProdGrid(fechas, byDL, esMaster) {
+function buildProdGrid(fechas, byDL, esMaster, operadorPorLinea) {
   var n = LINEAS_PRODUCCION.length;
   var cols = 'repeat(' + n + ',1fr)';
   var hdrs = LINEAS_PRODUCCION.map(function(ln) {
-    return '<div class="prod-col-hdr">' + escHtml(ln.nombre) + '</div>';
+    var op = operadorPorLinea && operadorPorLinea[ln.id];
+    return '<div class="prod-col-hdr">' + escHtml(ln.nombre) +
+      (op ? '<br><span style="text-transform:none;letter-spacing:0;font-weight:400;font-size:9px;opacity:.45">' + escHtml(op) + '</span>' : '') +
+      '</div>';
   }).join('');
   var body = LINEAS_PRODUCCION.map(function(ln) {
     return buildProdLineaCol(ln, fechas, byDL, esMaster);
@@ -5942,6 +5945,18 @@ async function renderProductividad() {
   // Fechas ordenadas más reciente primero
   var fechas = Object.keys(fechasSet).sort(function(a, b) { return b > a ? 1 : -1; });
 
+  // Operador más reciente por línea (fechas ya en orden newest-first)
+  var operadorPorLinea = {};
+  fechas.forEach(function(f) {
+    LINEAS_PRODUCCION.forEach(function(ln) {
+      if (operadorPorLinea[ln.id]) return;
+      var d = byDL[f] && byDL[f][ln.id];
+      if (!d) return;
+      var primer = d.momentos.inicio || d.momentos.mediodia || d.momentos.fin || d.velada;
+      if (primer && primer.operador_nombre) operadorPorLinea[ln.id] = primer.operador_nombre;
+    });
+  });
+
   // KPI strip: tiros acumulados por línea en el mes
   var esMaster = typeof TETRA !== 'undefined' && TETRA.rol === 'master';
   kpis.innerHTML = LINEAS_PRODUCCION.map(function(ln) {
@@ -5982,7 +5997,7 @@ async function renderProductividad() {
         '<button onclick="limpiarFotosAntiguas()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--gray-l);cursor:pointer;font-family:var(--sans)">🗑 Limpiar fotos &gt;7 días</button>' +
       '</div>'
     : '';
-  tabla.innerHTML = buildProdGrid(fechas, byDL, esMaster) + adminBar;
+  tabla.innerHTML = buildProdGrid(fechas, byDL, esMaster, operadorPorLinea) + adminBar;
 }
 
 var MOMENTO_LBL_ADMIN_TXT = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '🌇 Fin', velada: '🌙 Velada' };
