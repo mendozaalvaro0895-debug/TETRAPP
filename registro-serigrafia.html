@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>TETRAPLASTIC — Registro de Producción · Serigrafía</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="shared/auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared/styles.css">
@@ -224,6 +225,13 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
       <div class="titulo">¡Lectura registrada!</div>
       <div class="exito-corr" id="okCorr">—</div>
       <div class="exito-det" id="okDet">—</div>
+
+      <div id="okChartBox" style="display:none;margin:8px 0 24px;text-align:left">
+        <div style="font-size:12px;font-weight:800;color:#5B21B6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;text-align:center">📊 Productividad del mes · ¿Qué línea va ganando?</div>
+        <div id="okRank" style="margin-bottom:14px"></div>
+        <div style="height:220px;position:relative"><canvas id="okChartCanvas"></canvas></div>
+      </div>
+
       <button class="btn-guardar" onclick="volverSeleccion()">👤 Registrar otro operario</button>
     </div>
   </div>
@@ -340,6 +348,9 @@ function elegirOperario(codigo) {
 function volverSeleccion() {
   opActual = null;
   quitarFoto();
+  if (_okChart) { _okChart.destroy(); _okChart = null; }
+  var okBox = document.getElementById('okChartBox');
+  if (okBox) okBox.style.display = 'none';
   mostrarPantalla('scrSel');
   window.scrollTo(0, 0);
 }
@@ -543,6 +554,138 @@ async function subirFoto(fecha, lineaId, momento) {
   return SUPA_URL + '/storage/v1/object/public/tiros/' + path;
 }
 
+// ── Gráfico de productividad del mes (pantalla de éxito) ──────
+var LINEAS_OK = [1, 2, 3, 4];
+var COLS_OK   = ['#2A8B75', '#D97706', '#1D4ED8', '#16A34A'];
+var _okChart  = null;
+
+function okDeltaLinea(slot) {
+  if (!slot) return null;
+  var cnts = ['inicio','mediodia','fin'].map(function(m){ return slot[m]; })
+    .filter(function(v){ return v !== undefined; });
+  return cnts.length >= 2 ? Math.max.apply(null, cnts) - Math.min.apply(null, cnts) : null;
+}
+
+async function renderOkChart(lineaActual) {
+  var box    = document.getElementById('okChartBox');
+  var canvas = document.getElementById('okChartCanvas');
+  if (!box || !canvas || typeof Chart === 'undefined') return;
+
+  var mesStr = fechaHoy().slice(0, 7);
+  var desde  = mesStr + '-01';
+  var hasta  = mesStr + '-31';
+
+  var lecturas = [];
+  try {
+    var r = await db.from('registro_tiros_serig')
+      .select('fecha,linea_id,momento,contador')
+      .eq('area', 'serig').gte('fecha', desde).lte('fecha', hasta);
+    if (r.error) throw r.error;
+    lecturas = r.data || [];
+  } catch(e) { console.warn('renderOkChart:', e); box.style.display = 'none'; return; }
+  if (!lecturas.length) { box.style.display = 'none'; return; }
+
+  // byDL[fecha][linea] = {inicio,mediodia,fin}
+  var byDL = {};
+  lecturas.forEach(function(l) {
+    if (l.momento === 'velada') return;
+    if (!byDL[l.fecha]) byDL[l.fecha] = {};
+    if (!byDL[l.fecha][l.linea_id]) byDL[l.fecha][l.linea_id] = {};
+    var slot = byDL[l.fecha][l.linea_id];
+    if (slot[l.momento] === undefined) slot[l.momento] = l.contador || 0;
+  });
+
+  // Todos los días del mes
+  var anio = parseInt(mesStr.slice(0,4), 10), mes = parseInt(mesStr.slice(5,7), 10);
+  var totalDias = new Date(anio, mes, 0).getDate();
+  var mm = (mes < 10 ? '0' : '') + mes;
+  var fechas = [];
+  for (var d = 1; d <= totalDias; d++) { var dd = (d < 10 ? '0' : '') + d; fechas.push(anio + '-' + mm + '-' + dd); }
+  var labels = fechas.map(function(f){ return String(parseInt(f.slice(8,10), 10)); });
+
+  // Totales acumulados por línea (para el ranking)
+  var totales = {};
+  LINEAS_OK.forEach(function(ln){ totales[ln] = 0; });
+  fechas.forEach(function(f) {
+    LINEAS_OK.forEach(function(ln) {
+      var dl = okDeltaLinea(byDL[f] && byDL[f][ln]);
+      if (dl !== null) totales[ln] += dl;
+    });
+  });
+
+  // Ranking ordenado desc
+  var rank = LINEAS_OK.slice().sort(function(a, b){ return totales[b] - totales[a]; });
+  var maxTotal = Math.max(1, totales[rank[0]]);
+  var medallas = ['🥇','🥈','🥉',''];
+  document.getElementById('okRank').innerHTML = rank.map(function(ln, pos) {
+    var esMia = ln === lineaActual;
+    var pct = Math.round((totales[ln] / maxTotal) * 100);
+    var col = COLS_OK[ln - 1];
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;' +
+        (esMia ? 'background:#F5F3FF;border:1.5px solid #C4B5FD;border-radius:8px;padding:4px 8px' : 'padding:4px 8px') + '">' +
+      '<span style="font-size:15px;width:20px">' + medallas[pos] + '</span>' +
+      '<span style="font-size:12px;font-weight:800;color:' + col + ';white-space:nowrap">Línea ' + ln + (esMia ? ' (tú)' : '') + '</span>' +
+      '<div style="flex:1;background:#EEE;border-radius:4px;height:8px;overflow:hidden">' +
+        '<div style="background:' + col + ';height:8px;width:' + pct + '%"></div>' +
+      '</div>' +
+      '<span style="font-family:\'DM Mono\',monospace;font-size:11px;font-weight:700;color:#333;white-space:nowrap">' + totales[ln].toLocaleString() + '</span>' +
+    '</div>';
+  }).join('');
+
+  // Datasets del gráfico
+  var datasets = LINEAS_OK.map(function(ln, i) {
+    var esMia = ln === lineaActual;
+    return {
+      label: 'Línea ' + ln + (esMia ? ' (tú)' : ''),
+      data: fechas.map(function(f){ return okDeltaLinea(byDL[f] && byDL[f][ln]); }),
+      borderColor: COLS_OK[i],
+      backgroundColor: COLS_OK[i] + '18',
+      borderWidth: esMia ? 4 : 2,
+      pointRadius: esMia ? 4 : 2.5,
+      pointHoverRadius: 6,
+      pointBackgroundColor: COLS_OK[i],
+      tension: 0.25,
+      spanGaps: false
+    };
+  });
+  datasets.push({
+    label: 'Meta (' + META_LINEA.toLocaleString() + ')',
+    data: fechas.map(function(){ return META_LINEA; }),
+    borderColor: '#EF4444', borderWidth: 1.5, borderDash: [6,4], pointRadius: 0, tension: 0
+  });
+
+  box.style.display = 'block';
+  if (_okChart) { _okChart.destroy(); _okChart = null; }
+  _okChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 10 }, usePointStyle: true, boxWidth: 7, padding: 8 } },
+        tooltip: {
+          callbacks: {
+            title: function(items){ return fechas[items[0].dataIndex]; },
+            label: function(ctx) {
+              var v = ctx.parsed.y;
+              if (v === null || v === undefined) return '';
+              if (ctx.datasetIndex >= LINEAS_OK.length) return 'Meta: ' + META_LINEA.toLocaleString();
+              var pct = Math.round((v / META_LINEA) * 100);
+              return ctx.dataset.label + ': ' + v.toLocaleString() + ' (' + pct + '%)';
+            }
+          }
+        }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { font: { size: 8 }, maxTicksLimit: 6, callback: function(v){ return v >= 1000 ? (v/1000) + 'k' : v; } } },
+        x: { grid: { display: false }, ticks: { font: { size: 8 }, autoSkip: true, maxTicksLimit: 12, maxRotation: 0 } }
+      }
+    }
+  });
+}
+
 // ── Guardar ───────────────────────────────────────────────────
 async function guardarRegistro() {
   if (!opActual) { volverSeleccion(); return; }
@@ -600,6 +743,7 @@ async function guardarRegistro() {
       + '<br>Contador: <strong>' + contador.toLocaleString() + '</strong> · ' + escHtml(diseno);
     mostrarPantalla('scrOk');
     window.scrollTo(0, 0);
+    renderOkChart(linea);
   } catch(e) {
     console.error('guardarRegistro:', e);
     var detalle = (e && e.message ? e.message : String(e)) +
