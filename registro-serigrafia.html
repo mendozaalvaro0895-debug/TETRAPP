@@ -565,8 +565,13 @@ async function guardarRegistro() {
   try {
     if (fotoBlob) {
       btn.textContent = 'Subiendo foto…';
-      var fotoUrl = await subirFoto(fecha, linea, momentoActual);
-      if (fotoUrl) payload.foto_url = fotoUrl;
+      try {
+        var fotoUrl = await subirFoto(fecha, linea, momentoActual);
+        if (fotoUrl) payload.foto_url = fotoUrl;
+      } catch(fotoErr) {
+        console.warn('subirFoto:', fotoErr);
+        showToast('⚠️ Foto no subida — registro se guardará sin ella', '#D97706');
+      }
     }
     btn.textContent = 'Guardando…';
     var r = await db.from('registro_tiros_serig').insert(payload);
