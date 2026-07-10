@@ -19,7 +19,6 @@
   --teal-xl: #EBF7F4;
   --serig-m: #5A2D9E;
   --serig-l: #F0EBFF;
-  --gold: #B07D2A;
   --red: #B83232;
   --red-l: #FEE2E2;
   --amber: #B87200;
@@ -1049,48 +1048,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
      tanto desde Inicio > Entregados como desde Movimientos > Ingresos PT -->
 <div class="overlay" id="formEntregadoInline"></div>
 
-<!-- ══════════════════ MODAL PARO MÁQUINA ═════════════════ -->
-<div class="overlay" id="modalParo">
-  <div class="modal" style="max-width:400px">
-    <div class="mh">
-      <div class="mh-title">⏸ Reportar paro de máquina</div>
-      <button class="m-close" onclick="cerrarModalParo()">✕</button>
-    </div>
-    <div class="mb">
-      <div class="fg full">
-        <div class="fl">Máquina / Área</div>
-        <select class="fs" id="paroMaquina">
-          <option value="serigrafia_1">Máquina Serigrafía #1</option>
-          <option value="serigrafia_2">Máquina Serigrafía #2</option>
-          <option value="tampografia">Máquina Tampografía</option>
-          <option value="horno">Horno de secado</option>
-          <option value="flameado">Máquina Flameado</option>
-          <option value="otra">Otra</option>
-        </select>
-      </div>
-      <div class="fg full">
-        <div class="fl">Motivo del paro</div>
-        <select class="fs" id="paroMotivo">
-          <option value="mantenimiento">Mantenimiento</option>
-          <option value="falta_material">Falta de material</option>
-          <option value="cambio_molde">Cambio de molde</option>
-          <option value="operador_ausente">Operador ausente</option>
-          <option value="energia">Problema eléctrico</option>
-          <option value="calidad">Problema de calidad</option>
-          <option value="pantalla">Problema de pantalla</option>
-          <option value="tinta">Falta de tinta</option>
-          <option value="otro">Otro</option>
-        </select>
-      </div>
-      <div class="fg full"><div class="fl">Duración (minutos)</div><input class="fi" id="paroDuracion" type="number" placeholder="minutos" value="30"></div>
-      <div class="fg full"><div class="fl">Observaciones</div><textarea class="fta" id="paroObs" rows="2"></textarea></div>
-    </div>
-    <div class="mf">
-      <button class="btn btn-g" onclick="cerrarModalParo()">Cancelar</button>
-      <button class="btn btn-s" onclick="confirmarParo()">Registrar paro</button>
-    </div>
-  </div>
-</div>
 
 <script>
 // ════════════════════════════════════════════════════════════
@@ -1098,6 +1055,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 // ════════════════════════════════════════════════════════════
 
 // SUPA_URL, SUPA_KEY, db y HEADERS vienen de shared/auth.js
+
+// Fecha local (YYYY-MM-DD) sin desfase UTC — Guatemala es UTC-6.
+function fechaHoy() {
+  var d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
 
 // ── Meta-encoding (envase/cap/tiros en campo notas) ──────────
 var META_SEP = '__M__';
@@ -1335,10 +1300,10 @@ var matrizDbDisponible = null;   // null = aún no se sabe; true/false una vez d
 var ausentesHoy    = {};         // { codigo: true } — se carga al init y al marcar asistencia
 var asistHoyCache  = {};         // { codigo: estado } — refleja la fecha del widget
 var asistHoyRolCache = {};       // { codigo: rol }   — rol guardado para la fecha del widget
-var asistHoyFecha  = new Date().toISOString().slice(0,10); // fecha activa del widget
+var asistHoyFecha  = fechaHoy(); // fecha activa del widget
 
 async function cargarAusentesHoy() {
-  var hoy = new Date().toISOString().slice(0,10);
+  var hoy = fechaHoy();
   ausentesHoy   = {};
   asistHoyCache = {};
   // Caché local primero (velocidad)
@@ -1368,7 +1333,7 @@ async function cargarAusentesHoy() {
 }
 
 async function toggleAsistHoy(codigo, estado) {
-  var hoy = new Date().toISOString().slice(0,10);
+  var hoy = fechaHoy();
   var prev = asistHoyCache[codigo];
   var nuevoEstado = (prev === estado) ? 'presente' : estado;
   // Actualización optimista
@@ -2705,7 +2670,7 @@ function renderProdMensual() {
   var mes      = hoy.getMonth();
   var diasMes  = new Date(anio, mes + 1, 0).getDate();
   var mesStr   = hoy.toLocaleString('es-GT', { month: 'long', year: 'numeric' });
-  var todayStr = hoy.toISOString().slice(0,10);
+  var todayStr = fechaHoy();
   var finStr   = new Date(anio, mes, diasMes).toISOString().slice(0,10);
 
   // Rango: desde inicio del mes anterior
@@ -2982,7 +2947,7 @@ function renderAsistHoy() {
   var stPF = contarStats(plazaFija);
   var stPR = contarStats(prestados);
 
-  var hoy = new Date().toISOString().slice(0,10);
+  var hoy = fechaHoy();
   var esHoy = asistHoyFecha === hoy;
   var fechaLbl = new Date(asistHoyFecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long' });
   var navFecha =
@@ -3033,10 +2998,10 @@ async function renderFaltasChart() {
   var el = document.getElementById('faltasChart');
   if (!el) return;
   var hoy       = new Date();
-  var mesStr    = hoy.toISOString().slice(0,7);
+  var mesStr    = fechaHoy().slice(0,7);
   var inicioData  = ASIST_FECHA_MIN;
   var inicioDias  = inicioData;      // eje X: desde fecha mínima
-  var fin        = hoy.toISOString().slice(0,10);
+  var fin        = fechaHoy();
 
   // Identificar codigos de prestados
   var prestadosCod = (personalData && personalData.serig ? personalData.serig : [])
@@ -3179,7 +3144,7 @@ async function renderAsistGrid() {
   var _agTargets = ['asistGrid', 'personalAsist'].map(function(id){ return document.getElementById(id); }).filter(Boolean);
   if (!_agTargets.length) return;
   var el = _agTargets[0]; // para compatibilidad con código que asume el existe
-  var hoy    = new Date().toISOString().slice(0,10);
+  var hoy    = fechaHoy();
   var mesStr = asistGridMes || hoy.slice(0,7);
   var año    = parseInt(mesStr.slice(0,4));
   var mesN   = parseInt(mesStr.slice(5,7));
@@ -3321,7 +3286,7 @@ async function toggleAsistCell(codigo, fecha) {
   if (fechaInicio && fecha < fechaInicio) return;
   var byPD   = asistGridCache.byPersonDay;
   var curRaw = byPD[codigo] && byPD[codigo][fecha];
-  var hoy = new Date().toISOString().slice(0,10);
+  var hoy = fechaHoy();
   // Para hoy sin registro = 'pendiente' (gris); para días pasados sin registro = 'presente'
   var cur = curRaw !== undefined ? curRaw : (fecha === hoy ? 'pendiente' : 'presente');
   // Ciclo: pendiente(gris) → presente(verde) → ausente → tarde → velada → (borra registro)
@@ -3376,7 +3341,7 @@ function exportarAsistGridPDF() {
   var mesStr = asistGridCache._mes;
   var año    = parseInt(mesStr.slice(0,4));
   var mesN   = parseInt(mesStr.slice(5,7));
-  var hoy    = new Date().toISOString().slice(0,10);
+  var hoy    = fechaHoy();
   var ultimoDia = new Date(año, mesN, 0).getDate();
   var dias = [];
   for (var dd = 1; dd <= ultimoDia; dd++) dias.push(mesStr + '-' + (dd < 10 ? '0'+dd : dd));
@@ -3739,9 +3704,9 @@ function verDetalleAsistencia(fecha, evt) {
 
 async function exportarAsistenciaMes() {
   var hoy    = new Date();
-  var mesStr = hoy.toISOString().slice(0,7);
+  var mesStr = fechaHoy().slice(0,7);
   var inicio = mesStr + '-01';
-  var fin    = hoy.toISOString().slice(0,10);
+  var fin    = fechaHoy();
   var mesNombre = hoy.toLocaleDateString('es-GT', { month:'long', year:'numeric' });
   mesNombre = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1);
 
@@ -3921,7 +3886,7 @@ async function cargarEntregasSerig() {
         if (local.length > 0) {
           var payload = local.map(function(m) {
             return { requi: m.requi || '', cliente: m.cliente || '', cant: m.cant || 0,
-                     fecha: m.fecha || new Date().toISOString().slice(0,10), nota: m.nota || '',
+                     fecha: m.fecha || fechaHoy(), nota: m.nota || '',
                      sol_id: m.solId || null, sol_codigo: m.solCodigo || '', lineas: m.lineas || [] };
           });
           var ins = await db.from('entregas_serig').insert(payload).select();
@@ -4010,7 +3975,7 @@ function abrirFormEntregado() {
         '</div>' +
         '<div>' +
           '<div style="font-size:9px;font-weight:700;color:var(--gray-l);margin-bottom:2px">FECHA ENTREGA</div>' +
-          '<input id="eFecha" type="date" value="' + new Date().toISOString().slice(0,10) + '" style="' + inputSty + '">' +
+          '<input id="eFecha" type="date" value="' + fechaHoy() + '" style="' + inputSty + '">' +
         '</div>' +
       '</div>' +
       // Fila 3: Productos
@@ -4202,7 +4167,7 @@ async function guardarEntregadoManual() {
   lineas.forEach(function(l) { if (l.cliente && clientesPrincipales.indexOf(l.cliente) < 0) clientesPrincipales.push(l.cliente); });
   var clientePrincipal = clientesPrincipales.join(' / ');
   var firstLinked = lineas.find(function(l) { return l.solId; }) || {};
-  var fechaVal = ((document.getElementById('eFecha') || {}).value || new Date().toISOString().slice(0,10));
+  var fechaVal = ((document.getElementById('eFecha') || {}).value || fechaHoy());
   var dbPayload = { requi: requi, cliente: clientePrincipal, cant: totalCant, fecha: fechaVal,
                     nota: nota, sol_id: firstLinked.solId || null, sol_codigo: firstLinked.solCodigo || '', lineas: lineas };
 
@@ -4485,7 +4450,7 @@ async function refreshKPIs() {
   el = document.getElementById('ks-pend'); if (el) el.textContent = pendientes;
 
   try {
-    var hoy = new Date().toISOString().split('T')[0];
+    var hoy = fechaHoy();
     var r = await db.from('movimientos_materiales').select('cantidad,tipo').gte('created_at', hoy);
     if (r.data) {
       var perdidas = r.data.filter(function(f) { return f.tipo === 'perdida'; })
@@ -4542,16 +4507,6 @@ async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
       tipo: 'salida_bodega', operador_id: usuario, observaciones: obs
     });
     if (!r.error) await ajustarExistencia(sku, -cantidad);
-    return { ok: !r.error, error: r.error ? r.error.message : null };
-  } catch(e) { return { ok: false, error: e.message }; }
-}
-
-async function registrarParoMaquina(maquinaId, motivo, duracion, usuario, obs) {
-  try {
-    var r = await db.from('paros_maquina').insert({
-      maquina_id: maquinaId, motivo: motivo, duracion_minutos: duracion,
-      usuario: usuario, observaciones: obs
-    });
     return { ok: !r.error, error: r.error ? r.error.message : null };
   } catch(e) { return { ok: false, error: e.message }; }
 }
@@ -4912,19 +4867,6 @@ async function confirmarBorrar(id) {
   }
 }
 
-function reportarParo() { document.getElementById('modalParo').classList.add('open'); }
-function cerrarModalParo() { document.getElementById('modalParo').classList.remove('open'); }
-async function confirmarParo() {
-  var maquina  = document.getElementById('paroMaquina').value;
-  var motivo   = document.getElementById('paroMotivo').value;
-  var duracion = parseInt(document.getElementById('paroDuracion').value);
-  var obs      = document.getElementById('paroObs').value;
-  if (!duracion || duracion <= 0) { showToast('⚠️ Duración válida requerida', '#B83232'); return; }
-  var result = await registrarParoMaquina(maquina, motivo, duracion, 'supervisor', obs);
-  if (result.ok) { showToast('✅ Paro registrado: ' + duracion + ' min por ' + motivo); cerrarModalParo(); }
-  else showToast('❌ Error: ' + result.error, '#B83232');
-}
-
 // ════════════════════════════════════════════════════════════
 // FORMULARIO NUEVA SOLICITUD
 // ════════════════════════════════════════════════════════════
@@ -4940,7 +4882,7 @@ function abrirForm() {
   document.getElementById('mTitle').textContent = 'Nueva solicitud · Serigrafía';
   document.getElementById('btnSave').textContent = 'Guardar';
   var d = new Date(); d.setDate(d.getDate() + 3);
-  document.getElementById('fFecha').value = d.toISOString().split('T')[0];
+  document.getElementById('fFecha').value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   document.getElementById('fPrioSelect').value = 'normal';
   document.getElementById('overlay').classList.add('open');
   calcular();
@@ -5636,7 +5578,7 @@ async function renderProductividad() {
   if (!kpis || !tabla) return;
   tabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando...</div></div>';
 
-  var fecha = (document.getElementById('prodFecha') || {}).value || new Date().toISOString().slice(0,10);
+  var fecha = (document.getElementById('prodFecha') || {}).value || fechaHoy();
 
   var lecturas = [];
   try {
@@ -5911,7 +5853,7 @@ function abrirModalMovSerig() {
   movSLineasCount = 0; movSSkus = {}; movSSolIds = {};
   document.getElementById('movSRequi').value = '';
   document.getElementById('movSNota').value  = '';
-  document.getElementById('movSFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('movSFecha').value = fechaHoy();
   var usage = getCliUsage();
   var sorted = CLIENTES.slice().sort(function(a, b) {
     var diff = (usage[b] || 0) - (usage[a] || 0);
@@ -6409,17 +6351,6 @@ function animShake(el) {
   }, { once: true });
 }
 
-function animPop(el) {
-  if (!el) return;
-  el.classList.remove('anim-pop');
-  void el.offsetWidth;
-  el.classList.add('anim-pop');
-  el.addEventListener('animationend', function h() {
-    el.classList.remove('anim-pop');
-    el.removeEventListener('animationend', h);
-  }, { once: true });
-}
-
 function triggerViewEnter(viewId) {
   var el = document.getElementById(viewId);
   if (!el) return;
@@ -6453,7 +6384,7 @@ function switchTab(tab) {
     var v = document.getElementById('view-productividad');
     if (v) { v.style.display = 'flex'; triggerViewEnter('view-productividad'); }
     var fEl = document.getElementById('prodFecha');
-    if (fEl && !fEl.value) fEl.value = new Date().toISOString().slice(0,10);
+    if (fEl && !fEl.value) fEl.value = fechaHoy();
     renderProductividad();
   } else if (tab === 'dash') {
     window.location.href = 'dashboard.html';
@@ -6640,7 +6571,7 @@ function abrirModalNuevoOperario() {
   document.getElementById('mpIniciales').value = '';
   document.getElementById('mpCodigo').value = '';
   document.getElementById('mpCodigo').disabled = false;
-  document.getElementById('mpFechaInicio').value = new Date().toISOString().slice(0,10);
+  document.getElementById('mpFechaInicio').value = fechaHoy();
   document.getElementById('mpFechaBaja').value = '';
   document.getElementById('mpActivo').checked = true;
   poblarRolesModal('');
@@ -6769,7 +6700,7 @@ function showToast(msg, color) {
 
 // ── BADGE INVENTARIO ────────────────────────────────────────
 (function() {
-  var hoy = new Date().toISOString().split('T')[0];
+  var hoy = fechaHoy();
   var d = JSON.parse(localStorage.getItem('tetra_inv_' + hoy) || '{"count":0}');
   var c = d.count || 0;
   if (c < 2) {
@@ -6827,7 +6758,7 @@ function poblarClientes() {
 // ASISTENCIA & VELADAS
 // ════════════════════════════════════════════════════════════
 
-var asistFecha = new Date().toISOString().slice(0,10);
+var asistFecha = fechaHoy();
 var asistCache = {}; // { codigo: estado }
 var ASIST_TABLE = 'asistencia_diaria';
 
@@ -6918,7 +6849,7 @@ async function toggleAsistencia(codigo, estado) {
     local[asistFecha][codigo] = nuevoEstado;
     saveAsistLocal(local);
     // Sincronizar ausentesHoy y refrescar widgets si es hoy
-    var hoy = new Date().toISOString().slice(0,10);
+    var hoy = fechaHoy();
     if (asistFecha === hoy) {
       asistHoyCache[codigo] = nuevoEstado;
       if (nuevoEstado === 'ausente') ausentesHoy[codigo] = true;
@@ -7021,11 +6952,11 @@ async function renderAsistencia() {
 
 async function asistCambiarFecha(delta) {
   if (delta === 0) {
-    asistFecha = new Date().toISOString().slice(0,10);
+    asistFecha = fechaHoy();
   } else {
     var d = new Date(asistFecha + 'T12:00:00');
     d.setDate(d.getDate() + delta);
-    asistFecha = d.toISOString().slice(0,10);
+    asistFecha = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
   renderAsistencia();
 }
@@ -7059,7 +6990,7 @@ async function init() {
   // Fecha por defecto en formulario
   var d = new Date(); d.setDate(d.getDate() + 3);
   var fi = document.getElementById('fFecha');
-  if (fi) fi.value = d.toISOString().split('T')[0];
+  if (fi) fi.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 
   // Carga paralela de datos
   await Promise.all([cargarInventario(), cargarPersonal(), cargarEntregasSerig(), cargarOrdenSinAsignar()]);

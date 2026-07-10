@@ -206,6 +206,15 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 <script>
 // SUPA_URL, SUPA_KEY, db y escHtml vienen de shared/auth.js
 
+// Fecha local (YYYY-MM-DD) sin desfase UTC — Guatemala es UTC-6.
+// toISOString() devolvería mañana si son >18:00 hora local.
+function fechaHoy() {
+  var d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
 // ── Estado ────────────────────────────────────────────────────
 var operarios = [];
 var inventarioCache = [];
@@ -288,7 +297,7 @@ function elegirOperario(codigo) {
   document.getElementById('qAv').style.background = opActual.color_hex || '#5B21B6';
   document.getElementById('qNombre').textContent = opActual.nombre;
 
-  document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fFecha').value = fechaHoy();
   document.getElementById('fHora').value = new Date().toTimeString().slice(0,5);
   document.getElementById('fLinea').value = '1';
   document.getElementById('fDiseno').value = '';
@@ -371,7 +380,7 @@ document.addEventListener('click', function(e) {
 async function cargarHoyLinea() {
   var box = document.getElementById('hoyBox');
   var linea = parseInt(document.getElementById('fLinea').value) || 1;
-  var fecha = document.getElementById('fFecha').value || new Date().toISOString().slice(0,10);
+  var fecha = document.getElementById('fFecha').value || fechaHoy();
   try {
     var r = await db.from('registro_tiros_serig')
       .select('momento, contador, diseno, sku, hora, operador_codigo, created_at')
