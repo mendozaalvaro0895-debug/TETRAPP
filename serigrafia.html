@@ -186,6 +186,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .op-tiros-diseno{font-size:10px;color:var(--gray-l);margin-top:1px;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .op-tiros-row{font-size:10.5px;color:var(--gray);padding:2px 0;line-height:1.5}
 .op-tiros-row.op-tiros-vacia{color:var(--gray-l);font-style:italic}
+.prod-col-hdr{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--serig-m);padding:5px 8px;background:var(--serig-l);border-radius:6px;text-align:center}
+.pfc{background:var(--card);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;min-width:0}
+.pfc-hdr{background:var(--serig-l);color:var(--serig-m);font-size:11px;font-weight:800;padding:6px 10px;border-bottom:1px solid var(--border)}
+.pfc-diseno{font-size:10px;color:var(--gray-l);padding:4px 10px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pfc-row{font-size:11px;color:var(--ink);padding:4px 10px;border-bottom:1px solid var(--bg2);line-height:1.6;overflow:hidden}
+.pfc-row:last-child{border-bottom:none}
+.pfc-vacia{color:var(--gray-l);font-style:italic}
+.pfc-hora{font-family:var(--mono);font-size:10px;color:var(--gray)}
+.pfc-delta{font-size:11px;font-weight:800;padding:5px 10px;background:var(--bg2);border-top:1px solid var(--border)}
+.pfc-velada{background:var(--card);border:1.5px solid #DDD6FE;border-radius:10px;overflow:hidden;margin-bottom:8px;min-width:0}
+.pfc-velada .pfc-hdr{background:#EDE9FE;color:#5B21B6;border-bottom-color:#DDD6FE}
 
 /* ── BOARD DE ASIGNACIÓN ──────────────────────────────────── */
 /* Bloque principal "Sin asignar" */
@@ -671,7 +682,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="ph-sub">Meta por línea: 10,000 tiros/día</div>
         </div>
         <div class="ph-r">
-          <input class="fi" type="date" id="prodFecha" style="font-size:12px;padding:6px 10px" onchange="renderProductividad()">
+          <input class="fi" type="month" id="prodMes" style="font-size:12px;padding:6px 10px" onchange="renderProductividad()">
         </div>
       </div>
 
@@ -5578,8 +5589,8 @@ var META_TIROS_LINEA = 10000;
 function buildUltimaLecturaRow(l) {
   var f = String(l.fecha || '');
   return '<div style="padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer" ' +
-    'onclick="document.getElementById(\'prodFecha\').value=\'' + escHtml(f) + '\';renderProductividad()" ' +
-    'title="Ver esta fecha en Productividad">' +
+    'onclick="document.getElementById(\'prodMes\').value=\'' + escHtml(f.slice(0,7)) + '\';renderProductividad()" ' +
+    'title="Ver este mes en Productividad">' +
     '<strong>' + escHtml(f) + '</strong> · Línea ' + escHtml(String(l.linea_id || '?')) +
     ' · ' + escHtml(l.operador_nombre || l.operador_codigo || '—') +
     ' · ' + escHtml(l.momento || '') +
@@ -5607,19 +5618,102 @@ async function buildUltimasLecturasHint(fechaBuscada) {
   } catch(e) { return ''; }
 }
 
+// ── Productividad: helpers de fichas por fecha ─────────────────
+function pfcFmtHora(l) {
+  if (l.hora) return l.hora.slice(0,5);
+  if (l.created_at) {
+    var d = new Date(l.created_at);
+    if (!isNaN(d.getTime())) return d.toLocaleTimeString('es-GT', { hour:'2-digit', minute:'2-digit' });
+  }
+  return '—';
+}
+
+function buildPfcAcciones(id, esMaster) {
+  if (!esMaster) return '';
+  return '<span style="float:right">' +
+    '<button onclick="editarLecturaTiro(\'' + id + '\')" style="background:none;border:none;cursor:pointer;color:var(--serig-m);font-size:11px;padding:0 3px" title="Editar">✏️</button>' +
+    '<button onclick="eliminarLecturaTiro(\'' + id + '\')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:11px;padding:0 3px" title="Eliminar">🗑</button>' +
+    '</span>';
+}
+
+function buildPfcMomentoRow(l, m, esMaster) {
+  var lbl = MOMENTO_LBL_ADMIN_TXT[m];
+  if (!l) return '<div class="pfc-row pfc-vacia">' + lbl + ': —</div>';
+  return '<div class="pfc-row">' + buildPfcAcciones(l.id, esMaster) + lbl + ': <span class="pfc-hora">' + pfcFmtHora(l) + '</span> · <strong>' + (l.contador||0).toLocaleString() + '</strong></div>';
+}
+
+function buildPfcVeladaCard(vld, esMaster) {
+  return '<div class="pfc pfc-velada">' +
+    '<div class="pfc-hdr">🌙 Velada</div>' +
+    '<div class="pfc-row">' + buildPfcAcciones(vld.id, esMaster) + '<span class="pfc-hora">' + pfcFmtHora(vld) + '</span> · <strong>' + (vld.contador||0).toLocaleString() + '</strong></div>' +
+    '</div>';
+}
+
+function buildPfcFechaCard(fecha, datos, esMaster) {
+  var m = datos.momentos;
+  var vld = datos.velada;
+  var hayM = m.inicio || m.mediodia || m.fin;
+  var fechaFmt = new Date(fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday:'short', day:'2-digit', month:'short' });
+  var primer = m.inicio || m.mediodia || m.fin;
+  var diseno = primer ? (primer.diseno || primer.sku || '') : '';
+  var cnts = [m.inicio, m.mediodia, m.fin].filter(Boolean).map(function(l){ return l.contador || 0; });
+  var delta = cnts.length >= 2 ? Math.max.apply(null, cnts) - Math.min.apply(null, cnts) : null;
+  var pct = delta !== null ? Math.min(100, Math.round((delta / META_TIROS_LINEA) * 100)) : 0;
+  var dc = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--serig-m)' : 'var(--amber)';
+  var mainCard = '';
+  if (hayM) {
+    mainCard = '<div class="pfc">' +
+      '<div class="pfc-hdr">📅 ' + escHtml(fechaFmt) + '</div>' +
+      (diseno ? '<div class="pfc-diseno">' + escHtml(diseno.slice(0,50)) + '</div>' : '') +
+      buildPfcMomentoRow(m.inicio, 'inicio', esMaster) +
+      buildPfcMomentoRow(m.mediodia, 'mediodia', esMaster) +
+      buildPfcMomentoRow(m.fin, 'fin', esMaster) +
+      (delta !== null ? '<div class="pfc-delta" style="color:' + dc + '">▲ ' + delta.toLocaleString() + ' tiros · ' + pct + '%</div>' : '') +
+      '</div>';
+  }
+  return mainCard + (vld ? buildPfcVeladaCard(vld, esMaster) : '');
+}
+
+function buildProdLineaCol(ln, fechas, byDL, esMaster) {
+  var fichas = fechas.map(function(f) {
+    var datos = byDL[f] && byDL[f][ln.id];
+    if (!datos) return '';
+    return buildPfcFechaCard(f, datos, esMaster);
+  }).join('');
+  return '<div class="prod-col">' + fichas + '</div>';
+}
+
+function buildProdGrid(fechas, byDL, esMaster) {
+  var n = LINEAS_PRODUCCION.length;
+  var cols = 'repeat(' + n + ',1fr)';
+  var hdrs = LINEAS_PRODUCCION.map(function(ln) {
+    return '<div class="prod-col-hdr">' + escHtml(ln.nombre) + '</div>';
+  }).join('');
+  var body = LINEAS_PRODUCCION.map(function(ln) {
+    return buildProdLineaCol(ln, fechas, byDL, esMaster);
+  }).join('');
+  return '<div style="display:grid;grid-template-columns:' + cols + ';gap:8px;padding:0 0 8px">' + hdrs + '</div>' +
+         '<div style="display:grid;grid-template-columns:' + cols + ';gap:12px">' + body + '</div>';
+}
+
 async function renderProductividad() {
   var kpis = document.getElementById('prodKPIs');
   var tabla = document.getElementById('prodTabla');
   if (!kpis || !tabla) return;
   tabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando...</div></div>';
 
-  var fecha = (document.getElementById('prodFecha') || {}).value || fechaHoy();
+  var mesStr = (document.getElementById('prodMes') || {}).value || fechaHoy().slice(0,7);
+  var desde = mesStr + '-01';
+  var hasta = mesStr + '-31';
 
   var lecturas = [];
   try {
     var r = await db.from('registro_tiros_serig')
-      .select('*').eq('area', 'serig').eq('fecha', fecha)
-      .order('linea_id', { ascending: true }).order('created_at', { ascending: true });
+      .select('*').eq('area', 'serig')
+      .gte('fecha', desde).lte('fecha', hasta)
+      .order('fecha', { ascending: false })
+      .order('linea_id', { ascending: true })
+      .order('created_at', { ascending: true });
     if (r.error) {
       if (r.error.code === 'PGRST205' || r.error.code === '42P01') {
         kpis.innerHTML = '';
@@ -5636,30 +5730,42 @@ async function renderProductividad() {
     return;
   }
 
-  // Agrupar por línea
-  var porLinea = {};
-  LINEAS_PRODUCCION.forEach(function(ln){ porLinea[ln.id] = []; });
+  // Agrupar: byDL[fecha][linea_id] = { momentos:{inicio,mediodia,fin}, velada }
+  var byDL = {};
+  var fechasSet = {};
   lecturas.forEach(function(l) {
-    if (!porLinea[l.linea_id]) porLinea[l.linea_id] = [];
-    porLinea[l.linea_id].push(l);
+    var f = l.fecha;
+    var lid = l.linea_id;
+    if (!byDL[f]) { byDL[f] = {}; fechasSet[f] = true; }
+    if (!byDL[f][lid]) byDL[f][lid] = { momentos: {}, velada: null };
+    if (l.momento === 'velada') {
+      if (!byDL[f][lid].velada) byDL[f][lid].velada = l;
+    } else {
+      if (!byDL[f][lid].momentos[l.momento]) byDL[f][lid].momentos[l.momento] = l;
+    }
   });
+  // Fechas ordenadas más reciente primero
+  var fechas = Object.keys(fechasSet).sort(function(a, b) { return b > a ? 1 : -1; });
 
-  function deltaDe(lista) {
-    if (!lista.length) return 0;
-    var contadores = lista.map(function(l){ return l.contador || 0; });
-    return Math.max.apply(null, contadores) - Math.min.apply(null, contadores);
-  }
-
-  // KPI strip: una tarjeta por línea con avance vs meta
+  // KPI strip: tiros acumulados por línea en el mes
+  var esMaster = typeof TETRA !== 'undefined' && TETRA.rol === 'master';
   kpis.innerHTML = LINEAS_PRODUCCION.map(function(ln) {
-    var lista = porLinea[ln.id] || [];
-    var tiros = deltaDe(lista);
-    var pct = Math.min(100, Math.round((tiros / META_TIROS_LINEA) * 100));
-    var color = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--serig-m)' : pct > 0 ? 'var(--amber)' : 'var(--gray-l)';
+    var totalTiros = 0;
+    var diasConData = 0;
+    fechas.forEach(function(f) {
+      var datos = byDL[f] && byDL[f][ln.id];
+      if (!datos) return;
+      diasConData++;
+      var cnts = [datos.momentos.inicio, datos.momentos.mediodia, datos.momentos.fin].filter(Boolean).map(function(l){ return l.contador||0; });
+      if (cnts.length >= 2) totalTiros += Math.max.apply(null, cnts) - Math.min.apply(null, cnts);
+    });
+    var metaMes = diasConData * META_TIROS_LINEA;
+    var pct = metaMes > 0 ? Math.min(100, Math.round((totalTiros / metaMes) * 100)) : 0;
+    var color = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--serig-m)' : totalTiros > 0 ? 'var(--amber)' : 'var(--gray-l)';
     return '<div class="kpi">' +
       '<div class="kpi-l">' + escHtml(ln.nombre) + '</div>' +
-      '<div class="kpi-v" style="color:' + color + '">' + tiros.toLocaleString() + '</div>' +
-      '<div class="kpi-s">de ' + META_TIROS_LINEA.toLocaleString() + ' · ' + pct + '%</div>' +
+      '<div class="kpi-v" style="color:' + color + '">' + totalTiros.toLocaleString() + '</div>' +
+      '<div class="kpi-s">' + diasConData + ' día(s) · ' + pct + '%</div>' +
       '<div style="margin-top:6px;background:var(--border);border-radius:3px;height:5px">' +
         '<div style="background:' + color + ';height:5px;border-radius:3px;width:' + pct + '%"></div>' +
       '</div>' +
@@ -5667,63 +5773,12 @@ async function renderProductividad() {
   }).join('');
 
   if (!lecturas.length) {
-    tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin lecturas registradas para esta fecha</div>' +
-      (await buildUltimasLecturasHint(fecha));
+    tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin lecturas registradas para este mes</div>' +
+      (await buildUltimasLecturasHint(mesStr));
     return;
   }
 
-  // Columnas: una por línea (debajo de su KPI), con una ficha por
-  // operario/diseño mostrando Inicio/Mediodía/Fin + hora
-  var esMaster = typeof TETRA !== 'undefined' && TETRA.rol === 'master';
-
-  function fmtHora(iso) {
-    if (!iso) return null;
-    var d = new Date(iso);
-    if (isNaN(d.getTime())) return null;
-    return d.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function buildMomentoRow(l, m) {
-    var lbl = MOMENTO_LBL_ADMIN_TXT[m];
-    if (!l) return '<div class="op-tiros-row op-tiros-vacia">' + lbl + ': —</div>';
-    var hora = fmtHora(l.created_at) || '—';
-    var acciones = esMaster
-      ? '<span style="float:right">' +
-          '<button onclick="editarLecturaTiro(\'' + l.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--serig-m);font-size:11px;padding:0 3px" title="Editar">✏️</button>' +
-          '<button onclick="eliminarLecturaTiro(\'' + l.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:11px;padding:0 3px" title="Eliminar">🗑</button>' +
-        '</span>'
-      : '';
-    return '<div class="op-tiros-row">' + lbl + ': ' + hora + ' · ' + (l.contador||0).toLocaleString() + acciones + '</div>';
-  }
-
-  function buildLineaColumn(ln) {
-    var lista = porLinea[ln.id] || [];
-    if (!lista.length) return '<div class="prod-col"></div>';
-    // Agrupar por operario + diseño (una ficha por combinación)
-    var grupos = {};
-    var orden = [];
-    lista.forEach(function(l) {
-      var key = (l.operador_codigo || '') + '|' + (l.diseno || l.sku || '');
-      if (!grupos[key]) { grupos[key] = { operador: l.operador_nombre || l.operador_codigo || '—', diseno: l.diseno || l.sku || '', porMomento: {} }; orden.push(key); }
-      grupos[key].porMomento[l.momento] = l;
-    });
-    var fichas = orden.map(function(key) {
-      var g = grupos[key];
-      return '<div class="op-tiros-card">' +
-        '<div class="op-tiros-name">' + escHtml(g.operador) + '</div>' +
-        (g.diseno ? '<div class="op-tiros-diseno">' + escHtml(g.diseno) + '</div>' : '') +
-        buildMomentoRow(g.porMomento.inicio, 'inicio') +
-        buildMomentoRow(g.porMomento.mediodia, 'mediodia') +
-        buildMomentoRow(g.porMomento.fin, 'fin') +
-        (g.porMomento.velada ? buildMomentoRow(g.porMomento.velada, 'velada') : '') +
-        '</div>';
-    }).join('');
-    return '<div class="prod-col">' + fichas + '</div>';
-  }
-
-  tabla.innerHTML = '<div style="display:grid;grid-template-columns:repeat(' + LINEAS_PRODUCCION.length + ',1fr);gap:12px">' +
-    LINEAS_PRODUCCION.map(buildLineaColumn).join('') +
-    '</div>';
+  tabla.innerHTML = buildProdGrid(fechas, byDL, esMaster);
 }
 
 var MOMENTO_LBL_ADMIN_TXT = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '🌇 Fin', velada: '🌙 Velada' };
@@ -6420,8 +6475,8 @@ function switchTab(tab) {
   } else if (tab === 'productividad') {
     var v = document.getElementById('view-productividad');
     if (v) { v.style.display = 'flex'; triggerViewEnter('view-productividad'); }
-    var fEl = document.getElementById('prodFecha');
-    if (fEl && !fEl.value) fEl.value = fechaHoy();
+    var mEl = document.getElementById('prodMes');
+    if (mEl && !mEl.value) mEl.value = fechaHoy().slice(0,7);
     renderProductividad();
   } else if (tab === 'dash') {
     window.location.href = 'dashboard.html';
