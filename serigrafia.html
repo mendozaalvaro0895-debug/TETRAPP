@@ -5809,15 +5809,6 @@ function buildPfcFechaCard(fecha, datos, esMaster) {
   return mainCard + (vld ? buildPfcVeladaCard(vld, esMaster) : '');
 }
 
-function buildProdLineaCol(ln, fechas, byDL, esMaster) {
-  var fichas = fechas.map(function(f) {
-    var datos = byDL[f] && byDL[f][ln.id];
-    if (!datos) return '';
-    return buildPfcFechaCard(f, datos, esMaster);
-  }).join('');
-  return '<div class="prod-col">' + fichas + '</div>';
-}
-
 function buildProdGrid(fechas, byDL, esMaster, operadorPorLinea) {
   var n = LINEAS_PRODUCCION.length;
   var cols = 'repeat(' + n + ',1fr)';
@@ -5827,11 +5818,15 @@ function buildProdGrid(fechas, byDL, esMaster, operadorPorLinea) {
       (op ? '<br><span style="text-transform:none;letter-spacing:0;font-weight:600;font-size:11px;opacity:.7">' + escHtml(op) + '</span>' : '') +
       '</div>';
   }).join('');
-  var body = LINEAS_PRODUCCION.map(function(ln) {
-    return buildProdLineaCol(ln, fechas, byDL, esMaster);
+  // Fila-mayor: una fila por fecha, 4 celdas alineadas (blanco si la línea no registró ese día)
+  var rows = fechas.map(function(f) {
+    var cells = LINEAS_PRODUCCION.map(function(ln) {
+      var datos = byDL[f] && byDL[f][ln.id];
+      return '<div class="prod-col">' + (datos ? buildPfcFechaCard(f, datos, esMaster) : '') + '</div>';
+    }).join('');
+    return '<div style="display:grid;grid-template-columns:' + cols + ';gap:8px;align-items:start">' + cells + '</div>';
   }).join('');
-  return '<div style="display:grid;grid-template-columns:' + cols + ';gap:8px;padding:0 0 8px">' + hdrs + '</div>' +
-         '<div style="display:grid;grid-template-columns:' + cols + ';gap:12px">' + body + '</div>';
+  return '<div style="display:grid;grid-template-columns:' + cols + ';gap:8px;padding:0 0 8px">' + hdrs + '</div>' + rows;
 }
 
 var _prodChart = null;
