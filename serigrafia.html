@@ -5750,7 +5750,7 @@ function buildProdGrid(fechas, byDL, esMaster, operadorPorLinea) {
   var hdrs = LINEAS_PRODUCCION.map(function(ln) {
     var op = operadorPorLinea && operadorPorLinea[ln.id];
     return '<div class="prod-col-hdr">' + escHtml(ln.nombre) +
-      (op ? '<br><span style="text-transform:none;letter-spacing:0;font-weight:400;font-size:9px;opacity:.45">' + escHtml(op) + '</span>' : '') +
+      (op ? '<br><span style="text-transform:none;letter-spacing:0;font-weight:600;font-size:11px;opacity:.7">' + escHtml(op) + '</span>' : '') +
       '</div>';
   }).join('');
   var body = LINEAS_PRODUCCION.map(function(ln) {
@@ -5763,7 +5763,7 @@ function buildProdGrid(fechas, byDL, esMaster, operadorPorLinea) {
 var _prodChart = null;
 var _prodChartProds = {};
 
-function renderProductividadChart(fechas, byDL, mesStr) {
+function renderProductividadChart(fechas, byDL, mesStr, operadorPorLinea) {
   var container = document.getElementById('prodChart');
   var canvas    = document.getElementById('prodChartCanvas');
   if (!container || !canvas || typeof Chart === 'undefined') return;
@@ -5800,8 +5800,9 @@ function renderProductividadChart(fechas, byDL, mesStr) {
   var COLS = ['#2A8B75','#D97706','#1D4ED8','#16A34A'];
 
   var datasets = LINEAS_PRODUCCION.map(function(ln, i) {
+    var op = operadorPorLinea && operadorPorLinea[ln.id];
     return {
-      label: ln.nombre,
+      label: ln.nombre + (op ? ' · ' + op : ''),
       data: todasFechas.map(function(f) {
         var d = byDL[f] && byDL[f][ln.id];
         if (!d) return null;
@@ -5973,7 +5974,9 @@ async function renderProductividad() {
     var pct = metaMes > 0 ? Math.min(100, Math.round((totalTiros / metaMes) * 100)) : 0;
     var color = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--serig-m)' : totalTiros > 0 ? 'var(--amber)' : 'var(--gray-l)';
     return '<div class="kpi">' +
-      '<div class="kpi-l">' + escHtml(ln.nombre) + '</div>' +
+      '<div class="kpi-l">' + escHtml(ln.nombre) +
+        (operadorPorLinea[ln.id] ? '<span style="display:block;font-weight:500;font-size:10px;opacity:.65;margin-top:1px">' + escHtml(operadorPorLinea[ln.id]) + '</span>' : '') +
+      '</div>' +
       '<div class="kpi-v" style="color:' + color + '">' + totalTiros.toLocaleString() +
         (metaMes > 0 ? '<span style="font-size:13px;font-weight:500;color:var(--gray-l)"> / ' + metaMes.toLocaleString() + '</span>' : '') +
       '</div>' +
@@ -5984,7 +5987,7 @@ async function renderProductividad() {
     '</div>';
   }).join('');
 
-  renderProductividadChart(fechas, byDL, mesStr);
+  renderProductividadChart(fechas, byDL, mesStr, operadorPorLinea);
 
   if (!lecturas.length) {
     tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin lecturas registradas para este mes</div>' +
