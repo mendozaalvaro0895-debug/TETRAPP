@@ -5760,19 +5760,28 @@ function buildProdGrid(fechas, byDL, esMaster) {
 var _prodChart = null;
 var _prodChartProds = {};
 
-function renderProductividadChart(fechas, byDL) {
+function renderProductividadChart(fechas, byDL, mesStr) {
   var container = document.getElementById('prodChart');
   var canvas    = document.getElementById('prodChartCanvas');
   if (!container || !canvas || typeof Chart === 'undefined') return;
   if (_prodChart) { _prodChart.destroy(); _prodChart = null; }
-  if (!fechas.length) { container.style.display = 'none'; return; }
+  if (!fechas.length || !mesStr) { container.style.display = 'none'; return; }
 
-  var fechasAsc = fechas.slice().sort();
-  var labels    = fechasAsc.map(function(f) { return f.slice(8,10) + '/' + f.slice(5,7); });
+  // Generar TODOS los días del mes seleccionado
+  var anio  = parseInt(mesStr.slice(0,4), 10);
+  var mes   = parseInt(mesStr.slice(5,7), 10);
+  var totalDias = new Date(anio, mes, 0).getDate();
+  var mm = (mes < 10 ? '0' : '') + mes;
+  var todasFechas = [];
+  for (var d = 1; d <= totalDias; d++) {
+    var dd = (d < 10 ? '0' : '') + d;
+    todasFechas.push(anio + '-' + mm + '-' + dd);
+  }
+  var labels = todasFechas.map(function(f) { return String(parseInt(f.slice(8,10), 10)); });
 
-  // Productos por fecha/línea → para el tooltip
+  // Productos por fecha/línea → tooltip
   _prodChartProds = {};
-  fechasAsc.forEach(function(f) {
+  todasFechas.forEach(function(f) {
     _prodChartProds[f] = {};
     LINEAS_PRODUCCION.forEach(function(ln) {
       var d = byDL[f] && byDL[f][ln.id];
@@ -5790,7 +5799,7 @@ function renderProductividadChart(fechas, byDL) {
   var datasets = LINEAS_PRODUCCION.map(function(ln, i) {
     return {
       label: ln.nombre,
-      data: fechasAsc.map(function(f) {
+      data: todasFechas.map(function(f) {
         var d = byDL[f] && byDL[f][ln.id];
         if (!d) return null;
         var cnts = ['inicio','mediodia','fin']
@@ -5811,8 +5820,8 @@ function renderProductividadChart(fechas, byDL) {
   });
 
   datasets.push({
-    label: 'Meta diaria (' + META_TIROS_LINEA.toLocaleString() + ')',
-    data: fechasAsc.map(function(){ return META_TIROS_LINEA; }),
+    label: 'Meta (' + META_TIROS_LINEA.toLocaleString() + '/día)',
+    data: todasFechas.map(function(){ return META_TIROS_LINEA; }),
     borderColor: '#EF4444',
     borderWidth: 1.5,
     borderDash: [7,4],
@@ -5841,7 +5850,7 @@ function renderProductividadChart(fechas, byDL) {
           bodyFont:  { family: 'DM Sans', size: 11 },
           padding: 12,
           callbacks: {
-            title: function(items) { return fechasAsc[items[0].dataIndex]; },
+            title: function(items) { return todasFechas[items[0].dataIndex]; },
             label: function(ctx) {
               if (ctx.datasetIndex >= LINEAS_PRODUCCION.length)
                 return '  Meta: ' + META_TIROS_LINEA.toLocaleString();
@@ -5856,7 +5865,7 @@ function renderProductividadChart(fechas, byDL) {
               if (ctx.datasetIndex >= LINEAS_PRODUCCION.length) return '';
               var v = ctx.parsed.y;
               if (v === null || v === undefined) return '';
-              var f    = fechasAsc[ctx.dataIndex];
+              var f    = todasFechas[ctx.dataIndex];
               var prod = _prodChartProds[f] && _prodChartProds[f][LINEAS_PRODUCCION[ctx.datasetIndex].id];
               return prod ? '    📦 ' + prod : '';
             }
@@ -5874,8 +5883,8 @@ function renderProductividadChart(fechas, byDL) {
           }
         },
         x: {
-          grid: { display: false },
-          ticks: { font: { family: 'DM Sans', size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 16 }
+          grid: { color: '#F0EDE8' },
+          ticks: { font: { family: 'DM Sans', size: 10 }, maxRotation: 0, autoSkip: false }
         }
       }
     }
@@ -5958,7 +5967,7 @@ async function renderProductividad() {
     '</div>';
   }).join('');
 
-  renderProductividadChart(fechas, byDL);
+  renderProductividadChart(fechas, byDL, mesStr);
 
   if (!lecturas.length) {
     tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin lecturas registradas para este mes</div>' +
