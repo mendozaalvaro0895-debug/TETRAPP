@@ -687,13 +687,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
       </div>
 
-      <div class="kpi-strip" id="prodKPIs"></div>
-
-      <div id="prodChart" style="display:none;margin:8px 0 0;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
-        <canvas id="prodChartCanvas" height="260"></canvas>
-      </div>
-
       <div class="mov-scroll" id="prodScroll">
+        <div class="kpi-strip" id="prodKPIs"></div>
+
+        <div id="prodChart" style="display:none;margin:4px 0 8px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
+          <canvas id="prodChartCanvas" height="260"></canvas>
+        </div>
+
         <div id="prodTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
       </div>
     </div><!-- /view-productividad -->
@@ -5959,7 +5959,9 @@ async function renderProductividad() {
     var color = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--serig-m)' : totalTiros > 0 ? 'var(--amber)' : 'var(--gray-l)';
     return '<div class="kpi">' +
       '<div class="kpi-l">' + escHtml(ln.nombre) + '</div>' +
-      '<div class="kpi-v" style="color:' + color + '">' + totalTiros.toLocaleString() + '</div>' +
+      '<div class="kpi-v" style="color:' + color + '">' + totalTiros.toLocaleString() +
+        (metaMes > 0 ? '<span style="font-size:13px;font-weight:500;color:var(--gray-l)"> / ' + metaMes.toLocaleString() + '</span>' : '') +
+      '</div>' +
       '<div class="kpi-s">' + diasConData + ' día(s) · ' + pct + '%</div>' +
       '<div style="margin-top:6px;background:var(--border);border-radius:3px;height:5px">' +
         '<div style="background:' + color + ';height:5px;border-radius:3px;width:' + pct + '%"></div>' +
