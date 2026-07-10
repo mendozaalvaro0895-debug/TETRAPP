@@ -5659,11 +5659,20 @@ function buildPfcVeladaCard(vld, esMaster) {
 
 function verFoto(url) {
   var o = document.createElement('div');
-  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:zoom-out';
   o.onclick = function() { document.body.removeChild(o); };
   var img = document.createElement('img');
+  img.style.cssText = 'max-width:92vw;max-height:80vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,.6)';
+  img.onerror = function() {
+    img.style.display = 'none';
+    var lbl = document.createElement('div');
+    lbl.style.cssText = 'color:#fff;font:13px "DM Sans",sans-serif;text-align:center;padding:20px;max-width:90vw';
+    lbl.innerHTML = '⚠️ No se pudo cargar la imagen.<br>' +
+      '<a href="' + escHtml(url) + '" target="_blank" onclick="event.stopPropagation()" ' +
+      'style="color:#7DD3FC;word-break:break-all;font-size:11px">Abrir URL directamente ↗</a>';
+    o.appendChild(lbl);
+  };
   img.src = url;
-  img.style.cssText = 'max-width:92vw;max-height:88vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,.6)';
   o.appendChild(img);
   document.body.appendChild(o);
 }
