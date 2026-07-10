@@ -95,6 +95,8 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .exito-ico{font-size:56px;margin-bottom:12px}
 .exito-corr{font-family:'DM Mono',monospace;font-size:26px;font-weight:700;color:#5B21B6;margin:10px 0}
 .exito-det{font-size:13px;color:#6B6B6A;margin-bottom:24px;line-height:1.7}
+.okseg-btn{border:1.5px solid #DDD6FE;background:#fff;color:#6B21A8;border-radius:8px;padding:7px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.okseg-btn.okseg-active{background:#7C3AED;border-color:#7C3AED;color:#fff}
 
 .toast-msg{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#5B21B6;color:#fff;padding:12px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25)}
 .cargando{text-align:center;padding:50px 20px;color:#6B6B6A;font-size:13px}
@@ -227,9 +229,14 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
       <div class="exito-det" id="okDet">—</div>
 
       <div id="okChartBox" style="display:none;margin:8px 0 24px;text-align:left">
-        <div style="font-size:12px;font-weight:800;color:#5B21B6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;text-align:center">📊 Productividad del mes · ¿Qué línea va ganando?</div>
+        <div id="okChartTitle" style="font-size:12px;font-weight:800;color:#5B21B6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;text-align:center">📊 Productividad · ¿Qué línea va ganando?</div>
+        <div style="display:flex;gap:6px;justify-content:center;margin-bottom:14px">
+          <button type="button" id="okBtn-dia"    class="okseg-btn" onclick="okSetPeriodo('dia')">Día</button>
+          <button type="button" id="okBtn-semana" class="okseg-btn" onclick="okSetPeriodo('semana')">Semana</button>
+          <button type="button" id="okBtn-mes"    class="okseg-btn okseg-active" onclick="okSetPeriodo('mes')">Mes</button>
+        </div>
         <div id="okRank" style="margin-bottom:14px"></div>
-        <div style="height:220px;position:relative"><canvas id="okChartCanvas"></canvas></div>
+        <div id="okCanvasWrap" style="height:220px;position:relative"><canvas id="okChartCanvas"></canvas></div>
       </div>
 
       <button class="btn-guardar" onclick="volverSeleccion()">👤 Registrar otro operario</button>
@@ -554,10 +561,14 @@ async function subirFoto(fecha, lineaId, momento) {
   return SUPA_URL + '/storage/v1/object/public/tiros/' + path;
 }
 
-// ── Gráfico de productividad del mes (pantalla de éxito) ──────
+// ── Gráfico de productividad (pantalla de éxito) ──────────────
 var LINEAS_OK = [1, 2, 3, 4];
 var COLS_OK   = ['#2A8B75', '#D97706', '#1D4ED8', '#16A34A'];
 var _okChart  = null;
+var _okLineaActual = null;
+var _okPeriodo = 'mes';
+
+var OK_PERIODO_TXT = { dia: 'del día', semana: 'de la semana', mes: 'del mes' };
 
 function okDeltaLinea(slot) {
   if (!slot) return null;
@@ -566,14 +577,59 @@ function okDeltaLinea(slot) {
   return cnts.length >= 2 ? Math.max.apply(null, cnts) - Math.min.apply(null, cnts) : null;
 }
 
-async function renderOkChart(lineaActual) {
+function _okFmtFecha(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// Devuelve el arreglo de fechas (YYYY-MM-DD) del periodo elegido
+function okFechasPeriodo(periodo) {
+  var hoy = fechaHoy();
+  var fechas = [];
+  if (periodo === 'dia') {
+    fechas.push(hoy);
+  } else if (periodo === 'semana') {
+    var base = new Date(hoy + 'T12:00:00');
+    for (var i = 6; i >= 0; i--) {
+      var d = new Date(base); d.setDate(base.getDate() - i);
+      fechas.push(_okFmtFecha(d));
+    }
+  } else {
+    var mesStr = hoy.slice(0,7);
+    var anio = parseInt(mesStr.slice(0,4),10), mes = parseInt(mesStr.slice(5,7),10);
+    var totalDias = new Date(anio, mes, 0).getDate();
+    var mm = (mes < 10 ? '0' : '') + mes;
+    for (var dd = 1; dd <= totalDias; dd++) { fechas.push(anio + '-' + mm + '-' + (dd < 10 ? '0' : '') + dd); }
+  }
+  return fechas;
+}
+
+function okSetPeriodo(p) {
+  _okPeriodo = p;
+  ['dia','semana','mes'].forEach(function(k){
+    var b = document.getElementById('okBtn-' + k);
+    if (b) b.classList.toggle('okseg-active', k === p);
+  });
+  renderOkChart(_okLineaActual, p);
+}
+
+async function renderOkChart(lineaActual, periodo) {
+  periodo = periodo || _okPeriodo || 'mes';
+  _okLineaActual = lineaActual;
+  _okPeriodo = periodo;
+
   var box    = document.getElementById('okChartBox');
   var canvas = document.getElementById('okChartCanvas');
+  var wrap   = document.getElementById('okCanvasWrap');
+  var rankEl = document.getElementById('okRank');
+  var titleEl = document.getElementById('okChartTitle');
   if (!box || !canvas || typeof Chart === 'undefined') return;
 
-  var mesStr = fechaHoy().slice(0, 7);
-  var desde  = mesStr + '-01';
-  var hasta  = mesStr + '-31';
+  box.style.display = 'block'; // mantener visible (incluye los botones)
+  if (titleEl) titleEl.innerHTML = '📊 Productividad ' + (OK_PERIODO_TXT[periodo] || 'del mes') + ' · ¿Qué línea va ganando?';
+
+  var fechas = okFechasPeriodo(periodo);
+  var desde  = fechas[0];
+  var hasta  = fechas[fechas.length - 1];
 
   var lecturas = [];
   try {
@@ -582,8 +638,15 @@ async function renderOkChart(lineaActual) {
       .eq('area', 'serig').gte('fecha', desde).lte('fecha', hasta);
     if (r.error) throw r.error;
     lecturas = r.data || [];
-  } catch(e) { console.warn('renderOkChart:', e); box.style.display = 'none'; return; }
-  if (!lecturas.length) { box.style.display = 'none'; return; }
+  } catch(e) { console.warn('renderOkChart:', e); }
+
+  if (!lecturas.length) {
+    if (_okChart) { _okChart.destroy(); _okChart = null; }
+    if (wrap) wrap.style.display = 'none';
+    if (rankEl) rankEl.innerHTML = '<div style="text-align:center;color:#9A9A98;font-size:12px;padding:14px">Sin registros ' + (OK_PERIODO_TXT[periodo] || 'del mes') + '</div>';
+    return;
+  }
+  if (wrap) wrap.style.display = 'block';
 
   // byDL[fecha][linea] = {inicio,mediodia,fin}
   var byDL = {};
@@ -595,13 +658,10 @@ async function renderOkChart(lineaActual) {
     if (slot[l.momento] === undefined) slot[l.momento] = l.contador || 0;
   });
 
-  // Todos los días del mes
-  var anio = parseInt(mesStr.slice(0,4), 10), mes = parseInt(mesStr.slice(5,7), 10);
-  var totalDias = new Date(anio, mes, 0).getDate();
-  var mm = (mes < 10 ? '0' : '') + mes;
-  var fechas = [];
-  for (var d = 1; d <= totalDias; d++) { var dd = (d < 10 ? '0' : '') + d; fechas.push(anio + '-' + mm + '-' + dd); }
-  var labels = fechas.map(function(f){ return String(parseInt(f.slice(8,10), 10)); });
+  // Etiquetas del eje X según periodo
+  var labels = fechas.map(function(f){
+    return periodo === 'mes' ? String(parseInt(f.slice(8,10), 10)) : (f.slice(8,10) + '/' + f.slice(5,7));
+  });
 
   // Totales acumulados por línea (para el ranking)
   var totales = {};
@@ -743,7 +803,8 @@ async function guardarRegistro() {
       + '<br>Contador: <strong>' + contador.toLocaleString() + '</strong> · ' + escHtml(diseno);
     mostrarPantalla('scrOk');
     window.scrollTo(0, 0);
-    renderOkChart(linea);
+    _okLineaActual = linea;
+    okSetPeriodo('mes');
   } catch(e) {
     console.error('guardarRegistro:', e);
     var detalle = (e && e.message ? e.message : String(e)) +
