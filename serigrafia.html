@@ -5572,6 +5572,41 @@ function actualizarKPIsMov(data) {
 // ── Productividad: tiros de máquina por línea/diseño ──────────
 var META_TIROS_LINEA = 10000;
 
+// Cuando la fecha elegida no tiene lecturas, mostrar las últimas de la
+// tabla SIN filtro de fecha/área: distingue "la base está vacía (los
+// ingresos no llegan)" de "los registros cayeron con otra fecha".
+function buildUltimaLecturaRow(l) {
+  var f = String(l.fecha || '');
+  return '<div style="padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer" ' +
+    'onclick="document.getElementById(\'prodFecha\').value=\'' + escHtml(f) + '\';renderProductividad()" ' +
+    'title="Ver esta fecha en Productividad">' +
+    '<strong>' + escHtml(f) + '</strong> · Línea ' + escHtml(String(l.linea_id || '?')) +
+    ' · ' + escHtml(l.operador_nombre || l.operador_codigo || '—') +
+    ' · ' + escHtml(l.momento || '') +
+    ' · contador ' + (l.contador || 0).toLocaleString() +
+    (l.area && l.area !== 'serig' ? ' · <span style="color:var(--red)">area=' + escHtml(l.area) + '</span>' : '') +
+    '</div>';
+}
+
+async function buildUltimasLecturasHint(fechaBuscada) {
+  try {
+    var rx = await db.from('registro_tiros_serig')
+      .select('fecha, linea_id, operador_codigo, operador_nombre, momento, contador, area, created_at')
+      .order('created_at', { ascending: false }).limit(10);
+    if (rx.error) return '';
+    if (!rx.data || !rx.data.length) {
+      return '<div style="max-width:560px;margin:0 auto;padding:14px 18px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;font-size:12px;color:#991B1B;text-align:center">' +
+        '⚠️ La tabla <code>registro_tiros_serig</code> está completamente vacía: ' +
+        'ningún ingreso del formulario ha llegado a la base de datos.</div>';
+    }
+    return '<div style="max-width:560px;margin:0 auto;padding:14px 18px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;font-size:12px;color:#92400E">' +
+      '<div style="font-weight:700;margin-bottom:6px">Sí hay lecturas en la base, pero ninguna con fecha ' +
+      escHtml(fechaBuscada) + '. Últimas 10 (clic para ir a esa fecha):</div>' +
+      rx.data.map(buildUltimaLecturaRow).join('') +
+      '</div>';
+  } catch(e) { return ''; }
+}
+
 async function renderProductividad() {
   var kpis = document.getElementById('prodKPIs');
   var tabla = document.getElementById('prodTabla');
@@ -5632,7 +5667,8 @@ async function renderProductividad() {
   }).join('');
 
   if (!lecturas.length) {
-    tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin lecturas registradas para esta fecha</div>';
+    tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin lecturas registradas para esta fecha</div>' +
+      (await buildUltimasLecturasHint(fecha));
     return;
   }
 

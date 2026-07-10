@@ -188,6 +188,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
     </div>
 
     <button class="btn-guardar" id="btnGuardar" onclick="guardarRegistro()">💾 Guardar lectura</button>
+    <div id="errBox" style="display:none;margin-top:12px;padding:12px 14px;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:10px;font-size:13px;color:#991B1B;font-weight:600;word-break:break-word"></div>
   </div>
 
   <!-- PANTALLA 3: ÉXITO -->
@@ -479,6 +480,8 @@ async function guardarRegistro() {
   var btn = document.getElementById('btnGuardar');
   btn.disabled = true;
   btn.textContent = 'Guardando…';
+  var errBox = document.getElementById('errBox');
+  errBox.style.display = 'none';
 
   try {
     var r = await db.from('registro_tiros_serig').insert(payload);
@@ -492,7 +495,13 @@ async function guardarRegistro() {
     window.scrollTo(0, 0);
   } catch(e) {
     console.error('guardarRegistro:', e);
-    showToast('❌ Error al guardar: ' + (e.message || e), '#B83232');
+    var detalle = (e && e.message ? e.message : String(e)) +
+      (e && e.code ? ' [código ' + e.code + ']' : '') +
+      (e && e.details ? ' — ' + e.details : '') +
+      (e && e.hint ? ' — ' + e.hint : '');
+    errBox.textContent = '❌ El registro NO se guardó: ' + detalle;
+    errBox.style.display = 'block';
+    showToast('❌ Error al guardar', '#B83232');
   } finally {
     btn.disabled = false;
     btn.textContent = '💾 Guardar lectura';
