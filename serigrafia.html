@@ -1059,6 +1059,70 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 </div>
 
+<!-- ══════════════════ MODAL EDITAR LECTURA TIRO (master) ═══ -->
+<div class="overlay" id="overlayEditTiro" onclick="cerrarEditTiro(event)" style="display:none">
+  <div class="modal" style="max-width:420px">
+    <div class="mh">
+      <div class="mh-title">Editar lectura</div>
+      <button class="m-close" onclick="cerrarEditTiro()">✕</button>
+    </div>
+    <div class="mb" style="display:flex;flex-direction:column;gap:12px;padding:16px 20px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Fecha</label>
+          <input type="date" id="etFecha" class="fi" style="width:100%">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Hora</label>
+          <input type="time" id="etHora" class="fi" style="width:100%">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Línea</label>
+          <select id="etLinea" class="fi" style="width:100%">
+            <option value="1">Línea 1</option>
+            <option value="2">Línea 2</option>
+            <option value="3">Línea 3</option>
+            <option value="4">Línea 4</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Momento</label>
+          <select id="etMomento" class="fi" style="width:100%">
+            <option value="inicio">🌅 Inicio</option>
+            <option value="mediodia">🕐 Mediodía</option>
+            <option value="fin">🌇 Fin</option>
+            <option value="velada">🌙 Velada</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Operario</label>
+        <input type="text" id="etOperario" class="fi" placeholder="Nombre del operario" style="width:100%">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">SKU</label>
+          <input type="text" id="etSku" class="fi" placeholder="SKU del envase" style="width:100%">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Diseño / Envase</label>
+          <input type="text" id="etDiseno" class="fi" placeholder="Descripción" style="width:100%">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Contador</label>
+        <input type="number" id="etContador" class="fi" min="0" style="width:100%">
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cerrarEditTiro()">Cancelar</button>
+      <button class="btn btn-s" onclick="guardarEdicionTiro()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════ MODAL REGISTRAR ENTREGADO ═══════════ -->
 <!-- Overlay global (no vive dentro de view-inicio) para poder abrirse
      tanto desde Inicio > Entregados como desde Movimientos > Ingresos PT -->
@@ -6008,21 +6072,54 @@ var MOMENTO_LBL_ADMIN_TXT = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía',
 var MOMENTO_LBL_ADMIN = { inicio: '🌅', mediodia: '🕐', fin: '🌇', velada: '🌙' };
 var prodLecturasCache = [];
 
-async function editarLecturaTiro(id) {
+var _editTiroId = null;
+
+function cerrarEditTiro(e) {
+  if (e && e.target !== document.getElementById('overlayEditTiro')) return;
+  document.getElementById('overlayEditTiro').style.display = 'none';
+  _editTiroId = null;
+}
+
+function editarLecturaTiro(id) {
   if (!(typeof TETRA !== 'undefined' && TETRA.rol === 'master')) return;
   var l = prodLecturasCache.find(function(x){ return x.id === id; });
   if (!l) return;
-  var nuevo = prompt('Nuevo valor del contador (' + (MOMENTO_LBL_ADMIN[l.momento] || l.momento) + '):', l.contador);
-  if (nuevo === null) return;
-  var val = parseInt(nuevo);
-  if (isNaN(val) || val < 0) { showToast('⚠️ Valor inválido', '#B83232'); return; }
+  _editTiroId = id;
+  document.getElementById('etFecha').value    = l.fecha || '';
+  document.getElementById('etHora').value     = (l.hora || '').slice(0,5);
+  document.getElementById('etLinea').value    = String(l.linea_id || 1);
+  document.getElementById('etMomento').value  = l.momento || 'inicio';
+  document.getElementById('etOperario').value = l.operador_nombre || '';
+  document.getElementById('etSku').value      = l.sku || '';
+  document.getElementById('etDiseno').value   = l.diseno || '';
+  document.getElementById('etContador').value = String(l.contador || 0);
+  document.getElementById('overlayEditTiro').style.display = 'flex';
+}
+
+async function guardarEdicionTiro() {
+  if (!_editTiroId) return;
+  var contador = parseInt(document.getElementById('etContador').value, 10);
+  if (isNaN(contador) || contador < 0) { showToast('⚠️ Contador inválido', '#B83232'); return; }
+  var hora = document.getElementById('etHora').value.trim();
+  var payload = {
+    fecha:           document.getElementById('etFecha').value,
+    linea_id:        parseInt(document.getElementById('etLinea').value, 10),
+    momento:         document.getElementById('etMomento').value,
+    hora:            hora || null,
+    operador_nombre: document.getElementById('etOperario').value.trim() || null,
+    sku:             document.getElementById('etSku').value.trim() || null,
+    diseno:          document.getElementById('etDiseno').value.trim() || null,
+    contador:        contador
+  };
   try {
-    var r = await db.from('registro_tiros_serig').update({ contador: val }).eq('id', id);
+    var r = await db.from('registro_tiros_serig').update(payload).eq('id', _editTiroId);
     if (r.error) throw r.error;
     showToast('✅ Lectura actualizada');
+    document.getElementById('overlayEditTiro').style.display = 'none';
+    _editTiroId = null;
     renderProductividad();
   } catch(e) {
-    showToast('❌ Error: ' + e.message, '#B83232');
+    showToast('❌ ' + e.message, '#B83232');
   }
 }
 
