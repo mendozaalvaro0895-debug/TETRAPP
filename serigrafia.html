@@ -4440,6 +4440,18 @@ function buildProduccionHtml(entregadasSistema, manuales) {
         var rowSty = 'background:' + grpBg + ';' + (isFirst ? sepBdr : '');
         var requiSalLinea = l.solId ? (salidaRequiMap[l.solId] ? salidaRequiMap[l.solId].join(', ') : '—')
                           : (m.solId ? (salidaRequiMap[m.solId] ? salidaRequiMap[m.solId].join(', ') : '—') : '—');
+        // Fecha y Origen: valores del documento (requi), se repiten en cada fila del grupo
+        var fechaCell = '<td style="font-size:11px;color:var(--gray)">' + escHtml(m.fecha || '—') + '</td>';
+        var origenCell = '<td><span style="font-size:9px;background:#FEF3C7;color:#92400e;border-radius:4px;padding:2px 6px;font-weight:700">MANUAL</span>' +
+          (isFirst && m.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(m.nota) + '</span>' : '') + '</td>';
+        // Requi Salida Bodega: dato PROPIO de cada SKU (su solId) → por línea, no solo la primera
+        var salCell = '<td>' + (requiSalLinea !== '—' && (l.solId || m.solId)
+          ? '<span onclick="event.stopPropagation();irAResumenFicha(\'' + (l.solId || m.solId) + '\')" style="cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--serig-m);text-decoration:underline dotted">' + escHtml(requiSalLinea) + '</span>'
+          : '<span style="font-size:11px;color:var(--gray-l)">' + escHtml(requiSalLinea) + '</span>') + '</td>';
+        // Acciones: operan sobre la requi completa (m), solo en la primera fila
+        var accionesCell = isFirst
+          ? '<td style="white-space:nowrap"><button onclick="event.stopPropagation();editarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--serig-m);font-size:13px;padding:2px 4px" title="Editar">✏️</button><button onclick="event.stopPropagation();eliminarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 4px" title="Eliminar">✕</button></td>'
+          : '<td></td>';
         return '<tr style="' + rowSty + '">' +
           '<td>' + requiCell + '</td>' +
           '<td style="font-weight:600;font-size:11px">' + escHtml(l.cliente || m.cliente || '—') + '</td>' +
@@ -4449,12 +4461,10 @@ function buildProduccionHtml(entregadasSistema, manuales) {
             escHtml(l.desc || '—') +
           '</td>' +
           '<td style="font-family:var(--mono);font-weight:600">' + (l.cant||0).toLocaleString() + '</td>' +
-          (isFirst ? '<td style="font-size:11px;color:var(--gray)">' + escHtml(m.fecha || '—') + '</td>' : '<td></td>') +
-          (isFirst ? '<td><span style="font-size:9px;background:#FEF3C7;color:#92400e;border-radius:4px;padding:2px 6px;font-weight:700">MANUAL</span>' + (m.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(m.nota) + '</span>' : '') + '</td>' : '<td></td>') +
-          (isFirst ? '<td>' + (requiSalLinea !== '—' && (l.solId || m.solId)
-            ? '<span onclick="event.stopPropagation();irAResumenFicha(\'' + (l.solId || m.solId) + '\')" style="cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--serig-m);text-decoration:underline dotted">' + escHtml(requiSalLinea) + '</span>'
-            : '<span style="font-size:11px;color:var(--gray-l)">' + escHtml(requiSalLinea) + '</span>') + '</td>' : '<td></td>') +
-          (isFirst ? '<td style="white-space:nowrap"><button onclick="event.stopPropagation();editarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--serig-m);font-size:13px;padding:2px 4px" title="Editar">✏️</button><button onclick="event.stopPropagation();eliminarEntregadoManual(\'' + escHtml(m.id) + '\')" style="background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 4px" title="Eliminar">✕</button></td>' : '<td></td>') +
+          fechaCell +
+          origenCell +
+          salCell +
+          accionesCell +
         '</tr>';
       }).join('');
     }).join('');
