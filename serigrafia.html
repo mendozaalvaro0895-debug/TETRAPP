@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <title>TETRAPLASTIC — Serigrafía</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="shared/auth.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared/styles.css">
@@ -687,6 +688,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
 
       <div class="kpi-strip" id="prodKPIs"></div>
+
+      <div id="prodChart" style="display:none;margin:8px 0 0;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
+        <canvas id="prodChartCanvas" height="260"></canvas>
+      </div>
 
       <div class="mov-scroll" id="prodScroll">
         <div id="prodTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
@@ -5752,6 +5757,131 @@ function buildProdGrid(fechas, byDL, esMaster) {
          '<div style="display:grid;grid-template-columns:' + cols + ';gap:12px">' + body + '</div>';
 }
 
+var _prodChart = null;
+var _prodChartProds = {};
+
+function renderProductividadChart(fechas, byDL) {
+  var container = document.getElementById('prodChart');
+  var canvas    = document.getElementById('prodChartCanvas');
+  if (!container || !canvas || typeof Chart === 'undefined') return;
+  if (_prodChart) { _prodChart.destroy(); _prodChart = null; }
+  if (!fechas.length) { container.style.display = 'none'; return; }
+
+  var fechasAsc = fechas.slice().sort();
+  var labels    = fechasAsc.map(function(f) { return f.slice(8,10) + '/' + f.slice(5,7); });
+
+  // Productos por fecha/línea → para el tooltip
+  _prodChartProds = {};
+  fechasAsc.forEach(function(f) {
+    _prodChartProds[f] = {};
+    LINEAS_PRODUCCION.forEach(function(ln) {
+      var d = byDL[f] && byDL[f][ln.id];
+      if (!d) return;
+      var set = [];
+      var add = function(l) { if (!l) return; var v = l.diseno || l.sku; if (v && set.indexOf(v) < 0) set.push(v); };
+      ['inicio','mediodia','fin'].forEach(function(m){ add(d.momentos[m]); });
+      add(d.velada);
+      if (set.length) _prodChartProds[f][ln.id] = set.join(' / ');
+    });
+  });
+
+  var COLS = ['#2A8B75','#D97706','#1D4ED8','#16A34A'];
+
+  var datasets = LINEAS_PRODUCCION.map(function(ln, i) {
+    return {
+      label: ln.nombre,
+      data: fechasAsc.map(function(f) {
+        var d = byDL[f] && byDL[f][ln.id];
+        if (!d) return null;
+        var cnts = ['inicio','mediodia','fin']
+          .map(function(m){ return d.momentos[m]; })
+          .filter(Boolean).map(function(l){ return l.contador || 0; });
+        return cnts.length >= 2 ? Math.max.apply(null,cnts) - Math.min.apply(null,cnts) : null;
+      }),
+      borderColor: COLS[i],
+      backgroundColor: COLS[i] + '18',
+      borderWidth: 2.5,
+      pointRadius: 5,
+      pointHoverRadius: 7,
+      pointBackgroundColor: COLS[i],
+      tension: 0.25,
+      fill: false,
+      spanGaps: false
+    };
+  });
+
+  datasets.push({
+    label: 'Meta diaria (' + META_TIROS_LINEA.toLocaleString() + ')',
+    data: fechasAsc.map(function(){ return META_TIROS_LINEA; }),
+    borderColor: '#EF4444',
+    borderWidth: 1.5,
+    borderDash: [7,4],
+    pointRadius: 0,
+    fill: false,
+    tension: 0
+  });
+
+  container.style.display = '';
+
+  _prodChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { font: { family: 'DM Sans', size: 11 }, usePointStyle: true, boxWidth: 8, padding: 14 }
+        },
+        tooltip: {
+          backgroundColor: '#0C0C0B',
+          titleFont: { family: 'DM Sans', size: 11, weight: '700' },
+          bodyFont:  { family: 'DM Sans', size: 11 },
+          padding: 12,
+          callbacks: {
+            title: function(items) { return fechasAsc[items[0].dataIndex]; },
+            label: function(ctx) {
+              if (ctx.datasetIndex >= LINEAS_PRODUCCION.length)
+                return '  Meta: ' + META_TIROS_LINEA.toLocaleString();
+              var v = ctx.parsed.y;
+              if (v === null || v === undefined) return '';
+              var pct = Math.round((v / META_TIROS_LINEA) * 100);
+              var ic  = pct >= 100 ? '✅' : pct >= 60 ? '🟡' : '🔴';
+              return '  ' + LINEAS_PRODUCCION[ctx.datasetIndex].nombre +
+                     ': ' + v.toLocaleString() + ' (' + pct + '%) ' + ic;
+            },
+            afterLabel: function(ctx) {
+              if (ctx.datasetIndex >= LINEAS_PRODUCCION.length) return '';
+              var v = ctx.parsed.y;
+              if (v === null || v === undefined) return '';
+              var f    = fechasAsc[ctx.dataIndex];
+              var prod = _prodChartProds[f] && _prodChartProds[f][LINEAS_PRODUCCION[ctx.datasetIndex].id];
+              return prod ? '    📦 ' + prod : '';
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: '#ECEAE5' },
+          ticks: {
+            font: { family: 'DM Mono', size: 9 },
+            callback: function(v) { return v >= 1000 ? (v/1000).toFixed(0) + 'k' : v; },
+            maxTicksLimit: 7
+          }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { font: { family: 'DM Sans', size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 16 }
+        }
+      }
+    }
+  });
+}
+
 async function renderProductividad() {
   var kpis = document.getElementById('prodKPIs');
   var tabla = document.getElementById('prodTabla');
@@ -5827,6 +5957,8 @@ async function renderProductividad() {
       '</div>' +
     '</div>';
   }).join('');
+
+  renderProductividadChart(fechas, byDL);
 
   if (!lecturas.length) {
     tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin lecturas registradas para este mes</div>' +
