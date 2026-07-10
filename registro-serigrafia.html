@@ -570,7 +570,8 @@ async function guardarRegistro() {
         if (fotoUrl) payload.foto_url = fotoUrl;
       } catch(fotoErr) {
         console.warn('subirFoto:', fotoErr);
-        showToast('⚠️ Foto no subida — registro se guardará sin ella', '#D97706');
+        var fotoErrMsg = fotoErr && (fotoErr.message || fotoErr.error || fotoErr.statusCode || JSON.stringify(fotoErr)) || 'desconocido';
+        showToast('⚠️ Foto: ' + String(fotoErrMsg).slice(0, 100), '#D97706');
       }
     }
     btn.textContent = 'Guardando…';
