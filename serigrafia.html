@@ -188,6 +188,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .op-tiros-row{font-size:10.5px;color:var(--gray);padding:2px 0;line-height:1.5}
 .op-tiros-row.op-tiros-vacia{color:var(--gray-l);font-style:italic}
 .prod-col-hdr{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--serig-m);padding:5px 8px;background:var(--serig-l);border-radius:6px;text-align:center}
+.pcseg-btn{border:1.5px solid var(--border);background:var(--card);color:var(--gray);border-radius:7px;padding:5px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.pcseg-btn.pcseg-active{background:var(--serig-m);border-color:var(--serig-m);color:#fff}
+.pfc-coment{font-size:11px;color:var(--ink);padding:7px 10px;background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:8px;line-height:1.5;margin:-2px 0 8px}
+.pfc-coment .pfc-coment-txt{white-space:pre-wrap;word-break:break-word}
+.pfc-coment-add{color:var(--gray-l);font-style:italic}
 .pfc{background:var(--card);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;min-width:0}
 .pfc-hdr{background:var(--serig-l);color:var(--serig-m);font-size:11px;font-weight:800;padding:6px 10px;border-bottom:1px solid var(--border)}
 .pfc-diseno{font-size:10px;color:var(--gray-l);padding:4px 10px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -690,6 +695,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="mov-scroll" id="prodScroll">
         <div class="kpi-strip" id="prodKPIs"></div>
 
+        <div id="prodChartBar" style="display:none;justify-content:center;gap:6px;margin:8px 0 2px">
+          <button type="button" id="prodChartBtn-dia"    class="pcseg-btn" onclick="prodSetChartPeriodo('dia')">Día</button>
+          <button type="button" id="prodChartBtn-semana" class="pcseg-btn" onclick="prodSetChartPeriodo('semana')">Semana</button>
+          <button type="button" id="prodChartBtn-mes"    class="pcseg-btn pcseg-active" onclick="prodSetChartPeriodo('mes')">Mes</button>
+        </div>
+
         <div id="prodChart" style="display:none;margin:4px 0 8px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
           <canvas id="prodChartCanvas" height="260"></canvas>
         </div>
@@ -1119,6 +1130,29 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="mf">
       <button class="btn btn-g" onclick="cerrarEditTiro()">Cancelar</button>
       <button class="btn btn-s" onclick="guardarEdicionTiro()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL COMENTARIO FICHA (master) ═════ -->
+<div class="overlay" id="overlayComentario" onclick="cerrarComentario(event)" style="display:none">
+  <div class="modal" style="max-width:440px">
+    <div class="mh">
+      <div class="mh-title">Comentario de la ficha</div>
+      <button class="m-close" onclick="cerrarComentario()">✕</button>
+    </div>
+    <div class="mb" style="padding:16px 20px">
+      <div id="comFichaLbl" style="font-size:12px;color:var(--gray);margin-bottom:10px">—</div>
+      <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Motivo / observación</label>
+      <textarea id="comTexto" class="fi" rows="4" style="width:100%;resize:vertical;line-height:1.5"
+        placeholder="Ej: No había envase flameado; el equipo apoyó en empaque toda la mañana…"></textarea>
+    </div>
+    <div class="mf" style="justify-content:space-between">
+      <button class="btn btn-g" onclick="borrarComentarioFicha()" style="color:var(--red)">Borrar</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-g" onclick="cerrarComentario()">Cancelar</button>
+        <button class="btn btn-s" onclick="guardarComentarioFicha()">Guardar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -5661,6 +5695,10 @@ function actualizarKPIsMov(data) {
 
 // ── Productividad: tiros de máquina por línea/diseño ──────────
 var META_TIROS_LINEA = 10000;
+// Piso de cálculo: los conteos/meta de los KPIs de resumen arrancan desde esta
+// fecha (para que todas las líneas midan sobre la misma base). Las fichas de
+// días previos siguen visibles pero NO suman al acumulado ni al % de meta.
+var PROD_FECHA_PISO = '2026-07-10';
 
 // Cuando la fecha elegida no tiene lecturas, mostrar las últimas de la
 // tabla SIN filtro de fecha/área: distingue "la base está vacía (los
@@ -5785,7 +5823,18 @@ async function limpiarFotosAntiguas() {
   } catch(e) { showToast('❌ ' + e.message, '#B83232'); }
 }
 
-function buildPfcFechaCard(fecha, datos, esMaster) {
+function buildPfcComentario(fecha, lineaId, comentario, esMaster) {
+  var has = comentario && String(comentario).trim();
+  if (!has && !esMaster) return '';
+  var click = esMaster ? ' onclick="abrirComentarioFicha(\'' + fecha + '\',' + lineaId + ')" style="cursor:pointer"' : '';
+  if (has) {
+    return '<div class="pfc-coment"' + click + '>💬 <span class="pfc-coment-txt">' + escHtml(comentario) + '</span>' +
+      (esMaster ? ' <span style="color:var(--serig-m)">✏️</span>' : '') + '</div>';
+  }
+  return '<div class="pfc-coment"' + click + '><span class="pfc-coment-add">＋ Añadir comentario…</span></div>';
+}
+
+function buildPfcFechaCard(fecha, datos, esMaster, lineaId) {
   var m = datos.momentos;
   var vld = datos.velada;
   var hayM = m.inicio || m.mediodia || m.fin;
@@ -5809,7 +5858,8 @@ function buildPfcFechaCard(fecha, datos, esMaster) {
       (delta !== null ? '<div class="pfc-delta" style="color:' + dc + '">▲ ' + delta.toLocaleString() + ' tiros · ' + pct + '%</div>' : '') +
       '</div>';
   }
-  return mainCard + (vld ? buildPfcVeladaCard(vld, esMaster) : '');
+  return mainCard + (vld ? buildPfcVeladaCard(vld, esMaster) : '') +
+    buildPfcComentario(fecha, lineaId, datos.comentario, esMaster);
 }
 
 function buildProdGrid(fechas, byDL, esMaster, operadorPorLinea) {
@@ -5825,7 +5875,7 @@ function buildProdGrid(fechas, byDL, esMaster, operadorPorLinea) {
   var rows = fechas.map(function(f) {
     var cells = LINEAS_PRODUCCION.map(function(ln) {
       var datos = byDL[f] && byDL[f][ln.id];
-      return '<div class="prod-col">' + (datos ? buildPfcFechaCard(f, datos, esMaster) : '') + '</div>';
+      return '<div class="prod-col">' + (datos ? buildPfcFechaCard(f, datos, esMaster, ln.id) : '') + '</div>';
     }).join('');
     return '<div style="display:grid;grid-template-columns:' + cols + ';gap:8px;align-items:start">' + cells + '</div>';
   }).join('');
@@ -5834,25 +5884,84 @@ function buildProdGrid(fechas, byDL, esMaster, operadorPorLinea) {
 
 var _prodChart = null;
 var _prodChartProds = {};
+var _prodChartPeriodo = 'mes';
 
-function renderProductividadChart(fechas, byDL, mesStr, operadorPorLinea) {
+// Fechas (YYYY-MM-DD) del rango del gráfico según el periodo elegido.
+// Mes = mes del selector prodMes; Semana = últimos 7 días; Día = hoy (rel. a hoy).
+function prodChartFechas(periodo, mesStr) {
+  var fechas = [];
+  if (periodo === 'dia') {
+    fechas.push(fechaHoy());
+  } else if (periodo === 'semana') {
+    var base = new Date(fechaHoy() + 'T12:00:00');
+    for (var i = 6; i >= 0; i--) {
+      var dw = new Date(base); dw.setDate(base.getDate() - i);
+      fechas.push(dw.getFullYear() + '-' + String(dw.getMonth()+1).padStart(2,'0') + '-' + String(dw.getDate()).padStart(2,'0'));
+    }
+  } else {
+    var anio = parseInt(mesStr.slice(0,4), 10), mes = parseInt(mesStr.slice(5,7), 10);
+    var totalDias = new Date(anio, mes, 0).getDate();
+    var mm = (mes < 10 ? '0' : '') + mes;
+    for (var dd = 1; dd <= totalDias; dd++) { fechas.push(anio + '-' + mm + '-' + (dd < 10 ? '0' : '') + dd); }
+  }
+  return fechas;
+}
+
+function prodSetChartPeriodo(p) {
+  _prodChartPeriodo = p;
+  ['dia','semana','mes'].forEach(function(k){
+    var b = document.getElementById('prodChartBtn-' + k);
+    if (b) b.classList.toggle('pcseg-active', k === p);
+  });
+  renderProductividadChart(p);
+}
+
+async function renderProductividadChart(periodo) {
+  periodo = periodo || _prodChartPeriodo || 'mes';
+  _prodChartPeriodo = periodo;
   var container = document.getElementById('prodChart');
   var canvas    = document.getElementById('prodChartCanvas');
   if (!container || !canvas || typeof Chart === 'undefined') return;
-  if (_prodChart) { _prodChart.destroy(); _prodChart = null; }
-  if (!fechas.length || !mesStr) { container.style.display = 'none'; return; }
 
-  // Generar TODOS los días del mes seleccionado
-  var anio  = parseInt(mesStr.slice(0,4), 10);
-  var mes   = parseInt(mesStr.slice(5,7), 10);
-  var totalDias = new Date(anio, mes, 0).getDate();
-  var mm = (mes < 10 ? '0' : '') + mes;
-  var todasFechas = [];
-  for (var d = 1; d <= totalDias; d++) {
-    var dd = (d < 10 ? '0' : '') + d;
-    todasFechas.push(anio + '-' + mm + '-' + dd);
-  }
-  var labels = todasFechas.map(function(f) { return String(parseInt(f.slice(8,10), 10)); });
+  var mesStr = (document.getElementById('prodMes') || {}).value || fechaHoy().slice(0,7);
+  var todasFechas = prodChartFechas(periodo, mesStr);
+  var desde = todasFechas[0], hasta = todasFechas[todasFechas.length - 1];
+
+  var lecturas = [];
+  try {
+    var rq = await db.from('registro_tiros_serig')
+      .select('fecha,linea_id,momento,contador,diseno,sku,operador_nombre,created_at')
+      .eq('area', 'serig').gte('fecha', desde).lte('fecha', hasta);
+    if (rq.error) throw rq.error;
+    lecturas = rq.data || [];
+  } catch(e) { console.warn('renderProductividadChart:', e); }
+
+  if (_prodChart) { _prodChart.destroy(); _prodChart = null; }
+  if (!lecturas.length) { container.style.display = 'none'; return; }
+
+  // byDL[fecha][linea] = { momentos:{}, velada }
+  var byDL = {};
+  lecturas.forEach(function(l) {
+    if (!byDL[l.fecha]) byDL[l.fecha] = {};
+    if (!byDL[l.fecha][l.linea_id]) byDL[l.fecha][l.linea_id] = { momentos:{}, velada:null };
+    if (l.momento === 'velada') { if (!byDL[l.fecha][l.linea_id].velada) byDL[l.fecha][l.linea_id].velada = l; }
+    else { if (!byDL[l.fecha][l.linea_id].momentos[l.momento]) byDL[l.fecha][l.linea_id].momentos[l.momento] = l; }
+  });
+
+  // Operador más reciente por línea dentro del rango (para la leyenda)
+  var operadorPorLinea = {};
+  todasFechas.slice().sort(function(a,b){ return b > a ? 1 : -1; }).forEach(function(f) {
+    LINEAS_PRODUCCION.forEach(function(ln) {
+      if (operadorPorLinea[ln.id]) return;
+      var d = byDL[f] && byDL[f][ln.id]; if (!d) return;
+      var primer = d.momentos.inicio || d.momentos.mediodia || d.momentos.fin || d.velada;
+      if (primer && primer.operador_nombre) operadorPorLinea[ln.id] = primer.operador_nombre;
+    });
+  });
+
+  var labels = todasFechas.map(function(f) {
+    return periodo === 'mes' ? String(parseInt(f.slice(8,10), 10)) : (f.slice(8,10) + '/' + f.slice(5,7));
+  });
 
   // Productos por fecha/línea → tooltip
   _prodChartProds = {};
@@ -6018,6 +6127,21 @@ async function renderProductividad() {
   // Fechas ordenadas más reciente primero
   var fechas = Object.keys(fechasSet).sort(function(a, b) { return b > a ? 1 : -1; });
 
+  // Comentarios por ficha (fecha+linea). Graceful si la tabla aún no existe.
+  prodComentarioCache = {};
+  try {
+    var rc = await db.from('comentarios_productividad_serig')
+      .select('fecha,linea_id,comentario,autor')
+      .eq('area', 'serig').gte('fecha', desde).lte('fecha', hasta);
+    if (!rc.error && rc.data) {
+      rc.data.forEach(function(c) {
+        if (!c.comentario) return;
+        prodComentarioCache[c.fecha + '|' + c.linea_id] = { comentario: c.comentario, autor: c.autor || '' };
+        if (byDL[c.fecha] && byDL[c.fecha][c.linea_id]) byDL[c.fecha][c.linea_id].comentario = c.comentario;
+      });
+    }
+  } catch(e) { /* tabla de comentarios aún no creada */ }
+
   // Operador más reciente por línea (fechas ya en orden newest-first)
   var operadorPorLinea = {};
   fechas.forEach(function(f) {
@@ -6036,6 +6160,7 @@ async function renderProductividad() {
     var totalTiros = 0;
     var diasConData = 0;
     fechas.forEach(function(f) {
+      if (f < PROD_FECHA_PISO) return; // días previos al piso no suman al acumulado ni a la meta
       var datos = byDL[f] && byDL[f][ln.id];
       if (!datos) return;
       diasConData++;
@@ -6059,7 +6184,9 @@ async function renderProductividad() {
     '</div>';
   }).join('');
 
-  renderProductividadChart(fechas, byDL, mesStr, operadorPorLinea);
+  var _barEl = document.getElementById('prodChartBar');
+  if (_barEl) _barEl.style.display = 'flex';
+  renderProductividadChart(_prodChartPeriodo);
 
   if (!lecturas.length) {
     tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">📭 Sin lecturas registradas para este mes</div>' +
@@ -6079,6 +6206,7 @@ var MOMENTO_LBL_ADMIN_TXT = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía',
 
 var MOMENTO_LBL_ADMIN = { inicio: '🌅', mediodia: '🕐', fin: '🌇', velada: '🌙' };
 var prodLecturasCache = [];
+var prodComentarioCache = {}; // 'fecha|linea' → { comentario, autor }
 
 var _editTiroId = null;
 
@@ -6128,6 +6256,65 @@ async function guardarEdicionTiro() {
     renderProductividad();
   } catch(e) {
     showToast('❌ ' + e.message, '#B83232');
+  }
+}
+
+// ── Comentario por ficha (fecha + línea) ──────────────────────
+var _comFecha = null, _comLinea = null;
+
+function cerrarComentario(e) {
+  if (e && e.target !== document.getElementById('overlayComentario')) return;
+  document.getElementById('overlayComentario').style.display = 'none';
+  _comFecha = null; _comLinea = null;
+}
+
+function abrirComentarioFicha(fecha, lineaId) {
+  if (!(typeof TETRA !== 'undefined' && TETRA.rol === 'master')) return;
+  _comFecha = fecha; _comLinea = lineaId;
+  var existente = prodComentarioCache[fecha + '|' + lineaId];
+  var fFmt = new Date(fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday:'long', day:'2-digit', month:'long' });
+  var lnNom = (LINEAS_PRODUCCION.find(function(l){ return l.id === lineaId; }) || {}).nombre || ('Línea ' + lineaId);
+  document.getElementById('comFichaLbl').innerHTML = '📅 ' + escHtml(fFmt) + ' · <strong>' + escHtml(lnNom) + '</strong>';
+  document.getElementById('comTexto').value = existente ? existente.comentario : '';
+  document.getElementById('overlayComentario').style.display = 'flex';
+  setTimeout(function(){ var t = document.getElementById('comTexto'); if (t) t.focus(); }, 60);
+}
+
+async function guardarComentarioFicha() {
+  if (!_comFecha || !_comLinea) return;
+  var texto = document.getElementById('comTexto').value.trim();
+  if (!texto) { borrarComentarioFicha(); return; }
+  var payload = {
+    fecha: _comFecha, linea_id: _comLinea, area: 'serig',
+    comentario: texto,
+    autor: (typeof TETRA !== 'undefined' ? TETRA.nombre : '') || '',
+    updated_at: new Date().toISOString()
+  };
+  try {
+    var r = await db.from('comentarios_productividad_serig')
+      .upsert(payload, { onConflict: 'fecha,linea_id,area' });
+    if (r.error) throw r.error;
+    showToast('✅ Comentario guardado');
+    document.getElementById('overlayComentario').style.display = 'none';
+    _comFecha = null; _comLinea = null;
+    renderProductividad();
+  } catch(e) {
+    showToast('❌ ' + (e.message || 'Error al guardar'), '#B83232');
+  }
+}
+
+async function borrarComentarioFicha() {
+  if (!_comFecha || !_comLinea) return;
+  try {
+    var r = await db.from('comentarios_productividad_serig')
+      .delete().eq('fecha', _comFecha).eq('linea_id', _comLinea).eq('area', 'serig');
+    if (r.error) throw r.error;
+    showToast('🗑 Comentario eliminado');
+    document.getElementById('overlayComentario').style.display = 'none';
+    _comFecha = null; _comLinea = null;
+    renderProductividad();
+  } catch(e) {
+    showToast('❌ ' + (e.message || 'Error al borrar'), '#B83232');
   }
 }
 
