@@ -5636,17 +5636,62 @@ function buildPfcAcciones(id, esMaster) {
     '</span>';
 }
 
+function buildPfcThumb(url) {
+  if (!url) return '';
+  return '<img src="' + escHtml(url) + '" onclick="verFoto(\'' + escHtml(url) + '\')" ' +
+    'style="width:34px;height:34px;object-fit:cover;border-radius:4px;cursor:pointer;float:right;margin-left:6px;flex-shrink:0" title="Ver foto">';
+}
+
 function buildPfcMomentoRow(l, m, esMaster) {
   var lbl = MOMENTO_LBL_ADMIN_TXT[m];
   if (!l) return '<div class="pfc-row pfc-vacia">' + lbl + ': —</div>';
-  return '<div class="pfc-row">' + buildPfcAcciones(l.id, esMaster) + lbl + ': <span class="pfc-hora">' + pfcFmtHora(l) + '</span> · <strong>' + (l.contador||0).toLocaleString() + '</strong></div>';
+  return '<div class="pfc-row">' + buildPfcAcciones(l.id, esMaster) + buildPfcThumb(l.foto_url) +
+    lbl + ': <span class="pfc-hora">' + pfcFmtHora(l) + '</span> · <strong>' + (l.contador||0).toLocaleString() + '</strong></div>';
 }
 
 function buildPfcVeladaCard(vld, esMaster) {
   return '<div class="pfc pfc-velada">' +
     '<div class="pfc-hdr">🌙 Velada</div>' +
-    '<div class="pfc-row">' + buildPfcAcciones(vld.id, esMaster) + '<span class="pfc-hora">' + pfcFmtHora(vld) + '</span> · <strong>' + (vld.contador||0).toLocaleString() + '</strong></div>' +
+    '<div class="pfc-row">' + buildPfcAcciones(vld.id, esMaster) + buildPfcThumb(vld.foto_url) +
+    '<span class="pfc-hora">' + pfcFmtHora(vld) + '</span> · <strong>' + (vld.contador||0).toLocaleString() + '</strong></div>' +
     '</div>';
+}
+
+function verFoto(url) {
+  var o = document.createElement('div');
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  o.onclick = function() { document.body.removeChild(o); };
+  var img = document.createElement('img');
+  img.src = url;
+  img.style.cssText = 'max-width:92vw;max-height:88vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,.6)';
+  o.appendChild(img);
+  document.body.appendChild(o);
+}
+
+async function limpiarFotosAntiguas() {
+  if (!(typeof TETRA !== 'undefined' && TETRA.rol === 'master')) return;
+  var limite = new Date(); limite.setDate(limite.getDate() - 7);
+  var limiteStr = limite.toISOString().slice(0,10);
+  if (!confirm('¿Eliminar fotos de registros anteriores al ' + limiteStr + '?\nLos registros quedan intactos, solo se borran las imágenes.')) return;
+  try {
+    var r = await db.from('registro_tiros_serig')
+      .select('id,foto_url').lt('fecha', limiteStr).not('foto_url','is',null);
+    if (r.error) throw r.error;
+    var rows = r.data || [];
+    if (!rows.length) { showToast('Sin fotos antiguas para limpiar'); return; }
+    var paths = rows.map(function(row) {
+      var m = row.foto_url.match(/\/tiros\/(.+)$/);
+      return m ? decodeURIComponent(m[1]) : null;
+    }).filter(Boolean);
+    if (paths.length) {
+      var del = await db.storage.from('tiros').remove(paths);
+      if (del.error) console.warn('Storage remove:', del.error);
+    }
+    var ids = rows.map(function(row){ return row.id; });
+    await db.from('registro_tiros_serig').update({ foto_url: null }).in('id', ids);
+    showToast('✅ ' + rows.length + ' foto(s) eliminadas');
+    renderProductividad();
+  } catch(e) { showToast('❌ ' + e.message, '#B83232'); }
 }
 
 function buildPfcFechaCard(fecha, datos, esMaster) {
@@ -5778,7 +5823,12 @@ async function renderProductividad() {
     return;
   }
 
-  tabla.innerHTML = buildProdGrid(fechas, byDL, esMaster);
+  var adminBar = esMaster
+    ? '<div style="margin-top:16px;text-align:right">' +
+        '<button onclick="limpiarFotosAntiguas()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--gray-l);cursor:pointer;font-family:var(--sans)">🗑 Limpiar fotos &gt;7 días</button>' +
+      '</div>'
+    : '';
+  tabla.innerHTML = buildProdGrid(fechas, byDL, esMaster) + adminBar;
 }
 
 var MOMENTO_LBL_ADMIN_TXT = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '🌇 Fin', velada: '🌙 Velada' };

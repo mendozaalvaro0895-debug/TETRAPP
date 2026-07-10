@@ -98,6 +98,15 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .toast-msg{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#5B21B6;color:#fff;padding:12px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25)}
 .cargando{text-align:center;padding:50px 20px;color:#6B6B6A;font-size:13px}
 .spinner{display:inline-block;width:26px;height:26px;border:3px solid #E9D8FD;border-top-color:#7C3AED;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:10px}
+
+/* FOTO CONTADOR */
+.foto-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.btn-foto{border:1.5px solid #C8C6C0;background:#fff;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;color:#3A3A38;transition:border-color .15s;-webkit-tap-highlight-color:transparent;width:100%}
+.btn-foto:active{background:#F5F3FF;border-color:#7C3AED}
+.foto-preview{position:relative;border-radius:12px;overflow:hidden;background:#0C0C0B}
+.foto-preview img{width:100%;max-height:240px;object-fit:cover;display:block}
+.foto-preview-x{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.65);border:none;color:#fff;width:30px;height:30px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif}
+.foto-ok{font-size:11px;color:#6B6B6A;text-align:center;margin-top:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 @media(max-width:480px){
@@ -184,6 +193,23 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
       <div class="hoy-meta">
         <span class="hoy-meta-lbl">Tiros producidos hoy / meta 10,000</span>
         <span class="hoy-meta-val" id="hoyDelta">—</span>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">3</span> Foto del contador <span style="font-size:9px;font-weight:400;text-transform:none;color:#9CA3AF;margin-left:4px">(opcional pero recomendada)</span></div>
+      <div class="foto-btns">
+        <button type="button" class="btn-foto" onclick="abrirCamara()">📷 Cámara</button>
+        <button type="button" class="btn-foto" onclick="abrirGaleria()">🖼 Galería</button>
+      </div>
+      <input type="file" id="fFotoCam" accept="image/*" capture="environment" style="display:none" onchange="previsualizarFoto(this)">
+      <input type="file" id="fFotoGal" accept="image/*" style="display:none" onchange="previsualizarFoto(this)">
+      <div id="fotoPreview" style="display:none">
+        <div class="foto-preview">
+          <img id="fotoImg" src="" alt="foto contador">
+          <button class="foto-preview-x" onclick="quitarFoto()">✕</button>
+        </div>
+        <div class="foto-ok">✅ Foto lista — se subirá junto con el registro</div>
       </div>
     </div>
 
@@ -313,6 +339,7 @@ function elegirOperario(codigo) {
 
 function volverSeleccion() {
   opActual = null;
+  quitarFoto();
   mostrarPantalla('scrSel');
   window.scrollTo(0, 0);
 }
@@ -447,6 +474,59 @@ function actualizarMomentosDisponibles() {
   }
 }
 
+// ── Foto del contador ─────────────────────────────────────────
+var fotoBlob = null;
+
+function abrirCamara() { document.getElementById('fFotoCam').click(); }
+function abrirGaleria() { document.getElementById('fFotoGal').click(); }
+
+function previsualizarFoto(input) {
+  var file = input.files[0];
+  if (!file) return;
+  comprimirImagen(file, function(blob) {
+    fotoBlob = blob;
+    document.getElementById('fotoImg').src = URL.createObjectURL(blob);
+    document.getElementById('fotoPreview').style.display = 'block';
+  });
+}
+
+function comprimirImagen(file, cb) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var MAX = 1024;
+      var w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else        { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(cb, 'image/jpeg', 0.75);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function quitarFoto() {
+  fotoBlob = null;
+  document.getElementById('fotoImg').src = '';
+  document.getElementById('fotoPreview').style.display = 'none';
+  document.getElementById('fFotoCam').value = '';
+  document.getElementById('fFotoGal').value = '';
+}
+
+async function subirFoto(fecha, lineaId, momento) {
+  if (!fotoBlob) return null;
+  var path = 'serig/' + fecha + '/' + lineaId + '_' + momento + '.jpg';
+  var r = await db.storage.from('tiros').upload(path, fotoBlob, { upsert: true, contentType: 'image/jpeg' });
+  if (r.error) throw r.error;
+  return db.storage.from('tiros').getPublicUrl(path).data.publicUrl;
+}
+
 // ── Guardar ───────────────────────────────────────────────────
 async function guardarRegistro() {
   if (!opActual) { volverSeleccion(); return; }
@@ -479,11 +559,16 @@ async function guardarRegistro() {
 
   var btn = document.getElementById('btnGuardar');
   btn.disabled = true;
-  btn.textContent = 'Guardando…';
   var errBox = document.getElementById('errBox');
   errBox.style.display = 'none';
 
   try {
+    if (fotoBlob) {
+      btn.textContent = 'Subiendo foto…';
+      var fotoUrl = await subirFoto(fecha, linea, momentoActual);
+      if (fotoUrl) payload.foto_url = fotoUrl;
+    }
+    btn.textContent = 'Guardando…';
     var r = await db.from('registro_tiros_serig').insert(payload);
     if (r.error) throw r.error;
 
