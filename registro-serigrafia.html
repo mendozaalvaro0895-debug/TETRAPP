@@ -451,9 +451,10 @@ function elegirMomento(m) {
   if (btn && btn.classList.contains('disabled')) return;
 
   momentoActual = m;
-  // Mediodía siempre se posiciona a las 12:00; el resto conserva la hora ya asignada
-  // (no se reinicia al cambiar de línea ni al alternar entre momentos).
-  if (m === 'mediodia') document.getElementById('fHora').value = '12:00';
+  // Inicio → 06:00 y Mediodía → 12:00 (horas fijas del turno). El resto conserva
+  // la hora ya asignada (no se reinicia al cambiar de línea ni al alternar momentos).
+  if (m === 'inicio') document.getElementById('fHora').value = '06:00';
+  else if (m === 'mediodia') document.getElementById('fHora').value = '12:00';
   document.querySelectorAll('.momento-btn').forEach(function(b){
     b.classList.toggle('act', b.dataset.m === m);
   });
