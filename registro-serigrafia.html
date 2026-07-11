@@ -110,6 +110,27 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .foto-preview img{width:100%;max-height:240px;object-fit:cover;display:block}
 .foto-preview-x{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.65);border:none;color:#fff;width:30px;height:30px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif}
 .foto-ok{font-size:11px;color:#6B6B6A;text-align:center;margin-top:8px}
+/* PAROS DEL TURNO */
+.paro-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.paro-row{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E5E3DE;border-radius:8px;padding:8px 10px;font-size:12px}
+.pr-mot{font-weight:700;color:#3A3A38;flex:1;min-width:0}
+.pr-time{font-family:'DM Mono',monospace;font-size:11px;color:#6B6B6A;white-space:nowrap}
+.pr-min{font-weight:800;color:#B45309;white-space:nowrap}
+.pr-x{cursor:pointer;color:#9CA3AF;font-size:13px;-webkit-tap-highlight-color:transparent}
+.paro-open{background:#FEF3C7;border:1.5px solid #FCD34D;border-radius:12px;padding:12px 14px;margin-bottom:6px}
+.paro-open-t{font-size:12px;font-weight:800;color:#92400E;margin-bottom:10px;line-height:1.4}
+.btn-paro{border:1.5px dashed #C8C6C0;background:#fff;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;color:#6B6B6A;width:100%;-webkit-tap-highlight-color:transparent}
+.btn-paro:active{background:#FEF3C7;border-color:#FCD34D}
+.btn-terminar{background:#DC2626;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:800;cursor:pointer;width:100%;font-family:'DM Sans',sans-serif}
+.btn-terminar:active{transform:scale(.98)}
+/* Overlays del formulario (motivo / empaque / editar paro) */
+.ov{display:none;position:fixed;inset:0;background:rgba(12,12,11,.55);z-index:9998;align-items:center;justify-content:center;padding:16px}
+.ov.vis{display:flex}
+.ov-card{background:#fff;border-radius:16px;padding:20px;width:100%;max-width:380px;max-height:88vh;overflow-y:auto}
+.ov-t{font-size:16px;font-weight:800;color:#1A1A18;margin-bottom:14px}
+.motivo-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.motivo-op{border:1.5px solid #C8C6C0;background:#fff;border-radius:10px;padding:14px;font-size:14px;font-weight:700;color:#3A3A38;cursor:pointer;text-align:left;font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent}
+.motivo-op:active{background:#F5F3FF;border-color:#7C3AED}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 @media(max-width:480px){
@@ -157,7 +178,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
     <div class="sec">
       <div class="sec-label"><span class="paso-num">1</span> Línea y momento</div>
       <div class="grid-3">
-        <div class="field"><label>Fecha</label><input type="date" id="fFecha"></div>
+        <div class="field"><label>Fecha</label><input type="date" id="fFecha" onchange="cargarHoyLinea()"></div>
         <div class="field"><label>Hora del registro</label><input type="time" id="fHora"></div>
         <div class="field"><label>Línea</label>
           <select id="fLinea" onchange="cargarHoyLinea()">
@@ -200,7 +221,12 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
     </div>
 
     <div class="sec">
-      <div class="sec-label"><span class="paso-num">3</span> Foto del contador <span style="font-size:9px;font-weight:400;text-transform:none;color:#9CA3AF;margin-left:4px">(opcional pero recomendada)</span></div>
+      <div class="sec-label"><span class="paso-num">3</span> Paros del turno <span id="parosResumen" style="font-size:9px;font-weight:400;text-transform:none;color:#9CA3AF;margin-left:4px"></span></div>
+      <div id="parosCont"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">4</span> Foto del contador <span style="font-size:9px;font-weight:400;text-transform:none;color:#9CA3AF;margin-left:4px">(opcional pero recomendada)</span></div>
       <div class="foto-btns">
         <button type="button" class="btn-foto" onclick="abrirCamara()">📷 Cámara</button>
         <button type="button" class="btn-foto" onclick="abrirGaleria()">🖼 Galería</button>
@@ -243,6 +269,61 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
     </div>
   </div>
 
+</div>
+
+<!-- ══ MODAL: motivo del paro ══ -->
+<div class="ov" id="ovMotivo">
+  <div class="ov-card">
+    <div class="ov-t">⏸ ¿Motivo del paro?</div>
+    <div class="motivo-grid" id="motivoGrid"></div>
+    <button class="btn-paro" style="margin-top:12px" onclick="cerrarOv('ovMotivo')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ══ MODAL: empaque (envase + cantidad) ══ -->
+<div class="ov" id="ovEmpaque">
+  <div class="ov-card">
+    <div class="ov-t">📦 Paro por empaque</div>
+    <div class="field" style="margin-bottom:10px"><label>Envase empacado</label>
+      <div class="ac-wrap">
+        <input type="text" id="empEnvase" placeholder="Escribe SKU o descripción…" autocomplete="off" oninput="acGen(this.value,'empEnvase','empDrop')" data-sku="">
+        <div class="ac-drop" id="empDrop"></div>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:14px"><label>Cantidad empacada</label>
+      <input type="number" inputmode="numeric" id="empCantidad" min="0" placeholder="Ej: 500">
+    </div>
+    <button class="btn-terminar" style="background:#7C3AED" onclick="confirmarEmpaqueParo()">⏸ Iniciar paro de empaque</button>
+    <button class="btn-paro" style="margin-top:8px" onclick="cerrarOv('ovEmpaque')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ══ MODAL: editar paro ══ -->
+<div class="ov" id="ovEditParo">
+  <div class="ov-card">
+    <div class="ov-t">✏️ Editar paro</div>
+    <div class="field" style="margin-bottom:10px"><label>Motivo</label>
+      <select id="epMotivo"></select>
+    </div>
+    <div class="grid-3" style="grid-template-columns:1fr 1fr">
+      <div class="field"><label>Hora inicio</label><input type="time" id="epInicio"></div>
+      <div class="field"><label>Hora fin</label><input type="time" id="epFin"></div>
+    </div>
+    <div id="epEmpaqueWrap" style="display:none;margin-top:10px">
+      <div class="field" style="margin-bottom:10px"><label>Envase empacado</label>
+        <div class="ac-wrap">
+          <input type="text" id="epEnvase" placeholder="SKU o descripción…" autocomplete="off" oninput="acGen(this.value,'epEnvase','epDrop')" data-sku="">
+          <div class="ac-drop" id="epDrop"></div>
+        </div>
+      </div>
+      <div class="field"><label>Cantidad</label><input type="number" inputmode="numeric" id="epCantidad" min="0"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-paro" style="flex:1;color:#DC2626;border-color:#FCA5A5" onclick="borrarParo()">🗑 Borrar</button>
+      <button class="btn-terminar" style="flex:2;background:#5B21B6" onclick="guardarEdicionParo()">Guardar</button>
+    </div>
+    <button class="btn-paro" style="margin-top:8px" onclick="cerrarOv('ovEditParo')">Cancelar</button>
+  </div>
 </div>
 
 <script>
@@ -420,9 +501,32 @@ function acElegir(sku, desc) {
 
 document.addEventListener('click', function(e) {
   if (!e.target.closest('.ac-wrap')) {
-    document.getElementById('acDrop').style.display = 'none';
+    document.querySelectorAll('.ac-drop').forEach(function(d){ d.style.display = 'none'; });
   }
 });
+
+// Autocomplete genérico reutilizable (empaque, edición de paro)
+function acGen(query, inputId, dropId) {
+  var drop = document.getElementById(dropId);
+  if (!query || query.length < 2) { drop.style.display = 'none'; return; }
+  var q = query.toLowerCase();
+  var results = inventarioCache.filter(function(i){
+    return ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().indexOf(q) !== -1;
+  }).slice(0, 7);
+  if (!results.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = results.map(function(item){
+    var sku = String(item.sku || ''); var desc = String(item.descripcion || '');
+    return '<div class="ac-item" onmousedown="acGenElegir(\'' + escHtml(sku.replace(/\x27/g,'')) + '\',\'' + escHtml(desc.replace(/\x27/g,'')) + '\',\'' + inputId + '\',\'' + dropId + '\')">'
+      + '<div class="ac-sku">' + escHtml(sku) + '</div><div class="ac-desc">' + escHtml(desc.slice(0,60)) + '</div></div>';
+  }).join('');
+  drop.style.display = 'block';
+}
+function acGenElegir(sku, desc, inputId, dropId) {
+  var inp = document.getElementById(inputId);
+  inp.value = sku + ' — ' + desc;
+  inp.dataset.sku = sku;
+  document.getElementById(dropId).style.display = 'none';
+}
 
 // ── Lecturas de hoy en la línea seleccionada ───────────────────
 async function cargarHoyLinea() {
@@ -442,6 +546,7 @@ async function cargarHoyLinea() {
     lecturasHoyLinea = [];
     box.style.display = 'none';
   }
+  cargarParosHoy();
 }
 
 function renderHoyLinea() {
@@ -490,6 +595,195 @@ function actualizarMomentosDisponibles() {
     btn.disabled = false;
     btn.textContent = '💾 Guardar lectura';
   }
+}
+
+// ── Paros del turno ───────────────────────────────────────────
+var MOTIVOS_PARO = ['Marco dañado','Cambio de Diseño','Ajuste de máquina','Falta de TINTA','Falta de Envase Flameado','EMPAQUE'];
+var parosHoy = [];
+var _paroEditId = null;
+
+function abrirOv(id) { document.getElementById(id).classList.add('vis'); }
+function cerrarOv(id) { document.getElementById(id).classList.remove('vis'); }
+
+function minutosEntre(hi, hf) {
+  if (!hi || !hf) return null;
+  var a = hi.split(':'), b = hf.split(':');
+  var m = (parseInt(b[0],10)*60 + parseInt(b[1],10)) - (parseInt(a[0],10)*60 + parseInt(a[1],10));
+  if (m < 0) m += 1440; // cruce de medianoche (velada)
+  return m;
+}
+
+async function cargarParosHoy() {
+  var linea = parseInt(document.getElementById('fLinea').value) || 1;
+  var fecha = document.getElementById('fFecha').value || fechaHoy();
+  try {
+    var r = await db.from('paros_serig')
+      .select('*').eq('area','serig').eq('linea_id', linea).eq('fecha', fecha)
+      .order('hora_inicio', { ascending: true });
+    if (r.error) throw r.error;
+    parosHoy = r.data || [];
+  } catch(e) { console.warn('cargarParosHoy:', e); parosHoy = []; }
+  renderParos();
+}
+
+function buildParoRow(p) {
+  var abierto = !p.hora_fin;
+  var hi = (p.hora_inicio || '').slice(0,5);
+  var hf = abierto ? '…' : (p.hora_fin || '').slice(0,5);
+  var min = abierto ? 'en curso' : ((p.minutos || 0) + ' min');
+  var emp = (p.motivo === 'EMPAQUE' && p.empaque_cantidad)
+    ? ' · 📦 ' + escHtml((p.empaque_sku || p.empaque_desc || '')) + ' ×' + p.empaque_cantidad : '';
+  return '<div class="paro-row">' +
+    '<span class="pr-mot">' + escHtml(p.motivo) + emp + '</span>' +
+    '<span class="pr-time">' + escHtml(hi) + '–' + escHtml(hf) + '</span>' +
+    '<span class="pr-min">' + escHtml(min) + '</span>' +
+    '<span class="pr-x" onclick="editarParo(\'' + p.id + '\')" title="Editar">✏️</span>' +
+  '</div>';
+}
+
+function renderParos() {
+  var cont = document.getElementById('parosCont');
+  var resumen = document.getElementById('parosResumen');
+  if (!cont) return;
+  var abierto  = parosHoy.find(function(p){ return !p.hora_fin; });
+  var totalMin = parosHoy.filter(function(p){ return p.hora_fin; }).reduce(function(s,p){ return s + (p.minutos||0); }, 0);
+  if (resumen) resumen.textContent = parosHoy.length ? ('· ' + parosHoy.length + ' paro(s) · ' + totalMin + ' min detenido') : '';
+
+  var html = '';
+  if (parosHoy.length) html += '<div class="paro-list">' + parosHoy.map(buildParoRow).join('') + '</div>';
+  if (abierto) {
+    html += '<div class="paro-open">' +
+      '<div class="paro-open-t">⏸ Paro en curso: ' + escHtml(abierto.motivo) + ' · desde ' + escHtml((abierto.hora_inicio||'').slice(0,5)) + '</div>' +
+      '<button class="btn-terminar" onclick="terminarParo(\'' + abierto.id + '\')">▶ Terminar paro (reanudar)</button>' +
+    '</div>';
+  } else {
+    html += '<button class="btn-paro" onclick="abrirMotivoParo()">⏸ Registrar paro</button>';
+  }
+  cont.innerHTML = html;
+}
+
+function abrirMotivoParo() {
+  if (!opActual) return;
+  if (parosHoy.find(function(p){ return !p.hora_fin; })) { showToast('Ya hay un paro en curso', '#D97706'); return; }
+  document.getElementById('motivoGrid').innerHTML = MOTIVOS_PARO.map(function(m){
+    return '<button class="motivo-op" onclick="elegirMotivoParo(\'' + escHtml(m.replace(/\x27/g,'')) + '\')">' + (m === 'EMPAQUE' ? '📦 ' : '⏸ ') + escHtml(m) + '</button>';
+  }).join('');
+  abrirOv('ovMotivo');
+}
+
+function elegirMotivoParo(motivo) {
+  cerrarOv('ovMotivo');
+  if (motivo === 'EMPAQUE') {
+    var inp = document.getElementById('empEnvase');
+    inp.value = ''; inp.dataset.sku = '';
+    document.getElementById('empCantidad').value = '';
+    abrirOv('ovEmpaque');
+  } else {
+    iniciarParo(motivo, null);
+  }
+}
+
+function confirmarEmpaqueParo() {
+  var inp = document.getElementById('empEnvase');
+  var desc = inp.value.trim();
+  if (!desc) { showToast('Indica el envase empacado', '#B83232'); return; }
+  var empaque = { sku: inp.dataset.sku || '', desc: desc, cantidad: parseInt(document.getElementById('empCantidad').value) || 0 };
+  cerrarOv('ovEmpaque');
+  iniciarParo('EMPAQUE', empaque);
+}
+
+async function iniciarParo(motivo, empaque) {
+  if (!opActual) return;
+  var payload = {
+    fecha: document.getElementById('fFecha').value || fechaHoy(),
+    linea_id: parseInt(document.getElementById('fLinea').value) || 1,
+    area: 'serig', motivo: motivo,
+    hora_inicio: new Date().toTimeString().slice(0,5), hora_fin: null, minutos: null,
+    operador_codigo: opActual.codigo, operador_nombre: opActual.nombre || ''
+  };
+  if (empaque) {
+    payload.empaque_sku = empaque.sku || null;
+    payload.empaque_desc = empaque.desc || null;
+    payload.empaque_cantidad = empaque.cantidad || null;
+  }
+  try {
+    var r = await db.from('paros_serig').insert(payload);
+    if (r.error) throw r.error;
+    showToast('⏸ Paro iniciado');
+    await cargarParosHoy();
+  } catch(e) { showToast('❌ ' + (e.message || 'Error al iniciar'), '#B83232'); }
+}
+
+async function terminarParo(id) {
+  var p = parosHoy.find(function(x){ return x.id === id; });
+  if (!p) return;
+  var ahora = new Date().toTimeString().slice(0,5);
+  var min = minutosEntre((p.hora_inicio||'').slice(0,5), ahora);
+  try {
+    var r = await db.from('paros_serig').update({ hora_fin: ahora, minutos: min, updated_at: new Date().toISOString() }).eq('id', id);
+    if (r.error) throw r.error;
+    showToast('▶ Paro terminado · ' + min + ' min');
+    await cargarParosHoy();
+  } catch(e) { showToast('❌ ' + (e.message || 'Error'), '#B83232'); }
+}
+
+function toggleEpEmpaque(show) {
+  document.getElementById('epEmpaqueWrap').style.display = show ? 'block' : 'none';
+}
+
+function editarParo(id) {
+  var p = parosHoy.find(function(x){ return x.id === id; });
+  if (!p) return;
+  _paroEditId = id;
+  var sel = document.getElementById('epMotivo');
+  sel.innerHTML = MOTIVOS_PARO.map(function(m){ return '<option value="' + escHtml(m) + '"' + (m === p.motivo ? ' selected' : '') + '>' + escHtml(m) + '</option>'; }).join('');
+  sel.onchange = function(){ toggleEpEmpaque(sel.value === 'EMPAQUE'); };
+  document.getElementById('epInicio').value = (p.hora_inicio || '').slice(0,5);
+  document.getElementById('epFin').value = (p.hora_fin || '').slice(0,5);
+  toggleEpEmpaque(p.motivo === 'EMPAQUE');
+  var env = document.getElementById('epEnvase');
+  env.value = p.empaque_desc || p.empaque_sku || '';
+  env.dataset.sku = p.empaque_sku || '';
+  document.getElementById('epCantidad').value = p.empaque_cantidad || '';
+  abrirOv('ovEditParo');
+}
+
+async function guardarEdicionParo() {
+  if (!_paroEditId) return;
+  var motivo = document.getElementById('epMotivo').value;
+  var hi = document.getElementById('epInicio').value;
+  var hf = document.getElementById('epFin').value || null;
+  if (!hi) { showToast('Indica la hora de inicio', '#B83232'); return; }
+  var payload = {
+    motivo: motivo, hora_inicio: hi, hora_fin: hf,
+    minutos: hf ? minutosEntre(hi, hf) : null, updated_at: new Date().toISOString()
+  };
+  if (motivo === 'EMPAQUE') {
+    payload.empaque_sku = document.getElementById('epEnvase').dataset.sku || null;
+    payload.empaque_desc = document.getElementById('epEnvase').value.trim() || null;
+    payload.empaque_cantidad = parseInt(document.getElementById('epCantidad').value) || null;
+  } else {
+    payload.empaque_sku = null; payload.empaque_desc = null; payload.empaque_cantidad = null;
+  }
+  try {
+    var r = await db.from('paros_serig').update(payload).eq('id', _paroEditId);
+    if (r.error) throw r.error;
+    showToast('✅ Paro actualizado');
+    cerrarOv('ovEditParo'); _paroEditId = null;
+    await cargarParosHoy();
+  } catch(e) { showToast('❌ ' + (e.message || 'Error'), '#B83232'); }
+}
+
+async function borrarParo() {
+  if (!_paroEditId) return;
+  if (!confirm('¿Eliminar este paro?')) return;
+  try {
+    var r = await db.from('paros_serig').delete().eq('id', _paroEditId);
+    if (r.error) throw r.error;
+    showToast('🗑 Paro eliminado');
+    cerrarOv('ovEditParo'); _paroEditId = null;
+    await cargarParosHoy();
+  } catch(e) { showToast('❌ ' + (e.message || 'Error'), '#B83232'); }
 }
 
 // ── Foto del contador ─────────────────────────────────────────
