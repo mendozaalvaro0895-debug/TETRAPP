@@ -467,13 +467,11 @@ function renderHoyLinea() {
 // Bloquea los momentos que ya tienen lectura hoy en esta línea (una vez
 // registrado Inicio/Mediodía/Fin, no debe volver a tomarse ese mismo momento)
 function actualizarMomentosDisponibles() {
-  // Solo bloquea momentos que YA registró ESTE operario hoy en esta línea
+  // Bloquea cualquier momento que YA tenga registro para esta línea/fecha,
+  // sin importar qué operario lo ingresó (la lectura del contador es única
+  // por línea+día+momento).
   var tomados = {};
-  if (opActual) {
-    lecturasHoyLinea.forEach(function(l){
-      if (l.operador_codigo === opActual.codigo) tomados[l.momento] = true;
-    });
-  }
+  lecturasHoyLinea.forEach(function(l){ tomados[l.momento] = true; });
 
   document.querySelectorAll('.momento-btn').forEach(function(b){
     b.classList.toggle('disabled', !!tomados[b.dataset.m]);
