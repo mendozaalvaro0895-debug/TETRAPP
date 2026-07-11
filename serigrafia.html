@@ -7104,6 +7104,7 @@ function switchTab(tab) {
     if (v) { v.style.display = 'flex'; triggerViewEnter('view-productividad'); }
     var mEl = document.getElementById('prodMes');
     if (mEl && !mEl.value) mEl.value = fechaHoy().slice(0,7);
+    prodSuscribirRealtime();
     renderProductividad();
   } else if (tab === 'dash') {
     window.location.href = 'dashboard.html';
@@ -7123,6 +7124,27 @@ window.addEventListener('focus', prodRefrescarSiActiva);
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible') prodRefrescarSiActiva();
 });
+
+// ── Realtime: refresco EN VIVO de Productividad ───────────────
+// Requiere haber corrido sql/realtime_serig.sql (agrega las tablas a la
+// publicación supabase_realtime). Si no se corrió, la suscripción simplemente
+// no recibe eventos y seguimos con el botón 🔄 y el refresco por foco.
+var _prodRtChan = null, _prodRtTimer = null;
+
+function prodRealtimeThrottle() {
+  clearTimeout(_prodRtTimer);
+  _prodRtTimer = setTimeout(prodRefrescarSiActiva, 700);
+}
+
+function prodSuscribirRealtime() {
+  if (_prodRtChan || typeof db.channel !== 'function') return;
+  try {
+    _prodRtChan = db.channel('prod-serig-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'registro_tiros_serig' }, prodRealtimeThrottle)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comentarios_productividad_serig' }, prodRealtimeThrottle)
+      .subscribe();
+  } catch(e) { console.warn('Realtime serig no disponible:', e); }
+}
 
 function buildRoleOptions(actual) {
   var opts = '<option value="">— Sin rol —</option>';
