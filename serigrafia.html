@@ -1105,8 +1105,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Momento</label>
           <select id="etMomento" class="fi" style="width:100%">
             <option value="inicio">🌅 Inicio</option>
-            <option value="mediodia">🕐 Mediodía</option>
-            <option value="fin">🌇 Fin</option>
+            <option value="fin">⏹ Paro</option>
             <option value="velada">🌙 Velada</option>
           </select>
         </div>
@@ -5874,7 +5873,7 @@ function buildPfcFechaCard(fecha, datos, esMaster, lineaId) {
       '<div class="pfc-hdr">📅 ' + escHtml(fechaFmt) + opTag + '</div>' +
       (diseno ? '<div class="pfc-diseno">' + escHtml(diseno.slice(0,50)) + '</div>' : '') +
       buildPfcMomentoRow(m.inicio, 'inicio', esMaster) +
-      buildPfcMomentoRow(m.mediodia, 'mediodia', esMaster) +
+      (m.mediodia ? buildPfcMomentoRow(m.mediodia, 'mediodia', esMaster) : '') +
       buildPfcMomentoRow(m.fin, 'fin', esMaster) +
       (delta !== null ? '<div class="pfc-delta" style="color:' + dc + '">▲ ' + delta.toLocaleString() + ' tiros · ' + pct + '%</div>' : '') +
       '</div>';
@@ -6335,9 +6334,9 @@ async function renderProductividad() {
   tabla.innerHTML = buildProdGrid(fechas, byDL, esMaster, operadorPorLinea) + adminBar;
 }
 
-var MOMENTO_LBL_ADMIN_TXT = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '🌇 Fin', velada: '🌙 Velada' };
+var MOMENTO_LBL_ADMIN_TXT = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '⏹ Paro', velada: '🌙 Velada' };
 
-var MOMENTO_LBL_ADMIN = { inicio: '🌅', mediodia: '🕐', fin: '🌇', velada: '🌙' };
+var MOMENTO_LBL_ADMIN = { inicio: '🌅', mediodia: '🕐', fin: '⏹', velada: '🌙' };
 var prodLecturasCache = [];
 var prodComentarioCache = {}; // 'fecha|linea' → { comentario, autor }
 
