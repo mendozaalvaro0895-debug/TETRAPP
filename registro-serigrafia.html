@@ -33,8 +33,18 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .titulo{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;text-align:center;margin-bottom:4px}
 .subtitulo{font-size:13px;color:#6B6B6A;text-align:center;margin-bottom:22px}
 
+/* SELECCIÓN DE TAREA (pantalla 0) */
+.tarea-grid{display:grid;grid-template-columns:1fr;gap:14px;max-width:440px;margin:0 auto}
+.tarea-card{display:flex;align-items:center;gap:16px;background:#fff;border:1.5px solid #E0DED8;border-radius:16px;padding:18px;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.tarea-card:hover,.tarea-card:active{border-color:#7C3AED;box-shadow:0 4px 16px rgba(124,58,237,.15);transform:translateY(-2px)}
+.tarea-ico{width:54px;height:54px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.tarea-nombre{font-size:16px;font-weight:800}
+.tarea-desc{font-size:12px;color:#6B6B6A;margin-top:2px}
+.btn-volver-tarea{background:none;border:none;color:#7C3AED;font:600 13px 'DM Sans',sans-serif;cursor:pointer;padding:0 0 14px;display:block}
+
 /* SELECCIÓN DE OPERARIO */
 .op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.op-sel-apoyo{border-style:dashed;border-color:#059669}
 .op-sel-card{background:#fff;border:1.5px solid #E0DED8;border-radius:14px;padding:18px 12px;text-align:center;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
 .op-sel-card:hover,.op-sel-card:active{border-color:#7C3AED;box-shadow:0 4px 16px rgba(124,58,237,.15);transform:translateY(-2px)}
 .op-sel-av{width:52px;height:52px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#fff}
@@ -154,8 +164,38 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 
 <div class="wrap">
 
-  <!-- PANTALLA 1: SELECCIÓN DE OPERARIO -->
-  <div class="pantalla vis" id="scrSel">
+  <!-- PANTALLA 0: SELECCIÓN DE TAREA -->
+  <div class="pantalla vis" id="scrTarea">
+    <div class="titulo">¿Qué vas a registrar?</div>
+    <div class="subtitulo">Elige la tarea para comenzar</div>
+    <div class="tarea-grid">
+      <div class="tarea-card" onclick="elegirTarea('flameado')">
+        <div class="tarea-ico" style="background:#FEF3C7">🔥</div>
+        <div>
+          <div class="tarea-nombre">Flameado</div>
+          <div class="tarea-desc">Bolsa flameada que pasa a Impresión</div>
+        </div>
+      </div>
+      <div class="tarea-card" onclick="elegirTarea('impresion')">
+        <div class="tarea-ico" style="background:#F5F3FF">🖨</div>
+        <div>
+          <div class="tarea-nombre">Impresión</div>
+          <div class="tarea-desc">Lectura del contador de máquina por línea</div>
+        </div>
+      </div>
+      <div class="tarea-card" onclick="elegirTarea('empaque')">
+        <div class="tarea-ico" style="background:#ECFDF5">📦</div>
+        <div>
+          <div class="tarea-nombre">Empaque</div>
+          <div class="tarea-desc">Cantidad empacada por operador</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPRESIÓN · PANTALLA 1: SELECCIÓN DE OPERARIO -->
+  <div class="pantalla" id="scrSel">
+    <button class="btn-volver-tarea" onclick="volverTareas()">← Cambiar tarea</button>
     <div class="titulo">¿Quién registra el contador?</div>
     <div class="subtitulo">Toca tu nombre para comenzar</div>
     <div id="opGrid" class="op-grid">
@@ -266,6 +306,152 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
     </div>
   </div>
 
+  <!-- FLAMEADO · SELECCIÓN DE FLAMEADOR -->
+  <div class="pantalla" id="scrSelFlam">
+    <button class="btn-volver-tarea" onclick="volverTareas()">← Cambiar tarea</button>
+    <div class="titulo">🔥 ¿Quién flamea?</div>
+    <div class="subtitulo">Toca tu nombre para comenzar</div>
+    <div id="opGridFlam" class="op-grid">
+      <div class="cargando" style="grid-column:1/-1"><div class="spinner"></div><div>Cargando operarios…</div></div>
+    </div>
+  </div>
+
+  <!-- FLAMEADO · FORMULARIO (una bolsa por registro) -->
+  <div class="pantalla" id="scrFormFlam">
+    <div class="quien">
+      <div class="quien-av" id="qAvFlam">?</div>
+      <div>
+        <div class="quien-nombre" id="qNombreFlam">—</div>
+        <div class="quien-corr">Registro de bolsa flameada</div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn-cambiar" onclick="volverSeleccionFlam()">↩ Cambiar</button>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">1</span> Fecha y hora</div>
+      <div class="grid-2">
+        <div class="field"><label>Fecha</label><input type="date" id="fFlamFecha" onchange="cargarHoyFlam()"></div>
+        <div class="field"><label>Hora</label><input type="time" id="fFlamHora"></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">2</span> Envase y cantidad</div>
+      <div class="field" style="margin-bottom:10px"><label>Envase (SKU o descripción)</label>
+        <div class="ac-wrap">
+          <input type="text" id="fFlamEnvase" placeholder="Escribe SKU o descripción…" autocomplete="off" oninput="acGen(this.value,'fFlamEnvase','flamDrop')" data-sku="">
+          <div class="ac-drop" id="flamDrop"></div>
+        </div>
+      </div>
+      <div class="field"><label>Cantidad en la bolsa</label>
+        <input type="number" inputmode="numeric" id="fFlamCant" min="1" placeholder="Ej: 250">
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">3</span> ¿Para qué línea va?</div>
+      <div class="momento-tog" id="paraTog">
+        <div class="momento-btn act" data-l="1" onclick="elegirParaLinea(1)">Línea 1</div>
+        <div class="momento-btn" data-l="2" onclick="elegirParaLinea(2)">Línea 2</div>
+        <div class="momento-btn" data-l="3" onclick="elegirParaLinea(3)">Línea 3</div>
+        <div class="momento-btn" data-l="4" onclick="elegirParaLinea(4)">Línea 4</div>
+      </div>
+    </div>
+
+    <div class="hoy-box" id="hoyBoxFlam" style="display:none">
+      <div class="hoy-lbl">Bolsas registradas hoy</div>
+      <div id="hoyFilasFlam"></div>
+      <div class="hoy-meta">
+        <span class="hoy-meta-lbl">Total flameado hoy</span>
+        <span class="hoy-meta-val" id="hoyTotalFlam">—</span>
+      </div>
+    </div>
+
+    <button class="btn-guardar" id="btnGuardarFlam" onclick="guardarFlameado()">💾 Guardar bolsa</button>
+    <div id="errBoxFlam" style="display:none;margin-top:12px;padding:12px 14px;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:10px;font-size:13px;color:#991B1B;font-weight:600;word-break:break-word"></div>
+  </div>
+
+  <!-- FLAMEADO · ÉXITO -->
+  <div class="pantalla" id="scrOkFlam">
+    <div class="exito-box">
+      <div class="exito-ico">✅</div>
+      <div class="titulo">¡Bolsa registrada!</div>
+      <div class="exito-corr" id="okCorrFlam">—</div>
+      <div class="exito-det" id="okDetFlam">—</div>
+      <button class="btn-guardar" onclick="otraBolsaFlam()">🔥 Registrar otra bolsa</button>
+      <button class="btn-paro" style="margin-top:10px" onclick="volverSeleccionFlam()">👤 Cambiar flameador</button>
+    </div>
+  </div>
+
+  <!-- EMPAQUE · SELECCIÓN DE OPERADOR -->
+  <div class="pantalla" id="scrSelEmp">
+    <button class="btn-volver-tarea" onclick="volverTareas()">← Cambiar tarea</button>
+    <div class="titulo">📦 ¿Quién empaca?</div>
+    <div class="subtitulo">Toca tu nombre, o agrega a alguien de otra área</div>
+    <div id="opGridEmp" class="op-grid">
+      <div class="cargando" style="grid-column:1/-1"><div class="spinner"></div><div>Cargando operarios…</div></div>
+    </div>
+  </div>
+
+  <!-- EMPAQUE · FORMULARIO -->
+  <div class="pantalla" id="scrFormEmp">
+    <div class="quien">
+      <div class="quien-av" id="qAvEmp">?</div>
+      <div>
+        <div class="quien-nombre" id="qNombreEmp">—</div>
+        <div class="quien-corr" id="qCorrEmp">Registro de empaque</div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn-cambiar" onclick="volverSeleccionEmp()">↩ Cambiar</button>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">1</span> Fecha y hora (automáticas)</div>
+      <div class="grid-2">
+        <div class="field"><label>Fecha</label><input type="date" id="fEmpFecha" readonly></div>
+        <div class="field"><label>Hora</label><input type="time" id="fEmpHora" readonly></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label"><span class="paso-num">2</span> Producto y cantidad</div>
+      <div class="field" style="margin-bottom:10px"><label>SKU + Descripción</label>
+        <div class="ac-wrap">
+          <input type="text" id="fEmpSku" placeholder="Escribe SKU o descripción…" autocomplete="off" oninput="acGen(this.value,'fEmpSku','empSkuDrop')" data-sku="">
+          <div class="ac-drop" id="empSkuDrop"></div>
+        </div>
+      </div>
+      <div class="field"><label>Cantidad empacada</label>
+        <input type="number" inputmode="numeric" id="fEmpCant" min="1" placeholder="Ej: 500">
+      </div>
+    </div>
+
+    <div class="hoy-box" id="hoyBoxEmp" style="display:none">
+      <div class="hoy-lbl">Empaques registrados hoy</div>
+      <div id="hoyFilasEmp"></div>
+      <div class="hoy-meta">
+        <span class="hoy-meta-lbl">Total empacado hoy</span>
+        <span class="hoy-meta-val" id="hoyTotalEmp">—</span>
+      </div>
+    </div>
+
+    <button class="btn-guardar" id="btnGuardarEmp" onclick="guardarEmpaque()">💾 Guardar empaque</button>
+    <div id="errBoxEmp" style="display:none;margin-top:12px;padding:12px 14px;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:10px;font-size:13px;color:#991B1B;font-weight:600;word-break:break-word"></div>
+  </div>
+
+  <!-- EMPAQUE · ÉXITO -->
+  <div class="pantalla" id="scrOkEmp">
+    <div class="exito-box">
+      <div class="exito-ico">✅</div>
+      <div class="titulo">¡Empaque registrado!</div>
+      <div class="exito-corr" id="okCorrEmp">—</div>
+      <div class="exito-det" id="okDetEmp">—</div>
+      <button class="btn-guardar" onclick="otroEmpaque()">📦 Registrar otro empaque</button>
+      <button class="btn-paro" style="margin-top:10px" onclick="volverSeleccionEmp()">👤 Cambiar operador</button>
+    </div>
+  </div>
+
 </div>
 
 <!-- ══ MODAL: motivo del paro ══ -->
@@ -323,6 +509,26 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
   </div>
 </div>
 
+<!-- ══ MODAL: apoyo de otra área (empaque) ══ -->
+<div class="ov" id="ovApoyo">
+  <div class="ov-card">
+    <div class="ov-t">➕ Apoyo de otra área</div>
+    <div class="field" style="margin-bottom:10px"><label>Nombre de quien apoya</label>
+      <input type="text" id="apNombre" placeholder="Nombre completo" autocomplete="off">
+    </div>
+    <div class="field" style="margin-bottom:14px"><label>Área de origen</label>
+      <select id="apArea">
+        <option value="tapas">Tapas</option>
+        <option value="produccion">Producción</option>
+        <option value="bodega">Bodega</option>
+        <option value="otra">Otra</option>
+      </select>
+    </div>
+    <button class="btn-terminar" style="background:#059669" onclick="confirmarApoyo()">✓ Continuar</button>
+    <button class="btn-paro" style="margin-top:8px" onclick="cerrarOv('ovApoyo')">Cancelar</button>
+  </div>
+</div>
+
 <script>
 // SUPA_URL, SUPA_KEY, db y escHtml vienen de shared/auth.js
 
@@ -362,10 +568,15 @@ async function cargarOperarios() {
       return ia - ib;
     });
     renderSeleccion();
+    renderSeleccionFlam();
+    renderSeleccionEmp();
   } catch(e) {
     console.error('cargarOperarios:', e);
-    document.getElementById('opGrid').innerHTML =
-      '<div class="cargando" style="grid-column:1/-1">❌ No se pudieron cargar los operarios.<br>Revisa tu conexión y recarga la página.</div>';
+    var errHtml = '<div class="cargando" style="grid-column:1/-1">❌ No se pudieron cargar los operarios.<br>Revisa tu conexión y recarga la página.</div>';
+    ['opGrid','opGridFlam','opGridEmp'].forEach(function(id){
+      var g = document.getElementById(id);
+      if (g) g.innerHTML = errHtml;
+    });
   }
 }
 
@@ -388,15 +599,20 @@ async function cargarInventario() {
 }
 
 // ── Pantalla 1: selección ─────────────────────────────────────
-function buildOpCard(op) {
+// Tarjeta de operario genérica: fn es el nombre de la función global
+// que recibe el código al tocarla (elegirOperario / elegirFlameador /
+// elegirOperarioEmp)
+function buildOpCardGen(op, fn) {
   var color = op.color_hex || '#5B21B6';
   var ini = op.iniciales || (op.nombre || '?').slice(0, 2).toUpperCase();
-  return '<div class="op-sel-card" onclick="elegirOperario(\'' + escHtml(op.codigo) + '\')">'
+  return '<div class="op-sel-card" onclick="' + fn + '(\'' + escHtml(op.codigo) + '\')">'
     + '<div class="op-sel-av" style="background:' + escHtml(color) + '">' + escHtml(ini) + '</div>'
     + '<div class="op-sel-nombre">' + escHtml(op.nombre) + '</div>'
     + '<div class="op-sel-cod">' + escHtml(op.codigo) + '</div>'
     + '</div>';
 }
+
+function buildOpCard(op) { return buildOpCardGen(op, 'elegirOperario'); }
 
 function renderSeleccion() {
   var g = document.getElementById('opGrid');
@@ -440,10 +656,32 @@ function volverSeleccion() {
   window.scrollTo(0, 0);
 }
 
+var PANTALLAS = ['scrTarea','scrSel','scrForm','scrOk',
+                 'scrSelFlam','scrFormFlam','scrOkFlam',
+                 'scrSelEmp','scrFormEmp','scrOkEmp'];
+
 function mostrarPantalla(id) {
-  ['scrSel','scrForm','scrOk'].forEach(function(s){
-    document.getElementById(s).classList.toggle('vis', s === id);
+  PANTALLAS.forEach(function(s){
+    var el = document.getElementById(s);
+    if (el) el.classList.toggle('vis', s === id);
   });
+}
+
+// ── Pantalla 0: selección de tarea ─────────────────────────────
+var tareaActual = null;
+
+function elegirTarea(t) {
+  tareaActual = t;
+  if (t === 'flameado')      { renderSeleccionFlam(); mostrarPantalla('scrSelFlam'); }
+  else if (t === 'empaque')  { renderSeleccionEmp();  mostrarPantalla('scrSelEmp'); }
+  else                       { renderSeleccion();     mostrarPantalla('scrSel'); }
+  window.scrollTo(0, 0);
+}
+
+function volverTareas() {
+  tareaActual = null;
+  mostrarPantalla('scrTarea');
+  window.scrollTo(0, 0);
 }
 
 function elegirMomento(m) {
@@ -1110,6 +1348,355 @@ async function guardarRegistro() {
     btn.disabled = false;
     btn.textContent = '💾 Guardar lectura';
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FLAMEADO — un registro por bolsa (Hora, Flameador, Envase,
+// Cantidad, Para línea 1-4). Espejo de la hoja física.
+// ═══════════════════════════════════════════════════════════════
+var flamOpActual = null;
+var paraLinea = 1;
+var bolsasHoyFlam = [];
+
+// Lee sku + descripción de un input con autocomplete acGen.
+// Si eligió del listado: value = "SKU — desc" y dataset.sku = SKU.
+// Si escribió libre: sku vacío y todo el texto queda como descripción.
+function skuDescDe(inputId) {
+  var inp = document.getElementById(inputId);
+  var sku = inp.dataset.sku || '';
+  var texto = inp.value.trim();
+  var desc = texto;
+  if (sku && texto.indexOf(sku + ' — ') === 0) desc = texto.slice(sku.length + 3);
+  if (sku && texto.indexOf(sku) !== 0) sku = ''; // editó el texto a mano: el sku ya no aplica
+  return { sku: sku, descripcion: desc, texto: texto };
+}
+
+function renderSeleccionFlam() {
+  var g = document.getElementById('opGridFlam');
+  if (!operarios.length) {
+    g.innerHTML = '<div class="cargando" style="grid-column:1/-1"><div class="spinner"></div><div>Cargando operarios…</div></div>';
+    return;
+  }
+  // Flameadores primero
+  var lista = operarios.slice().sort(function(a, b) {
+    var ia = (a.proceso_hab === 'Flameado') ? 0 : 1;
+    var ib = (b.proceso_hab === 'Flameado') ? 0 : 1;
+    return ia - ib;
+  });
+  g.innerHTML = lista.map(function(op){ return buildOpCardGen(op, 'elegirFlameador'); }).join('');
+}
+
+function elegirFlameador(codigo) {
+  flamOpActual = operarios.find(function(o){ return o.codigo === codigo; });
+  if (!flamOpActual) return;
+  cargarInventario();
+  document.getElementById('qAvFlam').textContent = flamOpActual.iniciales || '?';
+  document.getElementById('qAvFlam').style.background = flamOpActual.color_hex || '#D97706';
+  document.getElementById('qNombreFlam').textContent = flamOpActual.nombre;
+  document.getElementById('fFlamFecha').value = fechaHoy();
+  document.getElementById('fFlamHora').value = new Date().toTimeString().slice(0,5);
+  document.getElementById('fFlamEnvase').value = '';
+  document.getElementById('fFlamEnvase').dataset.sku = '';
+  document.getElementById('fFlamCant').value = '';
+  elegirParaLinea(1);
+  cargarHoyFlam();
+  mostrarPantalla('scrFormFlam');
+  window.scrollTo(0, 0);
+}
+
+function volverSeleccionFlam() {
+  flamOpActual = null;
+  renderSeleccionFlam();
+  mostrarPantalla('scrSelFlam');
+  window.scrollTo(0, 0);
+}
+
+function elegirParaLinea(n) {
+  paraLinea = n;
+  document.querySelectorAll('#paraTog .momento-btn').forEach(function(b){
+    b.classList.toggle('act', parseInt(b.dataset.l) === n);
+  });
+}
+
+async function cargarHoyFlam() {
+  var box = document.getElementById('hoyBoxFlam');
+  if (!flamOpActual) { box.style.display = 'none'; return; }
+  var fecha = document.getElementById('fFlamFecha').value || fechaHoy();
+  try {
+    var r = await db.from('registro_flameado_serig')
+      .select('hora, sku, descripcion, cantidad, para_linea, created_at')
+      .eq('area', 'serig').eq('fecha', fecha).eq('flameador_codigo', flamOpActual.codigo)
+      .order('created_at', { ascending: true });
+    if (r.error) throw r.error;
+    bolsasHoyFlam = r.data || [];
+    renderHoyFlam();
+  } catch(e) {
+    console.warn('cargarHoyFlam:', e);
+    bolsasHoyFlam = [];
+    box.style.display = 'none';
+  }
+}
+
+function buildBolsaRow(l) {
+  var horaLbl = l.hora ? l.hora.slice(0,5) : (l.created_at ? l.created_at.slice(11,16) : '');
+  return '<div class="hoy-row">'
+    + '<span>' + escHtml(l.sku || (l.descripcion || '').slice(0,24)) + ' → L' + escHtml(String(l.para_linea || '?')) + '</span>'
+    + '<span style="display:flex;gap:12px;align-items:center">'
+    + (horaLbl ? '<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:#C4B5FD">⏰ ' + escHtml(horaLbl) + '</span>' : '')
+    + '<span>' + (l.cantidad || 0).toLocaleString() + '</span>'
+    + '</span>'
+    + '</div>';
+}
+
+function renderHoyFlam() {
+  var box = document.getElementById('hoyBoxFlam');
+  if (!bolsasHoyFlam.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  document.getElementById('hoyFilasFlam').innerHTML = bolsasHoyFlam.map(buildBolsaRow).join('');
+  var total = bolsasHoyFlam.reduce(function(s, l){ return s + (l.cantidad || 0); }, 0);
+  document.getElementById('hoyTotalFlam').textContent = total.toLocaleString() + ' unidades · ' + bolsasHoyFlam.length + ' bolsas';
+}
+
+async function guardarFlameado() {
+  if (!flamOpActual) { volverSeleccionFlam(); return; }
+
+  var fecha = document.getElementById('fFlamFecha').value;
+  if (!fecha) { showToast('⚠️ Selecciona la fecha', '#B83232'); return; }
+  var envase = skuDescDe('fFlamEnvase');
+  if (!envase.texto) { showToast('⚠️ Indica el envase que flameaste', '#B83232'); return; }
+  var cantidad = parseInt(document.getElementById('fFlamCant').value);
+  if (!cantidad || cantidad <= 0) { showToast('⚠️ Ingresa la cantidad de la bolsa', '#B83232'); return; }
+
+  var horaVal = document.getElementById('fFlamHora').value || null;
+  var payload = {
+    fecha: fecha,
+    hora: horaVal,
+    flameador_codigo: flamOpActual.codigo,
+    flameador_nombre: flamOpActual.nombre || '',
+    sku: envase.sku,
+    descripcion: envase.descripcion,
+    cantidad: cantidad,
+    para_linea: paraLinea,
+    area: 'serig'
+  };
+
+  var btn = document.getElementById('btnGuardarFlam');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+  var errBox = document.getElementById('errBoxFlam');
+  errBox.style.display = 'none';
+
+  try {
+    var r = await db.from('registro_flameado_serig').insert(payload);
+    if (r.error) throw r.error;
+    document.getElementById('okCorrFlam').textContent = 'Bolsa → Línea ' + paraLinea;
+    document.getElementById('okDetFlam').innerHTML =
+      escHtml(flamOpActual.nombre) + ' · ' + escHtml(fecha) + (horaVal ? ' · ⏰ ' + escHtml(horaVal) : '')
+      + '<br><strong>' + cantidad.toLocaleString() + '</strong> unidades · ' + escHtml(envase.texto);
+    mostrarPantalla('scrOkFlam');
+    window.scrollTo(0, 0);
+  } catch(e) {
+    console.error('guardarFlameado:', e);
+    var detalle = (e && e.message ? e.message : String(e)) +
+      (e && e.code ? ' [código ' + e.code + ']' : '') +
+      (e && e.details ? ' — ' + e.details : '') +
+      (e && e.hint ? ' — ' + e.hint : '');
+    errBox.textContent = '❌ El registro NO se guardó: ' + detalle;
+    errBox.style.display = 'block';
+    showToast('❌ Error al guardar', '#B83232');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Guardar bolsa';
+  }
+}
+
+// Conserva flameador, envase y línea (suelen repetirse bolsa tras
+// bolsa); solo renueva la hora y limpia la cantidad.
+function otraBolsaFlam() {
+  if (!flamOpActual) { volverSeleccionFlam(); return; }
+  document.getElementById('fFlamHora').value = new Date().toTimeString().slice(0,5);
+  document.getElementById('fFlamCant').value = '';
+  cargarHoyFlam();
+  mostrarPantalla('scrFormFlam');
+  window.scrollTo(0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EMPAQUE — operador (propio o apoyo de otra área) + SKU +
+// cantidad, con fecha/hora automáticas.
+// ═══════════════════════════════════════════════════════════════
+var empOpActual = null; // { codigo|null, nombre, iniciales, color_hex, area_origen }
+var empaquesHoy = [];
+
+var AREA_ORIGEN_LBL = { tapas: 'Tapas', produccion: 'Producción', bodega: 'Bodega', otra: 'Otra área', serig: 'Serigrafía' };
+
+function renderSeleccionEmp() {
+  var g = document.getElementById('opGridEmp');
+  var apoyoCard = '<div class="op-sel-card op-sel-apoyo" onclick="abrirApoyo()">'
+    + '<div class="op-sel-av" style="background:#059669">➕</div>'
+    + '<div class="op-sel-nombre">Apoyo de otra área</div>'
+    + '<div class="op-sel-cod">agregar persona</div>'
+    + '</div>';
+  if (!operarios.length) {
+    g.innerHTML = '<div class="cargando" style="grid-column:1/-1"><div class="spinner"></div><div>Cargando operarios…</div></div>';
+    return;
+  }
+  g.innerHTML = operarios.map(function(op){ return buildOpCardGen(op, 'elegirOperarioEmp'); }).join('') + apoyoCard;
+}
+
+function elegirOperarioEmp(codigo) {
+  var op = operarios.find(function(o){ return o.codigo === codigo; });
+  if (!op) return;
+  empOpActual = { codigo: op.codigo, nombre: op.nombre, iniciales: op.iniciales, color_hex: op.color_hex, area_origen: 'serig' };
+  iniciarFormEmp();
+}
+
+function abrirApoyo() {
+  document.getElementById('apNombre').value = '';
+  document.getElementById('apArea').value = 'tapas';
+  abrirOv('ovApoyo');
+}
+
+function confirmarApoyo() {
+  var nombre = document.getElementById('apNombre').value.trim();
+  if (!nombre) { showToast('⚠️ Escribe el nombre de quien apoya', '#B83232'); return; }
+  var area = document.getElementById('apArea').value;
+  var ini = nombre.split(/\s+/).map(function(p){ return p[0]; }).slice(0,2).join('').toUpperCase();
+  empOpActual = { codigo: null, nombre: nombre, iniciales: ini, color_hex: '#059669', area_origen: area };
+  cerrarOv('ovApoyo');
+  iniciarFormEmp();
+}
+
+function iniciarFormEmp() {
+  if (!empOpActual) return;
+  cargarInventario();
+  document.getElementById('qAvEmp').textContent = empOpActual.iniciales || '?';
+  document.getElementById('qAvEmp').style.background = empOpActual.color_hex || '#059669';
+  document.getElementById('qNombreEmp').textContent = empOpActual.nombre;
+  document.getElementById('qCorrEmp').textContent = empOpActual.area_origen === 'serig'
+    ? 'Registro de empaque'
+    : 'Registro de empaque · apoyo de ' + (AREA_ORIGEN_LBL[empOpActual.area_origen] || empOpActual.area_origen);
+  document.getElementById('fEmpFecha').value = fechaHoy();
+  document.getElementById('fEmpHora').value = new Date().toTimeString().slice(0,5);
+  document.getElementById('fEmpSku').value = '';
+  document.getElementById('fEmpSku').dataset.sku = '';
+  document.getElementById('fEmpCant').value = '';
+  cargarHoyEmp();
+  mostrarPantalla('scrFormEmp');
+  window.scrollTo(0, 0);
+}
+
+function volverSeleccionEmp() {
+  empOpActual = null;
+  renderSeleccionEmp();
+  mostrarPantalla('scrSelEmp');
+  window.scrollTo(0, 0);
+}
+
+async function cargarHoyEmp() {
+  var box = document.getElementById('hoyBoxEmp');
+  if (!empOpActual) { box.style.display = 'none'; return; }
+  try {
+    var q = db.from('registro_empaque_serig')
+      .select('hora, sku, descripcion, cantidad, created_at')
+      .eq('area', 'serig').eq('fecha', fechaHoy());
+    // Operario propio: por código. Apoyo externo (sin código): por nombre.
+    q = empOpActual.codigo ? q.eq('operador_codigo', empOpActual.codigo)
+                           : q.eq('operador_nombre', empOpActual.nombre);
+    var r = await q.order('created_at', { ascending: true });
+    if (r.error) throw r.error;
+    empaquesHoy = r.data || [];
+    renderHoyEmp();
+  } catch(e) {
+    console.warn('cargarHoyEmp:', e);
+    empaquesHoy = [];
+    box.style.display = 'none';
+  }
+}
+
+function buildEmpaqueRow(l) {
+  var horaLbl = l.hora ? l.hora.slice(0,5) : (l.created_at ? l.created_at.slice(11,16) : '');
+  return '<div class="hoy-row">'
+    + '<span>' + escHtml(l.sku || (l.descripcion || '').slice(0,24)) + '</span>'
+    + '<span style="display:flex;gap:12px;align-items:center">'
+    + (horaLbl ? '<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:#C4B5FD">⏰ ' + escHtml(horaLbl) + '</span>' : '')
+    + '<span>' + (l.cantidad || 0).toLocaleString() + '</span>'
+    + '</span>'
+    + '</div>';
+}
+
+function renderHoyEmp() {
+  var box = document.getElementById('hoyBoxEmp');
+  if (!empaquesHoy.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  document.getElementById('hoyFilasEmp').innerHTML = empaquesHoy.map(buildEmpaqueRow).join('');
+  var total = empaquesHoy.reduce(function(s, l){ return s + (l.cantidad || 0); }, 0);
+  document.getElementById('hoyTotalEmp').textContent = total.toLocaleString() + ' unidades · ' + empaquesHoy.length + ' registros';
+}
+
+async function guardarEmpaque() {
+  if (!empOpActual) { volverSeleccionEmp(); return; }
+
+  var producto = skuDescDe('fEmpSku');
+  if (!producto.texto) { showToast('⚠️ Indica el SKU o producto empacado', '#B83232'); return; }
+  var cantidad = parseInt(document.getElementById('fEmpCant').value);
+  if (!cantidad || cantidad <= 0) { showToast('⚠️ Ingresa la cantidad empacada', '#B83232'); return; }
+
+  // Fecha y hora automáticas: se toman al momento de guardar
+  var fecha = fechaHoy();
+  var horaVal = new Date().toTimeString().slice(0,5);
+  var payload = {
+    fecha: fecha,
+    hora: horaVal,
+    operador_codigo: empOpActual.codigo,
+    operador_nombre: empOpActual.nombre,
+    area_origen: empOpActual.area_origen,
+    sku: producto.sku,
+    descripcion: producto.descripcion,
+    cantidad: cantidad,
+    area: 'serig'
+  };
+
+  var btn = document.getElementById('btnGuardarEmp');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+  var errBox = document.getElementById('errBoxEmp');
+  errBox.style.display = 'none';
+
+  try {
+    var r = await db.from('registro_empaque_serig').insert(payload);
+    if (r.error) throw r.error;
+    document.getElementById('okCorrEmp').textContent = cantidad.toLocaleString() + ' unidades empacadas';
+    document.getElementById('okDetEmp').innerHTML =
+      escHtml(empOpActual.nombre) + ' · ' + escHtml(fecha) + ' · ⏰ ' + escHtml(horaVal)
+      + '<br>' + escHtml(producto.texto);
+    mostrarPantalla('scrOkEmp');
+    window.scrollTo(0, 0);
+  } catch(e) {
+    console.error('guardarEmpaque:', e);
+    var detalle = (e && e.message ? e.message : String(e)) +
+      (e && e.code ? ' [código ' + e.code + ']' : '') +
+      (e && e.details ? ' — ' + e.details : '') +
+      (e && e.hint ? ' — ' + e.hint : '');
+    errBox.textContent = '❌ El registro NO se guardó: ' + detalle;
+    errBox.style.display = 'block';
+    showToast('❌ Error al guardar', '#B83232');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Guardar empaque';
+  }
+}
+
+// Conserva operador y SKU (suelen empacar el mismo producto en tandas);
+// renueva la hora y limpia la cantidad.
+function otroEmpaque() {
+  if (!empOpActual) { volverSeleccionEmp(); return; }
+  document.getElementById('fEmpFecha').value = fechaHoy();
+  document.getElementById('fEmpHora').value = new Date().toTimeString().slice(0,5);
+  document.getElementById('fEmpCant').value = '';
+  cargarHoyEmp();
+  mostrarPantalla('scrFormEmp');
+  window.scrollTo(0, 0);
 }
 
 // ── Toast ─────────────────────────────────────────────────────
