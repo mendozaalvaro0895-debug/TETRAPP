@@ -545,8 +545,6 @@ function fechaHoy() {
 
 // ── Estado ────────────────────────────────────────────────────
 var operarios = [];
-var histImpCodes  = [];   // códigos con historial en registro_tiros_serig
-var histFlamCodes = [];   // códigos con historial en registro_flameado_serig
 var inventarioCache = [];
 var opActual = null;
 var momentoActual = 'inicio';
@@ -565,22 +563,6 @@ async function cargarOperarios() {
     var todos = r.data || [];
     operarios = todos.filter(function(p){ return p.rol !== 'supervisor'; });
     if (!operarios.length) operarios = todos;
-
-    // Historial Impresión
-    try {
-      var ri = await db.from('registro_tiros_serig').select('operador_codigo').limit(2000);
-      var si = {};
-      (ri.data || []).forEach(function(x){ if (x.operador_codigo) si[x.operador_codigo] = true; });
-      histImpCodes = Object.keys(si);
-    } catch(e2) { histImpCodes = []; }
-
-    // Historial Flameado
-    try {
-      var rf = await db.from('registro_flameado_serig').select('flameador_codigo').limit(2000);
-      var sf = {};
-      (rf.data || []).forEach(function(x){ if (x.flameador_codigo) sf[x.flameador_codigo] = true; });
-      histFlamCodes = Object.keys(sf);
-    } catch(e3) { histFlamCodes = []; }
 
     renderSeleccion();
     renderSeleccionFlam();
@@ -633,19 +615,11 @@ function buildSeccionesGrid(lista, fn, rolClave) {
   var asignados = lista.filter(function(o){ return o.proceso_hab === rolClave; });
   var asigSet = {};
   asignados.forEach(function(o){ asigSet[o.codigo] = true; });
-  var histCodes = rolClave === 'Impresión' ? histImpCodes : histFlamCodes;
-  var historicos = lista.filter(function(o){ return !asigSet[o.codigo] && histCodes.indexOf(o.codigo) >= 0; });
-  var histSet = {};
-  historicos.forEach(function(o){ histSet[o.codigo] = true; });
-  var otros = lista.filter(function(o){ return !asigSet[o.codigo] && !histSet[o.codigo]; });
+  var otros = lista.filter(function(o){ return !asigSet[o.codigo]; });
   var html = '';
   if (asignados.length) {
     html += '<div class="op-sec-lbl">Asignados · ' + rolClave + '</div>';
     html += asignados.map(function(op){ return buildOpCardGen(op, fn); }).join('');
-  }
-  if (historicos.length) {
-    html += '<div class="op-sec-lbl">Han estado en ' + rolClave + '</div>';
-    html += historicos.map(function(op){ return buildOpCardGen(op, fn); }).join('');
   }
   if (otros.length) {
     html += '<div class="op-sec-lbl">Otros operarios</div>';
@@ -1417,7 +1391,7 @@ function renderSeleccionFlam() {
     g.innerHTML = '<div class="cargando" style="grid-column:1/-1"><div class="spinner"></div><div>Cargando operarios…</div></div>';
     return;
   }
-  g.innerHTML = buildSeccionesGrid(operarios, 'elegirFlameador', 'Flameado');
+  g.innerHTML = buildSeccionesGrid(operarios, 'elegirFlameador', 'Flameador');
 }
 
 function elegirFlameador(codigo) {
