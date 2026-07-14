@@ -13,7 +13,8 @@
 ## Supabase
 - URL: https://rohdxjuuvpgrhevfsrye.supabase.co
 - KEY (publishable): sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i
-- Cada HTML crea su propio cliente `db` inline (no usa shared/supabase.js)
+- El cliente `db` lo provee `shared/auth.js` a TODAS las páginas (guardián de sesión + roles);
+  ningún HTML declara ya SUPA_URL/SUPA_KEY/db propios
 - `exec_sql` RPC no disponible con publishable key — DDL debe correrse manual en el dashboard
 
 ---
@@ -29,7 +30,8 @@ Los `.js` en shared/ eran huérfanos y se borraron (jul/2026).
 |---|---|---|
 | `index.html` | ✅ Activo | Fachada principal — 6 cards de módulo |
 | `tapas.html` | ✅ Activo | Módulo completo Tapas (hub + pedidos + movimientos + personal) |
-| `serigrafia.html` | ⚠️ Parcial | Solo Personal activo; resto muestra "En construcción" |
+| `serigrafia.html` | ✅ Activo | Módulo admin Serigrafía: Inicio (board de solicitudes) + Movimientos + Productividad (lecturas de contador por línea, con diagnóstico si la fecha elegida está vacía) + Personal (asistencia con grid mensual, veladas, PDF) + link a Dashboard |
+| `registro-serigrafia.html` | ✅ Activo | Formulario móvil rol `operativo_serig` (serigrafia@tetrapp.app). Pantalla 0 = selección de tarea: 🔥 Flameado (una bolsa por registro: hora, envase autocomplete, cantidad, Para línea 1-4; "otra bolsa" conserva flameador/envase/línea) · 🖨 Impresión (lectura de contador por línea/momento inicio-mediodía-fin-velada, foto opcional, paros del turno) · 📦 Empaque (operador o "apoyo de otra área" con area_origen, SKU + cantidad, fecha/hora automáticas). Errores de guardado se muestran en recuadro rojo persistente |
 | `comandas.html` | ✅ Activo | Registro de producción diaria por operario (vista admin) |
 | `registro-tapas.html` | ✅ Activo | Formulario móvil para rol `operativo` (tapas@tetrapp.app): el operario elige su nombre y registra su comanda ya concluida (sin campo Estado, sin devolución de material); correlativo CMD-### lo asigna trigger DB; supervisor se lee en vivo de `personal` (rol='supervisor', area='tapas', activo=true) — nunca hardcodeado |
 | `dashboard.html` | ✅ Activo | KPIs ejecutivos globales |
@@ -106,10 +108,29 @@ view-personal   (grid de operadores)
 ## serigrafia.html — Arquitectura de vistas
 
 ```
-view-personal   (ACTIVO por defecto — display:flex en HTML)
-view-wip        (shared — muestra "En Construcción" con WIP_CONFIG)
-Tabs WIP: serig, salidas, ingresos → showWipView(key)
-switchTab() revisa WIP_TABS array antes de renderizar
+Tabs: Inicio · Movimientos · Productividad · Personal · Dashboard (link)
+view-inicio        (board de solicitudes por línea, entregados, orden sin asignar)
+view-movimientos   (salidas/ingresos serig + resumen por ficha)
+view-productividad (lecturas de registro_tiros_serig por fecha; si la fecha
+                    está vacía, buildUltimasLecturasHint() muestra las últimas
+                    10 lecturas de la tabla sin filtro, clicables para saltar
+                    a su fecha — distingue "base vacía" de "fecha equivocada")
+view-personal      (grid personal + asistencia diaria/mensual, veladas, PDF)
+```
+
+## registro-serigrafia.html — Flujos (rol operativo_serig)
+
+```
+scrTarea (pantalla 0, default) → 3 tarjetas: flameado / impresion / empaque
+Impresión: scrSel → scrForm (contador, momentos, paros, foto) → scrOk (gráfico)
+Flameado:  scrSelFlam → scrFormFlam → scrOkFlam   (tabla registro_flameado_serig)
+Empaque:   scrSelEmp (+tarjeta "Apoyo de otra área" → ovApoyo) → scrFormEmp
+           → scrOkEmp                              (tabla registro_empaque_serig)
+mostrarPantalla() alterna sobre el array PANTALLAS.
+buildOpCardGen(op, fn) genera las tarjetas de operario para los 3 flujos.
+skuDescDe(inputId) extrae {sku, descripcion} de un input con acGen.
+Apoyo externo: operador_codigo=null + area_origen (tapas/produccion/bodega/otra)
+— NO se agrega a la tabla personal.
 ```
 
 ---
@@ -126,10 +147,16 @@ switchTab() revisa WIP_TABS array antes de renderizar
 | `inventario` | 2358 SKUs activos (sku, descripcion, existencia, facturable, activo) |
 | `movimientos_materiales` | Trazabilidad (tipo: 'salida_bodega' \| 'entrada_pt') |
 | `rechazos` | ✅ Existe (la creó movimientos_serigrafia_v1.sql) — RLS pendiente: correr sql/rechazos_rls_fix.sql |
-| `perfiles` | Roles de acceso: master / visor / operativo (ver sql/operativo_tapas_v1.sql) |
-| `paros_maquina` | Registro de paros |
+| `perfiles` | Roles de acceso: master / visor / operativo / operativo_serig |
+| `paros_maquina` | Registro de paros (legado tapas) |
+| `registro_tiros_serig` | Lecturas de contador por línea/fecha/momento (inicio/mediodia/fin/velada) + hora + foto_url — la llena Impresión en registro-serigrafia.html; la lee Productividad en serigrafia.html. RLS reparada con sql/fix_rls_serig_v2.sql (corrido jul/2026) |
+| `paros_serig` | Paros por línea/fecha con motivo (incl. EMPAQUE con envase+cantidad) — registrados desde el formulario del operador |
+| `registro_flameado_serig` | Una fila por bolsa flameada: hora, flameador, sku/descripcion, cantidad, para_linea 1-4 (sql/registro_procesos_serig_v1.sql) |
+| `registro_empaque_serig` | Empaques: operador_codigo (null = apoyo externo), area_origen, sku/descripcion, cantidad (sql/registro_procesos_serig_v1.sql) |
+| `entregas_serig` | Entregas/requis de serigrafía (migradas desde localStorage) |
+| `asistencia_diaria` | Asistencia por fecha/área/turno (presente/ausente/tarde/velada) — la usan serigrafia.html Personal y sus PDFs |
 | `comandas` + `comanda_tareas` | Producción diaria |
-| `clientes`, `cat_procesos`, `asistencia` | Catálogos |
+| `clientes`, `cat_procesos`, `asistencia`, `configuracion` | Catálogos / preferencias UI |
 | `v_solicitudes`, `v_capacidad_hoy` | Vistas |
 
 ### RPCs atómicas disponibles en Supabase
@@ -151,10 +178,23 @@ animPop y CSS huérfano (.rechazo-*, .rbadge, --serig-m, --gold).
 1. `sql/rechazos_rls_fix.sql` — activa RLS en la tabla rechazos
 2. `sql/operativo_tapas_v1.sql` — rol `operativo` + usuario tapas@tetrapp.app (crearlo antes
    en Auth → Users) + políticas INSERT en comandas/comanda_tareas + trigger correlativo CMD-###
+3. `sql/registro_procesos_serig_v1.sql` — crea registro_flameado_serig + registro_empaque_serig
+   con RLS (pendiente de confirmar; sin él los flujos Flameado/Empaque fallan con recuadro rojo)
 
-### Roles de acceso (shared/auth.js v1.1)
+### SQL ya corridos (referencia, jul/2026)
+- `sql/seguridad_v1.sql` — blindaje: perfiles + rol_actual()/es_master() + anon sin privilegios.
+  ⚠️ Su sección C BORRA TODAS las políticas del schema y recrea solo las genéricas: si se
+  re-corre, hay que re-correr después los fix de políticas específicas (insert_operativo_serig etc.)
+- `sql/fix_rls_serig_v2.sql` — reparó registro_tiros_serig: política insert_operativo_serig,
+  columna hora, CHECK momento con 'velada', y corrigió fechas UTC adelantadas un día
+
+### Roles de acceso (shared/auth.js)
 - `master` → todo · `visor` → solo lectura (banner Modo Visual)
 - `operativo` → enjaulado en registro-tapas.html; RLS solo le permite INSERT en comandas/comanda_tareas
+- `operativo_serig` → enjaulado en registro-serigrafia.html; INSERT en registro_tiros_serig,
+  paros_serig, registro_flameado_serig, registro_empaque_serig
+- La jaula vive en TETRA_PAGINAS_OPERATIVO (auth.js): rol → página permitida
+- Sesiones expiran a 60 min de inactividad, EXCEPTO roles operativos (pantallas de planta)
 
 ### Metas de productividad — CUATRO tablas, sincronizadas jul/2026
 Valores oficiales (und/hora), idénticos en las 4 copias:
@@ -191,6 +231,11 @@ intencional por la arquitectura autónoma de cada HTML.
 5. **Git siempre a ambas ramas**: `git push origin master && git push origin master:main`
 6. **Verificar referencias eliminadas**: tras borrar IDs o funciones, grep para confirmar que no quedan usos huérfanos.
 7. **var sobre const/let** en funciones globales de tapas.html (evitar errores de redeclaración entre módulos cargados múltiples veces).
+8. **Fecha "hoy" SIEMPRE con `fechaHoy()`** (fecha local, existe en serigrafia.html y
+   registro-serigrafia.html) — NUNCA `new Date().toISOString().slice(0,10)`: devuelve la fecha
+   UTC y Guatemala es UTC-6, después de las 18:00 marca el día siguiente (bug que dejó
+   Productividad "vacía" en jul/2026). `toISOString()` solo es válido sobre fechas ancladas a
+   mediodía (`new Date(str + 'T12:00:00')`) o para timestamps completos (updated_at).
 
 ---
 
