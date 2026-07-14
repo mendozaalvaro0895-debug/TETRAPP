@@ -24,6 +24,10 @@ body{font-family:'DM Sans',sans-serif;background:#0C0C0B;color:#fff;min-height:1
 .f-lbl{display:block;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.5);margin:0 0 6px 2px}
 .f-in{width:100%;background:#0C0C0B;border:1.5px solid rgba(255,255,255,.14);border-radius:10px;padding:12px 14px;font:500 14px 'DM Sans',sans-serif;color:#fff;outline:none;transition:border-color .15s;margin-bottom:18px}
 .f-in:focus{border-color:#1A6B5B}
+.clave-wrap{position:relative;margin-bottom:18px}
+.clave-wrap .f-in{margin-bottom:0;padding-right:46px}
+.btn-ojo{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:17px;padding:6px 8px;color:rgba(255,255,255,.55);line-height:1;-webkit-tap-highlight-color:transparent}
+.btn-ojo:hover{color:#7ECEC0}
 .btn{width:100%;background:#1A6B5B;color:#fff;border:none;border-radius:10px;padding:13px;font:700 14px 'DM Sans',sans-serif;cursor:pointer;transition:background .15s,transform .1s;letter-spacing:.3px}
 .btn:hover{background:#2A8B75}
 .btn:active{transform:scale(.97)}
@@ -45,7 +49,10 @@ body{font-family:'DM Sans',sans-serif;background:#0C0C0B;color:#fff;min-height:1
       <label class="f-lbl" for="usuario">Usuario</label>
       <input class="f-in" id="usuario" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
       <label class="f-lbl" for="clave">Contraseña</label>
-      <input class="f-in" id="clave" type="password" autocomplete="current-password" required>
+      <div class="clave-wrap">
+        <input class="f-in" id="clave" type="password" autocomplete="current-password" required>
+        <button class="btn-ojo" id="btnOjo" type="button" onclick="toggleClave()" title="Mostrar contraseña" aria-label="Mostrar contraseña">👁</button>
+      </div>
       <button class="btn" id="btn" type="submit">Ingresar →</button>
     </form>
   </div>
@@ -76,6 +83,18 @@ if (location.search.indexOf('e=inactividad') !== -1) {
 // PWA: registrar service worker también desde el login
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(function () {});
+}
+
+// Mostrar/ocultar contraseña
+function toggleClave() {
+  var inp = document.getElementById('clave');
+  var btn = document.getElementById('btnOjo');
+  var visible = inp.type === 'text';
+  inp.type = visible ? 'password' : 'text';
+  btn.textContent = visible ? '👁' : '🙈';
+  btn.title = visible ? 'Mostrar contraseña' : 'Ocultar contraseña';
+  btn.setAttribute('aria-label', btn.title);
+  inp.focus();
 }
 
 function mostrarError(msg) {
