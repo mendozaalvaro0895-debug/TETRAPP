@@ -46,6 +46,11 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .op-sec-lbl{grid-column:1/-1;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6B6B6A;padding:6px 2px 0;border-top:1px solid #E0DED8;margin-top:4px}
 .op-sec-lbl:first-child{border-top:none;padding-top:0;margin-top:0}
+.op-linea-badge{display:inline-block;font-size:9px;font-weight:700;background:#EDE9FE;color:#5B21B6;border-radius:6px;padding:2px 6px;margin-top:5px}
+.sku-linea-wrap{background:#F5F3FF;border:1.5px solid #DDD6FE;border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.sku-linea-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#7C3AED;margin-bottom:6px}
+.sku-linea-btn{width:100%;text-align:left;background:#EDE9FE;border:1.5px solid #C4B5FD;border-radius:8px;padding:9px 12px;cursor:pointer;font-size:12px;color:#4C1D95;font-weight:600;line-height:1.4;transition:background .15s}
+.sku-linea-btn:hover,.sku-linea-btn:active{background:#DDD6FE}
 .op-sel-apoyo{border-style:dashed;border-color:#059669}
 .op-sel-card{background:#fff;border:1.5px solid #E0DED8;border-radius:14px;padding:18px 12px;text-align:center;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
 .op-sel-card:hover,.op-sel-card:active{border-color:#7C3AED;box-shadow:0 4px 16px rgba(124,58,237,.15);transform:translateY(-2px)}
@@ -234,8 +239,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
       <div class="field" style="margin-bottom:6px"><label>Momento del turno</label></div>
       <div class="momento-tog" id="momentoTog">
         <div class="momento-btn" data-m="inicio" onclick="elegirMomento('inicio')">🌅 Inicio</div>
-        <div class="momento-btn" data-m="mediodia" onclick="elegirMomento('mediodia')">🕐 Mediodía</div>
-        <div class="momento-btn" data-m="fin" onclick="elegirMomento('fin')">🌇 Fin</div>
+        <div class="momento-btn" data-m="fin" onclick="elegirMomento('fin')">⏹ Paro</div>
         <div class="momento-btn" data-m="velada" onclick="elegirMomento('velada')">🌙 Velada</div>
       </div>
       <div class="field" style="margin:14px 0 6px"><label>Paros del turno <span id="parosResumen" style="font-weight:400;text-transform:none;color:#9CA3AF"></span></label></div>
@@ -244,6 +248,12 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 
     <div class="sec">
       <div class="sec-label"><span class="paso-num">2</span> Diseño e impresión</div>
+      <div id="skuLineaWrap" style="display:none">
+        <div class="sku-linea-wrap">
+          <div class="sku-linea-lbl">⚡ En esta línea — toca para seleccionar</div>
+          <button type="button" class="sku-linea-btn" id="btnSkuLinea" onclick="seleccionarSkuLinea()"></button>
+        </div>
+      </div>
       <div class="field" style="margin-bottom:10px"><label>Diseño / SKU que se está imprimiendo</label>
         <div class="ac-wrap">
           <input type="text" id="fDiseno" placeholder="Escribe SKU o descripción…" autocomplete="off" oninput="acBuscar(this.value)" data-sku="">
@@ -545,12 +555,14 @@ function fechaHoy() {
 
 // ── Estado ────────────────────────────────────────────────────
 var operarios = [];
+var operadorLineaMap = {}; // codigo → linea_id (del último registro)
+var skuEnLineaMap    = {}; // linea_id → {sku, diseno}
 var inventarioCache = [];
 var opActual = null;
 var momentoActual = 'inicio';
 var lecturasHoyLinea = [];
 
-var MOMENTO_LBL = { inicio: '🌅 Inicio', mediodia: '🕐 Mediodía', fin: '🌇 Fin', velada: '🌙 Velada' };
+var MOMENTO_LBL = { inicio: '🌅 Inicio', fin: '⏹ Paro', velada: '🌙 Velada' };
 var META_LINEA = 10000;
 
 // ── Carga de datos ────────────────────────────────────────────
@@ -563,6 +575,25 @@ async function cargarOperarios() {
     var todos = r.data || [];
     operarios = todos.filter(function(p){ return p.rol !== 'supervisor'; });
     if (!operarios.length) operarios = todos;
+
+    // Línea de cada operador + SKU en curso por línea (últimos 500 registros)
+    try {
+      var rh = await db.from('registro_tiros_serig')
+        .select('linea_id, operador_codigo, sku, diseno')
+        .eq('area','serig')
+        .order('created_at', { ascending: false }).limit(500);
+      var seenOp = {}, seenLn = {};
+      (rh.data || []).forEach(function(x) {
+        if (x.operador_codigo && !seenOp[x.operador_codigo]) {
+          seenOp[x.operador_codigo] = true;
+          operadorLineaMap[x.operador_codigo] = x.linea_id;
+        }
+        if (x.linea_id && !seenLn[x.linea_id] && (x.sku || x.diseno)) {
+          seenLn[x.linea_id] = true;
+          skuEnLineaMap[x.linea_id] = { sku: x.sku || '', diseno: x.diseno || '' };
+        }
+      });
+    } catch(e2) { operadorLineaMap = {}; skuEnLineaMap = {}; }
 
     renderSeleccion();
     renderSeleccionFlam();
@@ -602,10 +633,13 @@ async function cargarInventario() {
 function buildOpCardGen(op, fn) {
   var color = op.color_hex || '#5B21B6';
   var ini = op.iniciales || (op.nombre || '?').slice(0, 2).toUpperCase();
+  var linea = operadorLineaMap[op.codigo];
+  var lineaBadge = linea ? '<div class="op-linea-badge">Línea ' + linea + '</div>' : '';
   return '<div class="op-sel-card" onclick="' + fn + '(\'' + escHtml(op.codigo) + '\')">'
     + '<div class="op-sel-av" style="background:' + escHtml(color) + '">' + escHtml(ini) + '</div>'
     + '<div class="op-sel-nombre">' + escHtml(op.nombre) + '</div>'
     + '<div class="op-sel-cod">' + escHtml(op.codigo) + '</div>'
+    + lineaBadge
     + '</div>';
 }
 
@@ -613,6 +647,9 @@ function buildOpCard(op) { return buildOpCardGen(op, 'elegirOperario'); }
 
 function buildSeccionesGrid(lista, fn, rolClave) {
   var asignados = lista.filter(function(o){ return o.proceso_hab === rolClave; });
+  asignados.sort(function(a,b){
+    return (operadorLineaMap[a.codigo] || 99) - (operadorLineaMap[b.codigo] || 99);
+  });
   var asigSet = {};
   asignados.forEach(function(o){ asigSet[o.codigo] = true; });
   var otros = lista.filter(function(o){ return !asigSet[o.codigo]; });
@@ -706,7 +743,7 @@ function elegirMomento(m) {
   // Inicio → 06:00 y Mediodía → 12:00 (horas fijas del turno). El resto conserva
   // la hora ya asignada (no se reinicia al cambiar de línea ni al alternar momentos).
   if (m === 'inicio') document.getElementById('fHora').value = '06:00';
-  else if (m === 'mediodia') document.getElementById('fHora').value = '12:00';
+  else if (m === 'fin' || m === 'velada') document.getElementById('fHora').value = new Date().toTimeString().slice(0,5);
   document.querySelectorAll('.momento-btn').forEach(function(b){
     b.classList.toggle('act', b.dataset.m === m);
   });
@@ -728,6 +765,28 @@ function buildAcItem(item) {
     + '<div class="ac-sku">' + escHtml(sku) + '</div>'
     + '<div class="ac-desc">' + escHtml(desc.slice(0, 60)) + '</div>'
     + '</div>';
+}
+
+function mostrarSkuLinea(linea) {
+  var wrap = document.getElementById('skuLineaWrap');
+  var btn  = document.getElementById('btnSkuLinea');
+  if (!wrap || !btn) return;
+  var d = skuEnLineaMap[linea];
+  if (!d || !d.diseno) { wrap.style.display = 'none'; return; }
+  var skuTxt = d.sku ? '<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:#6D28D9">' + escHtml(d.sku) + '</span> — ' : '';
+  var descTxt = escHtml((d.diseno || '').replace(/^[^\s—]+\s*—\s*/, '').slice(0, 80));
+  btn.innerHTML = skuTxt + descTxt;
+  wrap.style.display = '';
+}
+
+function seleccionarSkuLinea() {
+  var linea = parseInt(document.getElementById('fLinea').value) || 1;
+  var d = skuEnLineaMap[linea];
+  if (!d) return;
+  var inp = document.getElementById('fDiseno');
+  inp.value = d.diseno || d.sku || '';
+  inp.dataset.sku = d.sku || '';
+  document.getElementById('acDrop').style.display = 'none';
 }
 
 function acBuscar(query) {
@@ -796,6 +855,7 @@ async function cargarHoyLinea() {
     lecturasHoyLinea = [];
     box.style.display = 'none';
   }
+  mostrarSkuLinea(linea);
   cargarParosHoy();
 }
 
@@ -833,7 +893,7 @@ function actualizarMomentosDisponibles() {
   });
 
   // Si el momento seleccionado ya está tomado, saltar al siguiente disponible
-  var orden = ['inicio','mediodia','fin','velada'];
+  var orden = ['inicio','fin','velada'];
   var siguiente = orden.find(function(m){ return !tomados[m]; });
   if (tomados[momentoActual] && siguiente) elegirMomento(siguiente);
 
