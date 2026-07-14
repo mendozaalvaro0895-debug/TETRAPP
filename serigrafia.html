@@ -341,7 +341,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ag-cell.tarde{background:#fef3c7;color:#92400e}
 .ag-cell.futuro{background:#f8fafc;cursor:default;color:transparent}
 .ag-cell.pendiente{background:#e2e8f0;color:#94a3b8}
-.ag-cell.finde{opacity:.45}
+.ag-th.finde{background:#eef2f7;color:#94a3b8}
+.ag-cell.finde{background:#eef2f7 !important;color:#94a3b8 !important;opacity:1}
+.ag-cell.finde.dom-trabajado{background:#dcfce7 !important;color:#15803d !important;opacity:.75}
 .ag-row-full .ag-td-name{color:#15803d;font-weight:700}
 .ag-row-inactivo .ag-td-name{opacity:.55}
 .ag-row-inactivo .ag-cell{opacity:.55}
@@ -3344,12 +3346,13 @@ async function renderAsistGrid() {
           html += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + '" title="' + titAnt + '"></td>';
         } else {
           var esPendiente = f === hoy && !daysByP[f];
-          var est = esPendiente ? 'pendiente' : (daysByP[f] || 'presente');
+          var est = esPendiente ? 'pendiente' : (daysByP[f] || (esFinde ? 'finde' : 'presente'));
           var lbl = est === 'ausente' ? '✗' : est === 'tarde' ? '!' : est === 'velada' ? '🌙' : '';
           var cod = p.codigo.replace(/'/g, "\\'");
           var notaPend = esPendiente ? ' · Aún no se toma asistencia' : (est === 'pendiente' ? ' · Sin registrar (ej. antes de ingresar)' : '');
-          var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + notaPend;
-          html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + '" onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + '</td>';
+          var domTrabajado = esFinde && daysByP[f] === 'presente';
+          var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esFinde && !domTrabajado ? ' · Domingo (no cuenta)' : '') + notaPend;
+          html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrabajado ? ' dom-trabajado' : '') + '" onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + '</td>';
         }
       });
       html += '</tr>';
@@ -3382,7 +3385,8 @@ async function renderAsistGrid() {
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#fef3c7;border:1px solid #fde68a"></span>Tarde (!)</span>' +
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ede9fe;border:1px solid #ddd6fe"></span>Velada (🌙)</span>' +
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#e2e8f0;border:1px solid #cbd5e1"></span>Pendiente (hoy sin tomar, o antes de ingresar)</span>' +
-        '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Fila verde = asistencia completa · Domingo no cuenta para racha</span>' +
+        '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#eef2f7;border:1px solid #cbd5e1"></span>Domingo (no cuenta)</span>' +
+        '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Fila verde = asistencia completa del mes</span>' +
       '</div>' +
     '</div>';
 
@@ -3853,7 +3857,9 @@ async function exportarAsistenciaMes() {
       var info = operariosMap[cod];
       var ausencias = 0, presentes = 0;
       var celdas = dias.map(function(f) {
+        var esDomingo = new Date(f + 'T12:00:00').getDay() === 0;
         var est = idx[cod + '_' + f];
+        if (esDomingo && !est) return '<td style="background:#eef2f7;color:#94a3b8;text-align:center;font-size:8px">D</td>';
         if (!est) return '<td style="background:#f3f4f6;color:#9ca3af;text-align:center">—</td>';
         if (est === 'ausente') { ausencias++; return '<td style="background:#fee2e2;color:#dc2626;font-weight:700;text-align:center">A</td>'; }
         presentes++;
@@ -3883,9 +3889,12 @@ async function exportarAsistenciaMes() {
     // Encabezados de días (número + día semana abreviado)
     var diasHeaders = dias.map(function(f) {
       var d2 = new Date(f + 'T12:00:00');
+      var esDomingo = d2.getDay() === 0;
       var dow = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'][d2.getDay()];
       var num = parseInt(f.slice(8));
-      return '<th style="text-align:center;font-weight:700;min-width:28px;background:#374151;color:#fff;font-size:10px;padding:4px 2px">' + num + '<br><span style="font-weight:400;font-size:9px">' + dow + '</span></th>';
+      var bg = esDomingo ? '#cbd5e1' : '#374151';
+      var clr = esDomingo ? '#64748b' : '#fff';
+      return '<th style="text-align:center;font-weight:700;min-width:28px;background:' + bg + ';color:' + clr + ';font-size:10px;padding:4px 2px">' + num + '<br><span style="font-weight:400;font-size:9px">' + dow + '</span></th>';
     }).join('');
 
     var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
