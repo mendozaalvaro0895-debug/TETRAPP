@@ -3333,8 +3333,11 @@ async function renderAsistGrid() {
         if (est === 'ausente') isFullGreen = false;
       });
       html += '<tr class="ag-row' + (isFullGreen ? ' ag-row-full' : '') + (!p.activo ? ' ag-row-inactivo' : '') + '">';
-      html += '<td class="ag-td-name">' + escHtml(p.nombre || p.codigo) +
+      var codEscN = p.codigo.replace(/'/g, "\\'");
+      html += '<td class="ag-td-name" style="cursor:pointer" onclick="abrirModalEditarOperario(\'' + codEscN + '\')" title="Editar · fecha inicio/baja">' +
+        escHtml(p.nombre || p.codigo) +
         (!p.activo ? '<span style="font-size:9px;font-weight:500;color:#9ca3af;margin-left:4px">(inactivo)</span>' : '') +
+        '<span style="font-size:8px;color:var(--gray-l);margin-left:4px">✏</span>' +
         '</td>';
       dias.forEach(function(f) {
         var esFuturo = f > hoy;
@@ -3406,14 +3409,22 @@ async function toggleAsistCell(codigo, fecha) {
   var byPD   = asistGridCache.byPersonDay;
   var curRaw = byPD[codigo] && byPD[codigo][fecha];
   var hoy = fechaHoy();
-  // Para hoy sin registro = 'pendiente' (gris); para días pasados sin registro = 'presente'
-  var cur = curRaw !== undefined ? curRaw : (fecha === hoy ? 'pendiente' : 'presente');
-  // Ciclo: pendiente(gris) → presente(verde) → ausente → tarde → velada → (borra registro)
-  var next = cur === 'pendiente' ? 'presente'
-           : cur === 'presente'  ? 'ausente'
-           : cur === 'ausente'   ? 'tarde'
-           : cur === 'tarde'     ? 'velada'
-           : null;
+  var esDomingo = new Date(fecha + 'T12:00:00').getDay() === 0;
+  // Para hoy sin registro = 'pendiente'; domingos sin registro = 'finde'; resto = 'presente'
+  var cur = curRaw !== undefined ? curRaw : (fecha === hoy ? 'pendiente' : (esDomingo ? 'finde' : 'presente'));
+  // Ciclo domingos: finde(gris) → presente(verde) → null (vuelve a gris)
+  // Ciclo resto:    pendiente → presente → ausente → tarde → velada → null
+  var next;
+  if (esDomingo) {
+    // finde(gris) → presente(verde) → null (vuelve a gris sin registro)
+    next = cur === 'presente' ? null : 'presente';
+  } else {
+    next = cur === 'pendiente' ? 'presente'
+         : cur === 'presente'  ? 'ausente'
+         : cur === 'ausente'   ? 'tarde'
+         : cur === 'tarde'     ? 'velada'
+         : null;
+  }
 
   if (!byPD[codigo]) byPD[codigo] = {};
   if (next === null) delete byPD[codigo][fecha];
