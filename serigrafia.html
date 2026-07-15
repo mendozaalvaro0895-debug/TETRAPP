@@ -196,6 +196,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .pfc{background:var(--card);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;min-width:0}
 .pfc-hdr{background:var(--serig-l);color:var(--serig-m);font-size:11px;font-weight:800;padding:6px 10px;border-bottom:1px solid var(--border)}
 .pfc-diseno{font-size:10px;color:var(--gray-l);padding:4px 10px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pfc-cambio{font-size:10px;font-weight:700;color:var(--amber);background:#FFFBEB;border-top:1px dashed #FCD34D;border-bottom:1px dashed #FCD34D;padding:3px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pfc-row{font-size:11px;color:var(--ink);padding:4px 10px;border-bottom:1px solid var(--bg2);line-height:1.6;overflow:hidden}
 .pfc-row:last-child{border-bottom:none}
 .pfc-vacia{color:var(--gray-l);font-style:italic}
@@ -5875,7 +5876,18 @@ function buildPfcFechaCard(fecha, datos, esMaster, lineaId) {
     mainCard = '<div class="pfc">' +
       '<div class="pfc-hdr">📅 ' + escHtml(fechaFmt) + opTag + '</div>' +
       (diseno ? '<div class="pfc-diseno">' + escHtml(diseno.slice(0,50)) + '</div>' : '') +
-      regs.map(function(l){ return buildPfcRegistroRow(l, esMaster); }).join('') +
+      (function(){
+        var html = ''; var prevD = diseno;
+        regs.forEach(function(l, i){
+          var d = l.diseno || l.sku || '';
+          if (i > 0 && d && d !== prevD) {
+            html += '<div class="pfc-cambio">🔄 Cambio: ' + escHtml(d.slice(0,45)) + '</div>';
+          }
+          if (d) prevD = d;
+          html += buildPfcRegistroRow(l, esMaster);
+        });
+        return html;
+      })() +
       (delta !== null ? '<div class="pfc-delta" style="color:' + dc + '">▲ ' + delta.toLocaleString() + ' tiros · ' + pct + '%</div>' : '') +
       '</div>';
   }
