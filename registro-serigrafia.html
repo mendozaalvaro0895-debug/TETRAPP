@@ -879,28 +879,39 @@ function renderHoyLinea() {
   document.getElementById('hoyDelta').textContent = delta.toLocaleString() + ' / ' + META_LINEA.toLocaleString();
 }
 
-// Bloquea los momentos que ya tienen lectura hoy en esta línea (una vez
-// registrado Inicio/Mediodía/Fin, no debe volver a tomarse ese mismo momento)
+// Habilita el siguiente momento según el último registrado (alternancia inicio ↔ paro).
+// Inicio y Paro pueden repetirse N veces; Velada cierra el día.
 function actualizarMomentosDisponibles() {
-  // Bloquea cualquier momento que YA tenga registro para esta línea/fecha,
-  // sin importar qué operario lo ingresó (la lectura del contador es única
-  // por línea+día+momento).
-  var tomados = {};
-  lecturasHoyLinea.forEach(function(l){ tomados[l.momento] = true; });
+  var ultimo = lecturasHoyLinea.length
+    ? lecturasHoyLinea[lecturasHoyLinea.length - 1].momento
+    : null;
+
+  // Qué botones están disponibles según el último momento
+  var habilitados = {};
+  if (!ultimo) {
+    habilitados['inicio'] = true;                  // sin registros → solo Inicio
+  } else if (ultimo === 'inicio') {
+    habilitados['fin'] = true; habilitados['velada'] = true; // arrancó → puede parar o velada
+  } else if (ultimo === 'fin') {
+    habilitados['inicio'] = true; habilitados['velada'] = true; // paró → puede reiniciar o velada
+  }
+  // ultimo === 'velada' → nada habilitado, turno cerrado
 
   document.querySelectorAll('.momento-btn').forEach(function(b){
-    b.classList.toggle('disabled', !!tomados[b.dataset.m]);
+    b.classList.toggle('disabled', !habilitados[b.dataset.m]);
   });
 
-  // Si el momento seleccionado ya está tomado, saltar al siguiente disponible
-  var orden = ['inicio','fin','velada'];
-  var siguiente = orden.find(function(m){ return !tomados[m]; });
-  if (tomados[momentoActual] && siguiente) elegirMomento(siguiente);
+  // Si el momento activo quedó bloqueado, saltar al primero disponible
+  if (!habilitados[momentoActual]) {
+    var orden = ['inicio','fin','velada'];
+    var siguiente = orden.find(function(m){ return habilitados[m]; });
+    if (siguiente) elegirMomento(siguiente);
+  }
 
   var btn = document.getElementById('btnGuardar');
-  if (!siguiente) {
+  if (!Object.keys(habilitados).length) {
     btn.disabled = true;
-    btn.textContent = '✅ Ya se registraron todos los momentos de hoy';
+    btn.textContent = '✅ Turno finalizado';
   } else {
     btn.disabled = false;
     btn.textContent = '💾 Guardar lectura';
