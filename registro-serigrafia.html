@@ -539,8 +539,9 @@ function fechaHoy() {
 
 // ── Estado ────────────────────────────────────────────────────
 var operarios = [];
-var operadorLineaMap = {}; // codigo → linea_id (del último registro)
-var skuEnLineaMap    = {}; // linea_id → {sku, diseno}
+var operadorLineaMap  = {}; // codigo → linea_id (del último registro)
+var lineaOpNombreMap  = {}; // linea_id → primer nombre del operario
+var skuEnLineaMap     = {}; // linea_id → {sku, diseno}
 var inventarioCache = [];
 var opActual = null;
 var momentoActual = 'inicio';
@@ -578,6 +579,15 @@ async function cargarOperarios() {
         }
       });
     } catch(e2) { operadorLineaMap = {}; skuEnLineaMap = {}; }
+
+    // Mapa inverso: linea_id → primer nombre del operario asignado
+    lineaOpNombreMap = {};
+    operarios.forEach(function(op) {
+      var ln = operadorLineaMap[op.codigo];
+      if (ln && !lineaOpNombreMap[ln])
+        lineaOpNombreMap[ln] = (op.nombre || '').split(' ')[0];
+    });
+    actualizarParaLineaBtns();
 
     renderSeleccion();
     renderSeleccionFlam();
@@ -656,6 +666,14 @@ function renderSeleccion() {
     return;
   }
   g.innerHTML = buildSeccionesGrid(operarios, 'elegirOperario', 'Impresión');
+}
+
+function actualizarParaLineaBtns() {
+  document.querySelectorAll('#paraTog .momento-btn').forEach(function(b) {
+    var ln = parseInt(b.dataset.l);
+    var nombre = lineaOpNombreMap[ln] || '';
+    b.innerHTML = 'Línea ' + ln + (nombre ? '<br><span style="font-size:10px;font-weight:400;opacity:.85">' + escHtml(nombre) + '</span>' : '');
+  });
 }
 
 function lineaParaOp(op) {
