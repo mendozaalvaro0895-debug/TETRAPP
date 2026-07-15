@@ -360,6 +360,13 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
           <input type="text" id="fFlamEnvase" placeholder="Escribe SKU o descripción…" autocomplete="off" oninput="acGen(this.value,'fFlamEnvase','flamDrop')" data-sku="">
           <div class="ac-drop" id="flamDrop"></div>
         </div>
+        <div id="flamEnvaseSug" style="display:none;margin-top:8px;align-items:center;gap:10px;flex-wrap:wrap">
+          <button type="button" onclick="usarUltimoEnvaseFlam()"
+            style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:7px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit">
+            📋 Último: <strong id="flamEnvaseSugLbl" style="color:#e2e8f0"></strong>
+          </button>
+          <span style="color:#64748b;font-size:11px">o escribe otro</span>
+        </div>
       </div>
       <div class="field"><label>Cantidad en la bolsa</label>
         <input type="number" inputmode="numeric" id="fFlamCant" min="1" placeholder="Ej: 250">
@@ -1414,7 +1421,9 @@ function renderSeleccionFlam() {
   g.innerHTML = buildSeccionesGrid(operarios, 'elegirFlameador', 'Flameador');
 }
 
-function elegirFlameador(codigo) {
+var _ultimoEnvaseFlam = null;
+
+async function elegirFlameador(codigo) {
   flamOpActual = operarios.find(function(o){ return o.codigo === codigo; });
   if (!flamOpActual) return;
   cargarInventario();
@@ -1430,6 +1439,29 @@ function elegirFlameador(codigo) {
   cargarHoyFlam();
   mostrarPantalla('scrFormFlam');
   window.scrollTo(0, 0);
+
+  // Sugerir último envase registrado por este flameador
+  _ultimoEnvaseFlam = null;
+  document.getElementById('flamEnvaseSug').style.display = 'none';
+  try {
+    var r = await db.from('registro_flameado_serig')
+      .select('sku, descripcion').eq('flameador_codigo', codigo)
+      .order('created_at', { ascending: false }).limit(1);
+    if (!r.error && r.data && r.data.length) {
+      _ultimoEnvaseFlam = r.data[0];
+      var lbl = (_ultimoEnvaseFlam.sku || '') + (_ultimoEnvaseFlam.descripcion ? ' — ' + _ultimoEnvaseFlam.descripcion.slice(0,35) : '');
+      document.getElementById('flamEnvaseSugLbl').textContent = lbl;
+      document.getElementById('flamEnvaseSug').style.display = 'flex';
+    }
+  } catch(e) { /* sin historial */ }
+}
+
+function usarUltimoEnvaseFlam() {
+  if (!_ultimoEnvaseFlam) return;
+  var inp = document.getElementById('fFlamEnvase');
+  inp.value = (_ultimoEnvaseFlam.sku ? _ultimoEnvaseFlam.sku + ' — ' : '') + (_ultimoEnvaseFlam.descripcion || '');
+  inp.dataset.sku = _ultimoEnvaseFlam.sku || '';
+  inp.focus();
 }
 
 function volverSeleccionFlam() {
