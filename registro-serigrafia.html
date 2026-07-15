@@ -651,6 +651,16 @@ function renderSeleccion() {
   g.innerHTML = buildSeccionesGrid(operarios, 'elegirOperario', 'Impresión');
 }
 
+function lineaParaOp(op) {
+  if (operadorLineaMap[op.codigo]) return operadorLineaMap[op.codigo];
+  var n = (op.nombre || '').toLowerCase();
+  if (n.indexOf('heidy')     >= 0) return 1;
+  if (n.indexOf('jackeline') >= 0) return 2;
+  if (n.indexOf('suri')      >= 0 || n.indexOf('sury') >= 0) return 3;
+  if (n.indexOf('gabriela')  >= 0) return 4;
+  return 1;
+}
+
 function elegirOperario(codigo) {
   opActual = operarios.find(function(o){ return o.codigo === codigo; });
   if (!opActual) return;
@@ -663,7 +673,7 @@ function elegirOperario(codigo) {
 
   document.getElementById('fFecha').value = fechaHoy();
   document.getElementById('fHora').value = new Date().toTimeString().slice(0,5);
-  document.getElementById('fLinea').value = '1';
+  document.getElementById('fLinea').value = lineaParaOp(opActual);
   document.getElementById('fDiseno').value = '';
   document.getElementById('fDiseno').dataset.sku = '';
   document.getElementById('fContador').value = '';
