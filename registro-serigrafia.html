@@ -262,6 +262,13 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
       </div>
       <div class="field"><label>Contador de la máquina (tiros acumulados)</label>
         <input type="number" inputmode="numeric" id="fContador" min="0" placeholder="Ej: 145820">
+        <div id="ctSugerencia" style="display:none;margin-top:8px;align-items:center;gap:10px;flex-wrap:wrap">
+          <button type="button" onclick="usarUltimoContador()"
+            style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:7px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit">
+            📋 Desde último: <strong id="ctValUltimo" style="color:#e2e8f0"></strong>
+          </button>
+          <span style="color:#64748b;font-size:11px">o escribe el valor actual</span>
+        </div>
       </div>
     </div>
 
@@ -747,13 +754,27 @@ function elegirMomento(m) {
   document.querySelectorAll('.momento-btn').forEach(function(b){
     b.classList.toggle('act', b.dataset.m === m);
   });
-  var contInp = document.getElementById('fContador');
-  if (m === 'inicio') {
-    contInp.value = '0';
-    contInp.readOnly = true;
+  document.getElementById('fContador').readOnly = false;
+  mostrarSugerenciaContador(m);
+}
+
+function mostrarSugerenciaContador(m) {
+  var sug = document.getElementById('ctSugerencia');
+  if (!sug) return;
+  var ultimo = lecturasHoyLinea.length ? lecturasHoyLinea[lecturasHoyLinea.length - 1] : null;
+  if (m === 'inicio' && ultimo && ultimo.contador) {
+    document.getElementById('ctValUltimo').textContent = ultimo.contador.toLocaleString();
+    sug.style.display = 'flex';
   } else {
-    contInp.readOnly = false;
-    if (contInp.value === '0') contInp.value = '';
+    sug.style.display = 'none';
+  }
+}
+
+function usarUltimoContador() {
+  var ultimo = lecturasHoyLinea.length ? lecturasHoyLinea[lecturasHoyLinea.length - 1] : null;
+  if (ultimo && ultimo.contador) {
+    document.getElementById('fContador').value = ultimo.contador;
+    document.getElementById('fContador').focus();
   }
 }
 
@@ -916,6 +937,7 @@ function actualizarMomentosDisponibles() {
     btn.disabled = false;
     btn.textContent = '💾 Guardar lectura';
   }
+  mostrarSugerenciaContador(momentoActual);
 }
 
 // ── Paros del turno ───────────────────────────────────────────
