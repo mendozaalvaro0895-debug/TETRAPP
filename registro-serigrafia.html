@@ -580,10 +580,15 @@ async function cargarOperarios() {
       });
     } catch(e2) { operadorLineaMap = {}; skuEnLineaMap = {}; }
 
-    // Mapa inverso: linea_id → primer nombre del operario asignado
+    // Mapa linea → nombre: solo operarios con rol Impresión, asignados por nombre
     lineaOpNombreMap = {};
     operarios.forEach(function(op) {
-      var ln = operadorLineaMap[op.codigo];
+      if (op.proceso_hab !== 'Impresión') return;
+      var n = (op.nombre || '').toLowerCase();
+      var ln = n.indexOf('heidy')     >= 0 ? 1 :
+               n.indexOf('jackeline') >= 0 ? 2 :
+               (n.indexOf('suri') >= 0 || n.indexOf('sury') >= 0) ? 3 :
+               n.indexOf('gabriela')  >= 0 ? 4 : 0;
       if (ln && !lineaOpNombreMap[ln])
         lineaOpNombreMap[ln] = (op.nombre || '').split(' ')[0];
     });
