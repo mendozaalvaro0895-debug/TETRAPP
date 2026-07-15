@@ -738,7 +738,7 @@ function elegirMomento(m) {
   // Inicio → 06:00 y Mediodía → 12:00 (horas fijas del turno). El resto conserva
   // la hora ya asignada (no se reinicia al cambiar de línea ni al alternar momentos).
   document.getElementById('fHora').value = new Date().toTimeString().slice(0,5);
-  document.querySelectorAll('.momento-btn').forEach(function(b){
+  document.querySelectorAll('#momentoTog .momento-btn').forEach(function(b){
     b.classList.toggle('act', b.dataset.m === m);
   });
   document.getElementById('fContador').readOnly = false;
@@ -905,7 +905,7 @@ function actualizarMomentosDisponibles() {
   }
   // ultimo === 'velada' → nada habilitado, turno cerrado
 
-  document.querySelectorAll('.momento-btn').forEach(function(b){
+  document.querySelectorAll('#momentoTog .momento-btn').forEach(function(b){
     b.classList.toggle('disabled', !habilitados[b.dataset.m]);
   });
 
