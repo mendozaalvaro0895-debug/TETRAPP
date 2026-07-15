@@ -145,9 +145,6 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ov.vis{display:flex}
 .ov-card{background:#fff;border-radius:16px;padding:20px;width:100%;max-width:380px;max-height:88vh;overflow-y:auto}
 .ov-t{font-size:16px;font-weight:800;color:#1A1A18;margin-bottom:14px}
-.motivo-grid{display:grid;grid-template-columns:1fr;gap:8px}
-.motivo-op{border:1.5px solid #C8C6C0;background:#fff;border-radius:10px;padding:14px;font-size:14px;font-weight:700;color:#3A3A38;cursor:pointer;text-align:left;font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent}
-.motivo-op:active{background:#F5F3FF;border-color:#7C3AED}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 @media(max-width:480px){
@@ -471,33 +468,6 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
     </div>
   </div>
 
-</div>
-
-<!-- ══ MODAL: motivo del paro ══ -->
-<div class="ov" id="ovMotivo">
-  <div class="ov-card">
-    <div class="ov-t">⏸ ¿Motivo del paro?</div>
-    <div class="motivo-grid" id="motivoGrid"></div>
-    <button class="btn-paro" style="margin-top:12px" onclick="cerrarOv('ovMotivo')">Cancelar</button>
-  </div>
-</div>
-
-<!-- ══ MODAL: empaque (envase + cantidad) ══ -->
-<div class="ov" id="ovEmpaque">
-  <div class="ov-card">
-    <div class="ov-t">📦 Paro por empaque</div>
-    <div class="field" style="margin-bottom:10px"><label>Envase empacado</label>
-      <div class="ac-wrap">
-        <input type="text" id="empEnvase" placeholder="Escribe SKU o descripción…" autocomplete="off" oninput="acGen(this.value,'empEnvase','empDrop')" data-sku="">
-        <div class="ac-drop" id="empDrop"></div>
-      </div>
-    </div>
-    <div class="field" style="margin-bottom:14px"><label>Cantidad empacada</label>
-      <input type="number" inputmode="numeric" id="empCantidad" min="0" placeholder="Ej: 500">
-    </div>
-    <button class="btn-terminar" style="background:#7C3AED" onclick="confirmarEmpaqueParo()">⏸ Iniciar paro de empaque</button>
-    <button class="btn-paro" style="margin-top:8px" onclick="cerrarOv('ovEmpaque')">Cancelar</button>
-  </div>
 </div>
 
 <!-- ══ MODAL: editar paro ══ -->
@@ -998,63 +968,10 @@ function renderParos() {
       '<div class="paro-open-t">⏸ Paro en curso: ' + escHtml(abierto.motivo) + ' · desde ' + escHtml((abierto.hora_inicio||'').slice(0,5)) + '</div>' +
       '<button class="btn-terminar" onclick="terminarParo(\'' + abierto.id + '\')">▶ Terminar paro (reanudar)</button>' +
     '</div>';
-  } else {
-    html += '<button class="btn-paro" onclick="abrirMotivoParo()">⏸ Registrar paro</button>';
   }
   cont.innerHTML = html;
 }
 
-function abrirMotivoParo() {
-  if (!opActual) return;
-  if (parosHoy.find(function(p){ return !p.hora_fin; })) { showToast('Ya hay un paro en curso', '#D97706'); return; }
-  document.getElementById('motivoGrid').innerHTML = MOTIVOS_PARO.map(function(m){
-    return '<button class="motivo-op" onclick="elegirMotivoParo(\'' + escHtml(m.replace(/\x27/g,'')) + '\')">' + (m === 'EMPAQUE' ? '📦 ' : '⏸ ') + escHtml(m) + '</button>';
-  }).join('');
-  abrirOv('ovMotivo');
-}
-
-function elegirMotivoParo(motivo) {
-  cerrarOv('ovMotivo');
-  if (motivo === 'EMPAQUE') {
-    var inp = document.getElementById('empEnvase');
-    inp.value = ''; inp.dataset.sku = '';
-    document.getElementById('empCantidad').value = '';
-    abrirOv('ovEmpaque');
-  } else {
-    iniciarParo(motivo, null);
-  }
-}
-
-function confirmarEmpaqueParo() {
-  var inp = document.getElementById('empEnvase');
-  var desc = inp.value.trim();
-  if (!desc) { showToast('Indica el envase empacado', '#B83232'); return; }
-  var empaque = { sku: inp.dataset.sku || '', desc: desc, cantidad: parseInt(document.getElementById('empCantidad').value) || 0 };
-  cerrarOv('ovEmpaque');
-  iniciarParo('EMPAQUE', empaque);
-}
-
-async function iniciarParo(motivo, empaque) {
-  if (!opActual) return;
-  var payload = {
-    fecha: document.getElementById('fFecha').value || fechaHoy(),
-    linea_id: parseInt(document.getElementById('fLinea').value) || 1,
-    area: 'serig', motivo: motivo,
-    hora_inicio: new Date().toTimeString().slice(0,5), hora_fin: null, minutos: null,
-    operador_codigo: opActual.codigo, operador_nombre: opActual.nombre || ''
-  };
-  if (empaque) {
-    payload.empaque_sku = empaque.sku || null;
-    payload.empaque_desc = empaque.desc || null;
-    payload.empaque_cantidad = empaque.cantidad || null;
-  }
-  try {
-    var r = await db.from('paros_serig').insert(payload);
-    if (r.error) throw r.error;
-    showToast('⏸ Paro iniciado');
-    await cargarParosHoy();
-  } catch(e) { showToast('❌ ' + (e.message || 'Error al iniciar'), '#B83232'); }
-}
 
 async function terminarParo(id) {
   var p = parosHoy.find(function(x){ return x.id === id; });

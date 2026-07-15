@@ -5781,11 +5781,15 @@ function buildPfcThumb(url) {
     'title="Ver foto del contador">📷 Ir al URL</a>';
 }
 
-function buildPfcMomentoRow(l, m, esMaster) {
-  var lbl = MOMENTO_LBL_ADMIN_TXT[m];
-  if (!l) return '<div class="pfc-row pfc-vacia">' + lbl + ': —</div>';
+function buildPfcRegistroRow(l, esMaster) {
+  var lbl = MOMENTO_LBL_ADMIN_TXT[l.momento] || l.momento;
   return '<div class="pfc-row">' + buildPfcAcciones(l.id, esMaster) + buildPfcThumb(l.foto_url) +
     lbl + ': <span class="pfc-hora">' + pfcFmtHora(l) + '</span> · <strong>' + (l.contador||0).toLocaleString() + '</strong></div>';
+}
+
+function pfcDelta(registros) {
+  var cnts = (registros || []).map(function(l){ return l.contador || 0; });
+  return cnts.length >= 2 ? Math.max.apply(null, cnts) - Math.min.apply(null, cnts) : null;
 }
 
 function buildPfcVeladaCard(vld, esMaster) {
@@ -5855,26 +5859,23 @@ function buildPfcComentario(fecha, lineaId, comentario, esMaster) {
 }
 
 function buildPfcFechaCard(fecha, datos, esMaster, lineaId) {
-  var m = datos.momentos;
+  var regs = datos.registros;
   var vld = datos.velada;
-  var hayM = m.inicio || m.mediodia || m.fin;
+  if (!regs.length && !vld) return buildPfcComentario(fecha, lineaId, datos.comentario, esMaster);
   var fechaFmt = new Date(fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday:'short', day:'2-digit', month:'short' });
-  var primer = m.inicio || m.mediodia || m.fin;
+  var primer = regs[0] || vld;
   var diseno = primer ? (primer.diseno || primer.sku || '') : '';
   var opNom = primer && primer.operador_nombre ? primer.operador_nombre : '';
   var opTag = opNom ? '<span style="float:right;font-weight:600;opacity:.75">👤 ' + escHtml(opNom) + '</span>' : '';
-  var cnts = [m.inicio, m.mediodia, m.fin].filter(Boolean).map(function(l){ return l.contador || 0; });
-  var delta = cnts.length >= 2 ? Math.max.apply(null, cnts) - Math.min.apply(null, cnts) : null;
+  var delta = pfcDelta(regs);
   var pct = delta !== null ? Math.min(100, Math.round((delta / META_TIROS_LINEA) * 100)) : 0;
   var dc = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--serig-m)' : 'var(--amber)';
   var mainCard = '';
-  if (hayM) {
+  if (regs.length) {
     mainCard = '<div class="pfc">' +
       '<div class="pfc-hdr">📅 ' + escHtml(fechaFmt) + opTag + '</div>' +
       (diseno ? '<div class="pfc-diseno">' + escHtml(diseno.slice(0,50)) + '</div>' : '') +
-      buildPfcMomentoRow(m.inicio, 'inicio', esMaster) +
-      (m.mediodia ? buildPfcMomentoRow(m.mediodia, 'mediodia', esMaster) : '') +
-      buildPfcMomentoRow(m.fin, 'fin', esMaster) +
+      regs.map(function(l){ return buildPfcRegistroRow(l, esMaster); }).join('') +
       (delta !== null ? '<div class="pfc-delta" style="color:' + dc + '">▲ ' + delta.toLocaleString() + ' tiros · ' + pct + '%</div>' : '') +
       '</div>';
   }
@@ -5912,12 +5913,9 @@ var _prodChartCtx = null; // { todasFechas, byDL } del último render (para el p
 // diurna no hay delta calculable → null.
 function prodVeladaDelta(datos) {
   if (!datos || !datos.velada) return null;
-  var m = datos.momentos;
-  var diurnal = ['inicio','mediodia','fin']
-    .map(function(k){ return m[k]; })
-    .filter(Boolean).map(function(l){ return l.contador || 0; });
-  if (!diurnal.length) return null;
-  var d = (datos.velada.contador || 0) - Math.max.apply(null, diurnal);
+  var cnts = (datos.registros || []).map(function(l){ return l.contador || 0; });
+  if (!cnts.length) return null;
+  var d = (datos.velada.contador || 0) - Math.max.apply(null, cnts);
   return d > 0 ? d : null;
 }
 
@@ -5974,13 +5972,13 @@ async function renderProductividadChart(periodo) {
   if (_prodChart) { _prodChart.destroy(); _prodChart = null; }
   if (!lecturas.length) { container.style.display = 'none'; return; }
 
-  // byDL[fecha][linea] = { momentos:{}, velada }
+  // byDL[fecha][linea] = { registros:[], velada }
   var byDL = {};
   lecturas.forEach(function(l) {
     if (!byDL[l.fecha]) byDL[l.fecha] = {};
-    if (!byDL[l.fecha][l.linea_id]) byDL[l.fecha][l.linea_id] = { momentos:{}, velada:null };
+    if (!byDL[l.fecha][l.linea_id]) byDL[l.fecha][l.linea_id] = { registros:[], velada:null };
     if (l.momento === 'velada') { if (!byDL[l.fecha][l.linea_id].velada) byDL[l.fecha][l.linea_id].velada = l; }
-    else { if (!byDL[l.fecha][l.linea_id].momentos[l.momento]) byDL[l.fecha][l.linea_id].momentos[l.momento] = l; }
+    else { byDL[l.fecha][l.linea_id].registros.push(l); }
   });
 
   // Operador más reciente por línea dentro del rango (para la leyenda)
@@ -5989,7 +5987,7 @@ async function renderProductividadChart(periodo) {
     LINEAS_PRODUCCION.forEach(function(ln) {
       if (operadorPorLinea[ln.id]) return;
       var d = byDL[f] && byDL[f][ln.id]; if (!d) return;
-      var primer = d.momentos.inicio || d.momentos.mediodia || d.momentos.fin || d.velada;
+      var primer = (d.registros[0]) || d.velada;
       if (primer && primer.operador_nombre) operadorPorLinea[ln.id] = primer.operador_nombre;
     });
   });
@@ -6007,7 +6005,7 @@ async function renderProductividadChart(periodo) {
       if (!d) return;
       var set = [];
       var add = function(l) { if (!l) return; var v = l.diseno || l.sku; if (v && set.indexOf(v) < 0) set.push(v); };
-      ['inicio','mediodia','fin'].forEach(function(m){ add(d.momentos[m]); });
+      d.registros.forEach(add);
       add(d.velada);
       if (set.length) _prodChartProds[f][ln.id] = set.join(' / ');
     });
@@ -6024,10 +6022,7 @@ async function renderProductividadChart(periodo) {
       data: todasFechas.map(function(f) {
         var d = byDL[f] && byDL[f][ln.id];
         if (!d) return null;
-        var cnts = ['inicio','mediodia','fin']
-          .map(function(m){ return d.momentos[m]; })
-          .filter(Boolean).map(function(l){ return l.contador || 0; });
-        return cnts.length >= 2 ? Math.max.apply(null,cnts) - Math.min.apply(null,cnts) : null;
+        return pfcDelta(d.registros);
       }),
       borderColor: COLS[i],
       backgroundColor: COLS[i] + '18',
@@ -6162,8 +6157,7 @@ function prodShowDayPanel(idx, nativeEvt) {
       return '<div style="display:flex;justify-content:space-between;gap:16px;padding:5px 0;border-bottom:1px solid #F0EDE8;color:#B7B5B0">' +
         '<span style="font-weight:700">' + escHtml(ln.nombre) + '</span><span>— sin registro</span></div>';
     }
-    var cnts = ['inicio','mediodia','fin'].map(function(m){ return d.momentos[m]; }).filter(Boolean).map(function(l){ return l.contador || 0; });
-    var delta = cnts.length >= 2 ? Math.max.apply(null, cnts) - Math.min.apply(null, cnts) : null;
+    var delta = pfcDelta(d.registros);
     var pct = delta !== null ? Math.round((delta / META_TIROS_LINEA) * 100) : null;
     var vd = prodVeladaDelta(d);
     var envase = _prodChartProds[f] && _prodChartProds[f][ln.id];
@@ -6242,18 +6236,18 @@ async function renderProductividad() {
     return;
   }
 
-  // Agrupar: byDL[fecha][linea_id] = { momentos:{inicio,mediodia,fin}, velada }
+  // Agrupar: byDL[fecha][linea_id] = { registros:[], velada }
   var byDL = {};
   var fechasSet = {};
   lecturas.forEach(function(l) {
     var f = l.fecha;
     var lid = l.linea_id;
     if (!byDL[f]) { byDL[f] = {}; fechasSet[f] = true; }
-    if (!byDL[f][lid]) byDL[f][lid] = { momentos: {}, velada: null };
+    if (!byDL[f][lid]) byDL[f][lid] = { registros: [], velada: null };
     if (l.momento === 'velada') {
       if (!byDL[f][lid].velada) byDL[f][lid].velada = l;
     } else {
-      if (!byDL[f][lid].momentos[l.momento]) byDL[f][lid].momentos[l.momento] = l;
+      byDL[f][lid].registros.push(l);
     }
   });
   // Fechas ordenadas más reciente primero
@@ -6281,7 +6275,7 @@ async function renderProductividad() {
       if (operadorPorLinea[ln.id]) return;
       var d = byDL[f] && byDL[f][ln.id];
       if (!d) return;
-      var primer = d.momentos.inicio || d.momentos.mediodia || d.momentos.fin || d.velada;
+      var primer = d.registros[0] || d.velada;
       if (primer && primer.operador_nombre) operadorPorLinea[ln.id] = primer.operador_nombre;
     });
   });
@@ -6296,8 +6290,8 @@ async function renderProductividad() {
       var datos = byDL[f] && byDL[f][ln.id];
       if (!datos) return;
       diasConData++;
-      var cnts = [datos.momentos.inicio, datos.momentos.mediodia, datos.momentos.fin].filter(Boolean).map(function(l){ return l.contador||0; });
-      if (cnts.length >= 2) totalTiros += Math.max.apply(null, cnts) - Math.min.apply(null, cnts);
+      var delta = pfcDelta(datos.registros);
+      if (delta !== null) totalTiros += delta;
     });
     var metaMes = diasConData * META_TIROS_LINEA;
     var pct = metaMes > 0 ? Math.min(100, Math.round((totalTiros / metaMes) * 100)) : 0;
