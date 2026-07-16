@@ -6384,6 +6384,27 @@ async function renderFlamLineaChart(periodo) {
 }
 
 // ── Gráfico Metas: barras agrupadas flameador × línea ──
+var _flamMetasSepPlugin = {
+  id: 'flamGroupSep',
+  afterDraw: function(chart) {
+    var n = chart.data.labels.length;
+    if (n <= 1) return;
+    var ctx = chart.ctx, xs = chart.scales.x, ys = chart.scales.y;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(160,160,160,0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 5]);
+    for (var i = 0; i < n - 1; i++) {
+      var xMid = (xs.getPixelForValue(i) + xs.getPixelForValue(i + 1)) / 2;
+      ctx.beginPath();
+      ctx.moveTo(xMid, ys.top);
+      ctx.lineTo(xMid, ys.bottom);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+};
+
 function renderFlamMetasChart(rows) {
   var container = document.getElementById('flamMetasChart');
   var canvas    = document.getElementById('flamMetasChartCanvas');
@@ -6415,9 +6436,11 @@ function renderFlamMetasChart(rows) {
   container.style.display = '';
   _flamMetasChart = new Chart(canvas, {
     type: 'bar',
+    plugins: [_flamMetasSepPlugin],
     data: { labels: labels, datasets: datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
+      categoryPercentage: 0.65,
       plugins: {
         legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 14, boxHeight: 14 } },
         tooltip: { callbacks: {
