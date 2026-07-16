@@ -690,17 +690,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div><div class="ph-title">Productividad · Serigrafía</div>
           <div class="ph-sub" id="prodSubLbl">Impresión · Meta por línea: 10,000 tiros/día</div>
         </div>
-        <div class="ph-r" style="gap:6px">
+        <div class="ph-r" style="gap:6px;align-items:center;flex-wrap:wrap">
+          <div style="display:flex;gap:4px;border-right:1px solid var(--border);padding-right:10px;margin-right:2px">
+            <button class="seg-btn seg-active" id="pseg-impresion" onclick="switchProdSub('impresion')">🖨 Impresión</button>
+            <button class="seg-btn" id="pseg-flameado" onclick="switchProdSub('flameado')">🔥 Flameado</button>
+            <button class="seg-btn" id="pseg-empaque" onclick="switchProdSub('empaque')">📦 Empaque</button>
+          </div>
           <button class="btn btn-g btn-sm" onclick="renderProdActual()" title="Actualizar">🔄 Actualizar</button>
           <input class="fi" type="month" id="prodMes" style="font-size:12px;padding:6px 10px" onchange="renderProdActual()">
         </div>
       </div>
 
-      <!-- Sub-pestañas -->
-      <div style="padding:0 16px 10px;display:flex;gap:8px;border-bottom:1px solid var(--border)">
-        <button class="seg-btn seg-active" id="pseg-impresion" onclick="switchProdSub('impresion')">🖨 Impresión</button>
-        <button class="seg-btn" id="pseg-flameado" onclick="switchProdSub('flameado')">🔥 Flameado</button>
-        <button class="seg-btn" id="pseg-empaque" onclick="switchProdSub('empaque')">📦 Empaque</button>
+      <!-- Barra secundaria Flameado: Por línea / Metas (fuera del scroll) -->
+      <div id="flamSubBar" style="display:none;padding:5px 16px;border-bottom:1px solid var(--border);background:var(--bg2)">
+        <button class="seg-btn seg-active" id="flamseg-linea" onclick="flamSwitchSub('linea')" style="padding:3px 12px;font-size:11px">📊 Por línea</button>
+        <button class="seg-btn" id="flamseg-metas" onclick="flamSwitchSub('metas')" style="padding:3px 12px;font-size:11px">🎯 Metas</button>
       </div>
 
       <div class="mov-scroll" id="prodScroll">
@@ -721,10 +725,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
         <!-- SUB: FLAMEADO -->
         <div id="prod-sub-flameado" style="display:none">
-          <div style="padding:0 0 12px;display:flex;gap:8px">
-            <button class="seg-btn seg-active" id="flamseg-linea" onclick="flamSwitchSub('linea')">📊 Por línea</button>
-            <button class="seg-btn" id="flamseg-metas" onclick="flamSwitchSub('metas')">🎯 Metas</button>
-          </div>
           <!-- Sub: Por línea -->
           <div id="flam-sub-linea">
             <div class="kpi-strip" id="flamKPIs"></div>
@@ -6283,6 +6283,8 @@ function switchProdSub(sub) {
     var btn = document.getElementById('pseg-' + s);
     if (btn) btn.classList.toggle('seg-active', s === sub);
   });
+  var flamBar = document.getElementById('flamSubBar');
+  if (flamBar) flamBar.style.display = sub === 'flameado' ? '' : 'none';
   var lbl = document.getElementById('prodSubLbl');
   if (lbl) lbl.textContent = PROD_SUB_LBL[sub] || '';
   renderProdActual();
