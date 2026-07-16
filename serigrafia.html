@@ -742,6 +742,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <!-- Sub: Metas -->
           <div id="flam-sub-metas" style="display:none">
             <div class="kpi-strip" id="flamMetasKPIs"></div>
+            <div id="flamMetasChartBar" style="display:none;justify-content:center;gap:6px;margin:8px 0 2px">
+              <button type="button" id="flamMetasBtn-dia"    class="pcseg-btn" onclick="flamMetasSetPeriodo('dia')">Día</button>
+              <button type="button" id="flamMetasBtn-semana" class="pcseg-btn" onclick="flamMetasSetPeriodo('semana')">Semana</button>
+              <button type="button" id="flamMetasBtn-mes"    class="pcseg-btn pcseg-active" onclick="flamMetasSetPeriodo('mes')">Mes</button>
+            </div>
             <div id="flamMetasChart" style="display:none;margin:4px 0 16px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
               <canvas id="flamMetasChartCanvas" height="220"></canvas>
             </div>
@@ -6356,10 +6361,12 @@ function renderProdActual() {
 }
 
 // ── FLAMEADO helpers ─────────────────────────────────────────
-var _flamLineaChart  = null;
-var _flamMetasChart  = null;
-var _flamChartPeriodo = 'mes';
-var flamSubActual    = 'linea';
+var _flamLineaChart    = null;
+var _flamMetasChart    = null;
+var _flamChartPeriodo  = 'mes';
+var _flamMetasPeriodo  = 'mes';
+var _flamMetasRowsAll  = [];
+var flamSubActual      = 'linea';
 var CHART_COLS = ['#2A8B75','#D97706','#1D4ED8','#16A34A','#7C3AED','#EF4444'];
 
 function flamSwitchSub(sub) {
@@ -6380,6 +6387,15 @@ function flamSetChartPeriodo(p) {
     if (b) b.classList.toggle('pcseg-active', k === p);
   });
   renderFlamLineaChart(p);
+}
+
+function flamMetasSetPeriodo(p) {
+  _flamMetasPeriodo = p;
+  ['dia','semana','mes'].forEach(function(k){
+    var b = document.getElementById('flamMetasBtn-' + k);
+    if (b) b.classList.toggle('pcseg-active', k === p);
+  });
+  renderFlamMetasChart(_flamMetasRowsAll);
 }
 
 // ── Gráfico Por línea: líneas L1-L4 (mismo estilo que Impresión) ──
@@ -6476,8 +6492,42 @@ function renderFlamMetasChart(rows) {
   if (_flamMetasChart) { _flamMetasChart.destroy(); _flamMetasChart = null; }
   if (!rows || !rows.length) { container.style.display = 'none'; return; }
 
+  // Filtrar según período
+  var periodo = _flamMetasPeriodo || 'mes';
+  var hoy = fechaHoy();
+  var filtered = rows;
+  if (periodo === 'dia') {
+    filtered = rows.filter(function(r){ return r.fecha === hoy; });
+  } else if (periodo === 'semana') {
+    var d7 = new Date(hoy + 'T12:00:00');
+    d7.setDate(d7.getDate() - 6);
+    var desde7 = d7.toISOString().slice(0,10);
+    filtered = rows.filter(function(r){ return r.fecha >= desde7 && r.fecha <= hoy; });
+  }
+
+  if (!filtered.length) { container.style.display = 'none'; return; }
+
+  // Meta escalada según período
+  var metaVal;
+  if (periodo === 'dia') {
+    metaVal = META_TIROS_LINEA;
+  } else if (periodo === 'semana') {
+    metaVal = META_TIROS_LINEA * 7;
+  } else {
+    // mes: días del mes seleccionado en el input
+    var mesInput = document.getElementById('prodMes');
+    var mesStr = mesInput ? mesInput.value : hoy.slice(0,7);
+    var partes  = mesStr.split('-');
+    var diasMes = new Date(parseInt(partes[0],10), parseInt(partes[1],10), 0).getDate();
+    metaVal = META_TIROS_LINEA * diasMes;
+  }
+
+  var yMax = Math.ceil(metaVal * 1.5 / 5000) * 5000;
+
+  var periodoLbl = periodo === 'dia' ? 'hoy' : periodo === 'semana' ? '7 días' : 'mes';
+
   var byOpLinea = {}, opMap = {}, totOp = {};
-  rows.forEach(function(r) {
+  filtered.forEach(function(r) {
     var k = r.flameador_codigo || r.flameador_nombre || '?';
     opMap[k] = (r.flameador_nombre || k).split(' ')[0];
     totOp[k] = (totOp[k] || 0) + (r.cantidad || 0);
@@ -6498,8 +6548,8 @@ function renderFlamMetasChart(rows) {
   });
 
   datasets.push({
-    label: 'Meta (' + META_TIROS_LINEA.toLocaleString() + ')',
-    data: labels.map(function(){ return META_TIROS_LINEA; }),
+    label: 'Meta ' + periodoLbl + ' (' + metaVal.toLocaleString() + ')',
+    data: labels.map(function(){ return metaVal; }),
     type: 'line',
     borderColor: '#EF4444', borderWidth: 1.5, borderDash: [7, 4],
     pointRadius: 0, fill: false, tension: 0, order: -1
@@ -6517,14 +6567,14 @@ function renderFlamMetasChart(rows) {
         legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 14, boxHeight: 14 } },
         tooltip: { callbacks: {
           label: function(item) {
-            if (item.dataset.type === 'line') return '  Meta: ' + META_TIROS_LINEA.toLocaleString();
+            if (item.dataset.type === 'line') return '  Meta (' + periodoLbl + '): ' + metaVal.toLocaleString();
             return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' bolsas';
           }
         }}
       },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 11, weight: '700' } } },
-        y: { beginAtZero: true, max: 15000, ticks: { font: { size: 10 } } }
+        y: { beginAtZero: true, max: yMax, ticks: { font: { size: 10 } } }
       }
     }
   });
@@ -6666,18 +6716,24 @@ function _renderFlamLinea(rows) {
 }
 
 function _renderFlamMetas(rows) {
-  var tabla = document.getElementById('flamMetasTabla');
-  var kpis  = document.getElementById('flamMetasKPIs');
+  var tabla   = document.getElementById('flamMetasTabla');
+  var kpis    = document.getElementById('flamMetasKPIs');
+  var chartBar = document.getElementById('flamMetasChartBar');
   if (!tabla) return;
+
+  _flamMetasRowsAll = rows || [];
 
   if (!rows.length) {
     if (kpis) kpis.innerHTML = '';
+    if (chartBar) chartBar.style.display = 'none';
     document.getElementById('flamMetasChart').style.display = 'none';
     tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">Sin registros de flameado en este período</div>';
     return;
   }
 
-  // Agrupar por flameador
+  if (chartBar) chartBar.style.display = 'flex';
+
+  // KPIs usan el mes completo (rows sin filtrar)
   var byOp = {}, opOrder = [];
   rows.forEach(function(l) {
     var k = l.flameador_codigo || l.flameador_nombre || '?';
