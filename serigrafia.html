@@ -721,16 +721,31 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
         <!-- SUB: FLAMEADO -->
         <div id="prod-sub-flameado" style="display:none">
-          <div class="kpi-strip" id="flamKPIs"></div>
-          <div id="flamChartBar" style="display:none;justify-content:center;gap:6px;margin:8px 0 2px">
-            <button type="button" id="flamChartBtn-dia"    class="pcseg-btn" onclick="flamSetChartPeriodo('dia')">Día</button>
-            <button type="button" id="flamChartBtn-semana" class="pcseg-btn" onclick="flamSetChartPeriodo('semana')">Semana</button>
-            <button type="button" id="flamChartBtn-mes"    class="pcseg-btn pcseg-active" onclick="flamSetChartPeriodo('mes')">Mes</button>
+          <div style="padding:0 0 12px;display:flex;gap:8px">
+            <button class="seg-btn seg-active" id="flamseg-linea" onclick="flamSwitchSub('linea')">📊 Por línea</button>
+            <button class="seg-btn" id="flamseg-metas" onclick="flamSwitchSub('metas')">🎯 Metas</button>
           </div>
-          <div id="flamChart" style="display:none;margin:4px 0 8px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
-            <canvas id="flamChartCanvas" height="220"></canvas>
+          <!-- Sub: Por línea -->
+          <div id="flam-sub-linea">
+            <div class="kpi-strip" id="flamKPIs"></div>
+            <div id="flamChartBar" style="display:none;justify-content:center;gap:6px;margin:8px 0 2px">
+              <button type="button" id="flamChartBtn-dia"    class="pcseg-btn" onclick="flamSetChartPeriodo('dia')">Día</button>
+              <button type="button" id="flamChartBtn-semana" class="pcseg-btn" onclick="flamSetChartPeriodo('semana')">Semana</button>
+              <button type="button" id="flamChartBtn-mes"    class="pcseg-btn pcseg-active" onclick="flamSetChartPeriodo('mes')">Mes</button>
+            </div>
+            <div id="flamChart" style="display:none;margin:4px 0 8px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
+              <canvas id="flamChartCanvas" height="220"></canvas>
+            </div>
+            <div id="flamTabla"></div>
           </div>
-          <div id="flamTabla"></div>
+          <!-- Sub: Metas -->
+          <div id="flam-sub-metas" style="display:none">
+            <div class="kpi-strip" id="flamMetasKPIs"></div>
+            <div id="flamMetasChart" style="display:none;margin:4px 0 16px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
+              <canvas id="flamMetasChartCanvas" height="220"></canvas>
+            </div>
+            <div id="flamMetasTabla"></div>
+          </div>
         </div>
 
         <!-- SUB: EMPAQUE -->
@@ -6280,9 +6295,20 @@ function renderProdActual() {
 }
 
 // ── FLAMEADO helpers ─────────────────────────────────────────
-var _flamChart = null;
+var _flamLineaChart  = null;
+var _flamMetasChart  = null;
 var _flamChartPeriodo = 'mes';
+var flamSubActual    = 'linea';
 var CHART_COLS = ['#2A8B75','#D97706','#1D4ED8','#16A34A','#7C3AED','#EF4444'];
+
+function flamSwitchSub(sub) {
+  flamSubActual = sub;
+  document.getElementById('flam-sub-linea').style.display  = sub === 'linea'  ? '' : 'none';
+  document.getElementById('flam-sub-metas').style.display  = sub === 'metas'  ? '' : 'none';
+  document.getElementById('flamseg-linea').classList.toggle('seg-active', sub === 'linea');
+  document.getElementById('flamseg-metas').classList.toggle('seg-active', sub === 'metas');
+  renderFlameado();
+}
 
 function flamSetChartPeriodo(p) {
   _flamChartPeriodo = p;
@@ -6290,10 +6316,11 @@ function flamSetChartPeriodo(p) {
     var b = document.getElementById('flamChartBtn-' + k);
     if (b) b.classList.toggle('pcseg-active', k === p);
   });
-  renderFlamChart(p);
+  renderFlamLineaChart(p);
 }
 
-async function renderFlamChart(periodo) {
+// ── Gráfico Por línea: líneas L1-L4 (mismo estilo que Impresión) ──
+async function renderFlamLineaChart(periodo) {
   periodo = periodo || _flamChartPeriodo || 'mes';
   _flamChartPeriodo = periodo;
   var container = document.getElementById('flamChart');
@@ -6307,163 +6334,282 @@ async function renderFlamChart(periodo) {
   var raws = [];
   try {
     var rq = await db.from('registro_flameado_serig')
-      .select('fecha,flameador_codigo,flameador_nombre,cantidad')
+      .select('fecha,para_linea,cantidad')
       .eq('area','serig').gte('fecha',desde).lte('fecha',hasta);
     if (rq.error) throw rq.error;
     raws = rq.data || [];
-  } catch(e) { console.warn('renderFlamChart:', e); }
+  } catch(e) { console.warn('renderFlamLineaChart:', e); }
 
-  if (_flamChart) { _flamChart.destroy(); _flamChart = null; }
+  if (_flamLineaChart) { _flamLineaChart.destroy(); _flamLineaChart = null; }
   if (!raws.length) { container.style.display = 'none'; return; }
 
-  var byFD = {}, opMapC = {};
+  var byFL = {};
   raws.forEach(function(r) {
-    var k = r.flameador_codigo || r.flameador_nombre || '?';
-    opMapC[k] = (r.flameador_nombre || k).split(' ')[0];
-    if (!byFD[r.fecha]) byFD[r.fecha] = {};
-    byFD[r.fecha][k] = (byFD[r.fecha][k] || 0) + (r.cantidad || 0);
+    if (!byFL[r.fecha]) byFL[r.fecha] = {};
+    byFL[r.fecha][r.para_linea] = (byFL[r.fecha][r.para_linea] || 0) + (r.cantidad || 0);
   });
-  var totPorOpC = {};
-  raws.forEach(function(r) {
-    var k = r.flameador_codigo || r.flameador_nombre || '?';
-    totPorOpC[k] = (totPorOpC[k] || 0) + (r.cantidad || 0);
-  });
-  var opKeysC = Object.keys(opMapC).sort(function(a,b){ return (totPorOpC[b]||0)-(totPorOpC[a]||0); });
 
   var labels = todasFechas.map(function(f) {
     return periodo === 'mes' ? String(parseInt(f.slice(8,10),10)) : (f.slice(8,10)+'/'+f.slice(5,7));
   });
-  var datasets = opKeysC.map(function(k, i) {
+  var COLS4 = ['#2A8B75','#D97706','#1D4ED8','#16A34A'];
+  var datasets = LINEAS_PRODUCCION.map(function(ln, i) {
     return {
-      label: opMapC[k],
-      data: todasFechas.map(function(f){ return byFD[f] && byFD[f][k] ? byFD[f][k] : null; }),
-      backgroundColor: CHART_COLS[i % CHART_COLS.length] + 'CC',
-      borderColor: CHART_COLS[i % CHART_COLS.length],
-      borderWidth: 1.5, borderRadius: 4, stack: 'bolsas'
+      label: ln.nombre,
+      data: todasFechas.map(function(f){ var v = byFL[f] && byFL[f][ln.id]; return v || null; }),
+      borderColor: COLS4[i], backgroundColor: COLS4[i]+'18',
+      borderWidth: 2.5, pointRadius: 5, pointHoverRadius: 7,
+      pointBackgroundColor: COLS4[i], tension: 0.25, fill: false, spanGaps: false
     };
   });
 
   container.style.display = '';
-  _flamChart = new Chart(canvas, {
+  _flamLineaChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 14, boxHeight: 14 } },
+        tooltip: { callbacks: {
+          label: function(item) { return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' bolsas'; }
+        }}
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+// ── Gráfico Metas: barras agrupadas flameador × línea ──
+function renderFlamMetasChart(rows) {
+  var container = document.getElementById('flamMetasChart');
+  var canvas    = document.getElementById('flamMetasChartCanvas');
+  if (!container || !canvas || typeof Chart === 'undefined') return;
+
+  if (_flamMetasChart) { _flamMetasChart.destroy(); _flamMetasChart = null; }
+  if (!rows || !rows.length) { container.style.display = 'none'; return; }
+
+  var byOpLinea = {}, opMap = {}, totOp = {};
+  rows.forEach(function(r) {
+    var k = r.flameador_codigo || r.flameador_nombre || '?';
+    opMap[k] = (r.flameador_nombre || k).split(' ')[0];
+    totOp[k] = (totOp[k] || 0) + (r.cantidad || 0);
+    if (!byOpLinea[k]) byOpLinea[k] = {};
+    if (r.para_linea) byOpLinea[k][r.para_linea] = (byOpLinea[k][r.para_linea]||0) + (r.cantidad||0);
+  });
+  var opKeys = Object.keys(opMap).sort(function(a,b){ return (totOp[b]||0)-(totOp[a]||0); });
+  var labels  = opKeys.map(function(k){ return opMap[k]; });
+  var COLS4   = ['#2A8B75','#D97706','#1D4ED8','#16A34A'];
+  var datasets = LINEAS_PRODUCCION.map(function(ln, i) {
+    return {
+      label: ln.nombre,
+      data: opKeys.map(function(k){ return byOpLinea[k] && byOpLinea[k][ln.id] ? byOpLinea[k][ln.id] : null; }),
+      backgroundColor: COLS4[i]+'CC', borderColor: COLS4[i],
+      borderWidth: 1.5, borderRadius: 4
+    };
+  });
+
+  container.style.display = '';
+  _flamMetasChart = new Chart(canvas, {
     type: 'bar',
     data: { labels: labels, datasets: datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 14, boxHeight: 14 } },
-        tooltip: {
-          callbacks: {
-            title: function(items) { return todasFechas[items[0].dataIndex].slice(8,10)+'/'+todasFechas[items[0].dataIndex].slice(5,7); },
-            label: function(item) { return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' bolsas'; }
-          }
-        }
+        tooltip: { callbacks: {
+          label: function(item) { return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' bolsas'; }
+        }}
       },
       scales: {
-        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
-        y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 } } }
+        x: { grid: { display: false }, ticks: { font: { size: 11, weight: '700' } } },
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
       }
     }
   });
 }
 
-function buildFlamCard(fecha, datos) {
+// ── Cards Por línea (fecha × linea) ──
+function buildFlamLineaCard(fecha, datos) {
   var total = datos.registros.reduce(function(s,r){ return s+(r.cantidad||0); }, 0);
   var fechaFmt = fecha.slice(8,10)+'/'+fecha.slice(5,7);
-  var html = '<div class="pfc"><div class="pfc-hdr">📅 ' + escHtml(fechaFmt) +
-    '<span style="float:right;font-weight:400">' + total.toLocaleString() + ' und</span></div>';
-  var prevEnvase = '';
+  var html = '<div class="pfc"><div class="pfc-hdr">📅 '+escHtml(fechaFmt)+
+    '<span style="float:right;font-weight:400">'+total.toLocaleString()+' und</span></div>';
+  var prevFlam = '', prevEnvase = '';
   datos.registros.forEach(function(r) {
+    var flam   = (r.flameador_nombre || '').split(' ')[0];
     var envase = r.descripcion || r.sku || '';
+    if (flam && flam !== prevFlam) {
+      html += prevFlam
+        ? '<div class="pfc-cambio">🔄 '+escHtml(flam)+'</div>'
+        : '<div class="pfc-diseno">🔥 '+escHtml(flam)+'</div>';
+      prevFlam = flam;
+    }
     if (envase && envase !== prevEnvase && prevEnvase) {
-      html += '<div class="pfc-cambio">🔄 ' + escHtml(envase.slice(0,45)) + '</div>';
+      html += '<div class="pfc-cambio">🔄 '+escHtml(envase.slice(0,45))+'</div>';
     }
     if (envase) prevEnvase = envase;
-    html += '<div class="pfc-row">' +
-      '<span class="pfc-hora">' + escHtml((r.hora||'').slice(0,5)) + '</span> · ' +
-      '<span style="color:var(--amber);font-weight:700">' + escHtml((envase||'—').slice(0,28)) + '</span>' +
-      ' · <strong>' + (r.cantidad||0).toLocaleString() + '</strong>' +
-      (r.para_linea ? ' <span style="font-size:10px;background:var(--teal-xl);color:var(--teal-dark);padding:1px 5px;border-radius:4px;font-weight:700">→L'+r.para_linea+'</span>' : '') +
+    html += '<div class="pfc-row">'+
+      '<span class="pfc-hora">'+escHtml((r.hora||'').slice(0,5))+'</span> · '+
+      '<span style="color:var(--amber);font-weight:700">'+escHtml((envase||'—').slice(0,28))+'</span>'+
+      ' · <strong>'+(r.cantidad||0).toLocaleString()+'</strong>'+
     '</div>';
   });
   html += '</div>';
   return html;
 }
 
-function buildFlamGrid(fechas, byFO, opKeys, opMap) {
-  if (!opKeys.length) return '';
-  var n = opKeys.length;
+function buildFlamLineaGrid(fechas, byFL) {
+  var n    = LINEAS_PRODUCCION.length;
   var cols = 'repeat('+n+',1fr)';
-  var hdrs = opKeys.map(function(k) {
-    return '<div class="prod-col-hdr">🔥 ' + escHtml((opMap[k]||k).split(' ')[0]) + '</div>';
+  var hdrs = LINEAS_PRODUCCION.map(function(ln) {
+    return '<div class="prod-col-hdr">'+escHtml(ln.nombre)+'</div>';
   }).join('');
   var rows = fechas.map(function(f) {
-    var cells = opKeys.map(function(k) {
-      var datos = byFO[f] && byFO[f][k];
-      return '<div class="prod-col">' + (datos && datos.registros.length ? buildFlamCard(f, datos) : '') + '</div>';
+    var cells = LINEAS_PRODUCCION.map(function(ln) {
+      var datos = byFL[f] && byFL[f][ln.id];
+      return '<div class="prod-col">'+(datos && datos.registros.length ? buildFlamLineaCard(f, datos) : '')+'</div>';
     }).join('');
     return '<div style="display:grid;grid-template-columns:'+cols+';gap:8px;align-items:start">'+cells+'</div>';
   }).join('');
   return '<div style="display:grid;grid-template-columns:'+cols+';gap:8px;padding:0 0 8px">'+hdrs+'</div>'+rows;
 }
 
+// ── Cards Metas (resumen mensual por flameador) ──
+function buildFlamMetaCard(opData) {
+  var html = '<div class="pfc" style="margin-bottom:8px">'+
+    '<div class="pfc-hdr">🔥 '+escHtml(opData.nombre)+
+      '<span style="float:right;font-weight:400">'+opData.total.toLocaleString()+' und · '+opData.dias+' día(s)</span></div>';
+  LINEAS_PRODUCCION.forEach(function(ln) {
+    var cant = opData.porLinea[ln.id] || 0;
+    if (!cant) return;
+    var pct = Math.round((cant / opData.total) * 100);
+    html += '<div class="pfc-row" style="display:flex;justify-content:space-between;align-items:center">'+
+      '<span>'+escHtml(ln.nombre)+'</span>'+
+      '<span><strong>'+cant.toLocaleString()+'</strong> <span style="color:var(--gray-l);font-size:10px">('+pct+'%)</span></span>'+
+    '</div>'+
+    '<div style="margin:2px 10px 6px;background:var(--border);border-radius:3px;height:4px">'+
+      '<div style="background:var(--amber);height:4px;border-radius:3px;width:'+pct+'%"></div>'+
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+// ── renderFlameado: única entrada, despacha a la sub-vista activa ──
 async function renderFlameado() {
-  var tabla = document.getElementById('flamTabla');
-  var kpis  = document.getElementById('flamKPIs');
-  if (!tabla) return;
-  tabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando flameado…</div></div>';
-
   var mesStr = (document.getElementById('prodMes') || {}).value || fechaHoy().slice(0,7);
-  var desde = mesStr + '-01', hasta = mesStr + '-31';
+  var desde  = mesStr + '-01', hasta = mesStr + '-31';
 
+  // Spinner en la sub-vista activa
+  var activeTabla = document.getElementById(flamSubActual === 'linea' ? 'flamTabla' : 'flamMetasTabla');
+  if (activeTabla) activeTabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando flameado…</div></div>';
+
+  var rows = [];
   try {
     var r = await db.from('registro_flameado_serig')
       .select('*').eq('area','serig')
       .gte('fecha', desde).lte('fecha', hasta)
       .order('fecha', { ascending: false })
+      .order('para_linea', { ascending: true })
       .order('hora', { ascending: true });
     if (r.error) throw r.error;
-    var rows = r.data || [];
-
-    var barEl = document.getElementById('flamChartBar');
-    if (barEl) barEl.style.display = rows.length ? 'flex' : 'none';
-    renderFlamChart(_flamChartPeriodo);
-
-    if (!rows.length) {
-      if (kpis) kpis.innerHTML = '';
-      tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">Sin registros de flameado en este período</div>';
-      return;
-    }
-
-    // byFO[fecha][opKey] = { nombre, registros }
-    var byFO = {}, opMap = {}, fechasSet = {}, totPorOp = {};
-    rows.forEach(function(l) {
-      var k = l.flameador_codigo || l.flameador_nombre || '?';
-      opMap[k] = l.flameador_nombre || k;
-      totPorOp[k] = (totPorOp[k] || 0) + (l.cantidad || 0);
-      var f = l.fecha;
-      fechasSet[f] = true;
-      if (!byFO[f]) byFO[f] = {};
-      if (!byFO[f][k]) byFO[f][k] = { nombre: opMap[k], registros: [] };
-      byFO[f][k].registros.push(l);
-    });
-    var fechas = Object.keys(fechasSet).sort(function(a,b){ return b > a ? 1 : -1; });
-    var opKeys = Object.keys(opMap).sort(function(a,b){ return (totPorOp[b]||0)-(totPorOp[a]||0); });
-
-    // KPIs
-    var totalBolsas = rows.reduce(function(s,l){ return s+(l.cantidad||0); }, 0);
-    var skusDist = {};
-    rows.forEach(function(l){ if (l.sku) skusDist[l.sku] = true; });
-    if (kpis) kpis.innerHTML =
-      '<div class="kpi"><div class="kpi-v">' + totalBolsas.toLocaleString() + '</div><div class="kpi-l">Bolsas del mes</div></div>' +
-      '<div class="kpi"><div class="kpi-v">' + rows.length + '</div><div class="kpi-l">Registros</div></div>' +
-      '<div class="kpi"><div class="kpi-v">' + opKeys.length + '</div><div class="kpi-l">Flameadores</div></div>' +
-      '<div class="kpi"><div class="kpi-v">' + Object.keys(skusDist).length + '</div><div class="kpi-l">SKUs</div></div>';
-
-    tabla.innerHTML = buildFlamGrid(fechas, byFO, opKeys, opMap);
+    rows = r.data || [];
   } catch(e) {
-    if (kpis) kpis.innerHTML = '';
-    tabla.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--red)">⚠️ ' + escHtml(e.message || 'Error') + '</div>';
+    if (activeTabla) activeTabla.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--red)">⚠️ '+escHtml(e.message||'Error')+'</div>';
+    return;
   }
+
+  if (flamSubActual === 'linea') {
+    _renderFlamLinea(rows);
+  } else {
+    _renderFlamMetas(rows);
+  }
+}
+
+function _renderFlamLinea(rows) {
+  var tabla = document.getElementById('flamTabla');
+  var kpis  = document.getElementById('flamKPIs');
+  if (!tabla) return;
+
+  var barEl = document.getElementById('flamChartBar');
+  if (barEl) barEl.style.display = rows.length ? 'flex' : 'none';
+  renderFlamLineaChart(_flamChartPeriodo);
+
+  if (!rows.length) {
+    if (kpis) kpis.innerHTML = '';
+    tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">Sin registros de flameado en este período</div>';
+    return;
+  }
+
+  // byFL[fecha][para_linea] = { registros }
+  var byFL = {}, fechasSet = {};
+  rows.forEach(function(l) {
+    var f = l.fecha, lid = l.para_linea || 0;
+    fechasSet[f] = true;
+    if (!byFL[f]) byFL[f] = {};
+    if (!byFL[f][lid]) byFL[f][lid] = { registros: [] };
+    byFL[f][lid].registros.push(l);
+  });
+  var fechas = Object.keys(fechasSet).sort(function(a,b){ return b > a ? 1 : -1; });
+
+  var totalBolsas = rows.reduce(function(s,l){ return s+(l.cantidad||0); }, 0);
+  if (kpis) kpis.innerHTML =
+    '<div class="kpi"><div class="kpi-v">'+totalBolsas.toLocaleString()+'</div><div class="kpi-l">Bolsas del mes</div></div>'+
+    '<div class="kpi"><div class="kpi-v">'+rows.length+'</div><div class="kpi-l">Registros</div></div>'+
+    LINEAS_PRODUCCION.map(function(ln) {
+      var tot = rows.filter(function(l){ return l.para_linea === ln.id; })
+                    .reduce(function(s,l){ return s+(l.cantidad||0); }, 0);
+      return '<div class="kpi"><div class="kpi-v">'+(tot||0).toLocaleString()+'</div><div class="kpi-l">'+escHtml(ln.nombre)+'</div></div>';
+    }).join('');
+
+  tabla.innerHTML = buildFlamLineaGrid(fechas, byFL);
+}
+
+function _renderFlamMetas(rows) {
+  var tabla = document.getElementById('flamMetasTabla');
+  var kpis  = document.getElementById('flamMetasKPIs');
+  if (!tabla) return;
+
+  if (!rows.length) {
+    if (kpis) kpis.innerHTML = '';
+    document.getElementById('flamMetasChart').style.display = 'none';
+    tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">Sin registros de flameado en este período</div>';
+    return;
+  }
+
+  // Agrupar por flameador
+  var byOp = {}, opOrder = [];
+  rows.forEach(function(l) {
+    var k = l.flameador_codigo || l.flameador_nombre || '?';
+    if (!byOp[k]) {
+      byOp[k] = { nombre: l.flameador_nombre || k, total: 0, porLinea: {1:0,2:0,3:0,4:0}, diasSet: {} };
+      opOrder.push(k);
+    }
+    byOp[k].total += (l.cantidad || 0);
+    if (l.para_linea) byOp[k].porLinea[l.para_linea] = (byOp[k].porLinea[l.para_linea]||0) + (l.cantidad||0);
+    if (l.fecha) byOp[k].diasSet[l.fecha] = true;
+  });
+  opOrder.sort(function(a,b){ return byOp[b].total - byOp[a].total; });
+  opOrder.forEach(function(k){ byOp[k].dias = Object.keys(byOp[k].diasSet).length; });
+
+  var totalBolsas = rows.reduce(function(s,l){ return s+(l.cantidad||0); }, 0);
+  if (kpis) kpis.innerHTML =
+    '<div class="kpi"><div class="kpi-v">'+totalBolsas.toLocaleString()+'</div><div class="kpi-l">Total bolsas</div></div>'+
+    '<div class="kpi"><div class="kpi-v">'+opOrder.length+'</div><div class="kpi-l">Flameadores</div></div>'+
+    opOrder.map(function(k) {
+      var op = byOp[k];
+      return '<div class="kpi"><div class="kpi-v">'+op.total.toLocaleString()+'</div><div class="kpi-l">'+escHtml(op.nombre.split(' ')[0])+'</div></div>';
+    }).join('');
+
+  renderFlamMetasChart(rows);
+
+  var html = '';
+  opOrder.forEach(function(k){ html += buildFlamMetaCard(byOp[k]); });
+  tabla.innerHTML = html;
 }
 
 // ── EMPAQUE helpers ───────────────────────────────────────────
