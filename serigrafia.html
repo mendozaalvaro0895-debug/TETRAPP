@@ -6429,8 +6429,17 @@ function renderFlamMetasChart(rows) {
       label: ln.nombre,
       data: opKeys.map(function(k){ return byOpLinea[k] && byOpLinea[k][ln.id] ? byOpLinea[k][ln.id] : null; }),
       backgroundColor: COLS4[i]+'CC', borderColor: COLS4[i],
-      borderWidth: 1.5, borderRadius: 4
+      borderWidth: 1.5, borderRadius: 4,
+      type: 'bar'
     };
+  });
+
+  datasets.push({
+    label: 'Meta (' + META_TIROS_LINEA.toLocaleString() + ')',
+    data: labels.map(function(){ return META_TIROS_LINEA; }),
+    type: 'line',
+    borderColor: '#EF4444', borderWidth: 1.5, borderDash: [7, 4],
+    pointRadius: 0, fill: false, tension: 0, order: -1
   });
 
   container.style.display = '';
@@ -6444,12 +6453,15 @@ function renderFlamMetasChart(rows) {
       plugins: {
         legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 14, boxHeight: 14 } },
         tooltip: { callbacks: {
-          label: function(item) { return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' bolsas'; }
+          label: function(item) {
+            if (item.dataset.type === 'line') return '  Meta: ' + META_TIROS_LINEA.toLocaleString();
+            return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' bolsas';
+          }
         }}
       },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 11, weight: '700' } } },
-        y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+        y: { beginAtZero: true, max: 15000, ticks: { font: { size: 10 } } }
       }
     }
   });
