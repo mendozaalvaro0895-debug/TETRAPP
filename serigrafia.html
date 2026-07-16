@@ -703,8 +703,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
       <!-- Barra secundaria Flameado: Por línea / Metas (fuera del scroll) -->
       <div id="flamSubBar" style="display:none;padding:5px 16px;border-bottom:1px solid var(--border);background:var(--bg2)">
-        <button class="seg-btn seg-active" id="flamseg-linea" onclick="flamSwitchSub('linea')" style="padding:3px 12px;font-size:11px">📊 Por línea</button>
-        <button class="seg-btn" id="flamseg-metas" onclick="flamSwitchSub('metas')" style="padding:3px 12px;font-size:11px">🎯 Metas</button>
+        <button class="seg-btn seg-active" id="flamseg-linea"     onclick="flamSwitchSub('linea')"     style="padding:3px 12px;font-size:11px">📊 Por línea</button>
+        <button class="seg-btn"            id="flamseg-metas"     onclick="flamSwitchSub('metas')"     style="padding:3px 12px;font-size:11px">🎯 Metas</button>
+        <button class="seg-btn"            id="flamseg-historial" onclick="flamSwitchSub('historial')" style="padding:3px 12px;font-size:11px">📋 Historial</button>
       </div>
 
       <div class="mov-scroll" id="prodScroll">
@@ -745,6 +746,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
               <canvas id="flamMetasChartCanvas" height="220"></canvas>
             </div>
             <div id="flamMetasTabla"></div>
+          </div>
+          <!-- Sub: Historial -->
+          <div id="flam-sub-historial" style="display:none">
+            <div id="flamHistTabla"></div>
           </div>
         </div>
 
@@ -1185,6 +1190,60 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="mf">
       <button class="btn btn-g" onclick="cerrarEditTiro()">Cancelar</button>
       <button class="btn btn-s" onclick="guardarEdicionTiro()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL EDITAR FLAMEADO (master) ══════ -->
+<div class="overlay" id="overlayEditFlam" onclick="cerrarEditFlam(event)" style="display:none">
+  <div class="modal" style="max-width:460px">
+    <div class="mh">
+      <div class="mh-title">✏️ Editar registro de flameado</div>
+      <button class="m-close" onclick="cerrarEditFlam()">✕</button>
+    </div>
+    <div class="mb" style="display:flex;flex-direction:column;gap:12px;padding:16px 20px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Fecha</label>
+          <input type="date" id="efFecha" class="fi" style="width:100%">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Hora</label>
+          <input type="time" id="efHora" class="fi" style="width:100%">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Flameador</label>
+        <select id="efFlameador" class="fi" style="width:100%"></select>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Envase (SKU o descripción)</label>
+        <div style="position:relative">
+          <input type="text" id="efEnvase" class="fi" placeholder="SKU o descripción…" autocomplete="off"
+            oninput="efAcBuscar(this.value)" data-sku="" style="width:100%">
+          <div class="sku-drop" id="efDrop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100"></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Cantidad</label>
+          <input type="number" id="efCantidad" class="fi" min="1" style="width:100%">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray);display:block;margin-bottom:4px">Para línea</label>
+          <select id="efLinea" class="fi" style="width:100%">
+            <option value="1">Línea 1</option>
+            <option value="2">Línea 2</option>
+            <option value="3">Línea 3</option>
+            <option value="4">Línea 4</option>
+          </select>
+        </div>
+      </div>
+      <div id="efError" style="display:none;background:#FEE2E2;color:#B91C1C;padding:8px 12px;border-radius:8px;font-size:12px"></div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cerrarEditFlam()">Cancelar</button>
+      <button class="btn btn-s" id="efGuardarBtn" onclick="guardarEditFlam()">💾 Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -6305,10 +6364,12 @@ var CHART_COLS = ['#2A8B75','#D97706','#1D4ED8','#16A34A','#7C3AED','#EF4444'];
 
 function flamSwitchSub(sub) {
   flamSubActual = sub;
-  document.getElementById('flam-sub-linea').style.display  = sub === 'linea'  ? '' : 'none';
-  document.getElementById('flam-sub-metas').style.display  = sub === 'metas'  ? '' : 'none';
-  document.getElementById('flamseg-linea').classList.toggle('seg-active', sub === 'linea');
-  document.getElementById('flamseg-metas').classList.toggle('seg-active', sub === 'metas');
+  ['linea','metas','historial'].forEach(function(s) {
+    var el  = document.getElementById('flam-sub-' + s);
+    var btn = document.getElementById('flamseg-' + s);
+    if (el)  el.style.display = s === sub ? '' : 'none';
+    if (btn) btn.classList.toggle('seg-active', s === sub);
+  });
   renderFlameado();
 }
 
@@ -6538,10 +6599,11 @@ function buildFlamMetaCard(opData) {
 
 // ── renderFlameado: única entrada, despacha a la sub-vista activa ──
 async function renderFlameado() {
+  if (flamSubActual === 'historial') { renderFlamHistorial(); return; }
+
   var mesStr = (document.getElementById('prodMes') || {}).value || fechaHoy().slice(0,7);
   var desde  = mesStr + '-01', hasta = mesStr + '-31';
 
-  // Spinner en la sub-vista activa
   var activeTabla = document.getElementById(flamSubActual === 'linea' ? 'flamTabla' : 'flamMetasTabla');
   if (activeTabla) activeTabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando flameado…</div></div>';
 
@@ -6560,11 +6622,8 @@ async function renderFlameado() {
     return;
   }
 
-  if (flamSubActual === 'linea') {
-    _renderFlamLinea(rows);
-  } else {
-    _renderFlamMetas(rows);
-  }
+  if (flamSubActual === 'linea') _renderFlamLinea(rows);
+  else _renderFlamMetas(rows);
 }
 
 function _renderFlamLinea(rows) {
@@ -6647,6 +6706,216 @@ function _renderFlamMetas(rows) {
   var html = '';
   opOrder.forEach(function(k){ html += buildFlamMetaCard(byOp[k]); });
   tabla.innerHTML = html;
+}
+
+// ── FLAMEADO HISTORIAL ────────────────────────────────────────
+var _editFlamId = null;
+var _flamHistCache = [];
+
+function renderFlamHistorial() {
+  var tabla = document.getElementById('flamHistTabla');
+  if (!tabla) return;
+  tabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando historial…</div></div>';
+  db.from('registro_flameado_serig')
+    .select('*').eq('area','serig')
+    .order('created_at', { ascending: false })
+    .limit(300)
+    .then(function(r) {
+      if (r.error) throw r.error;
+      _flamHistCache = r.data || [];
+      _renderFlamHistTabla(_flamHistCache);
+    })
+    .catch(function(e) {
+      tabla.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--red)">⚠️ '+escHtml(e.message||'Error')+'</div>';
+    });
+}
+
+function _renderFlamHistTabla(rows) {
+  var tabla = document.getElementById('flamHistTabla');
+  if (!tabla) return;
+
+  var tot = rows.length;
+  var pend = rows.filter(function(r){ return r.estado==='pendiente'; }).length;
+  var apro = rows.filter(function(r){ return r.estado==='aprobado'; }).length;
+  var rech = rows.filter(function(r){ return r.estado==='rechazado'; }).length;
+
+  var chips = '<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border)">'
+    + '<span style="background:var(--bg2);padding:3px 10px;border-radius:20px;font-size:12px">Total: <strong>'+tot+'</strong></span>'
+    + '<span style="background:#FEF3C7;color:#92400E;padding:3px 10px;border-radius:20px;font-size:12px">⏳ Pendientes: <strong>'+pend+'</strong></span>'
+    + '<span style="background:#D1FAE5;color:#065F46;padding:3px 10px;border-radius:20px;font-size:12px">✅ Aprobados: <strong>'+apro+'</strong></span>'
+    + '<span style="background:#FEE2E2;color:#991B1B;padding:3px 10px;border-radius:20px;font-size:12px">⛔ Rechazados: <strong>'+rech+'</strong></span>'
+    + '</div>';
+
+  if (!rows.length) {
+    tabla.innerHTML = chips + '<div class="empty" style="padding:24px;text-align:center;color:#64748b">Sin registros de flameado</div>';
+    return;
+  }
+
+  var thead = '<thead><tr>'
+    + '<th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b;white-space:nowrap">Fecha/Hora</th>'
+    + '<th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b">Flameador</th>'
+    + '<th style="padding:8px 10px;text-align:left;font-size:11px;color:#64748b">Envase</th>'
+    + '<th style="padding:8px 10px;text-align:center;font-size:11px;color:#64748b">Cant.</th>'
+    + '<th style="padding:8px 10px;text-align:center;font-size:11px;color:#64748b">Línea</th>'
+    + '<th style="padding:8px 10px;text-align:center;font-size:11px;color:#64748b">Estado</th>'
+    + '<th style="padding:8px 10px;text-align:center;font-size:11px;color:#64748b">Acciones</th>'
+    + '</tr></thead>';
+
+  var tbody = '<tbody>' + rows.map(buildFlamHistRow).join('') + '</tbody>';
+
+  tabla.innerHTML = chips + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+    + thead + tbody + '</table></div>';
+}
+
+function buildFlamHistRow(r) {
+  var estadoBadge = '';
+  if (r.estado === 'aprobado') {
+    estadoBadge = '<span style="background:#D1FAE5;color:#065F46;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700">✅ Aprobado</span>';
+  } else if (r.estado === 'rechazado') {
+    estadoBadge = '<span style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700">⛔ Rechazado</span>';
+  } else {
+    estadoBadge = '<span style="background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700">⏳ Pendiente</span>';
+  }
+
+  var revisadoPor = r.revisado_por ? '<div style="font-size:10px;color:#94a3b8;margin-top:2px">por '+escHtml(r.revisado_por)+'</div>' : '';
+
+  var acciones = '<div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap">';
+  if (r.estado !== 'aprobado')  acciones += '<button class="btn btn-s" style="padding:2px 8px;font-size:11px" onclick="aprobarFlam(\''+r.id+'\')">✅</button>';
+  if (r.estado !== 'rechazado') acciones += '<button class="btn" style="padding:2px 8px;font-size:11px;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5" onclick="rechazarFlam(\''+r.id+'\')">⛔</button>';
+  if (r.estado !== 'pendiente') acciones += '<button class="btn btn-g" style="padding:2px 8px;font-size:11px" onclick="pendienteFlam(\''+r.id+'\')">⏳</button>';
+  acciones += '<button class="btn btn-g" style="padding:2px 8px;font-size:11px" onclick="editarFlam(\''+r.id+'\')">✏️</button>';
+  acciones += '</div>';
+
+  var desc = r.descripcion ? escHtml(r.sku+' — '+r.descripcion) : escHtml(r.sku||'—');
+  var trStyle = r.estado === 'rechazado' ? 'background:#FFF5F5' : r.estado === 'aprobado' ? 'background:#F0FDF4' : '';
+
+  return '<tr style="border-top:1px solid var(--border);'+trStyle+'">'
+    + '<td style="padding:8px 10px;white-space:nowrap;color:#475569;font-size:12px">'+escHtml(r.fecha||'')+'<br><span style="color:#94a3b8">'+escHtml((r.hora||'').slice(0,5))+'</span></td>'
+    + '<td style="padding:8px 10px">'+escHtml(r.flameador_nombre||r.flameador_codigo||'—')+'</td>'
+    + '<td style="padding:8px 10px;font-size:12px;max-width:200px">'+desc+'</td>'
+    + '<td style="padding:8px 10px;text-align:center;font-weight:700">'+escHtml(String(r.cantidad||0))+'</td>'
+    + '<td style="padding:8px 10px;text-align:center;font-weight:700;color:var(--teal)">L'+escHtml(String(r.para_linea||'?'))+'</td>'
+    + '<td style="padding:8px 10px;text-align:center">'+estadoBadge+revisadoPor+'</td>'
+    + '<td style="padding:8px 10px">'+acciones+'</td>'
+    + '</tr>';
+}
+
+async function aprobarFlam(id) {
+  var upd = await db.from('registro_flameado_serig').update({ estado:'aprobado', revisado_por: TETRA.nombre }).eq('id', id);
+  if (upd.error) { alert('Error: '+upd.error.message); return; }
+  renderFlamHistorial();
+}
+async function rechazarFlam(id) {
+  var upd = await db.from('registro_flameado_serig').update({ estado:'rechazado', revisado_por: TETRA.nombre }).eq('id', id);
+  if (upd.error) { alert('Error: '+upd.error.message); return; }
+  renderFlamHistorial();
+}
+async function pendienteFlam(id) {
+  var upd = await db.from('registro_flameado_serig').update({ estado:'pendiente', revisado_por: null }).eq('id', id);
+  if (upd.error) { alert('Error: '+upd.error.message); return; }
+  renderFlamHistorial();
+}
+
+async function editarFlam(id) {
+  var r = _flamHistCache.find(function(x){ return x.id === id; });
+  if (!r) {
+    var res = await db.from('registro_flameado_serig').select('*').eq('id', id).single();
+    if (res.error || !res.data) { alert('No se encontró el registro'); return; }
+    r = res.data;
+  }
+  _editFlamId = id;
+
+  document.getElementById('efFecha').value = r.fecha || '';
+  document.getElementById('efHora').value  = (r.hora||'').slice(0,5);
+  document.getElementById('efCantidad').value = r.cantidad || '';
+  document.getElementById('efLinea').value    = r.para_linea || 1;
+
+  var envInput = document.getElementById('efEnvase');
+  envInput.value = r.descripcion ? r.sku+' — '+r.descripcion : r.sku||'';
+  envInput.dataset.sku = r.sku || '';
+
+  var sel = document.getElementById('efFlameador');
+  sel.innerHTML = '';
+  var ops = (personalData.serig||[]).filter(function(p){ return p.rol==='operador' && p.activo; });
+  ops.forEach(function(p){
+    var o = document.createElement('option');
+    o.value = p.codigo; o.textContent = p.nombre;
+    if (p.codigo === r.flameador_codigo) o.selected = true;
+    sel.appendChild(o);
+  });
+
+  document.getElementById('efError').style.display = 'none';
+  document.getElementById('overlayEditFlam').style.display = 'flex';
+}
+
+function cerrarEditFlam(e) {
+  if (e && e.target !== document.getElementById('overlayEditFlam')) return;
+  document.getElementById('overlayEditFlam').style.display = 'none';
+  _editFlamId = null;
+}
+
+function efAcBuscar(q) {
+  var drop = document.getElementById('efDrop');
+  if (!q || q.length < 2) { drop.style.display='none'; return; }
+  var ql = q.toLowerCase();
+  var hits = inventarioCache.filter(function(x){ return x.activo && (String(x.sku).includes(q) || (x.descripcion||'').toLowerCase().includes(ql)); }).slice(0,8);
+  if (!hits.length) { drop.style.display='none'; return; }
+  drop.innerHTML = hits.map(function(x){
+    return '<div class="sku-opt" onmousedown="efSelSku(\''+escHtml(x.sku)+'\',\''+escHtml(x.descripcion||'')+'\')">'+escHtml(x.sku)+' — '+escHtml(x.descripcion||'')+'</div>';
+  }).join('');
+  drop.style.display = 'block';
+}
+
+function efSelSku(sku, desc) {
+  var inp = document.getElementById('efEnvase');
+  inp.value = sku + (desc ? ' — '+desc : '');
+  inp.dataset.sku = sku;
+  document.getElementById('efDrop').style.display = 'none';
+}
+
+async function guardarEditFlam() {
+  if (!_editFlamId) return;
+  var btn = document.getElementById('efGuardarBtn');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+
+  var envInput = document.getElementById('efEnvase');
+  var rawSku = envInput.dataset.sku || '';
+  var rawVal = envInput.value.trim();
+  var sku = rawSku || rawVal.split(' — ')[0].trim();
+  var desc = rawVal.includes(' — ') ? rawVal.split(' — ').slice(1).join(' — ').trim() : '';
+
+  var sel = document.getElementById('efFlameador');
+  var flamOp = (personalData.serig||[]).find(function(p){ return p.codigo === sel.value; });
+
+  var payload = {
+    fecha:           document.getElementById('efFecha').value,
+    hora:            document.getElementById('efHora').value + ':00',
+    flameador_codigo: sel.value,
+    flameador_nombre: flamOp ? flamOp.nombre : sel.value,
+    sku:             sku,
+    descripcion:     desc,
+    cantidad:        parseInt(document.getElementById('efCantidad').value, 10) || 0,
+    para_linea:      parseInt(document.getElementById('efLinea').value, 10) || 1
+  };
+
+  var errDiv = document.getElementById('efError');
+  if (!payload.fecha || !payload.sku || !payload.cantidad) {
+    errDiv.textContent = 'Fecha, envase y cantidad son obligatorios.';
+    errDiv.style.display = 'block';
+    btn.disabled = false; btn.textContent = '💾 Guardar cambios';
+    return;
+  }
+
+  var upd = await db.from('registro_flameado_serig').update(payload).eq('id', _editFlamId);
+  btn.disabled = false; btn.textContent = '💾 Guardar cambios';
+  if (upd.error) {
+    errDiv.textContent = '⚠️ ' + (upd.error.message || 'Error al guardar');
+    errDiv.style.display = 'block';
+    return;
+  }
+  document.getElementById('overlayEditFlam').style.display = 'none';
+  _editFlamId = null;
+  renderFlamHistorial();
 }
 
 // ── EMPAQUE helpers ───────────────────────────────────────────
