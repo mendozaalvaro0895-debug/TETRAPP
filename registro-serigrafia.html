@@ -1448,15 +1448,15 @@ function mostrarChipsEnvaseFlam() {
     var d = skuEnLineaMap[ln];
     if (!d || (!d.diseno && !d.sku)) return;
     hayAlguno = true;
-    var lbl = escHtml(((d.sku ? d.sku + ' — ' : '') + (d.diseno || '')).slice(0, 32));
+    // d.diseno ya tiene formato "SKU — descripcion"; no anteponer sku de nuevo
+    var lbl = escHtml(d.diseno || d.sku);
     chips += '<button type="button" onclick="usarEnvaseLinea(' + ln + ')" ' +
-      'style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:6px 12px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;text-align:left">' +
-      '<span style="color:#7C3AED;font-weight:800;font-size:10px">L' + ln + '</span> ' +
+      'style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit;text-align:left;width:100%">' +
+      '<span style="color:#7C3AED;font-weight:800;font-size:11px;margin-right:8px">L' + ln + '</span>' +
       '<strong style="color:#e2e8f0">' + lbl + '</strong>' +
     '</button>';
   });
-  // mantener el label fijo + chips
-  container.innerHTML = '<span style="color:#64748b;font-size:11px;width:100%;margin-bottom:2px">Envase activo por línea:</span>' + chips;
+  container.innerHTML = '<span style="color:#64748b;font-size:11px;width:100%;margin-bottom:4px">Envase activo por línea:</span>' + chips;
   container.style.display = hayAlguno ? 'flex' : 'none';
 }
 
@@ -1464,7 +1464,8 @@ function usarEnvaseLinea(ln) {
   var d = skuEnLineaMap[ln];
   if (!d) return;
   var inp = document.getElementById('fFlamEnvase');
-  inp.value = (d.sku ? d.sku + ' — ' : '') + (d.diseno || '');
+  // d.diseno ya empieza con el sku, skuDescDe lo parsea correctamente
+  inp.value = d.diseno || d.sku;
   inp.dataset.sku = d.sku || '';
   document.getElementById('flamDrop').style.display = 'none';
   inp.focus();
