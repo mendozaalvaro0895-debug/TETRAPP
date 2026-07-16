@@ -722,12 +722,28 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <!-- SUB: FLAMEADO -->
         <div id="prod-sub-flameado" style="display:none">
           <div class="kpi-strip" id="flamKPIs"></div>
+          <div id="flamChartBar" style="display:none;justify-content:center;gap:6px;margin:8px 0 2px">
+            <button type="button" id="flamChartBtn-dia"    class="pcseg-btn" onclick="flamSetChartPeriodo('dia')">Día</button>
+            <button type="button" id="flamChartBtn-semana" class="pcseg-btn" onclick="flamSetChartPeriodo('semana')">Semana</button>
+            <button type="button" id="flamChartBtn-mes"    class="pcseg-btn pcseg-active" onclick="flamSetChartPeriodo('mes')">Mes</button>
+          </div>
+          <div id="flamChart" style="display:none;margin:4px 0 8px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
+            <canvas id="flamChartCanvas" height="220"></canvas>
+          </div>
           <div id="flamTabla"></div>
         </div>
 
         <!-- SUB: EMPAQUE -->
         <div id="prod-sub-empaque" style="display:none">
           <div class="kpi-strip" id="empKPIs"></div>
+          <div id="empChartBar" style="display:none;justify-content:center;gap:6px;margin:8px 0 2px">
+            <button type="button" id="empChartBtn-dia"    class="pcseg-btn" onclick="empSetChartPeriodo('dia')">Día</button>
+            <button type="button" id="empChartBtn-semana" class="pcseg-btn" onclick="empSetChartPeriodo('semana')">Semana</button>
+            <button type="button" id="empChartBtn-mes"    class="pcseg-btn pcseg-active" onclick="empSetChartPeriodo('mes')">Mes</button>
+          </div>
+          <div id="empChart" style="display:none;margin:4px 0 8px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
+            <canvas id="empChartCanvas" height="220"></canvas>
+          </div>
           <div id="empTabla"></div>
         </div>
 
@@ -6263,6 +6279,133 @@ function renderProdActual() {
   else if (prodSubActual === 'empaque') renderEmpaque();
 }
 
+// ── FLAMEADO helpers ─────────────────────────────────────────
+var _flamChart = null;
+var _flamChartPeriodo = 'mes';
+var CHART_COLS = ['#2A8B75','#D97706','#1D4ED8','#16A34A','#7C3AED','#EF4444'];
+
+function flamSetChartPeriodo(p) {
+  _flamChartPeriodo = p;
+  ['dia','semana','mes'].forEach(function(k){
+    var b = document.getElementById('flamChartBtn-' + k);
+    if (b) b.classList.toggle('pcseg-active', k === p);
+  });
+  renderFlamChart(p);
+}
+
+async function renderFlamChart(periodo) {
+  periodo = periodo || _flamChartPeriodo || 'mes';
+  _flamChartPeriodo = periodo;
+  var container = document.getElementById('flamChart');
+  var canvas    = document.getElementById('flamChartCanvas');
+  if (!container || !canvas || typeof Chart === 'undefined') return;
+
+  var mesStr = (document.getElementById('prodMes') || {}).value || fechaHoy().slice(0,7);
+  var todasFechas = prodChartFechas(periodo, mesStr);
+  var desde = todasFechas[0], hasta = todasFechas[todasFechas.length - 1];
+
+  var raws = [];
+  try {
+    var rq = await db.from('registro_flameado_serig')
+      .select('fecha,flameador_codigo,flameador_nombre,cantidad')
+      .eq('area','serig').gte('fecha',desde).lte('fecha',hasta);
+    if (rq.error) throw rq.error;
+    raws = rq.data || [];
+  } catch(e) { console.warn('renderFlamChart:', e); }
+
+  if (_flamChart) { _flamChart.destroy(); _flamChart = null; }
+  if (!raws.length) { container.style.display = 'none'; return; }
+
+  var byFD = {}, opMapC = {};
+  raws.forEach(function(r) {
+    var k = r.flameador_codigo || r.flameador_nombre || '?';
+    opMapC[k] = (r.flameador_nombre || k).split(' ')[0];
+    if (!byFD[r.fecha]) byFD[r.fecha] = {};
+    byFD[r.fecha][k] = (byFD[r.fecha][k] || 0) + (r.cantidad || 0);
+  });
+  var totPorOpC = {};
+  raws.forEach(function(r) {
+    var k = r.flameador_codigo || r.flameador_nombre || '?';
+    totPorOpC[k] = (totPorOpC[k] || 0) + (r.cantidad || 0);
+  });
+  var opKeysC = Object.keys(opMapC).sort(function(a,b){ return (totPorOpC[b]||0)-(totPorOpC[a]||0); });
+
+  var labels = todasFechas.map(function(f) {
+    return periodo === 'mes' ? String(parseInt(f.slice(8,10),10)) : (f.slice(8,10)+'/'+f.slice(5,7));
+  });
+  var datasets = opKeysC.map(function(k, i) {
+    return {
+      label: opMapC[k],
+      data: todasFechas.map(function(f){ return byFD[f] && byFD[f][k] ? byFD[f][k] : null; }),
+      backgroundColor: CHART_COLS[i % CHART_COLS.length] + 'CC',
+      borderColor: CHART_COLS[i % CHART_COLS.length],
+      borderWidth: 1.5, borderRadius: 4, stack: 'bolsas'
+    };
+  });
+
+  container.style.display = '';
+  _flamChart = new Chart(canvas, {
+    type: 'bar',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 14, boxHeight: 14 } },
+        tooltip: {
+          callbacks: {
+            title: function(items) { return todasFechas[items[0].dataIndex].slice(8,10)+'/'+todasFechas[items[0].dataIndex].slice(5,7); },
+            label: function(item) { return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' bolsas'; }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function buildFlamCard(fecha, datos) {
+  var total = datos.registros.reduce(function(s,r){ return s+(r.cantidad||0); }, 0);
+  var fechaFmt = fecha.slice(8,10)+'/'+fecha.slice(5,7);
+  var html = '<div class="pfc"><div class="pfc-hdr">📅 ' + escHtml(fechaFmt) +
+    '<span style="float:right;font-weight:400">' + total.toLocaleString() + ' und</span></div>';
+  var prevEnvase = '';
+  datos.registros.forEach(function(r) {
+    var envase = r.descripcion || r.sku || '';
+    if (envase && envase !== prevEnvase && prevEnvase) {
+      html += '<div class="pfc-cambio">🔄 ' + escHtml(envase.slice(0,45)) + '</div>';
+    }
+    if (envase) prevEnvase = envase;
+    html += '<div class="pfc-row">' +
+      '<span class="pfc-hora">' + escHtml((r.hora||'').slice(0,5)) + '</span> · ' +
+      '<span style="color:var(--amber);font-weight:700">' + escHtml((envase||'—').slice(0,28)) + '</span>' +
+      ' · <strong>' + (r.cantidad||0).toLocaleString() + '</strong>' +
+      (r.para_linea ? ' <span style="font-size:10px;background:var(--teal-xl);color:var(--teal-dark);padding:1px 5px;border-radius:4px;font-weight:700">→L'+r.para_linea+'</span>' : '') +
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function buildFlamGrid(fechas, byFO, opKeys, opMap) {
+  if (!opKeys.length) return '';
+  var n = opKeys.length;
+  var cols = 'repeat('+n+',1fr)';
+  var hdrs = opKeys.map(function(k) {
+    return '<div class="prod-col-hdr">🔥 ' + escHtml((opMap[k]||k).split(' ')[0]) + '</div>';
+  }).join('');
+  var rows = fechas.map(function(f) {
+    var cells = opKeys.map(function(k) {
+      var datos = byFO[f] && byFO[f][k];
+      return '<div class="prod-col">' + (datos && datos.registros.length ? buildFlamCard(f, datos) : '') + '</div>';
+    }).join('');
+    return '<div style="display:grid;grid-template-columns:'+cols+';gap:8px;align-items:start">'+cells+'</div>';
+  }).join('');
+  return '<div style="display:grid;grid-template-columns:'+cols+';gap:8px;padding:0 0 8px">'+hdrs+'</div>'+rows;
+}
+
 async function renderFlameado() {
   var tabla = document.getElementById('flamTabla');
   var kpis  = document.getElementById('flamKPIs');
@@ -6276,87 +6419,243 @@ async function renderFlameado() {
     var r = await db.from('registro_flameado_serig')
       .select('*').eq('area','serig')
       .gte('fecha', desde).lte('fecha', hasta)
-      .order('created_at', { ascending: false });
+      .order('fecha', { ascending: false })
+      .order('hora', { ascending: true });
     if (r.error) throw r.error;
     var rows = r.data || [];
 
+    var barEl = document.getElementById('flamChartBar');
+    if (barEl) barEl.style.display = rows.length ? 'flex' : 'none';
+    renderFlamChart(_flamChartPeriodo);
+
     if (!rows.length) {
-      kpis.innerHTML = '';
+      if (kpis) kpis.innerHTML = '';
       tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">Sin registros de flameado en este período</div>';
       return;
     }
 
-    // Agrupar por operario
-    var byOp = {};
+    // byFO[fecha][opKey] = { nombre, registros }
+    var byFO = {}, opMap = {}, fechasSet = {}, totPorOp = {};
     rows.forEach(function(l) {
       var k = l.flameador_codigo || l.flameador_nombre || '?';
-      if (!byOp[k]) byOp[k] = { nombre: l.flameador_nombre || k, total: 0, envases: {} };
-      byOp[k].total += (l.cantidad || 0);
-      var ek = (l.sku ? l.sku + ' — ' : '') + (l.descripcion || l.sku || '—');
-      byOp[k].envases[ek] = (byOp[k].envases[ek] || 0) + (l.cantidad || 0);
+      opMap[k] = l.flameador_nombre || k;
+      totPorOp[k] = (totPorOp[k] || 0) + (l.cantidad || 0);
+      var f = l.fecha;
+      fechasSet[f] = true;
+      if (!byFO[f]) byFO[f] = {};
+      if (!byFO[f][k]) byFO[f][k] = { nombre: opMap[k], registros: [] };
+      byFO[f][k].registros.push(l);
     });
+    var fechas = Object.keys(fechasSet).sort(function(a,b){ return b > a ? 1 : -1; });
+    var opKeys = Object.keys(opMap).sort(function(a,b){ return (totPorOp[b]||0)-(totPorOp[a]||0); });
 
     // KPIs
-    var totalBolsas = rows.reduce(function(s,l){ return s + (l.cantidad||0); }, 0);
-    kpis.innerHTML =
+    var totalBolsas = rows.reduce(function(s,l){ return s+(l.cantidad||0); }, 0);
+    var skusDist = {};
+    rows.forEach(function(l){ if (l.sku) skusDist[l.sku] = true; });
+    if (kpis) kpis.innerHTML =
       '<div class="kpi"><div class="kpi-v">' + totalBolsas.toLocaleString() + '</div><div class="kpi-l">Bolsas del mes</div></div>' +
       '<div class="kpi"><div class="kpi-v">' + rows.length + '</div><div class="kpi-l">Registros</div></div>' +
-      '<div class="kpi"><div class="kpi-v">' + Object.keys(byOp).length + '</div><div class="kpi-l">Flameadores</div></div>';
+      '<div class="kpi"><div class="kpi-v">' + opKeys.length + '</div><div class="kpi-l">Flameadores</div></div>' +
+      '<div class="kpi"><div class="kpi-v">' + Object.keys(skusDist).length + '</div><div class="kpi-l">SKUs</div></div>';
 
-    // Cards resumen por operario
-    var html = '<div style="margin-bottom:12px">';
-    Object.keys(byOp).sort().forEach(function(k) {
-      var op = byOp[k];
-      html += '<div class="pfc" style="margin-bottom:8px">' +
-        '<div class="pfc-hdr">🔥 ' + escHtml(op.nombre) +
-          '<span style="float:right;font-weight:400">' + op.total.toLocaleString() + ' und</span></div>' +
-        Object.keys(op.envases).map(function(e) {
-          return '<div class="pfc-row"><span style="color:var(--amber);font-weight:700">' + escHtml(e) + '</span>' +
-            ' · <strong>' + op.envases[e].toLocaleString() + ' und</strong></div>';
-        }).join('') +
-        '</div>';
-    });
-    html += '</div>';
-
-    // Tabla detalle
-    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">' +
-      '<thead><tr style="background:var(--bg2);text-align:left">' +
-      '<th style="padding:5px 8px">Fecha</th>' +
-      '<th style="padding:5px 8px">Hora</th>' +
-      '<th style="padding:5px 8px">Flameador</th>' +
-      '<th style="padding:5px 8px">Envase</th>' +
-      '<th style="padding:5px 8px;text-align:right">Cant.</th>' +
-      '<th style="padding:5px 8px;text-align:center">Línea</th>' +
-      '</tr></thead><tbody>' +
-      rows.map(function(l) {
-        return '<tr style="border-bottom:1px solid var(--border)">' +
-          '<td style="padding:4px 8px;white-space:nowrap">' + escHtml(l.fecha || '') + '</td>' +
-          '<td style="padding:4px 8px;font-family:var(--mono)">' + escHtml((l.hora||'').slice(0,5)) + '</td>' +
-          '<td style="padding:4px 8px">' + escHtml(l.flameador_nombre || l.flameador_codigo || '—') + '</td>' +
-          '<td style="padding:4px 8px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
-            escHtml(l.descripcion || l.sku || '—') + '</td>' +
-          '<td style="padding:4px 8px;text-align:right;font-weight:700">' + (l.cantidad||0).toLocaleString() + '</td>' +
-          '<td style="padding:4px 8px;text-align:center">' + (l.para_linea ? 'L' + l.para_linea : '—') + '</td>' +
-        '</tr>';
-      }).join('') +
-      '</tbody></table></div>';
-
-    tabla.innerHTML = html;
+    tabla.innerHTML = buildFlamGrid(fechas, byFO, opKeys, opMap);
   } catch(e) {
+    if (kpis) kpis.innerHTML = '';
     tabla.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--red)">⚠️ ' + escHtml(e.message || 'Error') + '</div>';
   }
+}
+
+// ── EMPAQUE helpers ───────────────────────────────────────────
+var _empChart = null;
+var _empChartPeriodo = 'mes';
+
+function empSetChartPeriodo(p) {
+  _empChartPeriodo = p;
+  ['dia','semana','mes'].forEach(function(k){
+    var b = document.getElementById('empChartBtn-' + k);
+    if (b) b.classList.toggle('pcseg-active', k === p);
+  });
+  renderEmpChart(p);
+}
+
+async function renderEmpChart(periodo) {
+  periodo = periodo || _empChartPeriodo || 'mes';
+  _empChartPeriodo = periodo;
+  var container = document.getElementById('empChart');
+  var canvas    = document.getElementById('empChartCanvas');
+  if (!container || !canvas || typeof Chart === 'undefined') return;
+
+  var mesStr = (document.getElementById('prodMes') || {}).value || fechaHoy().slice(0,7);
+  var todasFechas = prodChartFechas(periodo, mesStr);
+  var desde = todasFechas[0], hasta = todasFechas[todasFechas.length - 1];
+
+  var rawsE = [];
+  try {
+    var rqE = await db.from('registro_empaque_serig')
+      .select('fecha,operador_codigo,area_origen,cantidad')
+      .eq('area','serig').gte('fecha',desde).lte('fecha',hasta);
+    if (rqE.error) throw rqE.error;
+    rawsE = rqE.data || [];
+  } catch(e) { console.warn('renderEmpChart:', e); }
+
+  if (_empChart) { _empChart.destroy(); _empChart = null; }
+  if (!rawsE.length) { container.style.display = 'none'; return; }
+
+  var byED = {}, opMapE2 = {};
+  rawsE.forEach(function(r) {
+    var k = r.operador_codigo || ('apoyo:' + (r.area_origen || '?'));
+    if (!opMapE2[k]) opMapE2[k] = r.operador_codigo ? r.operador_codigo : ('Apoyo ' + (r.area_origen || '?'));
+    if (!byED[r.fecha]) byED[r.fecha] = {};
+    byED[r.fecha][k] = (byED[r.fecha][k] || 0) + (r.cantidad || 0);
+  });
+  var totPorOpE2 = {};
+  rawsE.forEach(function(r) {
+    var k = r.operador_codigo || ('apoyo:' + (r.area_origen || '?'));
+    totPorOpE2[k] = (totPorOpE2[k] || 0) + (r.cantidad || 0);
+  });
+  var opKeysE2 = Object.keys(opMapE2).sort(function(a,b){ return (totPorOpE2[b]||0)-(totPorOpE2[a]||0); });
+
+  var labelsE = todasFechas.map(function(f) {
+    return periodo === 'mes' ? String(parseInt(f.slice(8,10),10)) : (f.slice(8,10)+'/'+f.slice(5,7));
+  });
+  var datasetsE = opKeysE2.map(function(k, i) {
+    return {
+      label: (opMapE2[k]||k).split(' ')[0],
+      data: todasFechas.map(function(f){ return byED[f] && byED[f][k] ? byED[f][k] : null; }),
+      backgroundColor: CHART_COLS[i % CHART_COLS.length] + 'CC',
+      borderColor: CHART_COLS[i % CHART_COLS.length],
+      borderWidth: 1.5, borderRadius: 4, stack: 'unidades'
+    };
+  });
+
+  container.style.display = '';
+  _empChart = new Chart(canvas, {
+    type: 'bar',
+    data: { labels: labelsE, datasets: datasetsE },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 14, boxHeight: 14 } },
+        tooltip: {
+          callbacks: {
+            title: function(items) { return todasFechas[items[0].dataIndex].slice(8,10)+'/'+todasFechas[items[0].dataIndex].slice(5,7); },
+            label: function(item) { return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' und'; }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function buildEmpCard(fecha, datos) {
+  var total = datos.registros.reduce(function(s,r){ return s+(r.cantidad||0); }, 0);
+  var fechaFmt = fecha.slice(8,10)+'/'+fecha.slice(5,7);
+  var html = '<div class="pfc"><div class="pfc-hdr">📅 ' + escHtml(fechaFmt) +
+    '<span style="float:right;font-weight:400">' + total.toLocaleString() + ' und</span></div>';
+  var prevSku = '';
+  datos.registros.forEach(function(r) {
+    var sku = r.descripcion || r.sku || '';
+    if (sku && sku !== prevSku && prevSku) {
+      html += '<div class="pfc-cambio">🔄 ' + escHtml(sku.slice(0,45)) + '</div>';
+    }
+    if (sku) prevSku = sku;
+    html += '<div class="pfc-row">' +
+      '<span class="pfc-hora">' + escHtml((r.hora||'').slice(0,5)) + '</span> · ' +
+      '<span style="color:var(--amber);font-weight:700">' + escHtml((sku||'—').slice(0,28)) + '</span>' +
+      ' · <strong>' + (r.cantidad||0).toLocaleString() + '</strong>' +
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function empNombre(l) {
+  if (l.operador_nombre) return l.operador_nombre;
+  if (l.operador_codigo) return l.operador_codigo;
+  return 'Apoyo ' + (l.area_origen || '?');
+}
+
+function buildEmpGrid(fechas, byEO, opKeys, opMap) {
+  if (!opKeys.length) return '';
+  var n = opKeys.length;
+  var cols = 'repeat('+n+',1fr)';
+  var hdrs = opKeys.map(function(k) {
+    var nom = (opMap[k]||k).split(' ')[0];
+    return '<div class="prod-col-hdr">📦 ' + escHtml(nom) + '</div>';
+  }).join('');
+  var rows = fechas.map(function(f) {
+    var cells = opKeys.map(function(k) {
+      var datos = byEO[f] && byEO[f][k];
+      return '<div class="prod-col">' + (datos && datos.registros.length ? buildEmpCard(f, datos) : '') + '</div>';
+    }).join('');
+    return '<div style="display:grid;grid-template-columns:'+cols+';gap:8px;align-items:start">'+cells+'</div>';
+  }).join('');
+  return '<div style="display:grid;grid-template-columns:'+cols+';gap:8px;padding:0 0 8px">'+hdrs+'</div>'+rows;
 }
 
 async function renderEmpaque() {
   var tabla = document.getElementById('empTabla');
   var kpis  = document.getElementById('empKPIs');
   if (!tabla) return;
-  kpis.innerHTML = '';
-  tabla.innerHTML = '<div class="empty" style="padding:40px;text-align:center;color:var(--gray-l)">' +
-    '<div style="font-size:32px;margin-bottom:8px">📦</div>' +
-    '<div style="font-weight:700;margin-bottom:4px">Próximamente</div>' +
-    '<div style="font-size:12px">Cuando haya registros de empaque podrás ver la productividad aquí.</div>' +
-    '</div>';
+  tabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando empaque…</div></div>';
+
+  var mesStr = (document.getElementById('prodMes') || {}).value || fechaHoy().slice(0,7);
+  var desde = mesStr + '-01', hasta = mesStr + '-31';
+
+  try {
+    var re = await db.from('registro_empaque_serig')
+      .select('*').eq('area','serig')
+      .gte('fecha', desde).lte('fecha', hasta)
+      .order('fecha', { ascending: false })
+      .order('hora', { ascending: true });
+    if (re.error) throw re.error;
+    var rowsE = re.data || [];
+
+    var barElE = document.getElementById('empChartBar');
+    if (barElE) barElE.style.display = rowsE.length ? 'flex' : 'none';
+    renderEmpChart(_empChartPeriodo);
+
+    if (!rowsE.length) {
+      if (kpis) kpis.innerHTML = '';
+      tabla.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">Sin registros de empaque en este período</div>';
+      return;
+    }
+
+    // byEO[fecha][opKey] = { nombre, registros }
+    var byEO = {}, opMapE = {}, fechasSetE = {}, totPorOpE = {};
+    rowsE.forEach(function(l) {
+      var k = l.operador_codigo || ('apoyo:' + (l.area_origen || '?'));
+      opMapE[k] = empNombre(l);
+      totPorOpE[k] = (totPorOpE[k] || 0) + (l.cantidad || 0);
+      var f = l.fecha;
+      fechasSetE[f] = true;
+      if (!byEO[f]) byEO[f] = {};
+      if (!byEO[f][k]) byEO[f][k] = { nombre: opMapE[k], registros: [] };
+      byEO[f][k].registros.push(l);
+    });
+    var fechasE = Object.keys(fechasSetE).sort(function(a,b){ return b > a ? 1 : -1; });
+    var opKeysE = Object.keys(opMapE).sort(function(a,b){ return (totPorOpE[b]||0)-(totPorOpE[a]||0); });
+
+    // KPIs
+    var totalUnd = rowsE.reduce(function(s,l){ return s+(l.cantidad||0); }, 0);
+    var skusDistE = {};
+    rowsE.forEach(function(l){ if (l.sku) skusDistE[l.sku] = true; });
+    if (kpis) kpis.innerHTML =
+      '<div class="kpi"><div class="kpi-v">' + totalUnd.toLocaleString() + '</div><div class="kpi-l">Unidades del mes</div></div>' +
+      '<div class="kpi"><div class="kpi-v">' + rowsE.length + '</div><div class="kpi-l">Registros</div></div>' +
+      '<div class="kpi"><div class="kpi-v">' + opKeysE.length + '</div><div class="kpi-l">Empacadores</div></div>' +
+      '<div class="kpi"><div class="kpi-v">' + Object.keys(skusDistE).length + '</div><div class="kpi-l">SKUs</div></div>';
+
+    tabla.innerHTML = buildEmpGrid(fechasE, byEO, opKeysE, opMapE);
+  } catch(e) {
+    if (kpis) kpis.innerHTML = '';
+    tabla.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--red)">⚠️ ' + escHtml(e.message || 'Error') + '</div>';
+  }
 }
 
 async function renderProductividad() {
