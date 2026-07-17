@@ -557,27 +557,8 @@ async function cargarOperarios() {
     operarios = todos.filter(function(p){ return p.rol !== 'supervisor'; });
     if (!operarios.length) operarios = todos;
 
-    // Línea de cada operador + SKU en curso por línea (últimos 500 registros)
-    try {
-      var rh = await db.from('registro_tiros_serig')
-        .select('linea_id, operador_codigo, sku, diseno')
-        .eq('area','serig')
-        .order('created_at', { ascending: false }).limit(500);
-      var seenOp = {}, seenLn = {};
-      (rh.data || []).forEach(function(x) {
-        if (x.operador_codigo && !seenOp[x.operador_codigo]) {
-          seenOp[x.operador_codigo] = true;
-          operadorLineaMap[x.operador_codigo] = x.linea_id;
-        }
-        if (x.linea_id && !seenLn[x.linea_id] && (x.sku || x.diseno)) {
-          seenLn[x.linea_id] = true;
-          skuEnLineaMap[x.linea_id] = { sku: x.sku || '', diseno: x.diseno || '' };
-        }
-      });
-    } catch(e2) { operadorLineaMap = {}; skuEnLineaMap = {}; }
-
-    // Fallback: SKU asignado a la línea desde solicitudes vigentes
-    // (cubre el caso donde el operador aún no ha enviado ningún registro hoy)
+    // PRIORIDAD 1: SKU asignado en el pedido vigente (solicitud_lineas)
+    // Es la fuente más confiable del trabajo ACTUAL por línea.
     try {
       var rs = await db.from('solicitud_lineas')
         .select('linea_id, sku, descripcion')
@@ -595,6 +576,25 @@ async function cargarOperarios() {
         }
       });
     } catch(e3) { /* no critico */ }
+
+    // PRIORIDAD 2: registro_tiros_serig — para operadorLineaMap y líneas sin pedido asignado
+    try {
+      var rh = await db.from('registro_tiros_serig')
+        .select('linea_id, operador_codigo, sku, diseno')
+        .eq('area','serig')
+        .order('created_at', { ascending: false }).limit(500);
+      var seenOp = {}, seenLn = {};
+      (rh.data || []).forEach(function(x) {
+        if (x.operador_codigo && !seenOp[x.operador_codigo]) {
+          seenOp[x.operador_codigo] = true;
+          operadorLineaMap[x.operador_codigo] = x.linea_id;
+        }
+        if (x.linea_id && !seenLn[x.linea_id] && !skuEnLineaMap[x.linea_id] && (x.sku || x.diseno)) {
+          seenLn[x.linea_id] = true;
+          skuEnLineaMap[x.linea_id] = { sku: x.sku || '', diseno: x.diseno || '' };
+        }
+      });
+    } catch(e2) { operadorLineaMap = {}; }
 
     // Mapa linea → nombre: solo operarios con rol Impresión, asignados por nombre
     lineaOpNombreMap = {};
@@ -819,8 +819,7 @@ function buildAcItem(item) {
   var descE = escHtml(desc.replace(/'/g, ''));
   var handler = 'acElegirD(\'' + skuE + '\',\'' + descE + '\')';
   return '<div class="ac-item"'
-    + ' ontouchstart="' + handler + '"'
-    + ' onmousedown="' + handler + '">'
+    + ' onpointerdown="' + handler + '">'
     + '<div class="ac-sku">' + escHtml(sku) + '</div>'
     + '<div class="ac-desc">' + escHtml(desc.slice(0, 60)) + '</div>'
     + '</div>';
@@ -902,8 +901,7 @@ function acGen(query, inputId, dropId) {
     var descE = escHtml(desc.replace(/\x27/g,''));
     var handler = 'acGenElegirD(\'' + skuE + '\',\'' + descE + '\',\'' + inputId + '\',\'' + dropId + '\')';
     return '<div class="ac-item"'
-      + ' ontouchstart="' + handler + '"'
-      + ' onmousedown="' + handler + '">'
+      + ' onpointerdown="' + handler + '">'
       + '<div class="ac-sku">' + escHtml(sku) + '</div><div class="ac-desc">' + escHtml(desc.slice(0,60)) + '</div></div>';
   }).join('');
   drop.style.display = 'block';
