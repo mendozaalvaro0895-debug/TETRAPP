@@ -785,9 +785,14 @@ function usarUltimoContador() {
 
 // ── Autocomplete de diseño/SKU ─────────────────────────────────
 function buildAcItem(item) {
-  var sku = String(item.sku || '');
+  var sku  = String(item.sku || '');
   var desc = String(item.descripcion || '');
-  return '<div class="ac-item" onmousedown="acElegir(\'' + escHtml(sku.replace(/'/g, '')) + '\',\'' + escHtml(desc.replace(/'/g, '')) + '\')">'
+  var skuE  = escHtml(sku.replace(/'/g, ''));
+  var descE = escHtml(desc.replace(/'/g, ''));
+  var handler = 'acElegir(\'' + skuE + '\',\'' + descE + '\')';
+  return '<div class="ac-item"'
+    + ' ontouchstart="event.preventDefault();' + handler + '"'
+    + ' onmousedown="' + handler + '">'
     + '<div class="ac-sku">' + escHtml(sku) + '</div>'
     + '<div class="ac-desc">' + escHtml(desc.slice(0, 60)) + '</div>'
     + '</div>';
@@ -798,9 +803,17 @@ function mostrarSkuLinea(linea) {
   var btn  = document.getElementById('btnSkuLinea');
   if (!wrap || !btn) return;
   var d = skuEnLineaMap[linea];
-  if (!d || !d.diseno) { wrap.style.display = 'none'; return; }
-  var skuTxt = d.sku ? '<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:#6D28D9">' + escHtml(d.sku) + '</span> — ' : '';
-  var descTxt = escHtml((d.diseno || '').replace(/^[^\s—]+\s*—\s*/, '').slice(0, 80));
+  if (!d || (!d.sku && !d.diseno)) { wrap.style.display = 'none'; return; }
+
+  var sku    = d.sku || '';
+  var diseno = d.diseno || '';
+  if (!diseno && sku) {
+    var cached = inventarioCache.find(function(i){ return String(i.sku) === String(sku); });
+    if (cached && cached.descripcion) diseno = sku + ' — ' + cached.descripcion;
+  }
+
+  var skuTxt  = sku ? '<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:#6D28D9">' + escHtml(sku) + '</span> — ' : '';
+  var descTxt = escHtml((diseno || sku).replace(/^[^\s—]+\s*—\s*/, '').slice(0, 80));
   btn.innerHTML = skuTxt + descTxt;
   wrap.style.display = '';
 }
@@ -810,7 +823,12 @@ function seleccionarSkuLinea() {
   var d = skuEnLineaMap[linea];
   if (!d) return;
   var inp = document.getElementById('fDiseno');
-  inp.value = d.diseno || d.sku || '';
+  var val = d.diseno || '';
+  if (!val && d.sku) {
+    var cached = inventarioCache.find(function(i){ return String(i.sku) === String(d.sku); });
+    val = cached ? d.sku + ' — ' + (cached.descripcion || '') : d.sku;
+  }
+  inp.value = val;
   inp.dataset.sku = d.sku || '';
   document.getElementById('acDrop').style.display = 'none';
 }
@@ -850,8 +868,14 @@ function acGen(query, inputId, dropId) {
   }).slice(0, 7);
   if (!results.length) { drop.style.display = 'none'; return; }
   drop.innerHTML = results.map(function(item){
-    var sku = String(item.sku || ''); var desc = String(item.descripcion || '');
-    return '<div class="ac-item" onmousedown="acGenElegir(\'' + escHtml(sku.replace(/\x27/g,'')) + '\',\'' + escHtml(desc.replace(/\x27/g,'')) + '\',\'' + inputId + '\',\'' + dropId + '\')">'
+    var sku  = String(item.sku || '');
+    var desc = String(item.descripcion || '');
+    var skuE  = escHtml(sku.replace(/\x27/g,''));
+    var descE = escHtml(desc.replace(/\x27/g,''));
+    var handler = 'acGenElegir(\'' + skuE + '\',\'' + descE + '\',\'' + inputId + '\',\'' + dropId + '\')';
+    return '<div class="ac-item"'
+      + ' ontouchstart="event.preventDefault();' + handler + '"'
+      + ' onmousedown="' + handler + '">'
       + '<div class="ac-sku">' + escHtml(sku) + '</div><div class="ac-desc">' + escHtml(desc.slice(0,60)) + '</div></div>';
   }).join('');
   drop.style.display = 'block';
