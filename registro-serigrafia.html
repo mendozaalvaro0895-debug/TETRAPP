@@ -319,7 +319,8 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
         <div id="okCanvasWrap" style="height:220px;position:relative"><canvas id="okChartCanvas"></canvas></div>
       </div>
 
-      <button class="btn-guardar" onclick="volverSeleccion()">👤 Registrar otro operario</button>
+      <button class="btn-guardar" onclick="siguienteLectura()" style="margin-bottom:10px">📋 Siguiente momento</button>
+      <button class="btn-guardar" onclick="volverSeleccion()" style="background:#374151">👤 Registrar otro operario</button>
     </div>
   </div>
 
@@ -931,6 +932,27 @@ async function cargarHoyLinea() {
       .order('created_at', { ascending: true });
     if (r.error) throw r.error;
     lecturasHoyLinea = r.data || [];
+
+    // Si hoy no tiene registros y la fecha es la de hoy, revisar ayer:
+    // la velada se registra después de medianoche y el Inicio quedó en fecha anterior.
+    if (!lecturasHoyLinea.length && fecha === fechaHoy()) {
+      var d = new Date(fecha + 'T12:00:00');
+      d.setDate(d.getDate() - 1);
+      var ayer = d.toISOString().slice(0, 10);
+      var r2 = await db.from('registro_tiros_serig')
+        .select('momento, contador, diseno, sku, hora, operador_codigo, created_at')
+        .eq('area', 'serig').eq('linea_id', linea).eq('fecha', ayer)
+        .order('created_at', { ascending: true });
+      if (!r2.error && r2.data && r2.data.length) {
+        var ultimoAyer = r2.data[r2.data.length - 1].momento;
+        if (ultimoAyer !== 'velada') {
+          // Turno de ayer sin cerrar — continuar en fecha de ayer
+          lecturasHoyLinea = r2.data;
+          document.getElementById('fFecha').value = ayer;
+        }
+      }
+    }
+
     renderHoyLinea();
   } catch(e) {
     console.error('cargarHoyLinea:', e);
@@ -939,6 +961,18 @@ async function cargarHoyLinea() {
   }
   mostrarSkuLinea(linea);
   cargarParosHoy();
+}
+
+// Continúa el turno del mismo operario sin reinicializar el formulario.
+// Se usa desde el botón "Siguiente momento" en scrOk.
+async function siguienteLectura() {
+  if (!opActual) { mostrarPantalla('scrSel'); return; }
+  document.getElementById('fHora').value = new Date().toTimeString().slice(0, 5);
+  document.getElementById('fContador').value = '';
+  document.getElementById('errBox').textContent = '';
+  await cargarHoyLinea();
+  mostrarPantalla('scrForm');
+  window.scrollTo(0, 0);
 }
 
 function renderHoyLinea() {
