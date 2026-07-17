@@ -576,6 +576,26 @@ async function cargarOperarios() {
       });
     } catch(e2) { operadorLineaMap = {}; skuEnLineaMap = {}; }
 
+    // Fallback: SKU asignado a la línea desde solicitudes vigentes
+    // (cubre el caso donde el operador aún no ha enviado ningún registro hoy)
+    try {
+      var rs = await db.from('solicitud_lineas')
+        .select('linea_id, sku, descripcion')
+        .not('linea_id', 'is', null)
+        .not('sku', 'is', null)
+        .neq('sku', '')
+        .order('id', { ascending: false })
+        .limit(50);
+      (rs.data || []).forEach(function(l) {
+        if (l.linea_id && l.sku && !skuEnLineaMap[l.linea_id]) {
+          skuEnLineaMap[l.linea_id] = {
+            sku: String(l.sku),
+            diseno: l.descripcion ? (l.sku + ' — ' + l.descripcion) : String(l.sku)
+          };
+        }
+      });
+    } catch(e3) { /* no critico */ }
+
     // Mapa linea → nombre: solo operarios con rol Impresión, asignados por nombre
     lineaOpNombreMap = {};
     operarios.forEach(function(op) {
@@ -784,14 +804,22 @@ function usarUltimoContador() {
 }
 
 // ── Autocomplete de diseño/SKU ─────────────────────────────────
+var _acTapTime = 0;
+function acElegirD(sku, desc) {
+  var now = Date.now();
+  if (now - _acTapTime < 600) return;
+  _acTapTime = now;
+  acElegir(sku, desc);
+}
+
 function buildAcItem(item) {
   var sku  = String(item.sku || '');
   var desc = String(item.descripcion || '');
   var skuE  = escHtml(sku.replace(/'/g, ''));
   var descE = escHtml(desc.replace(/'/g, ''));
-  var handler = 'acElegir(\'' + skuE + '\',\'' + descE + '\')';
+  var handler = 'acElegirD(\'' + skuE + '\',\'' + descE + '\')';
   return '<div class="ac-item"'
-    + ' ontouchstart="event.preventDefault();' + handler + '"'
+    + ' ontouchstart="' + handler + '"'
     + ' onmousedown="' + handler + '">'
     + '<div class="ac-sku">' + escHtml(sku) + '</div>'
     + '<div class="ac-desc">' + escHtml(desc.slice(0, 60)) + '</div>'
@@ -872,9 +900,9 @@ function acGen(query, inputId, dropId) {
     var desc = String(item.descripcion || '');
     var skuE  = escHtml(sku.replace(/\x27/g,''));
     var descE = escHtml(desc.replace(/\x27/g,''));
-    var handler = 'acGenElegir(\'' + skuE + '\',\'' + descE + '\',\'' + inputId + '\',\'' + dropId + '\')';
+    var handler = 'acGenElegirD(\'' + skuE + '\',\'' + descE + '\',\'' + inputId + '\',\'' + dropId + '\')';
     return '<div class="ac-item"'
-      + ' ontouchstart="event.preventDefault();' + handler + '"'
+      + ' ontouchstart="' + handler + '"'
       + ' onmousedown="' + handler + '">'
       + '<div class="ac-sku">' + escHtml(sku) + '</div><div class="ac-desc">' + escHtml(desc.slice(0,60)) + '</div></div>';
   }).join('');
@@ -885,6 +913,12 @@ function acGenElegir(sku, desc, inputId, dropId) {
   inp.value = sku + ' — ' + desc;
   inp.dataset.sku = sku;
   document.getElementById(dropId).style.display = 'none';
+}
+function acGenElegirD(sku, desc, inputId, dropId) {
+  var now = Date.now();
+  if (now - _acTapTime < 600) return;
+  _acTapTime = now;
+  acGenElegir(sku, desc, inputId, dropId);
 }
 
 // ── Lecturas de hoy en la línea seleccionada ───────────────────
