@@ -87,7 +87,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 /* AUTOCOMPLETE */
 .ac-wrap{position:relative}
 .ac-drop{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #7C3AED;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.15);z-index:999;max-height:220px;overflow-y:auto;margin-top:3px}
-.ac-item{padding:10px 12px;cursor:pointer;border-bottom:1px solid #F0EDE8}
+.ac-item{padding:10px 12px;cursor:pointer;border-bottom:1px solid #F0EDE8;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 .ac-item:last-child{border-bottom:none}
 .ac-item:hover,.ac-item:active{background:#F5F3FF}
 .ac-sku{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:#5B21B6}
@@ -805,25 +805,23 @@ function usarUltimoContador() {
 }
 
 // ── Autocomplete de diseño/SKU ─────────────────────────────────
-var _acTapTime = 0;
-function acElegirD(sku, desc) {
-  var now = Date.now();
-  if (now - _acTapTime < 600) return;
-  _acTapTime = now;
-  acElegir(sku, desc);
-}
-
-function buildAcItem(item) {
-  var sku  = String(item.sku || '');
-  var desc = String(item.descripcion || '');
-  var skuE  = escHtml(sku.replace(/'/g, ''));
-  var descE = escHtml(desc.replace(/'/g, ''));
-  var handler = 'acElegirD(\'' + skuE + '\',\'' + descE + '\')';
-  return '<div class="ac-item"'
-    + ' onpointerdown="' + handler + '">'
-    + '<div class="ac-sku">' + escHtml(sku) + '</div>'
-    + '<div class="ac-desc">' + escHtml(desc.slice(0, 60)) + '</div>'
-    + '</div>';
+// Crea un item del dropdown ligando eventos vía addEventListener (no inline).
+// touchstart con { passive:false } + preventDefault() es la única forma
+// confiable en iOS dentro de contenedores overflow:auto: bloquea el
+// scroll-detection y suprime el click sintético que vendría después.
+// El listener de click actúa como fallback para desktop (nunca se
+// dispara en touch cuando touchstart llama preventDefault).
+function _acMakeItem(sku, desc, onSelect) {
+  var el = document.createElement('div');
+  el.className = 'ac-item';
+  el.innerHTML = '<div class="ac-sku">' + escHtml(sku) + '</div>'
+    + '<div class="ac-desc">' + escHtml(desc.slice(0, 60)) + '</div>';
+  el.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    onSelect(sku, desc);
+  }, { passive: false });
+  el.addEventListener('click', function() { onSelect(sku, desc); });
+  return el;
 }
 
 function mostrarSkuLinea(linea) {
@@ -869,7 +867,10 @@ function acBuscar(query) {
     return ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().indexOf(q) !== -1;
   }).slice(0, 7);
   if (!results.length) { drop.style.display = 'none'; return; }
-  drop.innerHTML = results.map(buildAcItem).join('');
+  drop.innerHTML = '';
+  results.forEach(function(item) {
+    drop.appendChild(_acMakeItem(String(item.sku || ''), String(item.descripcion || ''), acElegir));
+  });
   drop.style.display = 'block';
 }
 
@@ -895,16 +896,13 @@ function acGen(query, inputId, dropId) {
     return ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().indexOf(q) !== -1;
   }).slice(0, 7);
   if (!results.length) { drop.style.display = 'none'; return; }
-  drop.innerHTML = results.map(function(item){
-    var sku  = String(item.sku || '');
-    var desc = String(item.descripcion || '');
-    var skuE  = escHtml(sku.replace(/\x27/g,''));
-    var descE = escHtml(desc.replace(/\x27/g,''));
-    var handler = 'acGenElegirD(\'' + skuE + '\',\'' + descE + '\',\'' + inputId + '\',\'' + dropId + '\')';
-    return '<div class="ac-item"'
-      + ' onpointerdown="' + handler + '">'
-      + '<div class="ac-sku">' + escHtml(sku) + '</div><div class="ac-desc">' + escHtml(desc.slice(0,60)) + '</div></div>';
-  }).join('');
+  drop.innerHTML = '';
+  results.forEach(function(item) {
+    drop.appendChild(_acMakeItem(
+      String(item.sku || ''), String(item.descripcion || ''),
+      function(sku, desc) { acGenElegir(sku, desc, inputId, dropId); }
+    ));
+  });
   drop.style.display = 'block';
 }
 function acGenElegir(sku, desc, inputId, dropId) {
@@ -912,12 +910,6 @@ function acGenElegir(sku, desc, inputId, dropId) {
   inp.value = sku + ' — ' + desc;
   inp.dataset.sku = sku;
   document.getElementById(dropId).style.display = 'none';
-}
-function acGenElegirD(sku, desc, inputId, dropId) {
-  var now = Date.now();
-  if (now - _acTapTime < 600) return;
-  _acTapTime = now;
-  acGenElegir(sku, desc, inputId, dropId);
 }
 
 // ── Lecturas de hoy en la línea seleccionada ───────────────────
