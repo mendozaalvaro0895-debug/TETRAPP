@@ -5909,12 +5909,16 @@ function pfcDelta(registros) {
   return cnts.length >= 2 ? Math.max.apply(null, cnts) - Math.min.apply(null, cnts) : null;
 }
 
-function buildPfcVeladaCard(vld, esMaster) {
+function buildPfcVeladaCard(vld, esMaster, vDelta) {
   var opTag = vld && vld.operador_nombre ? '<span style="float:right;font-weight:600;opacity:.75">👤 ' + escHtml(vld.operador_nombre) + '</span>' : '';
+  var deltaHtml = (vDelta !== null && vDelta !== undefined)
+    ? '<div class="pfc-delta" style="color:var(--serig-m)">▲ ' + vDelta.toLocaleString() + ' tiros (velada)</div>'
+    : '';
   return '<div class="pfc pfc-velada">' +
     '<div class="pfc-hdr">🌙 Velada' + opTag + '</div>' +
     '<div class="pfc-row">' + buildPfcAcciones(vld.id, esMaster) + buildPfcThumb(vld.foto_url) +
     '<span class="pfc-hora">' + pfcFmtHora(vld) + '</span> · <strong>' + (vld.contador||0).toLocaleString() + '</strong></div>' +
+    deltaHtml +
     '</div>';
 }
 
@@ -6007,7 +6011,8 @@ function buildPfcFechaCard(fecha, datos, esMaster, lineaId) {
       (delta !== null ? '<div class="pfc-delta" style="color:' + dc + '">▲ ' + delta.toLocaleString() + ' tiros · ' + pct + '%</div>' : '') +
       '</div>';
   }
-  return mainCard + (vld ? buildPfcVeladaCard(vld, esMaster) : '') +
+  var vDelta = vld ? prodVeladaDelta(datos) : null;
+  return mainCard + (vld ? buildPfcVeladaCard(vld, esMaster, vDelta) : '') +
     buildPfcComentario(fecha, lineaId, datos.comentario, esMaster);
 }
 
@@ -6036,15 +6041,18 @@ var _prodChartProds = {};
 var _prodChartPeriodo = 'mes';
 var _prodChartCtx = null; // { todasFechas, byDL } del último render (para el panel de día)
 
-// Tiros de la velada (turno nocturno) = contador de velada − máximo del turno diurno.
-// El inicio siempre es 0, así que el diurno máximo es el fin (o mediodía). Sin base
-// diurna no hay delta calculable → null.
+// Tiros de la velada. Dos casos especiales:
+// 1) Sin turno diurno base → usar el contador directo de velada.
+// 2) Contador reseteado entre turnos (delta negativo) → usar contador directo.
 function prodVeladaDelta(datos) {
   if (!datos || !datos.velada) return null;
+  var vCnt = datos.velada.contador || 0;
+  if (!vCnt) return null;
   var cnts = (datos.registros || []).map(function(l){ return l.contador || 0; });
-  if (!cnts.length) return null;
-  var d = (datos.velada.contador || 0) - Math.max.apply(null, cnts);
-  return d > 0 ? d : null;
+  if (!cnts.length) return vCnt;
+  var maxDiurno = Math.max.apply(null, cnts);
+  var d = vCnt - maxDiurno;
+  return d > 0 ? d : vCnt;
 }
 
 // Fechas (YYYY-MM-DD) del rango del gráfico según el periodo elegido.
