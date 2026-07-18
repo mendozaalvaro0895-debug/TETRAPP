@@ -5909,16 +5909,16 @@ function pfcDelta(registros) {
   return cnts.length >= 2 ? Math.max.apply(null, cnts) - Math.min.apply(null, cnts) : null;
 }
 
-function buildPfcVeladaCard(vld, esMaster, vDelta) {
+function buildPfcVeladaCard(vld, esMaster) {
   var opTag = vld && vld.operador_nombre ? '<span style="float:right;font-weight:600;opacity:.75">👤 ' + escHtml(vld.operador_nombre) + '</span>' : '';
-  var deltaHtml = (vDelta !== null && vDelta !== undefined)
-    ? '<div class="pfc-delta" style="color:var(--serig-m)">▲ ' + vDelta.toLocaleString() + ' tiros (velada)</div>'
-    : '';
+  var vCnt = vld.contador || 0;
+  var pct  = vCnt && META_TIROS_LINEA ? Math.min(100, Math.round((vCnt / META_TIROS_LINEA) * 100)) : 0;
+  var dc   = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--serig-m)' : 'var(--amber)';
   return '<div class="pfc pfc-velada">' +
     '<div class="pfc-hdr">🌙 Velada' + opTag + '</div>' +
     '<div class="pfc-row">' + buildPfcAcciones(vld.id, esMaster) + buildPfcThumb(vld.foto_url) +
-    '<span class="pfc-hora">' + pfcFmtHora(vld) + '</span> · <strong>' + (vld.contador||0).toLocaleString() + '</strong></div>' +
-    deltaHtml +
+    '<span class="pfc-hora">' + pfcFmtHora(vld) + '</span> · <strong>' + vCnt.toLocaleString() + '</strong></div>' +
+    (vCnt ? '<div class="pfc-delta" style="color:' + dc + '">▲ ' + vCnt.toLocaleString() + ' tiros · ' + pct + '%</div>' : '') +
     '</div>';
 }
 
@@ -6011,8 +6011,7 @@ function buildPfcFechaCard(fecha, datos, esMaster, lineaId) {
       (delta !== null ? '<div class="pfc-delta" style="color:' + dc + '">▲ ' + delta.toLocaleString() + ' tiros · ' + pct + '%</div>' : '') +
       '</div>';
   }
-  var vDelta = vld ? prodVeladaDelta(datos) : null;
-  return mainCard + (vld ? buildPfcVeladaCard(vld, esMaster, vDelta) : '') +
+  return mainCard + (vld ? buildPfcVeladaCard(vld, esMaster) : '') +
     buildPfcComentario(fecha, lineaId, datos.comentario, esMaster);
 }
 
@@ -6041,18 +6040,14 @@ var _prodChartProds = {};
 var _prodChartPeriodo = 'mes';
 var _prodChartCtx = null; // { todasFechas, byDL } del último render (para el panel de día)
 
-// Tiros de la velada. Dos casos especiales:
-// 1) Sin turno diurno base → usar el contador directo de velada.
-// 2) Contador reseteado entre turnos (delta negativo) → usar contador directo.
+// Tiros producidos en la velada.
+// El contador de velada siempre se lee con el odómetro reseteado al inicio
+// del turno nocturno (igual que el diurno empieza en 0), por lo que el
+// valor del contador ES la producción — no se resta el máximo diurno.
 function prodVeladaDelta(datos) {
   if (!datos || !datos.velada) return null;
   var vCnt = datos.velada.contador || 0;
-  if (!vCnt) return null;
-  var cnts = (datos.registros || []).map(function(l){ return l.contador || 0; });
-  if (!cnts.length) return vCnt;
-  var maxDiurno = Math.max.apply(null, cnts);
-  var d = vCnt - maxDiurno;
-  return d > 0 ? d : vCnt;
+  return vCnt > 0 ? vCnt : null;
 }
 
 // Fechas (YYYY-MM-DD) del rango del gráfico según el periodo elegido.
