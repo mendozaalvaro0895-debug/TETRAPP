@@ -480,6 +480,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 @media(max-width:1100px){.hub-grid{grid-template-columns:repeat(2,1fr)}.lineas-grid{grid-template-columns:1fr}.board-lines-row{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:768px){.tabs{gap:0;padding:0 8px;overflow-x:auto;-webkit-overflow-scrolling:touch}.tab{font-size:12px;padding:10px 7px;white-space:nowrap}.tabs-r{flex:none;margin-left:auto}.hub-grid{grid-template-columns:1fr 1fr}.lineas-grid{grid-template-columns:1fr}.board-lines-row{grid-template-columns:repeat(2,1fr)}.proceso-pipeline{gap:3px}.proc-node{font-size:10px;padding:4px 7px}.mov-scroll{padding:10px}#movTabla{overflow-x:auto;-webkit-overflow-scrolling:touch}.mov-table{min-width:640px}.dc-b{overflow-x:auto}.det-scroll{padding:12px}.btn{min-height:38px}}
 @media(max-width:480px){.hub-grid{grid-template-columns:1fr}.board-lines-row{grid-template-columns:1fr}.ph{flex-wrap:wrap;gap:8px}.pg{grid-template-columns:1fr}}
+/* ── Time Picker 12h ── */
+.t12w{display:flex;align-items:center;gap:3px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;width:100%;box-sizing:border-box}
+.t12w select{border:none;background:transparent;font-size:12px;font-family:'DM Mono',monospace;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;color:var(--text);padding:0}
+.t12w .t12h{width:1.8ch}.t12w .t12m{width:2.1ch}.t12w .t12p{width:2.5ch;font-weight:700;color:var(--teal);margin-left:4px}.t12w .t12s{font-weight:600;color:#9CA3AF}
 </style>
 </head>
 <body>
@@ -6885,7 +6889,7 @@ async function editarFlam(id) {
   _editFlamId = id;
 
   document.getElementById('efFecha').value = r.fecha || '';
-  document.getElementById('efHora').value  = (r.hora||'').slice(0,5);
+  set12h('efHora', (r.hora||'').slice(0,5));
   document.getElementById('efCantidad').value = r.cantidad || '';
   document.getElementById('efLinea').value    = r.para_linea || 1;
 
@@ -6948,7 +6952,7 @@ async function guardarEditFlam() {
 
   var payload = {
     fecha:           document.getElementById('efFecha').value,
-    hora:            document.getElementById('efHora').value + ':00',
+    hora:            get12h('efHora') + ':00',
     flameador_codigo: sel.value,
     flameador_nombre: flamOp ? flamOp.nombre : sel.value,
     sku:             sku,
@@ -7315,7 +7319,7 @@ function editarLecturaTiro(id) {
   if (!l) return;
   _editTiroId = id;
   document.getElementById('etFecha').value    = l.fecha || '';
-  document.getElementById('etHora').value     = (l.hora || '').slice(0,5);
+  set12h('etHora', (l.hora || '').slice(0,5));
   document.getElementById('etLinea').value    = String(l.linea_id || 1);
   document.getElementById('etMomento').value  = l.momento || 'inicio';
   document.getElementById('etOperario').value = l.operador_nombre || '';
@@ -7329,7 +7333,7 @@ async function guardarEdicionTiro() {
   if (!_editTiroId) return;
   var contador = parseInt(document.getElementById('etContador').value, 10);
   if (isNaN(contador) || contador < 0) { showToast('⚠️ Contador inválido', '#B83232'); return; }
-  var hora = document.getElementById('etHora').value.trim();
+  var hora = get12h('etHora');
   var payload = {
     fecha:           document.getElementById('etFecha').value,
     linea_id:        parseInt(document.getElementById('etLinea').value, 10),
@@ -8762,6 +8766,9 @@ async function init() {
   document.addEventListener('dragover', function(e) { _dragScrollY = e.clientY; });
 }
 
+function get12h(id){var w=document.getElementById(id);if(!w||w.tagName==='INPUT')return(w?w.value:'')||'';var h=parseInt(w.querySelector('.t12h').value)||12,m=w.querySelector('.t12m').value||'00',ap=w.querySelector('.t12p').value;if(ap==='AM')h=(h===12)?0:h;else h=(h===12)?12:h+12;return(h<10?'0':'')+h+':'+m;}
+function set12h(id,v){var w=document.getElementById(id);if(!w||w.tagName==='INPUT'){if(w)w.value=v||'';return;}if(!v)return;var p=String(v).split(':'),h=parseInt(p[0])||0,m=('00'+(parseInt(p[1])||0)).slice(-2),ap=h<12?'AM':'PM',h12=(h===0)?12:(h>12?h-12:h);w.querySelector('.t12h').value=String(h12);w.querySelector('.t12m').value=m;w.querySelector('.t12p').value=ap;}
+(function(){var hO='',mO='';for(var i=1;i<=12;i++)hO+='<option value="'+i+'">'+i+'</option>';for(var i=0;i<60;i++){var ms=i<10?'0'+i:''+i;mO+='<option value="'+ms+'">'+ms+'</option>';}document.querySelectorAll('input[type="time"]').forEach(function(inp){var id=inp.id,ro=inp.readOnly,dis=ro?' disabled':'',dv=document.createElement('div');dv.className='t12w'+(ro?' t12w-ro':'');dv.id=id;dv.innerHTML='<select class="t12h"'+dis+'>'+hO+'</select><span class="t12s">:</span><select class="t12m"'+dis+'>'+mO+'</select><select class="t12p"'+dis+'><option>AM</option><option>PM</option></select>';inp.parentNode.replaceChild(dv,inp);set12h(id,new Date().toTimeString().slice(0,5));});})();
 init();
 </script>
 

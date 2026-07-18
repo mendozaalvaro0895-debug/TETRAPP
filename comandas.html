@@ -145,6 +145,10 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
   .kpi-v{font-size:15px}
   .welcome{padding:30px 16px}
 }
+/* ── Time Picker 12h ── */
+.t12w{display:flex;align-items:center;gap:3px;background:#fff;border:1.5px solid #C8C6C0;border-radius:8px;padding:8px 10px;width:100%;box-sizing:border-box}
+.t12w select{border:none;background:transparent;font-size:13px;font-family:'DM Mono',monospace;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;color:#0C0C0B;padding:0}
+.t12w .t12h{width:1.8ch}.t12w .t12m{width:2.1ch}.t12w .t12p{width:2.5ch;font-weight:700;color:#1A6B5B;margin-left:4px}.t12w .t12s{font-weight:600;color:#9CA3AF}
 </style>
 </head>
 <body>
@@ -495,8 +499,8 @@ function editarComanda(id) {
   document.getElementById('formTitle').textContent = 'Editar comanda';
   document.getElementById('fCorr').value = c.correlativo || '';
   document.getElementById('fFecha').value = c.fecha || '';
-  document.getElementById('fHoraInicio').value = c.hora_inicio || '06:00';
-  document.getElementById('fHoraCierre').value = c.hora_cierre || '';
+  set12h('fHoraInicio', c.hora_inicio || '06:00');
+  set12h('fHoraCierre', c.hora_cierre || '');
   document.getElementById('fOperario').value = c.operario_id || '';
   document.getElementById('fObs').value = c.observaciones || '';
   document.getElementById('tareasBody').innerHTML = '';
@@ -768,8 +772,8 @@ function nuevaComanda() {
   const fechaActual = new Date().toISOString().split('T')[0];
   document.getElementById('fCorr').value = 'CMD-' + String(comandas.length + 1).padStart(3, '0');
   document.getElementById('fFecha').value = document.getElementById('filtroFecha')?.value || fechaActual;
-  document.getElementById('fHoraInicio').value = '06:00';
-  document.getElementById('fHoraCierre').value = new Date().toTimeString().slice(0, 5);
+  set12h('fHoraInicio', '06:00');
+  set12h('fHoraCierre', new Date().toTimeString().slice(0,5));
   document.getElementById('fOperario').value = '';
   document.getElementById('fObs').value = '';
   document.getElementById('tareasBody').innerHTML = '';
@@ -842,8 +846,8 @@ async function guardar() {
     operario_nombre: op.nombre || '',
     supervisor_id: 'T0',
     supervisor_nombre: 'Heidy',
-    hora_inicio: document.getElementById('fHoraInicio').value,
-    hora_cierre: document.getElementById('fHoraCierre').value,
+    hora_inicio: get12h('fHoraInicio'),
+    hora_cierre: get12h('fHoraCierre'),
     total_unidades: totalPT,
     material_devuelto: recopilarDevolucion(),
     observaciones: document.getElementById('fObs').value,
@@ -903,8 +907,8 @@ async function inicializar() {
   const hoy = new Date().toISOString().split('T')[0];
   if (document.getElementById('filtroFecha')) document.getElementById('filtroFecha').value = hoy;
   if (document.getElementById('fFecha')) document.getElementById('fFecha').value = hoy;
-  if (document.getElementById('fHoraInicio')) document.getElementById('fHoraInicio').value = '06:00';
-  if (document.getElementById('fHoraCierre')) document.getElementById('fHoraCierre').value = new Date().toTimeString().slice(0, 5);
+  set12h('fHoraInicio', '06:00');
+  set12h('fHoraCierre', new Date().toTimeString().slice(0,5));
   
   document.getElementById('btnNuevaComanda')?.addEventListener('click', (e) => { e.preventDefault(); nuevaComanda(); });
   
@@ -927,6 +931,9 @@ async function inicializar() {
   });
 }
 
+function get12h(id){var w=document.getElementById(id);if(!w||w.tagName==='INPUT')return(w?w.value:'')||'';var h=parseInt(w.querySelector('.t12h').value)||12,m=w.querySelector('.t12m').value||'00',ap=w.querySelector('.t12p').value;if(ap==='AM')h=(h===12)?0:h;else h=(h===12)?12:h+12;return(h<10?'0':'')+h+':'+m;}
+function set12h(id,v){var w=document.getElementById(id);if(!w||w.tagName==='INPUT'){if(w)w.value=v||'';return;}if(!v)return;var p=String(v).split(':'),h=parseInt(p[0])||0,m=('00'+(parseInt(p[1])||0)).slice(-2),ap=h<12?'AM':'PM',h12=(h===0)?12:(h>12?h-12:h);w.querySelector('.t12h').value=String(h12);w.querySelector('.t12m').value=m;w.querySelector('.t12p').value=ap;}
+(function(){var hO='',mO='';for(var i=1;i<=12;i++)hO+='<option value="'+i+'">'+i+'</option>';for(var i=0;i<60;i++){var ms=i<10?'0'+i:''+i;mO+='<option value="'+ms+'">'+ms+'</option>';}document.querySelectorAll('input[type="time"]').forEach(function(inp){var id=inp.id,ro=inp.readOnly,dis=ro?' disabled':'',dv=document.createElement('div');dv.className='t12w'+(ro?' t12w-ro':'');dv.id=id;dv.innerHTML='<select class="t12h"'+dis+'>'+hO+'</select><span class="t12s">:</span><select class="t12m"'+dis+'>'+mO+'</select><select class="t12p"'+dis+'><option>AM</option><option>PM</option></select>';inp.parentNode.replaceChild(dv,inp);set12h(id,new Date().toTimeString().slice(0,5));});})();
 inicializar();
 
 function toggleLogoNav(e) {

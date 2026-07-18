@@ -100,6 +100,10 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
   .grid-3{grid-template-columns:1fr 1fr}
   .op-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
 }
+/* ── Time Picker 12h ── */
+.t12w{display:flex;align-items:center;gap:3px;background:#fff;border:1.5px solid #C8C6C0;border-radius:10px;padding:11px 12px;width:100%;box-sizing:border-box}
+.t12w select{border:none;background:transparent;font-size:16px;font-family:'DM Mono',monospace;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;color:#0C0C0B;padding:0}
+.t12w .t12h{width:1.8ch}.t12w .t12m{width:2.1ch}.t12w .t12p{width:2.5ch;font-weight:700;color:#1A6B5B;margin-left:4px}.t12w .t12s{font-weight:600;color:#9CA3AF}
 </style>
 </head>
 <body>
@@ -292,8 +296,8 @@ function elegirOperario(codigo) {
   tareaCount = 0;
   document.getElementById('tareasWrap').innerHTML = '';
   document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
-  document.getElementById('fHoraInicio').value = '06:00';
-  document.getElementById('fHoraCierre').value = '18:00';
+  set12h('fHoraInicio', '06:00');
+  set12h('fHoraCierre', '18:00');
   document.getElementById('fObs').value = '';
   document.getElementById('totalVal').textContent = '0';
   addTarea();
@@ -457,8 +461,8 @@ async function guardarRegistro() {
     operario_nombre: opActual.nombre || '',
     supervisor_id: supervisorActual.codigo || null,
     supervisor_nombre: supervisorActual.nombre || '',
-    hora_inicio: document.getElementById('fHoraInicio').value,
-    hora_cierre: document.getElementById('fHoraCierre').value,
+    hora_inicio: get12h('fHoraInicio'),
+    hora_cierre: get12h('fHoraCierre'),
     total_unidades: totalPT,
     observaciones: document.getElementById('fObs').value
   };
@@ -521,6 +525,9 @@ async function init() {
   await cargarOperarios();
   await cargarInventario();
 }
+function get12h(id){var w=document.getElementById(id);if(!w||w.tagName==='INPUT')return(w?w.value:'')||'';var h=parseInt(w.querySelector('.t12h').value)||12,m=w.querySelector('.t12m').value||'00',ap=w.querySelector('.t12p').value;if(ap==='AM')h=(h===12)?0:h;else h=(h===12)?12:h+12;return(h<10?'0':'')+h+':'+m;}
+function set12h(id,v){var w=document.getElementById(id);if(!w||w.tagName==='INPUT'){if(w)w.value=v||'';return;}if(!v)return;var p=String(v).split(':'),h=parseInt(p[0])||0,m=('00'+(parseInt(p[1])||0)).slice(-2),ap=h<12?'AM':'PM',h12=(h===0)?12:(h>12?h-12:h);w.querySelector('.t12h').value=String(h12);w.querySelector('.t12m').value=m;w.querySelector('.t12p').value=ap;}
+(function(){var hO='',mO='';for(var i=1;i<=12;i++)hO+='<option value="'+i+'">'+i+'</option>';for(var i=0;i<60;i++){var ms=i<10?'0'+i:''+i;mO+='<option value="'+ms+'">'+ms+'</option>';}document.querySelectorAll('input[type="time"]').forEach(function(inp){var id=inp.id,ro=inp.readOnly,dis=ro?' disabled':'',dv=document.createElement('div');dv.className='t12w'+(ro?' t12w-ro':'');dv.id=id;dv.innerHTML='<select class="t12h"'+dis+'>'+hO+'</select><span class="t12s">:</span><select class="t12m"'+dis+'>'+mO+'</select><select class="t12p"'+dis+'><option>AM</option><option>PM</option></select>';inp.parentNode.replaceChild(dv,inp);set12h(id,new Date().toTimeString().slice(0,5));});})();
 init();
 </script>
 </body>

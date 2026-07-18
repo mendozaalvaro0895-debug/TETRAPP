@@ -153,6 +153,11 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
   .momento-tog{grid-template-columns:1fr 1fr}
   .op-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
 }
+/* ── Time Picker 12h ── */
+.t12w{display:flex;align-items:center;gap:3px;background:#fff;border:1.5px solid #C8C6C0;border-radius:10px;padding:11px 12px;width:100%;box-sizing:border-box}
+.t12w select{border:none;background:transparent;font-size:16px;font-family:'DM Mono',monospace;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;color:#0C0C0B;padding:0}
+.t12w .t12h{width:1.8ch}.t12w .t12m{width:2.1ch}.t12w .t12p{width:2.5ch;font-weight:700;color:#7C3AED;margin-left:4px}.t12w .t12s{font-weight:600;color:#9CA3AF}
+.t12w-ro{background:#F7F6F2}.t12w-ro select{color:#6B6B6A}
 </style>
 </head>
 <body>
@@ -719,7 +724,7 @@ function elegirOperario(codigo) {
   document.getElementById('qNombre').textContent = opActual.nombre;
 
   document.getElementById('fFecha').value = fechaHoy();
-  document.getElementById('fHora').value = new Date().toTimeString().slice(0,5);
+  set12h('fHora', new Date().toTimeString().slice(0,5));
   document.getElementById('fLinea').value = lineaParaOp(opActual);
   document.getElementById('fDiseno').value = '';
   document.getElementById('fDiseno').dataset.sku = '';
@@ -776,7 +781,7 @@ function elegirMomento(m) {
   momentoActual = m;
   // Inicio → 06:00 y Mediodía → 12:00 (horas fijas del turno). El resto conserva
   // la hora ya asignada (no se reinicia al cambiar de línea ni al alternar momentos).
-  document.getElementById('fHora').value = new Date().toTimeString().slice(0,5);
+  set12h('fHora', new Date().toTimeString().slice(0,5));
   document.querySelectorAll('#momentoTog .momento-btn').forEach(function(b){
     b.classList.toggle('act', b.dataset.m === m);
   });
@@ -959,7 +964,7 @@ async function cargarHoyLinea() {
 // Se usa desde el botón "Siguiente momento" en scrOk.
 async function siguienteLectura() {
   if (!opActual) { mostrarPantalla('scrSel'); return; }
-  document.getElementById('fHora').value = new Date().toTimeString().slice(0, 5);
+  set12h('fHora', new Date().toTimeString().slice(0,5));
   document.getElementById('fContador').value = '';
   document.getElementById('errBox').textContent = '';
   await cargarHoyLinea();
@@ -1115,8 +1120,8 @@ function editarParo(id) {
   var sel = document.getElementById('epMotivo');
   sel.innerHTML = MOTIVOS_PARO.map(function(m){ return '<option value="' + escHtml(m) + '"' + (m === p.motivo ? ' selected' : '') + '>' + escHtml(m) + '</option>'; }).join('');
   sel.onchange = function(){ toggleEpEmpaque(sel.value === 'EMPAQUE'); };
-  document.getElementById('epInicio').value = (p.hora_inicio || '').slice(0,5);
-  document.getElementById('epFin').value = (p.hora_fin || '').slice(0,5);
+  set12h('epInicio', (p.hora_inicio || '').slice(0,5));
+  set12h('epFin', (p.hora_fin || '').slice(0,5));
   toggleEpEmpaque(p.motivo === 'EMPAQUE');
   var env = document.getElementById('epEnvase');
   env.value = p.empaque_desc || p.empaque_sku || '';
@@ -1128,8 +1133,8 @@ function editarParo(id) {
 async function guardarEdicionParo() {
   if (!_paroEditId) return;
   var motivo = document.getElementById('epMotivo').value;
-  var hi = document.getElementById('epInicio').value;
-  var hf = document.getElementById('epFin').value || null;
+  var hi = get12h('epInicio');
+  var hf = get12h('epFin') || null;
   if (!hi) { showToast('Indica la hora de inicio', '#B83232'); return; }
   var payload = {
     motivo: motivo, hora_inicio: hi, hora_fin: hf,
@@ -1433,7 +1438,7 @@ async function guardarRegistro() {
   if (!diseno) { showToast('⚠️ Indica el diseño que se está imprimiendo', '#B83232'); return; }
   if (!contador && contador !== 0) { showToast('⚠️ Ingresa la lectura del contador', '#B83232'); return; }
 
-  var horaVal = document.getElementById('fHora').value || null;
+  var horaVal = get12h('fHora') || null;
   var payload = {
     fecha: fecha,
     linea_id: linea,
@@ -1561,7 +1566,7 @@ function elegirFlameador(codigo) {
   document.getElementById('qAvFlam').style.background = flamOpActual.color_hex || '#D97706';
   document.getElementById('qNombreFlam').textContent = flamOpActual.nombre;
   document.getElementById('fFlamFecha').value = fechaHoy();
-  document.getElementById('fFlamHora').value = new Date().toTimeString().slice(0,5);
+  set12h('fFlamHora', new Date().toTimeString().slice(0,5));
   document.getElementById('fFlamEnvase').value = '';
   document.getElementById('fFlamEnvase').dataset.sku = '';
   document.getElementById('fFlamCant').value = '';
@@ -1635,7 +1640,7 @@ async function guardarFlameado() {
   var cantidad = parseInt(document.getElementById('fFlamCant').value);
   if (!cantidad || cantidad <= 0) { showToast('⚠️ Ingresa la cantidad de la bolsa', '#B83232'); return; }
 
-  var horaVal = document.getElementById('fFlamHora').value || null;
+  var horaVal = get12h('fFlamHora') || null;
   var payload = {
     fecha: fecha,
     hora: horaVal,
@@ -1682,7 +1687,7 @@ async function guardarFlameado() {
 // bolsa); solo renueva la hora y limpia la cantidad.
 function otraBolsaFlam() {
   if (!flamOpActual) { volverSeleccionFlam(); return; }
-  document.getElementById('fFlamHora').value = new Date().toTimeString().slice(0,5);
+  set12h('fFlamHora', new Date().toTimeString().slice(0,5));
   document.getElementById('fFlamCant').value = '';
   cargarHoyFlam();
   mostrarPantalla('scrFormFlam');
@@ -1745,7 +1750,7 @@ function iniciarFormEmp() {
     ? 'Registro de empaque'
     : 'Registro de empaque · apoyo de ' + (AREA_ORIGEN_LBL[empOpActual.area_origen] || empOpActual.area_origen);
   document.getElementById('fEmpFecha').value = fechaHoy();
-  document.getElementById('fEmpHora').value = new Date().toTimeString().slice(0,5);
+  set12h('fEmpHora', new Date().toTimeString().slice(0,5));
   document.getElementById('fEmpSku').value = '';
   document.getElementById('fEmpSku').dataset.sku = '';
   document.getElementById('fEmpCant').value = '';
@@ -1860,7 +1865,7 @@ async function guardarEmpaque() {
 function otroEmpaque() {
   if (!empOpActual) { volverSeleccionEmp(); return; }
   document.getElementById('fEmpFecha').value = fechaHoy();
-  document.getElementById('fEmpHora').value = new Date().toTimeString().slice(0,5);
+  set12h('fEmpHora', new Date().toTimeString().slice(0,5));
   document.getElementById('fEmpCant').value = '';
   cargarHoyEmp();
   mostrarPantalla('scrFormEmp');
@@ -1884,6 +1889,9 @@ async function init() {
   await cargarOperarios();
   await cargarInventario();
 }
+function get12h(id){var w=document.getElementById(id);if(!w||w.tagName==='INPUT')return(w?w.value:'')||'';var h=parseInt(w.querySelector('.t12h').value)||12,m=w.querySelector('.t12m').value||'00',ap=w.querySelector('.t12p').value;if(ap==='AM')h=(h===12)?0:h;else h=(h===12)?12:h+12;return(h<10?'0':'')+h+':'+m;}
+function set12h(id,v){var w=document.getElementById(id);if(!w||w.tagName==='INPUT'){if(w)w.value=v||'';return;}if(!v)return;var p=String(v).split(':'),h=parseInt(p[0])||0,m=('00'+(parseInt(p[1])||0)).slice(-2),ap=h<12?'AM':'PM',h12=(h===0)?12:(h>12?h-12:h);w.querySelector('.t12h').value=String(h12);w.querySelector('.t12m').value=m;w.querySelector('.t12p').value=ap;}
+(function(){var hO='',mO='';for(var i=1;i<=12;i++)hO+='<option value="'+i+'">'+i+'</option>';for(var i=0;i<60;i++){var ms=i<10?'0'+i:''+i;mO+='<option value="'+ms+'">'+ms+'</option>';}document.querySelectorAll('input[type="time"]').forEach(function(inp){var id=inp.id,ro=inp.readOnly,dis=ro?' disabled':'',dv=document.createElement('div');dv.className='t12w'+(ro?' t12w-ro':'');dv.id=id;dv.innerHTML='<select class="t12h"'+dis+'>'+hO+'</select><span class="t12s">:</span><select class="t12m"'+dis+'>'+mO+'</select><select class="t12p"'+dis+'><option>AM</option><option>PM</option></select>';inp.parentNode.replaceChild(dv,inp);set12h(id,new Date().toTimeString().slice(0,5));});})();
 init();
 </script>
 </body>
