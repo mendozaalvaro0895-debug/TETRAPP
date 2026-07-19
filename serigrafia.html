@@ -753,7 +753,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
               <button type="button" id="flamMetasBtn-mes"    class="pcseg-btn pcseg-active" onclick="flamMetasSetPeriodo('mes')">Mes</button>
             </div>
             <div id="flamMetasChart" style="display:none;margin:4px 0 16px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
-              <canvas id="flamMetasChartCanvas" height="220"></canvas>
+              <div id="flamMetasChartLegend" style="display:flex;flex-wrap:wrap;justify-content:center;padding:2px 0 10px"></div>
+              <div style="position:relative;height:260px"><canvas id="flamMetasChartCanvas"></canvas></div>
             </div>
             <div id="flamMetasTabla"></div>
           </div>
@@ -5837,6 +5838,7 @@ function actualizarKPIsMov(data) {
 
 // ── Productividad: tiros de máquina por línea/diseño ──────────
 var META_TIROS_LINEA = 10000;
+var META_FLAM_DIA    = 1500;
 // Piso de cálculo: los conteos/meta de los KPIs de resumen arrancan desde esta
 // fecha (para que todas las líneas midan sobre la misma base). Las fichas de
 // días previos siguen visibles pero NO suman al acumulado ni al % de meta.
@@ -6497,27 +6499,22 @@ async function renderFlamLineaChart(periodo) {
   });
 }
 
-// ── Gráfico Metas: barras agrupadas flameador × línea ──
-var _flamMetasSepPlugin = {
-  id: 'flamGroupSep',
-  afterDraw: function(chart) {
-    var n = chart.data.labels.length;
-    if (n <= 1) return;
-    var ctx = chart.ctx, xs = chart.scales.x, ys = chart.scales.y;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(160,160,160,0.45)';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([5, 5]);
-    for (var i = 0; i < n - 1; i++) {
-      var xMid = (xs.getPixelForValue(i) + xs.getPixelForValue(i + 1)) / 2;
-      ctx.beginPath();
-      ctx.moveTo(xMid, ys.top);
-      ctx.lineTo(xMid, ys.bottom);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-};
+// ── Gráfico Metas: línea diaria por flameador (mismo formato que Impresión) ──
+var FLAM_COLS = ['#7C3AED','#D97706','#2A8B75','#EF4444','#1D4ED8','#16A34A','#DB2777','#0E7490'];
+
+function buildFlamMetasLegend(datasets) {
+  var el = document.getElementById('flamMetasChartLegend');
+  if (!el) return;
+  var stItem = 'display:flex;align-items:center;gap:5px;font-size:11px;font-family:\'DM Sans\',sans-serif;padding:2px 8px;white-space:nowrap;color:var(--ink)';
+  function svgCircle(c){ return '<svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="'+c+'"/></svg>'; }
+  function svgDash(){ return '<svg width="24" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="24" y2="5" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="5,3"/></svg>'; }
+  var items = datasets.filter(function(d){ return !d._meta; }).map(function(d){
+    return '<div style="'+stItem+'">'+svgCircle(d.borderColor)+'<span>'+escHtml(d.label)+'</span></div>';
+  });
+  var meta = datasets.find(function(d){ return d._meta; });
+  if (meta) items.push('<div style="'+stItem+'">'+svgDash()+'<span>'+escHtml(meta.label)+'</span></div>');
+  el.innerHTML = '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px">'+items.join('')+'</div>';
+}
 
 function renderFlamMetasChart(rows) {
   var container = document.getElementById('flamMetasChart');
@@ -6527,89 +6524,88 @@ function renderFlamMetasChart(rows) {
   if (_flamMetasChart) { _flamMetasChart.destroy(); _flamMetasChart = null; }
   if (!rows || !rows.length) { container.style.display = 'none'; return; }
 
-  // Filtrar según período
   var periodo = _flamMetasPeriodo || 'mes';
-  var hoy = fechaHoy();
-  var filtered = rows;
-  if (periodo === 'dia') {
-    filtered = rows.filter(function(r){ return r.fecha === hoy; });
-  } else if (periodo === 'semana') {
-    var d7 = new Date(hoy + 'T12:00:00');
-    d7.setDate(d7.getDate() - 6);
-    var desde7 = d7.toISOString().slice(0,10);
-    filtered = rows.filter(function(r){ return r.fecha >= desde7 && r.fecha <= hoy; });
-  }
+  var mesStr  = (document.getElementById('prodMes') || {}).value || fechaHoy().slice(0,7);
+  var todasFechas = prodChartFechas(periodo, mesStr);
+  var desde = todasFechas[0], hasta = todasFechas[todasFechas.length - 1];
+  var filtered = rows.filter(function(r){ return r.fecha >= desde && r.fecha <= hasta; });
 
   if (!filtered.length) { container.style.display = 'none'; return; }
 
-  // Meta escalada según período
-  var metaVal;
-  if (periodo === 'dia') {
-    metaVal = META_TIROS_LINEA;
-  } else if (periodo === 'semana') {
-    metaVal = META_TIROS_LINEA * 7;
-  } else {
-    // mes: días del mes seleccionado en el input
-    var mesInput = document.getElementById('prodMes');
-    var mesStr = mesInput ? mesInput.value : hoy.slice(0,7);
-    var partes  = mesStr.split('-');
-    var diasMes = new Date(parseInt(partes[0],10), parseInt(partes[1],10), 0).getDate();
-    metaVal = META_TIROS_LINEA * diasMes;
-  }
-
-  var yMax = Math.ceil(metaVal * 1.5 / 5000) * 5000;
-
-  var periodoLbl = periodo === 'dia' ? 'hoy' : periodo === 'semana' ? '7 días' : 'mes';
-
-  var byOpLinea = {}, opMap = {}, totOp = {};
+  // Agrupar por flameador × fecha
+  var byOpFecha = {}, opNombre = {}, opOrder = [];
   filtered.forEach(function(r) {
     var k = r.flameador_codigo || r.flameador_nombre || '?';
-    opMap[k] = (r.flameador_nombre || k).split(' ')[0];
-    totOp[k] = (totOp[k] || 0) + (r.cantidad || 0);
-    if (!byOpLinea[k]) byOpLinea[k] = {};
-    if (r.para_linea) byOpLinea[k][r.para_linea] = (byOpLinea[k][r.para_linea]||0) + (r.cantidad||0);
+    if (!opNombre[k]) { opNombre[k] = (r.flameador_nombre || k).split(' ')[0]; opOrder.push(k); }
+    if (!byOpFecha[k]) byOpFecha[k] = {};
+    byOpFecha[k][r.fecha] = (byOpFecha[k][r.fecha] || 0) + (r.cantidad || 0);
   });
-  var opKeys = Object.keys(opMap).sort(function(a,b){ return (totOp[b]||0)-(totOp[a]||0); });
-  var labels  = opKeys.map(function(k){ return opMap[k]; });
-  var COLS4   = ['#2A8B75','#D97706','#1D4ED8','#16A34A'];
-  var datasets = LINEAS_PRODUCCION.map(function(ln, i) {
+
+  var labels = todasFechas.map(function(f){
+    return periodo === 'mes' ? String(parseInt(f.slice(8,10),10)) : (f.slice(8,10)+'/'+f.slice(5,7));
+  });
+
+  var datasets = opOrder.map(function(k, i) {
+    var col = FLAM_COLS[i % FLAM_COLS.length];
     return {
-      label: ln.nombre,
-      data: opKeys.map(function(k){ return byOpLinea[k] && byOpLinea[k][ln.id] ? byOpLinea[k][ln.id] : null; }),
-      backgroundColor: COLS4[i]+'CC', borderColor: COLS4[i],
-      borderWidth: 1.5, borderRadius: 4,
-      type: 'bar'
+      label: opNombre[k],
+      data: todasFechas.map(function(f){ var v = byOpFecha[k][f]; return v > 0 ? v : null; }),
+      borderColor: col, backgroundColor: col+'18',
+      borderWidth: 2.5, pointRadius: 5, pointHoverRadius: 7,
+      pointBackgroundColor: col, tension: 0.25, fill: false, spanGaps: false
     };
   });
 
   datasets.push({
-    label: 'Meta ' + periodoLbl + ' (' + metaVal.toLocaleString() + ')',
-    data: labels.map(function(){ return metaVal; }),
-    type: 'line',
-    borderColor: '#EF4444', borderWidth: 1.5, borderDash: [7, 4],
-    pointRadius: 0, fill: false, tension: 0, order: -1
+    label: 'Meta ('+META_FLAM_DIA.toLocaleString()+'/día)',
+    _meta: true,
+    data: todasFechas.map(function(){ return META_FLAM_DIA; }),
+    borderColor: '#EF4444', borderWidth: 1.5, borderDash: [7,4],
+    pointRadius: 0, fill: false, tension: 0
   });
 
+  buildFlamMetasLegend(datasets);
   container.style.display = '';
+
   _flamMetasChart = new Chart(canvas, {
-    type: 'bar',
-    plugins: [_flamMetasSepPlugin],
+    type: 'line',
     data: { labels: labels, datasets: datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      categoryPercentage: 0.65,
+      events: ['click'],
+      interaction: { mode: 'nearest', intersect: true },
       plugins: {
-        legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 14, boxHeight: 14 } },
-        tooltip: { callbacks: {
-          label: function(item) {
-            if (item.dataset.type === 'line') return '  Meta (' + periodoLbl + '): ' + metaVal.toLocaleString();
-            return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' bolsas';
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0C0C0B',
+          titleFont: { family: 'DM Sans', size: 11, weight: '700' },
+          bodyFont:  { family: 'DM Sans', size: 11 },
+          padding: 12,
+          callbacks: {
+            title: function(items){ return todasFechas[items[0].dataIndex]; },
+            label: function(ctx){
+              if (ctx.dataset._meta) return '  Meta: '+META_FLAM_DIA.toLocaleString()+' bolsas/día';
+              var v = ctx.parsed.y;
+              if (v === null || v === undefined) return '';
+              var pct = Math.round((v / META_FLAM_DIA) * 100);
+              var ic = pct >= 100 ? '✅' : pct >= 60 ? '🟡' : '🔴';
+              return '  '+ctx.dataset.label+': '+v.toLocaleString()+' bolsas ('+pct+'%) '+ic;
+            }
           }
-        }}
+        }
       },
       scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 11, weight: '700' } } },
-        y: { beginAtZero: true, max: yMax, ticks: { font: { size: 10 } } }
+        y: {
+          beginAtZero: true,
+          grid: { color: '#ECEAE5' },
+          ticks: { font: { family: 'DM Mono', size: 9 }, maxTicksLimit: 7,
+            callback: function(v){ return v >= 1000 ? (v/1000).toFixed(1)+'k' : v; }
+          }
+        },
+        x: {
+          grid: { color: '#F0EDE8' },
+          ticks: { font: { family: 'DM Sans', size: 10 }, maxRotation: 0, autoSkip: false }
+        }
       }
     }
   });
