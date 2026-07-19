@@ -525,6 +525,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="tab active" id="tab-inicio" onclick="switchTab('inicio')">🏠 Inicio</div>
     <div class="tab" id="tab-movimientos" onclick="switchTab('movimientos')">⬇⬆ Movimientos</div>
     <div class="tab" id="tab-productividad" onclick="switchTab('productividad')">🖨 Productividad</div>
+    <div class="tab" id="tab-trazabilidad" onclick="switchTab('trazabilidad')">🔗 Trazabilidad</div>
     <div class="tab" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
     <div class="tab" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
     <div class="tabs-r">
@@ -780,6 +781,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
       </div>
     </div><!-- /view-productividad -->
+
+    <!-- ══ TRAZABILIDAD ══════════════════════════════════════ -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-trazabilidad">
+      <div class="ph" style="flex-wrap:wrap;gap:8px;justify-content:flex-start">
+        <div><div class="ph-title">Trazabilidad · Serigrafía</div>
+          <div class="ph-sub">Cascada por pedido: Salida → Flameado → Impresión → Empaque → Entrega PT</div>
+        </div>
+        <div class="ph-r" style="gap:6px;align-items:center;margin-left:auto">
+          <button class="btn btn-g btn-sm" onclick="renderTrazabilidad()" title="Actualizar">🔄 Actualizar</button>
+          <input class="fi" type="month" id="trazaMes" style="font-size:12px;padding:6px 10px" onchange="renderTrazabilidad()">
+        </div>
+      </div>
+      <div class="mov-scroll">
+        <div class="kpi-strip" id="trazaKPIs"></div>
+        <div id="trazaTabla"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>
+      </div>
+    </div><!-- /view-trazabilidad -->
 
     <!-- ══ PERSONAL ══════════════════════════════════════════ -->
     <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
@@ -8107,6 +8125,203 @@ function triggerViewEnter(viewId) {
   el.classList.add('view-enter');
 }
 
+// ═══════════════════════════════════════════════════════════════
+// TRAZABILIDAD — cascada por pedido: Salida → Flameado → Impresión
+// → Empaque → Entrega PT. Cruza las 5 etapas y marca el descuadre.
+//
+// Enlaces: Salida/Flameado por solicitud_id (Flameado viejo se INFIERE
+// por sku_base+línea); Impresión/Empaque por SKU impreso; PT por sol_id
+// en entregas_serig. Impresión cuenta TIROS → se normaliza dividiendo
+// entre el factor `tiros` de cada diseño para comparar en envases.
+// ═══════════════════════════════════════════════════════════════
+
+function _trazaDelta(cnts) {
+  if (!cnts.length) return null;
+  if (cnts.length === 1) return cnts[0] > 0 ? cnts[0] : null;
+  return Math.max.apply(null, cnts) - Math.min.apply(null, cnts);
+}
+
+async function renderTrazabilidad() {
+  var cont = document.getElementById('trazaTabla');
+  var kpis = document.getElementById('trazaKPIs');
+  if (!cont) return;
+  var mesStr = (document.getElementById('trazaMes') || {}).value || fechaHoy().slice(0,7);
+  var desde = mesStr + '-01', hasta = mesStr + '-31';
+  cont.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando trazabilidad…</div></div>';
+  if (kpis) kpis.innerHTML = '';
+
+  var flam = [], tiros = [], emp = [], sal = [];
+  try {
+    var res = await Promise.all([
+      db.from('registro_flameado_serig').select('cantidad,sku,para_linea,solicitud_id,fecha,estado').eq('area','serig').neq('estado','rechazado').gte('fecha',desde).lte('fecha',hasta),
+      db.from('registro_tiros_serig').select('linea_id,sku,momento,contador,fecha').eq('area','serig').gte('fecha',desde).lte('fecha',hasta),
+      db.from('registro_empaque_serig').select('sku,cantidad,fecha').eq('area','serig').gte('fecha',desde).lte('fecha',hasta),
+      db.from('movimientos_materiales').select('solicitud_id,sku_original,cantidad,tipo').eq('tipo','salida_bodega')
+    ]);
+    if (res[0].error) throw res[0].error;
+    flam = res[0].data || []; tiros = res[1].data || []; emp = res[2].data || []; sal = res[3].data || [];
+  } catch(e) {
+    cont.innerHTML = '<div class="empty" style="padding:24px;text-align:center;color:var(--red)">⚠️ '+escHtml(e.message||'Error')+'</div>';
+    return;
+  }
+
+  var pedidos = (solicitudes || []).filter(function(s){ return s.area === 'serig'; });
+
+  // ── Salida bodega por pedido ──
+  var salByPed = {};
+  sal.forEach(function(m){ if (m.solicitud_id) salByPed[m.solicitud_id] = (salByPed[m.solicitud_id]||0) + (m.cantidad||0); });
+
+  // ── Flameado: explícito por solicitud_id + inferido por sku_base+línea ──
+  var flamByPed = {};  // solId -> {und, inferido}
+  var inferPool = [];
+  flam.forEach(function(f){
+    if (f.solicitud_id) {
+      if (!flamByPed[f.solicitud_id]) flamByPed[f.solicitud_id] = { und:0, inferido:0 };
+      flamByPed[f.solicitud_id].und += (f.cantidad||0);
+    } else { inferPool.push(f); }
+  });
+  // Cada registro sin destino se asigna a UN solo pedido (evita doble conteo)
+  inferPool.forEach(function(f){
+    var cand = pedidos.find(function(s){
+      return (s.lineas||[]).some(function(l){
+        return l.linea_id === f.para_linea && l.sku_base && String(l.sku_base) === String(f.sku);
+      });
+    });
+    if (cand) {
+      if (!flamByPed[cand.id]) flamByPed[cand.id] = { und:0, inferido:0 };
+      flamByPed[cand.id].und += (f.cantidad||0);
+      flamByPed[cand.id].inferido += (f.cantidad||0);
+    }
+  });
+
+  // ── Impresión: pfcDelta por (línea, fecha), atribuido al SKU dominante ──
+  var grupos = {};
+  tiros.forEach(function(t){
+    var k = t.linea_id + '|' + t.fecha;
+    if (!grupos[k]) grupos[k] = { cnts:[], skuCount:{} };
+    grupos[k].cnts.push(t.contador||0);
+    var s = t.sku || ''; grupos[k].skuCount[s] = (grupos[k].skuCount[s]||0) + 1;
+  });
+  var impBySku = {};  // sku impreso -> tiros
+  Object.keys(grupos).forEach(function(k){
+    var g = grupos[k];
+    var delta = _trazaDelta(g.cnts);
+    if (!delta) return;
+    var domSku = '', max = -1;
+    Object.keys(g.skuCount).forEach(function(s){ if (g.skuCount[s] > max) { max = g.skuCount[s]; domSku = s; } });
+    if (domSku) impBySku[domSku] = (impBySku[domSku]||0) + delta;
+  });
+
+  // ── Empaque por SKU impreso ──
+  var empBySku = {};
+  emp.forEach(function(e){ var s = e.sku || ''; if (s) empBySku[s] = (empBySku[s]||0) + (e.cantidad||0); });
+
+  // ── PT (entregas_serig) por pedido, filtrado al mes ──
+  var ptByPed = {};
+  (entregasCache || []).forEach(function(en){
+    if (en.fecha && (en.fecha < desde || en.fecha > hasta)) return;
+    var conSol = (en.lineas||[]).filter(function(l){ return l.solId; });
+    if (conSol.length) {
+      conSol.forEach(function(l){ ptByPed[l.solId] = (ptByPed[l.solId]||0) + (l.cant||0); });
+    } else if (en.solId) {
+      ptByPed[en.solId] = (ptByPed[en.solId]||0) + (en.cant||0);
+    }
+  });
+
+  // ── Construir filas por pedido (solo con actividad en el mes) ──
+  var filas = [];
+  pedidos.forEach(function(s){
+    var printSkus = {}, baseSkus = {}, lineaIds = {}, tirosFactor = {};
+    (s.lineas||[]).forEach(function(l){
+      if (l.sku) { printSkus[l.sku] = true; tirosFactor[l.sku] = l.tiros || 1; }
+      if (l.sku_base) baseSkus[l.sku_base] = true;
+      if (l.linea_id) lineaIds[l.linea_id] = true;
+    });
+    var pk = Object.keys(printSkus);
+    var salida = salByPed[s.id] || 0;
+    var fl = flamByPed[s.id] || { und:0, inferido:0 };
+    var impTiros = 0, impEnv = 0;
+    pk.forEach(function(sku){
+      var tt = impBySku[sku] || 0;
+      impTiros += tt;
+      impEnv += tt / (tirosFactor[sku] || 1);
+    });
+    var empaque = pk.reduce(function(a,sku){ return a + (empBySku[sku]||0); }, 0);
+    var pt = ptByPed[s.id] || 0;
+    var suma = salida + fl.und + impTiros + empaque + pt;
+    if (suma <= 0) return;
+    filas.push({
+      s: s, printSkus: pk, baseSkus: Object.keys(baseSkus), lineaIds: Object.keys(lineaIds),
+      salida: salida, flam: fl.und, flamInfer: fl.inferido,
+      impTiros: impTiros, impEnv: Math.round(impEnv), empaque: empaque, pt: pt
+    });
+  });
+
+  filas.sort(function(a,b){ return b.flam - a.flam; });
+
+  // KPIs globales
+  var totFlam = filas.reduce(function(a,f){ return a+f.flam; }, 0);
+  var totPt   = filas.reduce(function(a,f){ return a+f.pt; }, 0);
+  var mermaGlobal = totFlam > 0 ? Math.round(((totFlam - totPt) / totFlam) * 100) : 0;
+  if (kpis) kpis.innerHTML =
+    '<div class="kpi"><div class="kpi-v">'+filas.length+'</div><div class="kpi-l">Pedidos con flujo</div></div>'+
+    '<div class="kpi"><div class="kpi-v">'+totFlam.toLocaleString()+'</div><div class="kpi-l">Flameado (env)</div></div>'+
+    '<div class="kpi"><div class="kpi-v">'+totPt.toLocaleString()+'</div><div class="kpi-l">Entregado PT (und)</div></div>'+
+    '<div class="kpi"><div class="kpi-v">'+mermaGlobal+'%</div><div class="kpi-l">Merma aparente</div></div>';
+
+  if (!filas.length) {
+    cont.innerHTML = '<div class="empty" style="padding:30px;text-align:center;color:var(--gray-l)">Sin flujo registrado en este mes</div>';
+    return;
+  }
+  cont.innerHTML = filas.map(buildTrazaCard).join('');
+}
+
+function buildTrazaFila(icono, label, valor, unidad, extra, tenue) {
+  var col = tenue ? '#94a3b8' : 'var(--ink)';
+  var val = valor > 0 ? valor.toLocaleString() : '—';
+  return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;color:'+col+'">'
+    + '<span style="width:20px;text-align:center;flex-shrink:0">'+icono+'</span>'
+    + '<span style="flex:1">'+escHtml(label)+'</span>'
+    + '<strong style="font-family:\'DM Mono\',monospace">'+val+'</strong>'
+    + '<span style="width:44px;font-size:11px;color:#94a3b8;flex-shrink:0">'+escHtml(unidad)+'</span>'
+    + '<span style="width:120px;font-size:11px;color:#94a3b8;text-align:right;flex-shrink:0">'+(extra||'')+'</span>'
+    + '</div>';
+}
+
+function buildTrazaCard(f) {
+  var s = f.s;
+  var merma = f.flam > 0 ? Math.round(((f.flam - f.pt) / f.flam) * 100) : null;
+  var mermaCol = merma === null ? '#94a3b8' : merma <= 5 ? 'var(--green)' : merma <= 15 ? 'var(--amber)' : 'var(--red)';
+  var mermaTxt = merma === null ? 'sin dato'
+    : (f.flam - f.pt).toLocaleString() + ' und (' + merma + '%)';
+
+  var head = '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">'
+    + '<div><div style="font-weight:800;font-size:14px;color:var(--ink)">'+escHtml(s.id_display||'—')+' · '+escHtml(s.cliente||'')+'</div>'
+    + '<div style="font-size:11px;color:#94a3b8;margin-top:2px">Impreso: '+escHtml(f.printSkus.join(', ')||'—')
+    + '  ·  Base: '+escHtml(f.baseSkus.join(', ')||'—')
+    + '  ·  Línea '+escHtml(f.lineaIds.join('/')||'?')+'</div></div>'
+    + '<span style="font-size:11px;color:#94a3b8;flex-shrink:0">'+escHtml(s.estado||'')+'</span>'
+    + '</div>';
+
+  var impExtra = f.impEnv > 0 ? '≈ ' + f.impEnv.toLocaleString() + ' env' : '';
+  var flamExtra = f.flamInfer > 0 ? f.flamInfer.toLocaleString() + ' inferido' : '';
+
+  var body = ''
+    + buildTrazaFila('📤', 'Salida bodega', f.salida, 'env', 'info', true)
+    + buildTrazaFila('🔥', 'Flameado', f.flam, 'env', flamExtra, false)
+    + buildTrazaFila('🖨', 'Impresión', f.impTiros, 'tiros', impExtra, false)
+    + buildTrazaFila('📦', 'Empaque', f.empaque, 'und', '', false)
+    + buildTrazaFila('✅', 'Entrega PT', f.pt, 'und', '', false);
+
+  var foot = '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);font-size:12px">'
+    + '<span style="color:#64748b">Merma aparente (Flameado → PT)</span>'
+    + '<strong style="color:'+mermaCol+'">'+mermaTxt+'</strong>'
+    + '</div>';
+
+  return '<div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px">'
+    + head + body + foot + '</div>';
+}
+
 function switchTab(tab) {
   document.querySelectorAll('.view').forEach(function(v) { v.style.display = 'none'; });
   document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
@@ -8135,6 +8350,12 @@ function switchTab(tab) {
     if (mEl && !mEl.value) mEl.value = fechaHoy().slice(0,7);
     prodSuscribirRealtime();
     renderProdActual();
+  } else if (tab === 'trazabilidad') {
+    var v = document.getElementById('view-trazabilidad');
+    if (v) { v.style.display = 'flex'; triggerViewEnter('view-trazabilidad'); }
+    var tmEl = document.getElementById('trazaMes');
+    if (tmEl && !tmEl.value) tmEl.value = fechaHoy().slice(0,7);
+    renderTrazabilidad();
   } else if (tab === 'dash') {
     window.location.href = 'dashboard.html';
   } else if (WIP_TABS.indexOf(tab) !== -1) {
