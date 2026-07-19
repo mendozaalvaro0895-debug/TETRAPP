@@ -6451,7 +6451,7 @@ async function renderFlamLineaChart(periodo) {
   try {
     var rq = await db.from('registro_flameado_serig')
       .select('fecha,para_linea,cantidad')
-      .eq('area','serig').gte('fecha',desde).lte('fecha',hasta);
+      .eq('area','serig').neq('estado','rechazado').gte('fecha',desde).lte('fecha',hasta);
     if (rq.error) throw rq.error;
     raws = rq.data || [];
   } catch(e) { console.warn('renderFlamLineaChart:', e); }
@@ -6694,7 +6694,7 @@ async function renderFlameado() {
   var rows = [];
   try {
     var r = await db.from('registro_flameado_serig')
-      .select('*').eq('area','serig')
+      .select('*').eq('area','serig').neq('estado','rechazado')
       .gte('fecha', desde).lte('fecha', hasta)
       .order('fecha', { ascending: false })
       .order('para_linea', { ascending: true })
