@@ -723,6 +723,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
             <button type="button" id="prodChartBtn-mes"    class="pcseg-btn pcseg-active" onclick="prodSetChartPeriodo('mes')">Mes</button>
           </div>
           <div id="prodChart" style="display:none;margin:4px 0 8px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:16px 16px 10px">
+            <div id="prodChartLegend" style="display:flex;flex-wrap:wrap;justify-content:center;padding:2px 0 10px"></div>
             <canvas id="prodChartCanvas" height="260"></canvas>
           </div>
           <div id="prodTabla"><div class="loading"><div class="spinner"></div><div>Cargando...</div></div></div>
@@ -6044,6 +6045,33 @@ var _prodChartProds = {};
 var _prodChartPeriodo = 'mes';
 var _prodChartCtx = null; // { todasFechas, byDL } del último render (para el panel de día)
 
+function buildProdLegend(datasets) {
+  var el = document.getElementById('prodChartLegend');
+  if (!el) return;
+  var normales = datasets.filter(function(d){ return d._kind === 'dia'; });
+  var veladas  = datasets.filter(function(d){ return d._kind === 'velada'; });
+  var meta     = datasets.find(function(d){ return d._kind === 'meta'; });
+  var stCol = 'display:flex;flex-direction:column;align-items:flex-start;padding:2px 10px';
+  var stItem = 'display:flex;align-items:center;gap:5px;font-size:11px;font-family:\'DM Sans\',sans-serif;padding:2px 0;white-space:nowrap;color:var(--ink)';
+  function svgCircle(c){ return '<svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="'+c+'"/></svg>'; }
+  function svgDiamond(c){ return '<svg width="10" height="10" style="flex-shrink:0"><rect x="1.5" y="1.5" width="7" height="7" fill="#fff" stroke="'+c+'" stroke-width="1.5" transform="rotate(45 5 5)"/></svg>'; }
+  function svgDash(){ return '<svg width="24" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="24" y2="5" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="5,3"/></svg>'; }
+  var cols = normales.map(function(d, i) {
+    var v = veladas[i]; var col = d.borderColor;
+    return '<div style="'+stCol+'">'
+      + '<div style="'+stItem+'">'+svgCircle(col)+'<span>'+escHtml(d.label)+'</span></div>'
+      + (v ? '<div style="'+stItem+'">'+svgDiamond(col)+'<span>'+escHtml(v.label)+'</span></div>'
+           : '<div style="'+stItem+';visibility:hidden">—</div>')
+      + '</div>';
+  });
+  if (meta) {
+    cols.push('<div style="'+stCol+'">'
+      + '<div style="'+stItem+'">'+svgDash()+'<span>'+escHtml(meta.label)+'</span></div>'
+      + '</div>');
+  }
+  el.innerHTML = cols.join('');
+}
+
 // Tiros producidos en la velada.
 // El contador de velada siempre se lee con el odómetro reseteado al inicio
 // del turno nocturno (igual que el diurno empieza en 0), por lo que el
@@ -6206,6 +6234,7 @@ async function renderProductividadChart(periodo) {
   container.style.display = '';
   _prodChartCtx = { todasFechas: todasFechas, byDL: byDL };
 
+  buildProdLegend(datasets);
   _prodChart = new Chart(canvas, {
     type: 'line',
     data: { labels: labels, datasets: datasets },
@@ -6224,10 +6253,7 @@ async function renderProductividadChart(periodo) {
         prodShowDayPanel(idx, evt.native);
       },
       plugins: {
-        legend: {
-          position: 'top',
-          labels: { font: { family: 'DM Sans', size: 11 }, usePointStyle: true, boxWidth: 8, padding: 12 }
-        },
+        legend: { display: false },
         tooltip: {
           backgroundColor: '#0C0C0B',
           titleFont: { family: 'DM Sans', size: 11, weight: '700' },
