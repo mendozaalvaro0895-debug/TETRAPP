@@ -567,7 +567,7 @@ async function cargarOperarios() {
     // Es la fuente más confiable del trabajo ACTUAL por línea.
     try {
       var rs = await db.from('solicitud_lineas')
-        .select('linea_id, sku, descripcion')
+        .select('linea_id, sku, descripcion, sku_base')
         .not('linea_id', 'is', null)
         .not('sku', 'is', null)
         .neq('sku', '')
@@ -577,7 +577,8 @@ async function cargarOperarios() {
         if (l.linea_id && l.sku && !skuEnLineaMap[l.linea_id]) {
           skuEnLineaMap[l.linea_id] = {
             sku: String(l.sku),
-            diseno: l.descripcion ? (l.sku + ' — ' + l.descripcion) : String(l.sku)
+            diseno: l.descripcion ? (l.sku + ' — ' + l.descripcion) : String(l.sku),
+            sku_base: l.sku_base || ''
           };
         }
       });
@@ -1533,27 +1534,29 @@ function mostrarChipsEnvaseFlam() {
   var hayAlguno = false;
   LINEAS_OK.forEach(function(ln) {
     var d = skuEnLineaMap[ln];
-    if (!d || (!d.diseno && !d.sku)) return;
+    if (!d || !d.sku_base) return;
     hayAlguno = true;
-    // d.diseno ya tiene formato "SKU — descripcion"; no anteponer sku de nuevo
-    var lbl = escHtml(d.diseno || d.sku);
-    chips += '<button type="button" onclick="usarEnvaseLinea(' + ln + ')" ' +
+    var skuB = String(d.sku_base);
+    var cachedBase = inventarioCache.find(function(x){ return String(x.sku) === skuB; });
+    var lbl = skuB + (cachedBase && cachedBase.descripcion ? ' — ' + cachedBase.descripcion : '');
+    chips += '<button type="button" onclick="usarEnvaseBase(' + ln + ')" ' +
       'style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit;text-align:left;width:100%">' +
       '<span style="color:#7C3AED;font-weight:800;font-size:11px;margin-right:8px">L' + ln + '</span>' +
-      '<strong style="color:#e2e8f0">' + lbl + '</strong>' +
+      '<strong style="color:#e2e8f0">' + escHtml(lbl.slice(0, 50)) + '</strong>' +
     '</button>';
   });
-  container.innerHTML = '<span style="color:#64748b;font-size:11px;width:100%;margin-bottom:4px">Envase activo por línea:</span>' + chips;
+  container.innerHTML = '<span style="color:#64748b;font-size:11px;width:100%;margin-bottom:4px">Envase base por línea:</span>' + chips;
   container.style.display = hayAlguno ? 'flex' : 'none';
 }
 
-function usarEnvaseLinea(ln) {
+function usarEnvaseBase(ln) {
   var d = skuEnLineaMap[ln];
-  if (!d) return;
+  if (!d || !d.sku_base) return;
+  var skuB = String(d.sku_base);
+  var cachedBase = inventarioCache.find(function(x){ return String(x.sku) === skuB; });
   var inp = document.getElementById('fFlamEnvase');
-  // d.diseno ya empieza con el sku, skuDescDe lo parsea correctamente
-  inp.value = d.diseno || d.sku;
-  inp.dataset.sku = d.sku || '';
+  inp.value = skuB + (cachedBase && cachedBase.descripcion ? ' — ' + cachedBase.descripcion : '');
+  inp.dataset.sku = skuB;
   document.getElementById('flamDrop').style.display = 'none';
   inp.focus();
 }
