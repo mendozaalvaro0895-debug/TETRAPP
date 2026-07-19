@@ -7697,9 +7697,14 @@ function rellenarDesdeRequi() {
     agregarLineaMovS();
   }
 
+  var detalle = p.productos.map(function(pr){
+    var inv = (inventarioCache || []).find(function(x){ return String(x.sku) === String(pr.sku); });
+    var d = (inv && inv.descripcion) ? (pr.sku + ' — ' + inv.descripcion) : pr.sku;
+    return d + ' × ' + (pr.cant || 0).toLocaleString();
+  }).join(' · ');
   var resumen = '✓ ' + (p.requi ? 'Requi ' + p.requi : 'Sin requi')
     + (p.fecha ? ' · ' + p.fecha : '')
-    + ' · ' + p.productos.length + ' producto(s). Completá Cliente y Pedido.';
+    + (detalle ? ' · ' + detalle : '');
   if (p.warnings.length) resumen += '  ⚠️ ' + p.warnings.join('; ');
   if (msg) { msg.style.color = p.warnings.length ? '#b45309' : '#059669'; msg.textContent = resumen; }
 }
@@ -7832,38 +7837,20 @@ async function guardarEditSalida() {
   refreshKPIs();
 }
 
-function agregarLineaMovS(descVal, skuVal, cantVal, clienteVal, solIdVal) {
+function agregarLineaMovS(descVal, skuVal, cantVal) {
   var container = document.getElementById('movSLineasContainer');
   if (!container) return;
   var i = movSLineasCount++;
   movSSkus[i] = skuVal || null;
-  if (!clienteVal && i > 0) {
-    var prevCli = document.getElementById('movSCli-' + (i - 1));
-    if (prevCli) clienteVal = prevCli.value;
-  }
-  var bSty = 'padding:5px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box;width:100%';
+  var bSty = 'padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box;width:100%';
   var row = document.createElement('div');
   row.id = 'movSLinea-' + i;
-  row.style.cssText = 'display:grid;grid-template-columns:150px 185px 1fr 90px 28px;gap:5px;margin-bottom:5px;align-items:start';
-  var cliOpts = movSClientesOptsHtml.replace(
-    'value="' + escHtml(clienteVal || '') + '"',
-    'value="' + escHtml(clienteVal || '') + '" selected'
-  );
-  if (solIdVal) movSSolIds[i] = solIdVal;
-  var solLabel = '';
-  if (solIdVal) {
-    var solPre = solicitudes.find(function(x) { return x.id === solIdVal; });
-    if (solPre) solLabel = (solPre.id_display || '') + ' · ' + (solPre.cliente || '').slice(0, 14);
-  }
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 110px 28px;gap:6px;margin-bottom:5px;align-items:start';
+  // Cliente y Pedido ya no se piden aquí: la atribución se hace en Flameado.
   row.innerHTML =
-    '<select id="movSCli-' + i + '" style="' + bSty + ';background:var(--card);color:var(--text)">' + cliOpts + '</select>' +
     '<div class="sku-wrap-s">' +
-      '<input id="movSSol-' + i + '" placeholder="🔗 Buscar pedido…" autocomplete="off" style="' + bSty + '" value="' + escHtml(solLabel) + '"' +
-        ' oninput="movSSolInput(this.value,' + i + ')" onfocus="movSSolInput(this.value,' + i + ')" onblur="setTimeout(function(){cerrarMovSSolDrop(' + i + ')},200)">' +
-      '<div class="sku-drop-s" id="movS-sol-drop-' + i + '"></div>' +
-    '</div>' +
-    '<div class="sku-wrap-s">' +
-      '<input id="movSDesc-' + i + '" placeholder="🔍 SKU o descripción…" autocomplete="off" style="' + bSty + '"' +
+      '<input id="movSDesc-' + i + '" placeholder="🔍 SKU o descripción del envase base…" autocomplete="off" style="' + bSty + '"' +
+        ' title="' + escHtml(descVal || '') + '"' +
         ' oninput="movSDescInput(this.value,' + i + ')" onblur="setTimeout(function(){cerrarMovSSkuDrop(' + i + ')},200)"' +
         ' value="' + escHtml(descVal || '') + '">' +
       '<div class="sku-drop-s" id="movS-sku-drop-' + i + '"></div>' +
@@ -7908,7 +7895,11 @@ function seleccionarMovSDesc(sku, i) {
   var item = inventarioCache.find(function(x) { return x.sku === sku; });
   movSSkus[i] = sku;
   var inp = document.getElementById('movSDesc-' + i);
-  if (inp) inp.value = (item ? item.descripcion : '') || sku;
+  if (inp) {
+    var full = (item && item.descripcion) ? (sku + ' — ' + item.descripcion) : sku;
+    inp.value = full;
+    inp.title = full;
+  }
   cerrarMovSSkuDrop(i);
 }
 
@@ -7977,19 +7968,13 @@ async function confirmarMovSerig() {
       var cv = cInp ? parseInt(cInp.value || '0') : 0;
       if (!dv)           { showToast('⚠️ Completá el SKU del producto ' + (ri + 1), '#92400e'); if (dInp) dInp.focus(); return; }
       if (!cv || cv < 1) { showToast('⚠️ Cantidad inválida en producto ' + (ri + 1), '#92400e'); if (cInp) cInp.focus(); return; }
-      lineas.push({ sku: movSSkus[idx] || dv, cant: cv, solId: movSSolIds[idx] || null });
+      lineas.push({ sku: movSSkus[idx] || dv, cant: cv });
     }
   }
   if (!lineas.length) { showToast('⚠️ Agregá al menos un producto', '#92400e'); return; }
 
-  var sinPedido = lineas.filter(function(l) { return !l.solId; });
-  if (sinPedido.length > 0) {
-    var msg = sinPedido.length === lineas.length
-      ? '⚠️ Ninguna línea tiene pedido vinculado. La salida no aparecerá en las fichas del tablero. ¿Continuar de todas formas?'
-      : '⚠️ ' + sinPedido.length + ' línea(s) sin pedido vinculado. Esas filas no aparecerán en las fichas del tablero. ¿Continuar de todas formas?';
-    if (!window.confirm(msg)) return;
-  }
-
+  // Cliente/Pedido ya no se asignan en la Salida: la atribución la hace
+  // Flameado (solicitud_id/destino). La salida entra como material base.
   var obsFinal = 'FECHA:' + fecha + (nota ? ' | ' + nota : '');
   var btn = document.getElementById('movSBtnOk');
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
@@ -7997,7 +7982,7 @@ async function confirmarMovSerig() {
   try {
     var payload = lineas.map(function(l) {
       return {
-        solicitud_id:  l.solId,
+        solicitud_id:  null,
         sku_original:  l.sku,
         cantidad:      l.cant,
         tipo:          'salida_bodega',
@@ -8260,9 +8245,11 @@ async function renderTrazabilidad() {
 
   var pedidos = (solicitudes || []).filter(function(s){ return s.area === 'serig'; });
 
-  // ── Salida bodega por pedido ──
-  var salByPed = {};
-  sal.forEach(function(m){ if (m.solicitud_id) salByPed[m.solicitud_id] = (salByPed[m.solicitud_id]||0) + (m.cantidad||0); });
+  // ── Salida bodega por SKU BASE ──
+  // Ya no se vincula a pedido en la captura (es material base compartido,
+  // p.ej. roll-on). Se cruza por sku_original = sku_base del pedido.
+  var salByBase = {};
+  sal.forEach(function(m){ var sk = m.sku_original; if (sk) salByBase[sk] = (salByBase[sk]||0) + (m.cantidad||0); });
 
   // ── Flameado: explícito por solicitud_id + inferido por sku_base+línea ──
   var flamByPed = {};  // solId -> {und, inferido}
@@ -8331,7 +8318,7 @@ async function renderTrazabilidad() {
       if (l.linea_id) lineaIds[l.linea_id] = true;
     });
     var pk = Object.keys(printSkus);
-    var salida = salByPed[s.id] || 0;
+    var salida = Object.keys(baseSkus).reduce(function(a,bs){ return a + (salByBase[bs]||0); }, 0);
     var fl = flamByPed[s.id] || { und:0, inferido:0 };
     var impTiros = 0, impEnv = 0;
     pk.forEach(function(sku){
