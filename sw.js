@@ -1,7 +1,7 @@
-// TETRAPP — Service Worker v1
+// TETRAPP — Service Worker v2
 // Estrategia: red primero, caché como respaldo (solo GET del propio
 // dominio). Las peticiones a Supabase NUNCA se tocan ni se cachean.
-var CACHE = 'tetrapp-v1';
+var CACHE = 'tetrapp-v2';
 
 self.addEventListener('install', function (e) {
   self.skipWaiting();
