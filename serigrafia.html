@@ -6631,10 +6631,13 @@ function buildFlamLineaCard(fecha, datos) {
       html += '<div class="pfc-cambio">🔄 '+escHtml(envase.slice(0,45))+'</div>';
     }
     if (envase) prevEnvase = envase;
-    html += '<div class="pfc-row">'+
-      '<span class="pfc-hora">'+escHtml((r.hora||'').slice(0,5))+'</span> · '+
-      '<span style="color:var(--amber);font-weight:700">'+escHtml((envase||'—').slice(0,28))+'</span>'+
-      ' · <strong>'+(r.cantidad||0).toLocaleString()+'</strong>'+
+    html += '<div class="pfc-row" style="justify-content:space-between;align-items:center">'+
+      '<span>'+
+        '<span class="pfc-hora">'+escHtml((r.hora||'').slice(0,5))+'</span> · '+
+        '<span style="color:var(--amber);font-weight:700">'+escHtml((envase||'—').slice(0,24))+'</span>'+
+        ' · <strong>'+(r.cantidad||0).toLocaleString()+'</strong>'+
+      '</span>'+
+      '<button onclick="editarFlam(\''+r.id+'\')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:1px 6px;font-size:11px;cursor:pointer;color:var(--ink);flex-shrink:0;margin-left:4px">✏️</button>'+
     '</div>';
   });
   html += '</div>';
@@ -6799,6 +6802,11 @@ function _renderFlamMetas(rows) {
 var _editFlamId = null;
 var _flamHistCache = [];
 
+function _flamSyncViews() {
+  renderFlamHistorial();
+  if (flamSubActual !== 'historial') renderFlameado();
+}
+
 function renderFlamHistorial() {
   var tabla = document.getElementById('flamHistTabla');
   if (!tabla) return;
@@ -6897,23 +6905,23 @@ async function aprobarTodosPendientesFlam() {
     .update({ estado: 'aprobado', revisado_por: TETRA.nombre })
     .in('id', ids);
   if (upd.error) { alert('Error: ' + upd.error.message); return; }
-  renderFlamHistorial();
+  _flamSyncViews();
 }
 
 async function aprobarFlam(id) {
   var upd = await db.from('registro_flameado_serig').update({ estado:'aprobado', revisado_por: TETRA.nombre }).eq('id', id);
   if (upd.error) { alert('Error: '+upd.error.message); return; }
-  renderFlamHistorial();
+  _flamSyncViews();
 }
 async function rechazarFlam(id) {
   var upd = await db.from('registro_flameado_serig').update({ estado:'rechazado', revisado_por: TETRA.nombre }).eq('id', id);
   if (upd.error) { alert('Error: '+upd.error.message); return; }
-  renderFlamHistorial();
+  _flamSyncViews();
 }
 async function pendienteFlam(id) {
   var upd = await db.from('registro_flameado_serig').update({ estado:'pendiente', revisado_por: null }).eq('id', id);
   if (upd.error) { alert('Error: '+upd.error.message); return; }
-  renderFlamHistorial();
+  _flamSyncViews();
 }
 
 async function editarFlam(id) {
@@ -7015,7 +7023,7 @@ async function guardarEditFlam() {
   }
   document.getElementById('overlayEditFlam').style.display = 'none';
   _editFlamId = null;
-  renderFlamHistorial();
+  _flamSyncViews();
 }
 
 // ── EMPAQUE helpers ───────────────────────────────────────────
