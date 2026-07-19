@@ -383,6 +383,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
         <div class="momento-btn" data-l="3" onclick="elegirParaLinea(3)">Línea 3</div>
         <div class="momento-btn" data-l="4" onclick="elegirParaLinea(4)">Línea 4</div>
       </div>
+      <div id="flamDestino" style="display:none;margin-top:8px;padding:8px 12px;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:8px;font-size:12px;color:#3730A3"></div>
     </div>
 
     <div class="hoy-box" id="hoyBoxFlam" style="display:none">
@@ -567,7 +568,7 @@ async function cargarOperarios() {
     // Es la fuente más confiable del trabajo ACTUAL por línea.
     try {
       var rs = await db.from('solicitud_lineas')
-        .select('linea_id, sku, descripcion, sku_base')
+        .select('linea_id, sku, descripcion, sku_base, solicitud_id')
         .not('linea_id', 'is', null)
         .not('sku', 'is', null)
         .neq('sku', '')
@@ -578,7 +579,9 @@ async function cargarOperarios() {
           skuEnLineaMap[l.linea_id] = {
             sku: String(l.sku),
             diseno: l.descripcion ? (l.sku + ' — ' + l.descripcion) : String(l.sku),
-            sku_base: l.sku_base || ''
+            sku_base: l.sku_base || '',
+            descripcion: l.descripcion || '',
+            solicitud_id: l.solicitud_id || null
           };
         }
       });
@@ -1592,6 +1595,19 @@ function elegirParaLinea(n) {
   document.querySelectorAll('#paraTog .momento-btn').forEach(function(b){
     b.classList.toggle('act', parseInt(b.dataset.l) === n);
   });
+  actualizarDestinoFlam();
+}
+
+// Muestra a qué SKU impreso / diseño va dirigido el envase base
+// según la línea elegida (dato que se guarda en la fila de flameado).
+function actualizarDestinoFlam() {
+  var box = document.getElementById('flamDestino');
+  if (!box) return;
+  var d = skuEnLineaMap[paraLinea];
+  if (!d || !d.sku) { box.style.display = 'none'; return; }
+  var lbl = d.descripcion ? (d.sku + ' — ' + d.descripcion) : d.sku;
+  box.innerHTML = '→ Destino: <strong>' + escHtml(lbl.slice(0, 60)) + '</strong>';
+  box.style.display = 'block';
 }
 
 async function cargarHoyFlam() {
@@ -1644,6 +1660,9 @@ async function guardarFlameado() {
   if (!cantidad || cantidad <= 0) { showToast('⚠️ Ingresa la cantidad de la bolsa', '#B83232'); return; }
 
   var horaVal = get12h('fFlamHora') || null;
+  // Destino: a qué pedido / SKU impreso va dirigido este envase base.
+  // Se deriva de la línea elegida (pedido vigente en esa línea).
+  var destino = skuEnLineaMap[paraLinea] || {};
   var payload = {
     fecha: fecha,
     hora: horaVal,
@@ -1653,6 +1672,9 @@ async function guardarFlameado() {
     descripcion: envase.descripcion,
     cantidad: cantidad,
     para_linea: paraLinea,
+    solicitud_id: destino.solicitud_id || null,
+    destino_sku: destino.sku || null,
+    destino_descripcion: destino.descripcion || null,
     area: 'serig'
   };
 
