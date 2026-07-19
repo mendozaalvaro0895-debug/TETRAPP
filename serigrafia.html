@@ -5911,7 +5911,9 @@ function buildPfcRegistroRow(l, esMaster) {
 
 function pfcDelta(registros) {
   var cnts = (registros || []).map(function(l){ return l.contador || 0; });
-  return cnts.length >= 2 ? Math.max.apply(null, cnts) - Math.min.apply(null, cnts) : null;
+  if (cnts.length === 0) return null;
+  if (cnts.length === 1) return cnts[0] > 0 ? cnts[0] : null;
+  return Math.max.apply(null, cnts) - Math.min.apply(null, cnts);
 }
 
 function buildPfcVeladaCard(vld, esMaster) {
