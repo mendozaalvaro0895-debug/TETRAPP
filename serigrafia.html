@@ -6488,7 +6488,7 @@ async function renderFlamLineaChart(periodo) {
       plugins: {
         legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 14, boxHeight: 14 } },
         tooltip: { callbacks: {
-          label: function(item) { return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' bolsas'; }
+          label: function(item) { return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' unidades'; }
         }}
       },
       scales: {
@@ -6584,12 +6584,12 @@ function renderFlamMetasChart(rows) {
           callbacks: {
             title: function(items){ return todasFechas[items[0].dataIndex]; },
             label: function(ctx){
-              if (ctx.dataset._meta) return '  Meta: '+META_FLAM_DIA.toLocaleString()+' bolsas/día';
+              if (ctx.dataset._meta) return '  Meta: '+META_FLAM_DIA.toLocaleString()+' unidades/día';
               var v = ctx.parsed.y;
               if (v === null || v === undefined) return '';
               var pct = Math.round((v / META_FLAM_DIA) * 100);
               var ic = pct >= 100 ? '✅' : pct >= 60 ? '🟡' : '🔴';
-              return '  '+ctx.dataset.label+': '+v.toLocaleString()+' bolsas ('+pct+'%) '+ic;
+              return '  '+ctx.dataset.label+': '+v.toLocaleString()+' unidades ('+pct+'%) '+ic;
             }
           }
         }
@@ -6784,7 +6784,7 @@ function _renderFlamMetas(rows) {
 
   var totalBolsas = rows.reduce(function(s,l){ return s+(l.cantidad||0); }, 0);
   if (kpis) kpis.innerHTML =
-    '<div class="kpi"><div class="kpi-v">'+totalBolsas.toLocaleString()+'</div><div class="kpi-l">Total bolsas</div></div>'+
+    '<div class="kpi"><div class="kpi-v">'+totalBolsas.toLocaleString()+'</div><div class="kpi-l">Total unidades</div></div>'+
     '<div class="kpi"><div class="kpi-v">'+opOrder.length+'</div><div class="kpi-l">Flameadores</div></div>'+
     opOrder.map(function(k) {
       var op = byOp[k];
