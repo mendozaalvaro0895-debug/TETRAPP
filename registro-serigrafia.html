@@ -313,15 +313,32 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
       <div class="exito-corr" id="okCorr">—</div>
       <div class="exito-det" id="okDet">—</div>
 
-      <div id="okChartBox" style="display:none;margin:8px 0 24px;text-align:left">
-        <div id="okChartTitle" style="font-size:12px;font-weight:800;color:#5B21B6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;text-align:center">📊 Productividad · ¿Qué línea va ganando?</div>
-        <div style="display:flex;gap:6px;justify-content:center;margin-bottom:14px">
+      <div id="okChartBox" style="display:none;margin:8px 0 20px">
+        <!-- ── Gauge de progreso diario ── -->
+        <div style="text-align:center;padding:16px 16px 14px;background:#F5F3FF;border-radius:16px;margin-bottom:14px">
+          <div style="font-size:10px;font-weight:800;color:#5B21B6;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">
+            📊 Tu progreso hoy · Línea <span id="okGaugeLin">—</span>
+          </div>
+          <div id="okGaugeBigNum" style="font-family:'DM Mono',monospace;font-size:48px;font-weight:900;color:#1A1A19;line-height:1">0</div>
+          <div style="font-size:11px;color:#9A9A98;margin-bottom:14px">tiros registrados hoy</div>
+          <div style="background:rgba(91,33,182,.15);border-radius:12px;height:22px;overflow:hidden;margin:0 4px">
+            <div id="okProgressBar" style="height:100%;background:#5B21B6;border-radius:12px;width:0%;transition:width 1.3s cubic-bezier(.4,0,.2,1)"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:#9A9A98;margin:5px 4px 0">
+            <span>0</span>
+            <span id="okPctLbl" style="font-weight:800;color:#5B21B6;font-size:12px">0%</span>
+            <span id="okMetaLbl">Meta: 10,000</span>
+          </div>
+        </div>
+        <!-- ── Competencia entre líneas ── -->
+        <div style="font-size:10px;font-weight:800;color:#5B21B6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;text-align:center">¿Qué línea va ganando?</div>
+        <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px">
           <button type="button" id="okBtn-dia"    class="okseg-btn" onclick="okSetPeriodo('dia')">Día</button>
           <button type="button" id="okBtn-semana" class="okseg-btn" onclick="okSetPeriodo('semana')">Semana</button>
           <button type="button" id="okBtn-mes"    class="okseg-btn okseg-active" onclick="okSetPeriodo('mes')">Mes</button>
         </div>
-        <div id="okRank" style="margin-bottom:14px"></div>
-        <div id="okCanvasWrap" style="height:220px;position:relative"><canvas id="okChartCanvas"></canvas></div>
+        <div id="okRank" style="margin-bottom:12px"></div>
+        <div id="okCanvasWrap" style="height:160px;position:relative"><canvas id="okChartCanvas"></canvas></div>
       </div>
 
       <button class="btn-guardar" onclick="siguienteLectura()" style="margin-bottom:10px">📋 Siguiente momento</button>
@@ -1351,15 +1368,7 @@ async function renderOkChart(lineaActual, periodo) {
     lecturas = r.data || [];
   } catch(e) { console.warn('renderOkChart:', e); }
 
-  if (!lecturas.length) {
-    if (_okChart) { _okChart.destroy(); _okChart = null; }
-    if (wrap) wrap.style.display = 'none';
-    if (rankEl) rankEl.innerHTML = '<div style="text-align:center;color:#9A9A98;font-size:12px;padding:14px">Sin registros ' + (OK_PERIODO_TXT[periodo] || 'del mes') + '</div>';
-    return;
-  }
-  if (wrap) wrap.style.display = 'block';
-
-  // byDL[fecha][linea] = {inicio,mediodia,fin}
+  // byDL[fecha][linea] = {inicio,mediodia,fin}  — siempre construir para el gauge
   var byDL = {};
   lecturas.forEach(function(l) {
     if (l.momento === 'velada') return;
@@ -1368,6 +1377,32 @@ async function renderOkChart(lineaActual, periodo) {
     var slot = byDL[l.fecha][l.linea_id];
     if (slot[l.momento] === undefined) slot[l.momento] = l.contador || 0;
   });
+
+  // ── Actualizar gauge (siempre muestra HOY, independiente del periodo) ──
+  var hoyKey   = fechaHoy();
+  var tirosHoy = okDeltaLinea(byDL[hoyKey] && byDL[hoyKey][lineaActual]) || 0;
+  var metaGauge = META_LINEA || 10000;
+  var pctDec   = Math.min(1, metaGauge > 0 ? tirosHoy / metaGauge : 0);
+  var pctPct   = Math.round(pctDec * 100);
+  var gaugeColor = pctDec >= 1 ? '#16A34A' : pctDec >= 0.5 ? '#D97706' : '#5B21B6';
+  var gBigNum = document.getElementById('okGaugeBigNum');
+  if (gBigNum) gBigNum.textContent = tirosHoy.toLocaleString();
+  var gBar = document.getElementById('okProgressBar');
+  if (gBar) { gBar.style.background = gaugeColor; gBar.style.width = '0%'; setTimeout(function(){ gBar.style.width = Math.min(100, pctPct) + '%'; }, 80); }
+  var gPct = document.getElementById('okPctLbl');
+  if (gPct) { gPct.textContent = pctPct + '%'; gPct.style.color = gaugeColor; }
+  var gMeta = document.getElementById('okMetaLbl');
+  if (gMeta) gMeta.textContent = 'Meta: ' + metaGauge.toLocaleString();
+  var gLin = document.getElementById('okGaugeLin');
+  if (gLin) gLin.textContent = lineaActual;
+
+  if (!lecturas.length) {
+    if (_okChart) { _okChart.destroy(); _okChart = null; }
+    if (wrap) wrap.style.display = 'none';
+    if (rankEl) rankEl.innerHTML = '<div style="text-align:center;color:#9A9A98;font-size:12px;padding:14px">Sin registros ' + (OK_PERIODO_TXT[periodo] || 'del mes') + '</div>';
+    return;
+  }
+  if (wrap) wrap.style.display = 'block';
 
   // Etiquetas del eje X según periodo
   var labels = fechas.map(function(f){
