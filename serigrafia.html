@@ -8404,52 +8404,82 @@ function buildTrazaCard(f) {
     + head + body + foot + '</div>';
 }
 
+// Normaliza un nombre de cliente para agrupar (mayúsculas, sin espacios extra)
+function _cliKey(nombre) {
+  return String(nombre || 'Sin cliente').trim().replace(/\s+/g, ' ').toUpperCase();
+}
+
 function renderClienteAvance() {
   var cont = document.getElementById('trazaClientes');
   if (!cont) return;
 
-  // Totales pedidos por cliente (todos los pedidos serig, sin filtro de mes)
-  var pedido = {};
-  (solicitudes || []).filter(function(s){ return s.area === 'serig'; }).forEach(function(s) {
-    var cli = (s.cliente || 'Sin cliente').trim();
-    pedido[cli] = (pedido[cli]||0) + (s.cant||0);
-  });
+  var peds = (solicitudes || []).filter(function(s){ return s.area === 'serig'; });
 
-  // Totales entregados por cliente (todas las entregas, sin filtro de mes)
-  var entregado = {};
+  // Mapa solId → cliente canónico del pedido (fuente de verdad para atribuir entregas)
+  var solCliente = {};
+  peds.forEach(function(s) { if (s.id) solCliente[s.id] = s.cliente || 'Sin cliente'; });
+
+  // clave normalizada → { nombre (canónico para mostrar), pedido, entregado }
+  var acc = {};
+  function bucket(nombre) {
+    var k = _cliKey(nombre);
+    if (!acc[k]) acc[k] = { nombre: (nombre || 'Sin cliente').trim(), pedido: 0, entregado: 0 };
+    return acc[k];
+  }
+
+  // Totales pedidos por cliente (todos los pedidos serig)
+  peds.forEach(function(s) { bucket(s.cliente).pedido += (s.cant || 0); });
+
+  // Totales entregados: atribuir SIEMPRE al cliente del pedido vinculado (solId),
+  // no al texto libre de la entrega (que a veces trae nombres compuestos como
+  // "INCOGUA / DAROSA"). Solo cae al texto libre si la entrega no tiene solId.
   (entregasCache || []).forEach(function(e) {
-    var cli = (e.cliente || 'Sin cliente').trim();
-    var total = (e.lineas && e.lineas.length)
-      ? e.lineas.reduce(function(s,l){ return s + (l.cant||0); }, 0)
-      : (e.cant||0);
-    entregado[cli] = (entregado[cli]||0) + total;
+    var lns = (e.lineas && e.lineas.length) ? e.lineas : null;
+    if (lns) {
+      lns.forEach(function(l) {
+        var cli = (l.solId && solCliente[l.solId]) ? solCliente[l.solId] : (e.cliente || 'Sin cliente');
+        bucket(cli).entregado += (l.cant || 0);
+      });
+    } else {
+      var cli2 = (e.solId && solCliente[e.solId]) ? solCliente[e.solId] : (e.cliente || 'Sin cliente');
+      bucket(cli2).entregado += (e.cant || 0);
+    }
   });
 
-  var clientesSet = {};
-  Object.keys(pedido).concat(Object.keys(entregado)).forEach(function(k){ clientesSet[k] = true; });
-  var clientes = Object.keys(clientesSet).sort();
-  if (!clientes.length) { cont.innerHTML = ''; return; }
+  var claves = Object.keys(acc);
+  if (!claves.length) { cont.innerHTML = ''; return; }
 
-  var filas = clientes.map(function(cli) {
-    var ped = pedido[cli] || 0;
-    var ent = entregado[cli] || 0;
-    var pct = ped > 0 ? Math.min(100, Math.round((ent / ped) * 100)) : 0;
+  // Ordenar por lo que falta (mayor pendiente arriba), luego por nombre
+  var filasArr = claves.map(function(k){ return acc[k]; }).sort(function(a, b) {
+    var fa = Math.max(0, a.pedido - a.entregado), fb = Math.max(0, b.pedido - b.entregado);
+    if (fb !== fa) return fb - fa;
+    return a.nombre.localeCompare(b.nombre);
+  });
+
+  var filas = filasArr.map(function(r) {
+    var ped = r.pedido, ent = r.entregado;
+    var tienePed = ped > 0;
+    var pct = tienePed ? Math.min(100, Math.round((ent / ped) * 100)) : null;
     var falta = Math.max(0, ped - ent);
-    var barColor = pct >= 100 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--teal)';
+    var barColor = !tienePed ? 'var(--gray-l)' : pct >= 100 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--teal)';
+    var pctTxt = tienePed ? pct + '%' : '—';
+    var barW = tienePed ? pct : 0;
+    var nota;
+    if (!tienePed) nota = '<div style="font-size:10px;color:var(--amber);margin-top:2px">⚠ Entregas sin pedido registrado</div>';
+    else if (falta > 0) nota = '<div style="font-size:10px;color:var(--gray-l);margin-top:2px">Falta: '+falta.toLocaleString()+' und</div>';
+    else nota = '<div style="font-size:10px;color:var(--green);margin-top:2px">✓ Completado</div>';
     return '<div style="margin-bottom:6px">'
       + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px">'
-      + '<span style="font-size:13px;font-weight:700;color:var(--ink)">'+escHtml(cli)+'</span>'
+      + '<span style="font-size:13px;font-weight:700;color:var(--ink)">'+escHtml(r.nombre)+'</span>'
       + '<span style="font-size:11px;font-family:var(--mono);white-space:nowrap">'
       + '<span style="color:var(--gray)">'+ent.toLocaleString()+' / '+ped.toLocaleString()+'</span>'
-      + ' &nbsp;<strong style="color:'+barColor+'">'+pct+'%</strong>'
+      + ' &nbsp;<strong style="color:'+barColor+'">'+pctTxt+'</strong>'
       + '</span>'
       + '</div>'
       + '<div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">'
-      + '<div style="height:100%;width:'+pct+'%;background:'+barColor+';border-radius:4px;transition:width .6s ease"></div>'
+      + '<div style="height:100%;width:'+barW+'%;background:'+barColor+';border-radius:4px;transition:width .6s ease"></div>'
       + '</div>'
-      + (falta > 0
-        ? '<div style="font-size:10px;color:var(--gray-l);margin-top:2px">Falta: '+falta.toLocaleString()+' und</div>'
-        : '<div style="font-size:10px;color:var(--green);margin-top:2px">✓ Completado</div>')
+      + nota
       + '</div>';
   });
 
