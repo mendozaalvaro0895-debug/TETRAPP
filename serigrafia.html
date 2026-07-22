@@ -1580,6 +1580,7 @@ var posDiaCache    = {};         // { codigo: mtx_pos } posiciones guardadas del
 var posEstadoCache = {};         // { codigo: estado } estados del día (para no pisarlos al guardar posición)
 var ausentesDia    = {};         // { codigo: true } ausentes del día activo (getMatriz los saca de su celda)
 var posColDispo    = null;       // null = aún no se sabe; false si la tabla matriz_dia_serig no existe
+var posAvisoMostrado = false;    // para avisar una sola vez si no se pueden guardar posiciones
 var MATRIZ_DIA_TABLE = 'matriz_dia_serig'; // posición de matriz por día — SEPARADA de asistencia
 var ausentesHoy    = {};         // { codigo: true } — se carga al init y al marcar asistencia
 var asistHoyCache  = {};         // { codigo: estado } — refleja la fecha del widget
@@ -1898,10 +1899,21 @@ async function cargarPosDia(fecha) {
   if (fecha === fechaHoy()) ausentesHoy = Object.assign({}, ausentesDia);
 }
 
+// Avisa UNA sola vez si las posiciones no se pueden guardar (tabla/permiso)
+function avisarSinTablaPos(e) {
+  if (posAvisoMostrado) return;
+  posAvisoMostrado = true;
+  var txt = (e && ((e.message || '') + (e.details || ''))) || '';
+  var msg = /permission|denied|rls|row-level|policy/i.test(txt)
+    ? '⚠️ Sin permiso para guardar posiciones · revisá RLS/grant de matriz_dia_serig'
+    : '⚠️ Las posiciones por día no se guardan aún · corré sql/matriz_dia_serig_v1.sql en Supabase';
+  showToast(msg, '#B45309');
+}
+
 // Guarda (upsert) la posición del operador para el día activo. Auto-guardado.
+// SIEMPRE intenta escribir: si falla, avisa (no se pierde el cambio en silencio).
 async function guardarPosDia(codigo, posKey) {
   posDiaCache[codigo] = posKey;
-  if (posColDispo === false) return; // sin tabla matriz_dia_serig: no persistir (evita romper)
   try {
     var r = await db.from(MATRIZ_DIA_TABLE).upsert({
       fecha: posFecha,
@@ -1913,12 +1925,8 @@ async function guardarPosDia(codigo, posKey) {
     if (r.error) throw r.error;
     posColDispo = true;
   } catch(e) {
-    if (/matriz_dia_serig|relation|does not exist|column|schema cache/i.test((e.message || '') + (e.details || ''))) {
-      posColDispo = false;
-      showToast('⚠️ Posiciones por día aún no se guardan · ejecuta sql/matriz_dia_serig_v1.sql', '#B45309');
-    } else {
-      showToast('Error al guardar posición: ' + (e.message || e), '#B83232');
-    }
+    posColDispo = false;
+    avisarSinTablaPos(e);
   }
 }
 
@@ -1926,7 +1934,6 @@ async function guardarPosDia(codigo, posKey) {
 // snapshot queda guardado en su posición actual, para que el día se conserve "tal como
 // está" aunque después cambie la asignación normal. Solo toca posiciones (no asistencia).
 async function freezeDiaCompleto() {
-  if (posColDispo === false) return;
   var lista = (personalData && personalData.serig ? personalData.serig : [])
     .filter(function(p) {
       return p.activo && !ausentesDia[p.codigo]
@@ -1943,7 +1950,8 @@ async function freezeDiaCompleto() {
     if (r.error) throw r.error;
     posColDispo = true;
   } catch(e) {
-    if (/matriz_dia_serig|relation|does not exist|schema cache/i.test((e.message || '') + (e.details || ''))) posColDispo = false;
+    posColDispo = false;
+    avisarSinTablaPos(e);
   }
 }
 
