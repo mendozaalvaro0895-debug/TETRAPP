@@ -332,6 +332,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .asist-grid-table{border-collapse:collapse;width:max-content;min-width:100%}
 .ag-th{position:sticky;top:0;background:var(--card);z-index:2;padding:4px 2px;text-align:center;font-size:9px;font-weight:700;color:var(--gray-l);border-bottom:1.5px solid var(--border);min-width:26px;width:26px}
 .ag-th.hoy{color:var(--serig-m);font-weight:900}
+.ag-col-sel{box-shadow:inset 2px 0 0 var(--serig-m),inset -2px 0 0 var(--serig-m)}
+th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box-shadow:inset 2px 0 0 var(--serig-m),inset -2px 0 0 var(--serig-m),inset 0 2px 0 var(--serig-m)}
 .ag-th-name{position:sticky;left:0;z-index:3;min-width:130px;text-align:left;padding:4px 10px;background:var(--card);border-right:1.5px solid var(--border)}
 .ag-td-name{position:sticky;left:0;z-index:1;background:var(--bg);padding:5px 10px;font-size:11px;font-weight:600;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1.5px solid var(--border);min-width:130px}
 .ag-cell{width:26px;min-width:26px;height:26px;text-align:center;vertical-align:middle;cursor:pointer;border:1px solid rgba(0,0,0,.06);font-size:9px;font-weight:700;transition:opacity .1s;user-select:none;position:relative}
@@ -593,6 +595,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
         </div>
 
+        <!-- Barra de día compartida — afecta Personal+Roles y Asistencia Mensual -->
+        <div id="diaBar" style="display:flex;align-items:center;gap:8px;padding:8px 0 6px;flex-wrap:wrap">
+          <button class="asist-nav-arr" onclick="navegarDia(-1)" title="Día anterior" id="diaBtnPrev">‹</button>
+          <span id="diaBarLbl" style="font-size:13px;font-weight:700;color:var(--serig-m);min-width:200px;text-align:center;text-transform:capitalize"></span>
+          <button class="asist-nav-arr" onclick="navegarDia(1)" title="Día siguiente" id="diaBtnNext">›</button>
+          <button class="btn btn-g btn-xs" onclick="irDiaHoy()" id="diaBtnHoy" style="margin-left:4px">Hoy</button>
+          <input type="date" id="diaBarInput" class="fi" style="font-size:11px;padding:4px 8px;width:130px" onchange="irDiaEspecifico(this.value)">
+          <span id="diaBarModoLbl" style="font-size:10px;font-weight:700;color:#94a3b8;margin-left:4px"></span>
+        </div>
+
         <!-- Layout 50/50: izq = Personal + Producción · der = Asistencia -->
         <div class="inicio-dos-col">
           <div class="inicio-col-izq">
@@ -600,7 +612,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
               <div class="mtx-hdr" style="justify-content:space-between">
                 <div>
                   <span class="mtx-hdr-title">👥 Personal y Roles</span>
-                  <span class="mtx-hdr-sub">Arrastra cada operador a su rol y línea</span>
+                  <span class="mtx-hdr-sub" id="matrizSub">Arrastra cada operador a su rol y línea</span>
                 </div>
               </div>
               <div id="matrizPersonal"></div>
@@ -1563,6 +1575,11 @@ var LINEA_NOCTURNO = 5;
 var MATRIZ_KEY = 'tetra_matriz_serig';
 var matrizDragCodigo = null;
 var matrizDbDisponible = null;   // null = aún no se sabe; true/false una vez detectado
+var posFecha       = fechaHoy(); // día activo: matriz por día + resaltado de columna
+var posDiaCache    = {};         // { codigo: mtx_pos } posiciones guardadas del día activo
+var posEstadoCache = {};         // { codigo: estado } estados del día (para no pisarlos al guardar posición)
+var ausentesDia    = {};         // { codigo: true } ausentes del día activo (getMatriz los saca de su celda)
+var posColDispo    = null;       // null = aún no se sabe; false si la columna mtx_pos no existe
 var ausentesHoy    = {};         // { codigo: true } — se carga al init y al marcar asistencia
 var asistHoyCache  = {};         // { codigo: estado } — refleja la fecha del widget
 var asistHoyRolCache = {};       // { codigo: rol }   — rol guardado para la fecha del widget
@@ -1624,6 +1641,12 @@ async function toggleAsistHoy(codigo, estado) {
     if (asistHoyFecha === hoy) {
       if (nuevoEstado === 'ausente') ausentesHoy[codigo] = true;
       else delete ausentesHoy[codigo];
+    }
+    // Sincronizar la matriz del día activo (posFecha === asistHoyFecha)
+    if (asistHoyFecha === posFecha) {
+      if (nuevoEstado === 'ausente') ausentesDia[codigo] = true;
+      else delete ausentesDia[codigo];
+      posEstadoCache[codigo] = nuevoEstado;
       renderMatriz();
     }
     faltasMesCache = null;
@@ -1659,17 +1682,28 @@ function lineaDeOperador(p) {
 // La matriz se DERIVA del rol (proceso_hab) — fuente única — más la línea.
 // Así matriz y página Personal siempre coinciden.
 // Los ausentes de hoy (ausentesHoy) quedan fuera de sus celdas de rol.
+// Posición NORMAL de un operador (mtx_rol o proceso_hab + línea) — el default
+// cuando el día activo no tiene un snapshot guardado para esa persona.
+function posKeyDefault(p) {
+  // mtx_rol tiene precedencia: permite a Prestados tener rol de matriz sin perder su estado
+  var mr = p.mtx_rol || PROCESO_TO_MATRIZ[(p.proceso_hab || '').trim()];
+  if (!mr) return null;
+  return esRolGlobal(mr) ? mr : mr + '-' + (lineaDeOperador(p) || 1);
+}
+
+// La matriz se arma por DÍA (posFecha): si hay snapshot guardado ese día para el
+// operador, manda ese; si no, cae a su posición NORMAL. Los ausentes del día salen.
 function getMatriz() {
   var m = {};
   var lista = (personalData && personalData.serig ? personalData.serig : [])
-    .filter(function(p) { return p.activo && !ausentesHoy[p.codigo]; });
+    .filter(function(p) { return p.activo && !ausentesDia[p.codigo]; });
   lista.forEach(function(p) {
-    // mtx_rol tiene precedencia: permite a Prestados tener rol de matriz sin perder su estado
-    var mr = p.mtx_rol || PROCESO_TO_MATRIZ[(p.proceso_hab || '').trim()];
-    if (!mr) return;
-    var key = esRolGlobal(mr) ? mr : mr + '-' + (lineaDeOperador(p) || 1);
-    if (!m[key]) m[key] = [];
-    m[key].push(p.codigo);
+    var pos = Object.prototype.hasOwnProperty.call(posDiaCache, p.codigo)
+      ? posDiaCache[p.codigo]   // snapshot del día ('' = pool explícito ese día)
+      : posKeyDefault(p);       // sin snapshot → posición normal
+    if (!pos) return;
+    if (!m[pos]) m[pos] = [];
+    m[pos].push(p.codigo);
   });
   return m;
 }
@@ -1700,9 +1734,9 @@ function renderMatriz() {
   Object.keys(m).forEach(function(k) { (m[k] || []).forEach(function(c) { asignados[c] = true; }); });
   var lista = (personalData && personalData.serig ? personalData.serig : []).filter(function(p) { return p.activo; });
 
-  var poolChips = lista.filter(function(p) { return !asignados[p.codigo] && !ausentesHoy[p.codigo]; })
+  var poolChips = lista.filter(function(p) { return !asignados[p.codigo] && !ausentesDia[p.codigo]; })
                        .map(function(p) { return matrizChip(p.codigo); }).join('');
-  var ausenteChips = lista.filter(function(p) { return !!ausentesHoy[p.codigo]; })
+  var ausenteChips = lista.filter(function(p) { return !!ausentesDia[p.codigo]; })
                           .map(function(p) {
                             var ini = (p.nombre || '?')[0].toUpperCase();
                             var nombre = (p.nombre || '').split(' ')[0];
@@ -1768,60 +1802,191 @@ async function matrizDrop(e, targetKey) {
   var codigo = matrizDragCodigo;
   matrizDragCodigo = null;
 
-  // Resolver rol/línea destino
+  var posKeyStore = (targetKey === 'pool') ? '' : targetKey;
+
+  // Resolver rol/línea destino (para la actualización permanente de HOY)
   var rol = null, linea = null;
   if (targetKey !== 'pool') {
     if (esRolGlobal(targetKey)) { rol = targetKey; }
-    else { var p = targetKey.split('-'); rol = p[0]; linea = parseInt(p[1]) || null; }
+    else { var pp = targetKey.split('-'); rol = pp[0]; linea = parseInt(pp[1]) || null; }
   }
-  // Rol equivalente para la página Personal (proceso_hab)
-  var procHab = rol ? (MATRIZ_TO_PROCESO[rol] || '') : '';
   var lista = personalData && personalData.serig ? personalData.serig : [];
   var op = lista.find(function(x) { return x.codigo === codigo; });
-  // Los Prestados conservan su proceso_hab='Prestado'; solo cambia mtx_rol/mtx_linea
-  var esPrestado = op && (op.proceso_hab || '') === 'Prestado';
-  var procHabFinal = esPrestado ? 'Prestado' : procHab;
-  var colorFinal = colorParaEstado(op ? !!op.activo : true, procHabFinal);
 
-  // Guardar en Supabase para que sincronice entre equipos (un operador = una celda)
-  if (matrizDbDisponible !== false) {
-    try {
-      var r = await db.from('personal')
-        .update({ mtx_rol: rol, mtx_linea: linea, proceso_hab: procHabFinal, color_hex: colorFinal })
-        .eq('codigo', codigo);
-      if (r.error) throw r.error;
-      matrizDbDisponible = true;
-      if (op) { op.mtx_rol = rol; op.mtx_linea = linea; op.proceso_hab = procHabFinal; op.color_hex = colorFinal; }
-      renderMatriz();
-      renderPersonal();
-      renderAsistHoy();
-      guardarRolDiario(codigo, procHabFinal);
-      return;
-    } catch(err) {
-      if (/mtx_rol|mtx_linea|column|schema cache/i.test((err.message || '') + (err.details || ''))) {
-        matrizDbDisponible = false;   // columnas mtx_* aún no existen → respaldo local
-        showToast('⚠️ Posiciones guardadas solo en este equipo · ejecuta el SQL para sincronizar', '#B45309');
-      } else {
-        showToast('Error al asignar rol: ' + err.message, '#B83232');
-        renderMatriz();
-        return;
+  // 1) SIEMPRE: guardar el snapshot de posición para el DÍA activo (histórico por día)
+  var estadoDia = ausentesDia[codigo] ? 'ausente' : (posEstadoCache[codigo] || 'presente');
+  await guardarPosDia(codigo, posKeyStore, estadoDia);
+
+  // 2) Solo si el día activo es HOY: además reescribir la asignación NORMAL del operador
+  //    (mtx_rol/mtx_linea/proceso_hab). Editar un día pasado NO toca lo permanente.
+  if (posFecha === fechaHoy()) {
+    var procHab = rol ? (MATRIZ_TO_PROCESO[rol] || '') : '';
+    var esPrestado = op && (op.proceso_hab || '') === 'Prestado';
+    var procHabFinal = esPrestado ? 'Prestado' : procHab;
+    var colorFinal = colorParaEstado(op ? !!op.activo : true, procHabFinal);
+
+    if (matrizDbDisponible !== false) {
+      try {
+        var r = await db.from('personal')
+          .update({ mtx_rol: rol, mtx_linea: linea, proceso_hab: procHabFinal, color_hex: colorFinal })
+          .eq('codigo', codigo);
+        if (r.error) throw r.error;
+        matrizDbDisponible = true;
+        if (op) { op.mtx_rol = rol; op.mtx_linea = linea; op.proceso_hab = procHabFinal; op.color_hex = colorFinal; }
+      } catch(err) {
+        if (/mtx_rol|mtx_linea|column|schema cache/i.test((err.message || '') + (err.details || ''))) {
+          matrizDbDisponible = false;   // columnas mtx_* aún no existen → respaldo local
+          var lines0 = getMatrizLines(); if (linea) lines0[codigo] = linea; else delete lines0[codigo]; saveMatrizLines(lines0);
+          try { var rp0 = await db.from('personal').update({ proceso_hab: procHabFinal, color_hex: colorFinal }).eq('codigo', codigo); if (!rp0.error && op) { op.proceso_hab = procHabFinal; op.color_hex = colorFinal; } } catch(e2) {}
+          showToast('⚠️ Posiciones guardadas solo en este equipo · ejecuta el SQL para sincronizar', '#B45309');
+        } else {
+          showToast('Error al asignar rol: ' + err.message, '#B83232');
+        }
       }
+    } else {
+      var lines = getMatrizLines(); if (linea) lines[codigo] = linea; else delete lines[codigo]; saveMatrizLines(lines);
+      try { var rp = await db.from('personal').update({ proceso_hab: procHabFinal, color_hex: colorFinal }).eq('codigo', codigo); if (!rp.error && op) { op.proceso_hab = procHabFinal; op.color_hex = colorFinal; } } catch(e3) {}
     }
+    renderPersonal();
   }
 
-  // Respaldo: el ROL se sincroniza vía proceso_hab (BD); la LÍNEA en localStorage
-  try {
-    var rp = await db.from('personal').update({ proceso_hab: procHabFinal, color_hex: colorFinal }).eq('codigo', codigo);
-    if (!rp.error && op) { op.proceso_hab = procHabFinal; op.color_hex = colorFinal; }
-  } catch(e2) { /* sin conexión: se queda local */ }
-
-  var lines = getMatrizLines();
-  if (linea) lines[codigo] = linea; else delete lines[codigo];
-  saveMatrizLines(lines);
   renderMatriz();
-  renderPersonal();
-  renderAsistHoy();
-  guardarRolDiario(codigo, procHabFinal);
+  if (typeof renderAsistHoy === 'function') renderAsistHoy();
+}
+
+// ════════════════════════════════════════════════════════════
+// MATRIZ POR DÍA — carga/guardado de posiciones y barra de día
+// ════════════════════════════════════════════════════════════
+
+function fechaLocalDe(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// mtx_pos ("flameador-2", "supervisor", "") → proceso legible para el campo rol
+function posKeyToProceso(posKey) {
+  if (!posKey) return '';
+  var rolPart = String(posKey).split('-')[0];
+  return MATRIZ_TO_PROCESO[rolPart] || '';
+}
+
+// Carga las posiciones + estados guardados para un día (matriz histórica)
+async function cargarPosDia(fecha) {
+  posDiaCache = {};
+  posEstadoCache = {};
+  ausentesDia = {};
+  try {
+    var r = await db.from(ASIST_TABLE)
+      .select('operador_codigo,estado,mtx_pos')
+      .eq('fecha', fecha).eq('area','serig').eq('turno','dia');
+    if (r.error) throw r.error;
+    (r.data || []).forEach(function(row) {
+      posEstadoCache[row.operador_codigo] = row.estado;
+      if (row.estado === 'ausente') ausentesDia[row.operador_codigo] = true;
+      if (row.mtx_pos !== undefined && row.mtx_pos !== null) posDiaCache[row.operador_codigo] = row.mtx_pos;
+    });
+    posColDispo = true;
+  } catch(e) {
+    // La columna mtx_pos puede no existir aún → solo tomamos estados (matriz cae a defaults)
+    posColDispo = false;
+    try {
+      var r2 = await db.from(ASIST_TABLE).select('operador_codigo,estado')
+        .eq('fecha', fecha).eq('area','serig').eq('turno','dia');
+      (r2.data || []).forEach(function(row) {
+        posEstadoCache[row.operador_codigo] = row.estado;
+        if (row.estado === 'ausente') ausentesDia[row.operador_codigo] = true;
+      });
+    } catch(e2) { /* sin datos */ }
+  }
+  if (fecha === fechaHoy()) ausentesHoy = Object.assign({}, ausentesDia);
+}
+
+// Guarda (upsert) la posición del operador para el día activo. Auto-guardado.
+async function guardarPosDia(codigo, posKey, estado) {
+  posDiaCache[codigo] = posKey;
+  if (posColDispo === false) return; // sin columna mtx_pos: no persistir posición (evita romper)
+  try {
+    var r = await db.from(ASIST_TABLE).upsert({
+      fecha: posFecha,
+      operador_codigo: codigo,
+      operador_nombre: getNombreOperario(codigo),
+      area: 'serig', turno: 'dia',
+      estado: estado || posEstadoCache[codigo] || 'presente',
+      rol: posKeyToProceso(posKey),
+      mtx_pos: posKey,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'fecha,operador_codigo,area,turno' });
+    if (r.error) throw r.error;
+    posColDispo = true;
+  } catch(e) {
+    if (/mtx_pos|column|schema cache/i.test((e.message || '') + (e.details || ''))) {
+      posColDispo = false;
+      showToast('⚠️ Posiciones por día aún no se guardan · ejecuta sql/asistencia_mtx_pos_v1.sql', '#B45309');
+    } else {
+      showToast('Error al guardar posición: ' + (e.message || e), '#B83232');
+    }
+  }
+}
+
+function renderDiaBar() {
+  var lbl  = document.getElementById('diaBarLbl');
+  if (!lbl) return;
+  var inp  = document.getElementById('diaBarInput');
+  var prev = document.getElementById('diaBtnPrev');
+  var next = document.getElementById('diaBtnNext');
+  var hoyB = document.getElementById('diaBtnHoy');
+  var modo = document.getElementById('diaBarModoLbl');
+  var sub  = document.getElementById('matrizSub');
+  var hoy  = fechaHoy();
+  var esHoy = posFecha === hoy;
+  var d = new Date(posFecha + 'T12:00:00');
+  lbl.textContent = d.toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long' }) + (esHoy ? ' · HOY' : '');
+  if (inp)  { inp.value = posFecha; inp.max = hoy; inp.min = ASIST_FECHA_MIN; }
+  if (prev) { prev.disabled = posFecha <= ASIST_FECHA_MIN; prev.style.opacity = prev.disabled ? '.35' : ''; }
+  if (next) { next.disabled = esHoy; next.style.opacity = esHoy ? '.35' : ''; }
+  if (hoyB) { hoyB.style.display = esHoy ? 'none' : ''; }
+  if (modo) modo.textContent = esHoy ? '' : '· editando un día pasado (no cambia lo normal)';
+  if (sub)  sub.textContent = esHoy
+    ? 'Arrastra cada operador a su rol y línea'
+    : 'Registro histórico de este día — arrastra para corregir quién cubrió cada puesto';
+}
+
+// Cambia el día activo y refresca matriz + grilla mensual + resaltado
+async function aplicarDia() {
+  var hoy = fechaHoy();
+  if (posFecha > hoy) posFecha = hoy;
+  if (posFecha < ASIST_FECHA_MIN) posFecha = ASIST_FECHA_MIN;
+  asistHoyFecha = posFecha;
+  var mes = posFecha.slice(0,7);
+  if ((asistGridMes || hoy.slice(0,7)) !== mes) { asistGridMes = mes; asistGridCache = null; }
+  await cargarPosDia(posFecha);
+  renderDiaBar();
+  renderMatriz();
+  await renderAsistGrid();
+}
+
+function navegarDia(delta) {
+  var d = new Date(posFecha + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  var nueva = fechaLocalDe(d);
+  if (nueva > fechaHoy() || nueva < ASIST_FECHA_MIN) return;
+  posFecha = nueva;
+  aplicarDia();
+}
+function irDiaHoy() { posFecha = fechaHoy(); aplicarDia(); }
+function irDiaEspecifico(val) { if (!val) return; posFecha = val; aplicarDia(); }
+
+// Cambio de mes desde la grilla mensual: también reposiciona el día activo dentro del mes
+function cambiarMesGrid(mesStr) {
+  var hoy = fechaHoy();
+  var dia = parseInt(posFecha.slice(8)) || 1;
+  var anio = parseInt(mesStr.slice(0,4)), mesN = parseInt(mesStr.slice(5,7));
+  var lastDay = new Date(anio, mesN, 0).getDate();
+  if (dia > lastDay) dia = lastDay;
+  var cand = mesStr + '-' + String(dia).padStart(2,'0');
+  if (cand > hoy) cand = hoy;
+  if (cand < ASIST_FECHA_MIN) cand = ASIST_FECHA_MIN;
+  posFecha = cand;
+  aplicarDia();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -3459,9 +3624,10 @@ async function renderAsistGrid() {
   var thDays = dias.map(function(f) {
     var dn   = parseInt(f.slice(8));
     var dow  = new Date(f + 'T12:00:00').getDay();
-    var cls  = 'ag-th' + (f === hoy ? ' hoy' : '') + (dow === 0 ? ' finde' : '');
+    var cls  = 'ag-th' + (f === hoy ? ' hoy' : '') + (dow === 0 ? ' finde' : '') + (f === posFecha ? ' ag-col-sel' : '');
     var lbl  = dn;
-    return '<th class="' + cls + '">' + lbl + '</th>';
+    var clk  = (f <= hoy && f >= ASIST_FECHA_MIN) ? ' onclick="irDiaEspecifico(\'' + f + '\')" style="cursor:pointer" title="Ver este día en Personal y Roles"' : '';
+    return '<th class="' + cls + '"' + clk + '>' + lbl + '</th>';
   }).join('');
 
   function buildRows(lista, secLabel) {
@@ -3495,7 +3661,7 @@ async function renderAsistGrid() {
         var esFinde = dow === 0;
         if (esFuturo || esAntesIngreso) {
           var titAnt = esAntesIngreso ? 'Antes de ingreso (' + fechaInicio + ')' : '';
-          html += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + '" title="' + titAnt + '"></td>';
+          html += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + (f === posFecha ? ' ag-col-sel' : '') + '" title="' + titAnt + '"></td>';
         } else {
           var esPendiente = f === hoy && !daysByP[f];
           var est = esPendiente ? 'pendiente' : (daysByP[f] || (esFinde ? 'finde' : 'presente'));
@@ -3504,7 +3670,7 @@ async function renderAsistGrid() {
           var notaPend = esPendiente ? ' · Aún no se toma asistencia' : (est === 'pendiente' ? ' · Sin registrar (ej. antes de ingresar)' : '');
           var domTrabajado = esFinde && daysByP[f] === 'presente';
           var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esFinde && !domTrabajado ? ' · Domingo (no cuenta)' : '') + notaPend;
-          html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrabajado ? ' dom-trabajado' : '') + '" onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + '</td>';
+          html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrabajado ? ' dom-trabajado' : '') + (f === posFecha ? ' ag-col-sel' : '') + '" onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + '</td>';
         }
       });
       html += '</tr>';
@@ -3520,9 +3686,9 @@ async function renderAsistGrid() {
       '<div class="asist-grid-hdr">' +
         '<span style="font-size:12px;font-weight:800;color:var(--ink)">📋 Asistencia Mensual</span>' +
         '<div style="display:flex;align-items:center;gap:8px">' +
-          '<button class="btn btn-g btn-xs" onclick="asistGridMes=\'' + prevMes + '\';asistGridCache=null;renderAsistGrid()">‹</button>' +
+          '<button class="btn btn-g btn-xs" onclick="cambiarMesGrid(\'' + prevMes + '\')">‹</button>' +
           '<span style="font-size:11px;font-weight:600;color:var(--text);text-transform:capitalize;min-width:130px;text-align:center">' + mesNombre + '</span>' +
-          '<button class="btn btn-g btn-xs" onclick="asistGridMes=\'' + nextMes + '\';asistGridCache=null;renderAsistGrid()"' + (isCurrentMes ? ' disabled style="opacity:.35;cursor:default"' : '') + '>›</button>' +
+          '<button class="btn btn-g btn-xs" onclick="cambiarMesGrid(\'' + nextMes + '\')"' + (isCurrentMes ? ' disabled style="opacity:.35;cursor:default"' : '') + '>›</button>' +
           '<button class="btn btn-g btn-xs" onclick="exportarAsistGridPDF()" style="margin-left:8px">⬇ PDF</button>' +
         '</div>' +
       '</div>' +
@@ -3584,6 +3750,13 @@ async function toggleAsistCell(codigo, fecha) {
     else asistHoyCache[codigo] = next;
     if (next === 'ausente') ausentesHoy[codigo] = true;
     else delete ausentesHoy[codigo];
+  }
+  // Sincronizar la matriz del día activo: un ausente sale de su celda de rol
+  if (fecha === posFecha) {
+    if (next === null) delete posEstadoCache[codigo];
+    else posEstadoCache[codigo] = next;
+    if (next === 'ausente') ausentesDia[codigo] = true;
+    else delete ausentesDia[codigo];
     renderMatriz();
   }
   renderAsistGrid();
@@ -9024,9 +9197,15 @@ async function toggleAsistencia(codigo, estado) {
       if (nuevoEstado === 'ausente') ausentesHoy[codigo] = true;
       else delete ausentesHoy[codigo];
       faltasMesCache = null;
-      renderMatriz();
       renderAsistHoy();
       renderFaltasChart();
+    }
+    // Sincronizar la matriz del día activo (posFecha)
+    if (asistFecha === posFecha) {
+      if (nuevoEstado === 'ausente') ausentesDia[codigo] = true;
+      else delete ausentesDia[codigo];
+      posEstadoCache[codigo] = nuevoEstado;
+      renderMatriz();
     }
     showToast('✅ Guardado');
   } catch(e) {
@@ -9165,6 +9344,8 @@ async function init() {
   await Promise.all([cargarInventario(), cargarPersonal(), cargarEntregasSerig(), cargarOrdenSinAsignar()]);
   await cargarSalidaRequiMap(); // debe ir después de cargarEntregasSerig
   await cargarAusentesHoy(); // filtra ausentes de la matriz (llama renderMatriz internamente)
+  await cargarPosDia(posFecha); // posiciones guardadas del día (matriz por día)
+  renderDiaBar();
   await cargarSolicitudes(); // llama renderInicio() internamente
 
   switchTab('inicio');
