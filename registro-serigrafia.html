@@ -934,9 +934,11 @@ async function cargarHoyLinea() {
     if (r.error) throw r.error;
     lecturasHoyLinea = r.data || [];
 
-    // Si hoy no tiene registros y la fecha es la de hoy, revisar ayer:
-    // la velada se registra después de medianoche y el Inicio quedó en fecha anterior.
-    if (!lecturasHoyLinea.length && fecha === fechaHoy()) {
+    // Si hoy no tiene registros y la fecha es la de hoy, revisar ayer SOLO en
+    // la madrugada (antes de las 6 AM): la velada empieza antes de medianoche
+    // y el Inicio quedó en la fecha anterior. Durante el día normal, un día sin
+    // velada es lo corriente — NO debe retroceder la fecha.
+    if (!lecturasHoyLinea.length && fecha === fechaHoy() && new Date().getHours() < 6) {
       var d = new Date(fecha + 'T12:00:00');
       d.setDate(d.getDate() - 1);
       var ayer = d.toISOString().slice(0, 10);
