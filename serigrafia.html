@@ -596,13 +596,23 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
         </div>
 
         <!-- Barra de día compartida — afecta Personal+Roles y Asistencia Mensual -->
-        <div id="diaBar" style="display:flex;align-items:center;gap:8px;padding:8px 0 6px;flex-wrap:wrap">
-          <button class="asist-nav-arr" onclick="navegarDia(-1)" title="Día anterior" id="diaBtnPrev">‹</button>
-          <span id="diaBarLbl" style="font-size:13px;font-weight:700;color:var(--serig-m);min-width:200px;text-align:center;text-transform:capitalize"></span>
-          <button class="asist-nav-arr" onclick="navegarDia(1)" title="Día siguiente" id="diaBtnNext">›</button>
-          <button class="btn btn-g btn-xs" onclick="irDiaHoy()" id="diaBtnHoy" style="margin-left:4px">Hoy</button>
-          <input type="date" id="diaBarInput" class="fi" style="font-size:11px;padding:4px 8px;width:130px" onchange="irDiaEspecifico(this.value)">
-          <span id="diaBarModoLbl" style="font-size:10px;font-weight:700;color:#94a3b8;margin-left:4px"></span>
+        <div id="diaBar" style="display:flex;align-items:center;justify-content:center;gap:14px;padding:8px 0 6px;flex-wrap:wrap">
+          <!-- Mes -->
+          <div style="display:flex;align-items:center;gap:6px">
+            <button class="asist-nav-arr" onclick="navegarMes(-1)" title="Mes anterior" id="mesBtnPrev">‹</button>
+            <span id="mesBarLbl" style="font-size:12px;font-weight:700;color:var(--ink);text-transform:capitalize;min-width:120px;text-align:center"></span>
+            <button class="asist-nav-arr" onclick="navegarMes(1)" title="Mes siguiente" id="mesBtnNext">›</button>
+          </div>
+          <span style="width:1px;height:22px;background:var(--border)"></span>
+          <!-- Día -->
+          <div style="display:flex;align-items:center;gap:6px">
+            <button class="asist-nav-arr" onclick="navegarDia(-1)" title="Día anterior" id="diaBtnPrev">‹</button>
+            <span id="diaBarLbl" style="font-size:13px;font-weight:700;color:var(--serig-m);min-width:180px;text-align:center;text-transform:capitalize"></span>
+            <button class="asist-nav-arr" onclick="navegarDia(1)" title="Día siguiente" id="diaBtnNext">›</button>
+            <button class="btn btn-g btn-xs" onclick="irDiaHoy()" id="diaBtnHoy">Hoy</button>
+            <input type="date" id="diaBarInput" class="fi" style="font-size:11px;padding:4px 8px;width:130px" onchange="irDiaEspecifico(this.value)">
+          </div>
+          <span id="diaBarModoLbl" style="font-size:10px;font-weight:700;color:#94a3b8"></span>
         </div>
 
         <!-- Layout 50/50: izq = Personal + Producción · der = Asistencia -->
@@ -1971,6 +1981,15 @@ function renderDiaBar() {
   if (inp)  { inp.value = posFecha; inp.max = hoy; inp.min = ASIST_FECHA_MIN; }
   if (prev) { prev.disabled = posFecha <= ASIST_FECHA_MIN; prev.style.opacity = prev.disabled ? '.35' : ''; }
   if (next) { next.disabled = esHoy; next.style.opacity = esHoy ? '.35' : ''; }
+  // Controles de mes
+  var mesLbl = document.getElementById('mesBarLbl');
+  var mesPrev = document.getElementById('mesBtnPrev');
+  var mesNext = document.getElementById('mesBtnNext');
+  var mesStr = posFecha.slice(0,7);
+  var hoyMes = hoy.slice(0,7), minMes = ASIST_FECHA_MIN.slice(0,7);
+  if (mesLbl)  mesLbl.textContent = d.toLocaleDateString('es-GT', { month:'long', year:'numeric' });
+  if (mesPrev) { mesPrev.disabled = mesStr <= minMes; mesPrev.style.opacity = mesPrev.disabled ? '.35' : ''; }
+  if (mesNext) { mesNext.disabled = mesStr >= hoyMes; mesNext.style.opacity = mesNext.disabled ? '.35' : ''; }
   if (hoyB) { hoyB.style.display = esHoy ? 'none' : ''; }
   if (modo) modo.textContent = esHoy ? '' : '· editando un día pasado (no cambia lo normal)';
   if (sub)  sub.textContent = esHoy
@@ -1990,6 +2009,7 @@ async function aplicarDia() {
   if (posFecha === hoy) await freezeDiaCompleto(); // congela el roster de hoy al abrirlo
   renderDiaBar();
   renderMatriz();
+  renderProdMensual();
   await renderAsistGrid();
 }
 
@@ -2004,7 +2024,18 @@ function navegarDia(delta) {
 function irDiaHoy() { posFecha = fechaHoy(); aplicarDia(); }
 function irDiaEspecifico(val) { if (!val) return; posFecha = val; aplicarDia(); }
 
-// Cambio de mes desde la grilla mensual: también reposiciona el día activo dentro del mes
+// Navegación por mes: avanza/retrocede el mes y reposiciona el día dentro de él
+function navegarMes(delta) {
+  var mes = posFecha.slice(0,7);
+  var anio = parseInt(mes.slice(0,4)), m = parseInt(mes.slice(5,7));
+  var d = new Date(anio, m - 1 + delta, 1);
+  var nuevoMes = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  var hoyMes = fechaHoy().slice(0,7), minMes = ASIST_FECHA_MIN.slice(0,7);
+  if (nuevoMes > hoyMes || nuevoMes < minMes) return;
+  cambiarMesGrid(nuevoMes);
+}
+
+// Cambio de mes: también reposiciona el día activo dentro del mes
 function cambiarMesGrid(mesStr) {
   var hoy = fechaHoy();
   var dia = parseInt(posFecha.slice(8)) || 1;
@@ -3186,12 +3217,16 @@ function renderProdMensual() {
     var px  = esFuturo ? 2 : (val ? Math.max(Math.round((val / maxVal) * 60), 5) : 2);
     var numDia = parseInt(f.slice(8));
     var esHoy  = f === todayStr;
+    var esSel  = f === posFecha;   // día seleccionado en la barra de fecha
     var barColor = esFuturo ? 'var(--border)' : (val > 0 ? _prodColor(val) : 'var(--border)');
-    var bStyle   = esFuturo ? ';opacity:.25' : (esHoy ? ';outline:2px solid var(--serig-m);outline-offset:1px;border-radius:3px 3px 0 0' : '');
+    var bStyle   = esFuturo ? ';opacity:.25' : '';
+    if (esSel)      bStyle += ';outline:2px solid var(--serig-m);outline-offset:1px;border-radius:3px 3px 0 0';
+    else if (esHoy) bStyle += ';outline:1px dashed var(--serig-m);outline-offset:1px;border-radius:3px 3px 0 0';
     var tip    = !esFuturo && val ? ' title="' + f + ': ' + val.toLocaleString() + ' und"' : '';
-    var lbl    = (numDia % 5 === 0 || numDia === 1 || esHoy) ? numDia : '';
+    var lbl    = (numDia % 5 === 0 || numDia === 1 || esHoy || esSel) ? numDia : '';
     var clickProd = (!esFuturo && val) ? ' onclick="verDetalleProdDia(\'' + f + '\',event)"' : '';
-    cols += '<div' + (esHoy ? ' id="prodTodayBar"' : '') + clickProd + ' style="flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end' + (!esFuturo && val ? ';cursor:pointer' : '') + '"' + tip + '>' +
+    var barId  = esSel ? ' id="prodSelBar"' : (esHoy ? ' id="prodTodayBar"' : '');
+    cols += '<div' + barId + clickProd + ' style="flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end' + (!esFuturo && val ? ';cursor:pointer' : '') + '"' + tip + '>' +
       '<div class="prod-bar" style="width:100%;height:' + px + 'px;background:' + barColor + bStyle + '"></div>' +
       '<div style="font-size:8px;color:var(--gray-l);line-height:1;margin-top:3px;text-align:center;height:8px;flex-shrink:0;' + (esFuturo?'opacity:.3':'') + '">' + lbl + '</div>' +
     '</div>';
@@ -3215,9 +3250,9 @@ function renderProdMensual() {
   setTimeout(function() {
     var sc = document.getElementById('prodChartScroll');
     if (!sc) return;
-    var hoyEl = document.getElementById('prodTodayBar');
-    if (hoyEl) {
-      sc.scrollLeft = Math.max(0, hoyEl.offsetLeft - sc.clientWidth + hoyEl.offsetWidth + 24);
+    var tgtEl = document.getElementById('prodSelBar') || document.getElementById('prodTodayBar');
+    if (tgtEl) {
+      sc.scrollLeft = Math.max(0, tgtEl.offsetLeft - sc.clientWidth + tgtEl.offsetWidth + 24);
     } else {
       sc.scrollLeft = sc.scrollWidth;
     }
@@ -3715,9 +3750,7 @@ async function renderAsistGrid() {
       '<div class="asist-grid-hdr">' +
         '<span style="font-size:12px;font-weight:800;color:var(--ink)">📋 Asistencia Mensual</span>' +
         '<div style="display:flex;align-items:center;gap:8px">' +
-          '<button class="btn btn-g btn-xs" onclick="cambiarMesGrid(\'' + prevMes + '\')">‹</button>' +
           '<span style="font-size:11px;font-weight:600;color:var(--text);text-transform:capitalize;min-width:130px;text-align:center">' + mesNombre + '</span>' +
-          '<button class="btn btn-g btn-xs" onclick="cambiarMesGrid(\'' + nextMes + '\')"' + (isCurrentMes ? ' disabled style="opacity:.35;cursor:default"' : '') + '>›</button>' +
           '<button class="btn btn-g btn-xs" onclick="exportarAsistGridPDF()" style="margin-left:8px">⬇ PDF</button>' +
         '</div>' +
       '</div>' +
