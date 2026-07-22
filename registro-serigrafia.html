@@ -254,7 +254,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
       <div id="skuLineaWrap" style="display:none">
         <div class="sku-linea-wrap">
           <div class="sku-linea-lbl">⚡ En esta línea — toca para seleccionar</div>
-          <button type="button" class="sku-linea-btn" id="btnSkuLinea" onclick="seleccionarSkuLinea()"></button>
+          <div id="skuLineaChips" style="display:flex;flex-direction:column;gap:6px"></div>
         </div>
       </div>
       <div class="field" style="margin-bottom:10px"><label>Diseño / SKU que se está imprimiendo</label>
@@ -544,7 +544,8 @@ function fechaHoy() {
 var operarios = [];
 var operadorLineaMap  = {}; // codigo → linea_id (del último registro)
 var lineaOpNombreMap  = {}; // linea_id → primer nombre del operario
-var skuEnLineaMap     = {}; // linea_id → {sku, diseno}
+var skuEnLineaMap     = {}; // linea_id → {sku, diseno} (ficha primaria — compat flameado/empaque)
+var skuLineaFichas    = {}; // linea_id → [ {sku, diseno, sku_base, descripcion, solicitud_id}, ... ] (TODAS las fichas activas de la línea)
 var inventarioCache = [];
 var opActual = null;
 var momentoActual = 'inicio';
@@ -567,22 +568,37 @@ async function cargarOperarios() {
     // PRIORIDAD 1: SKU asignado en el pedido vigente (solicitud_lineas)
     // Es la fuente más confiable del trabajo ACTUAL por línea.
     try {
+      // Embed resiliente de solicitudes(estado, area): si el rol puede leerlo,
+      // filtramos a pedidos serig ACTIVOS (mismo criterio que el board de admin);
+      // si RLS lo bloquea (llega null), incluimos la ficha igual (sin regresión).
+      var ESTADOS_ACTIVOS = ['nueva','programada','proceso','parcial'];
       var rs = await db.from('solicitud_lineas')
-        .select('linea_id, sku, descripcion, sku_base, solicitud_id')
+        .select('linea_id, sku, descripcion, sku_base, solicitud_id, solicitudes(estado, area)')
         .not('linea_id', 'is', null)
         .not('sku', 'is', null)
         .neq('sku', '')
         .order('id', { ascending: false })
-        .limit(50);
+        .limit(80);
       (rs.data || []).forEach(function(l) {
-        if (l.linea_id && l.sku && !skuEnLineaMap[l.linea_id]) {
-          skuEnLineaMap[l.linea_id] = {
-            sku: String(l.sku),
-            diseno: l.descripcion ? (l.sku + ' — ' + l.descripcion) : String(l.sku),
-            sku_base: l.sku_base || '',
-            descripcion: l.descripcion || '',
-            solicitud_id: l.solicitud_id || null
-          };
+        if (!l.linea_id || !l.sku) return;
+        var sol = l.solicitudes || null;
+        if (sol) {
+          if (sol.area && sol.area !== 'serig') return;
+          if (sol.estado && ESTADOS_ACTIVOS.indexOf(sol.estado) < 0) return;
+        }
+        var ficha = {
+          sku: String(l.sku),
+          diseno: l.descripcion ? (l.sku + ' — ' + l.descripcion) : String(l.sku),
+          sku_base: l.sku_base || '',
+          descripcion: l.descripcion || '',
+          solicitud_id: l.solicitud_id || null
+        };
+        // Ficha primaria (la más reciente) → compat flameado/empaque
+        if (!skuEnLineaMap[l.linea_id]) skuEnLineaMap[l.linea_id] = ficha;
+        // Todas las fichas de la línea (deduplicadas por SKU)
+        if (!skuLineaFichas[l.linea_id]) skuLineaFichas[l.linea_id] = [];
+        if (!skuLineaFichas[l.linea_id].some(function(f){ return String(f.sku) === String(l.sku); })) {
+          skuLineaFichas[l.linea_id].push(ficha);
         }
       });
     } catch(e3) { /* no critico */ }
@@ -833,34 +849,47 @@ function _acMakeItem(sku, desc, onSelect) {
   return el;
 }
 
+// Fichas actualmente mostradas como chips (para resolver el click por índice)
+var _skuLineaVista = [];
+
 function mostrarSkuLinea(linea) {
   var wrap = document.getElementById('skuLineaWrap');
-  var btn  = document.getElementById('btnSkuLinea');
-  if (!wrap || !btn) return;
-  var d = skuEnLineaMap[linea];
-  if (!d || (!d.sku && !d.diseno)) { wrap.style.display = 'none'; return; }
+  var box  = document.getElementById('skuLineaChips');
+  if (!wrap || !box) return;
 
-  var sku    = d.sku || '';
-  var diseno = d.diseno || '';
-  if (!diseno && sku) {
-    var cached = inventarioCache.find(function(i){ return String(i.sku) === String(sku); });
-    if (cached && cached.descripcion) diseno = sku + ' — ' + cached.descripcion;
+  // TODAS las fichas activas de la línea; si no hay (línea sin pedido asignado),
+  // caer a la ficha primaria del mapa single.
+  var fichas = (skuLineaFichas[linea] || []).slice();
+  if (!fichas.length) {
+    var d = skuEnLineaMap[linea];
+    if (d && (d.sku || d.diseno)) fichas = [d];
   }
+  if (!fichas.length) { wrap.style.display = 'none'; _skuLineaVista = []; box.innerHTML = ''; return; }
 
-  var skuTxt  = sku ? '<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:#6D28D9">' + escHtml(sku) + '</span> — ' : '';
-  var descTxt = escHtml((diseno || sku).replace(/^[^\s—]+\s*—\s*/, '').slice(0, 80));
-  btn.innerHTML = skuTxt + descTxt;
+  _skuLineaVista = fichas;
+  box.innerHTML = fichas.map(buildSkuChip).join('');
   wrap.style.display = '';
 }
 
-function seleccionarSkuLinea() {
-  var linea = parseInt(document.getElementById('fLinea').value) || 1;
-  var d = skuEnLineaMap[linea];
+function buildSkuChip(d, i) {
+  var sku    = d.sku || '';
+  var diseno = d.diseno || '';
+  if (!diseno && sku) {
+    var cached = inventarioCache.find(function(x){ return String(x.sku) === String(sku); });
+    if (cached && cached.descripcion) diseno = sku + ' — ' + cached.descripcion;
+  }
+  var skuTxt  = sku ? '<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:#6D28D9">' + escHtml(sku) + '</span> — ' : '';
+  var descTxt = escHtml((diseno || sku).replace(/^[^\s—]+\s*—\s*/, '').slice(0, 80));
+  return '<button type="button" class="sku-linea-btn" onclick="seleccionarSkuLineaChip(' + i + ')">' + skuTxt + descTxt + '</button>';
+}
+
+function seleccionarSkuLineaChip(i) {
+  var d = _skuLineaVista[i];
   if (!d) return;
   var inp = document.getElementById('fDiseno');
   var val = d.diseno || '';
   if (!val && d.sku) {
-    var cached = inventarioCache.find(function(i){ return String(i.sku) === String(d.sku); });
+    var cached = inventarioCache.find(function(x){ return String(x.sku) === String(d.sku); });
     val = cached ? d.sku + ' — ' + (cached.descripcion || '') : d.sku;
   }
   inp.value = val;
