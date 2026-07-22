@@ -795,6 +795,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
       <div class="mov-scroll">
         <div class="kpi-strip" id="trazaKPIs"></div>
+        <div id="trazaClientes"></div>
         <div id="trazaTabla"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>
       </div>
     </div><!-- /view-trazabilidad -->
@@ -8227,6 +8228,7 @@ async function renderTrazabilidad() {
   var desde = mesStr + '-01', hasta = mesStr + '-31';
   cont.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando trazabilidad…</div></div>';
   if (kpis) kpis.innerHTML = '';
+  renderClienteAvance();
 
   var flam = [], tiros = [], emp = [], sal = [];
   try {
@@ -8400,6 +8402,61 @@ function buildTrazaCard(f) {
 
   return '<div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px">'
     + head + body + foot + '</div>';
+}
+
+function renderClienteAvance() {
+  var cont = document.getElementById('trazaClientes');
+  if (!cont) return;
+
+  // Totales pedidos por cliente (todos los pedidos serig, sin filtro de mes)
+  var pedido = {};
+  (solicitudes || []).filter(function(s){ return s.area === 'serig'; }).forEach(function(s) {
+    var cli = (s.cliente || 'Sin cliente').trim();
+    pedido[cli] = (pedido[cli]||0) + (s.cant||0);
+  });
+
+  // Totales entregados por cliente (todas las entregas, sin filtro de mes)
+  var entregado = {};
+  (entregasCache || []).forEach(function(e) {
+    var cli = (e.cliente || 'Sin cliente').trim();
+    var total = (e.lineas && e.lineas.length)
+      ? e.lineas.reduce(function(s,l){ return s + (l.cant||0); }, 0)
+      : (e.cant||0);
+    entregado[cli] = (entregado[cli]||0) + total;
+  });
+
+  var clientesSet = {};
+  Object.keys(pedido).concat(Object.keys(entregado)).forEach(function(k){ clientesSet[k] = true; });
+  var clientes = Object.keys(clientesSet).sort();
+  if (!clientes.length) { cont.innerHTML = ''; return; }
+
+  var filas = clientes.map(function(cli) {
+    var ped = pedido[cli] || 0;
+    var ent = entregado[cli] || 0;
+    var pct = ped > 0 ? Math.min(100, Math.round((ent / ped) * 100)) : 0;
+    var falta = Math.max(0, ped - ent);
+    var barColor = pct >= 100 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--teal)';
+    return '<div style="margin-bottom:6px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px">'
+      + '<span style="font-size:13px;font-weight:700;color:var(--ink)">'+escHtml(cli)+'</span>'
+      + '<span style="font-size:11px;font-family:var(--mono);white-space:nowrap">'
+      + '<span style="color:var(--gray)">'+ent.toLocaleString()+' / '+ped.toLocaleString()+'</span>'
+      + ' &nbsp;<strong style="color:'+barColor+'">'+pct+'%</strong>'
+      + '</span>'
+      + '</div>'
+      + '<div style="height:8px;background:var(--bg2);border-radius:4px;overflow:hidden">'
+      + '<div style="height:100%;width:'+pct+'%;background:'+barColor+';border-radius:4px;transition:width .6s ease"></div>'
+      + '</div>'
+      + (falta > 0
+        ? '<div style="font-size:10px;color:var(--gray-l);margin-top:2px">Falta: '+falta.toLocaleString()+' und</div>'
+        : '<div style="font-size:10px;color:var(--green);margin-top:2px">✓ Completado</div>')
+      + '</div>';
+  });
+
+  cont.innerHTML = '<div style="background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px">'
+    + '<div style="font-weight:800;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);margin-bottom:12px">📊 Avance por cliente</div>'
+    + filas.join('')
+    + '</div>';
 }
 
 function switchTab(tab) {
