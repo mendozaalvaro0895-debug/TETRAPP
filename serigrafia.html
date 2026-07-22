@@ -1579,7 +1579,8 @@ var posFecha       = fechaHoy(); // día activo: matriz por día + resaltado de 
 var posDiaCache    = {};         // { codigo: mtx_pos } posiciones guardadas del día activo
 var posEstadoCache = {};         // { codigo: estado } estados del día (para no pisarlos al guardar posición)
 var ausentesDia    = {};         // { codigo: true } ausentes del día activo (getMatriz los saca de su celda)
-var posColDispo    = null;       // null = aún no se sabe; false si la columna mtx_pos no existe
+var posColDispo    = null;       // null = aún no se sabe; false si la tabla matriz_dia_serig no existe
+var MATRIZ_DIA_TABLE = 'matriz_dia_serig'; // posición de matriz por día — SEPARADA de asistencia
 var ausentesHoy    = {};         // { codigo: true } — se carga al init y al marcar asistencia
 var asistHoyCache  = {};         // { codigo: estado } — refleja la fecha del widget
 var asistHoyRolCache = {};       // { codigo: rol }   — rol guardado para la fecha del widget
@@ -1813,12 +1814,14 @@ async function matrizDrop(e, targetKey) {
   var lista = personalData && personalData.serig ? personalData.serig : [];
   var op = lista.find(function(x) { return x.codigo === codigo; });
 
-  // 1) SIEMPRE: guardar el snapshot de posición para el DÍA activo (histórico por día)
-  var estadoDia = ausentesDia[codigo] ? 'ausente' : (posEstadoCache[codigo] || 'presente');
-  await guardarPosDia(codigo, posKeyStore, estadoDia);
+  // 1) SIEMPRE: guardar el snapshot de posición para el DÍA activo + congelar el resto
+  //    del roster, para que el día quede "tal como está" aunque cambie el default luego.
+  await guardarPosDia(codigo, posKeyStore);
+  await freezeDiaCompleto();
 
   // 2) Solo si el día activo es HOY: además reescribir la asignación NORMAL del operador
-  //    (mtx_rol/mtx_linea/proceso_hab). Editar un día pasado NO toca lo permanente.
+  //    (mtx_rol/mtx_linea/proceso_hab) y el rol legible del día. Editar un día pasado NO
+  //    toca lo permanente.
   if (posFecha === fechaHoy()) {
     var procHab = rol ? (MATRIZ_TO_PROCESO[rol] || '') : '';
     var esPrestado = op && (op.proceso_hab || '') === 'Prestado';
@@ -1847,6 +1850,8 @@ async function matrizDrop(e, targetKey) {
       var lines = getMatrizLines(); if (linea) lines[codigo] = linea; else delete lines[codigo]; saveMatrizLines(lines);
       try { var rp = await db.from('personal').update({ proceso_hab: procHabFinal, color_hex: colorFinal }).eq('codigo', codigo); if (!rp.error && op) { op.proceso_hab = procHabFinal; op.color_hex = colorFinal; } } catch(e3) {}
     }
+    // Rol legible del día (widget de asistencia + PDF) — solo hoy
+    guardarRolDiario(codigo, procHabFinal);
     renderPersonal();
   }
 
@@ -1862,68 +1867,83 @@ function fechaLocalDe(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
-// mtx_pos ("flameador-2", "supervisor", "") → proceso legible para el campo rol
-function posKeyToProceso(posKey) {
-  if (!posKey) return '';
-  var rolPart = String(posKey).split('-')[0];
-  return MATRIZ_TO_PROCESO[rolPart] || '';
-}
-
-// Carga las posiciones + estados guardados para un día (matriz histórica)
+// Carga posiciones (matriz_dia_serig) + estados de asistencia (asistencia_diaria) del día.
+// Las posiciones viven en su PROPIA tabla, separadas de la asistencia: congelar el
+// roster completo de un día NO marca a nadie presente/ausente.
 async function cargarPosDia(fecha) {
   posDiaCache = {};
   posEstadoCache = {};
   ausentesDia = {};
+  // Estados de asistencia → para sacar a los ausentes de su celda de rol
   try {
-    var r = await db.from(ASIST_TABLE)
-      .select('operador_codigo,estado,mtx_pos')
+    var ra = await db.from(ASIST_TABLE).select('operador_codigo,estado')
       .eq('fecha', fecha).eq('area','serig').eq('turno','dia');
-    if (r.error) throw r.error;
-    (r.data || []).forEach(function(row) {
+    (ra.data || []).forEach(function(row) {
       posEstadoCache[row.operador_codigo] = row.estado;
       if (row.estado === 'ausente') ausentesDia[row.operador_codigo] = true;
+    });
+  } catch(e) { /* sin datos de asistencia */ }
+  // Posiciones del día (tabla dedicada)
+  try {
+    var rp = await db.from(MATRIZ_DIA_TABLE).select('operador_codigo,mtx_pos')
+      .eq('fecha', fecha).eq('area','serig');
+    if (rp.error) throw rp.error;
+    (rp.data || []).forEach(function(row) {
       if (row.mtx_pos !== undefined && row.mtx_pos !== null) posDiaCache[row.operador_codigo] = row.mtx_pos;
     });
     posColDispo = true;
   } catch(e) {
-    // La columna mtx_pos puede no existir aún → solo tomamos estados (matriz cae a defaults)
-    posColDispo = false;
-    try {
-      var r2 = await db.from(ASIST_TABLE).select('operador_codigo,estado')
-        .eq('fecha', fecha).eq('area','serig').eq('turno','dia');
-      (r2.data || []).forEach(function(row) {
-        posEstadoCache[row.operador_codigo] = row.estado;
-        if (row.estado === 'ausente') ausentesDia[row.operador_codigo] = true;
-      });
-    } catch(e2) { /* sin datos */ }
+    posColDispo = false; // la tabla puede no existir aún → matriz cae a defaults
   }
   if (fecha === fechaHoy()) ausentesHoy = Object.assign({}, ausentesDia);
 }
 
 // Guarda (upsert) la posición del operador para el día activo. Auto-guardado.
-async function guardarPosDia(codigo, posKey, estado) {
+async function guardarPosDia(codigo, posKey) {
   posDiaCache[codigo] = posKey;
-  if (posColDispo === false) return; // sin columna mtx_pos: no persistir posición (evita romper)
+  if (posColDispo === false) return; // sin tabla matriz_dia_serig: no persistir (evita romper)
   try {
-    var r = await db.from(ASIST_TABLE).upsert({
+    var r = await db.from(MATRIZ_DIA_TABLE).upsert({
       fecha: posFecha,
       operador_codigo: codigo,
-      operador_nombre: getNombreOperario(codigo),
-      area: 'serig', turno: 'dia',
-      estado: estado || posEstadoCache[codigo] || 'presente',
-      rol: posKeyToProceso(posKey),
+      area: 'serig',
       mtx_pos: posKey,
       updated_at: new Date().toISOString()
-    }, { onConflict: 'fecha,operador_codigo,area,turno' });
+    }, { onConflict: 'fecha,operador_codigo,area' });
     if (r.error) throw r.error;
     posColDispo = true;
   } catch(e) {
-    if (/mtx_pos|column|schema cache/i.test((e.message || '') + (e.details || ''))) {
+    if (/matriz_dia_serig|relation|does not exist|column|schema cache/i.test((e.message || '') + (e.details || ''))) {
       posColDispo = false;
-      showToast('⚠️ Posiciones por día aún no se guardan · ejecuta sql/asistencia_mtx_pos_v1.sql', '#B45309');
+      showToast('⚠️ Posiciones por día aún no se guardan · ejecuta sql/matriz_dia_serig_v1.sql', '#B45309');
     } else {
       showToast('Error al guardar posición: ' + (e.message || e), '#B83232');
     }
+  }
+}
+
+// Congela el roster COMPLETO del día activo: cada operador presente que aún no tiene
+// snapshot queda guardado en su posición actual, para que el día se conserve "tal como
+// está" aunque después cambie la asignación normal. Solo toca posiciones (no asistencia).
+async function freezeDiaCompleto() {
+  if (posColDispo === false) return;
+  var lista = (personalData && personalData.serig ? personalData.serig : [])
+    .filter(function(p) {
+      return p.activo && !ausentesDia[p.codigo]
+        && !Object.prototype.hasOwnProperty.call(posDiaCache, p.codigo);
+    });
+  if (!lista.length) return;
+  var rows = lista.map(function(p) {
+    var pos = posKeyDefault(p) || '';
+    posDiaCache[p.codigo] = pos;
+    return { fecha: posFecha, operador_codigo: p.codigo, area: 'serig', mtx_pos: pos, updated_at: new Date().toISOString() };
+  });
+  try {
+    var r = await db.from(MATRIZ_DIA_TABLE).upsert(rows, { onConflict: 'fecha,operador_codigo,area' });
+    if (r.error) throw r.error;
+    posColDispo = true;
+  } catch(e) {
+    if (/matriz_dia_serig|relation|does not exist|schema cache/i.test((e.message || '') + (e.details || ''))) posColDispo = false;
   }
 }
 
@@ -1959,6 +1979,7 @@ async function aplicarDia() {
   var mes = posFecha.slice(0,7);
   if ((asistGridMes || hoy.slice(0,7)) !== mes) { asistGridMes = mes; asistGridCache = null; }
   await cargarPosDia(posFecha);
+  if (posFecha === hoy) await freezeDiaCompleto(); // congela el roster de hoy al abrirlo
   renderDiaBar();
   renderMatriz();
   await renderAsistGrid();
@@ -9345,6 +9366,7 @@ async function init() {
   await cargarSalidaRequiMap(); // debe ir después de cargarEntregasSerig
   await cargarAusentesHoy(); // filtra ausentes de la matriz (llama renderMatriz internamente)
   await cargarPosDia(posFecha); // posiciones guardadas del día (matriz por día)
+  await freezeDiaCompleto();    // congela el roster de hoy tal como está al abrir
   renderDiaBar();
   await cargarSolicitudes(); // llama renderInicio() internamente
 
