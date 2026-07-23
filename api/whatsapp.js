@@ -213,6 +213,7 @@ module.exports = async function handler(req, res) {
 
   // ── Llamada a Claude ──────────────────────────────────────────
   let parsed;
+  let rawText = '';
   try {
     const aiResp = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -220,12 +221,20 @@ module.exports = async function handler(req, res) {
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userContent }]
     });
-    const rawText = aiResp.content[0].text.trim()
+    rawText = aiResp.content[0].text.trim()
       .replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim();
+  } catch(e) {
+    console.error('[TETRAPP-BOT] Error llamada Anthropic:', e.message);
+    res.setHeader('Content-Type', 'text/xml');
+    res.end(twiml('❌ Error API: ' + e.message.slice(0, 100)));
+    return;
+  }
+  try {
     parsed = JSON.parse(rawText);
   } catch(e) {
+    console.error('[TETRAPP-BOT] JSON inválido de Claude:', rawText.slice(0, 200));
     res.setHeader('Content-Type', 'text/xml');
-    res.end(twiml('❌ No pude leer el mensaje. Prueba con más detalle (ej: "L2 fin 15000 Morton Gelo")'));
+    res.end(twiml('❌ Respuesta inesperada de Claude. Intenta de nuevo.'));
     return;
   }
 
