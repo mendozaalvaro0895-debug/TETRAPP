@@ -177,97 +177,111 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  // Parsear body form-encoded de Twilio
-  const raw  = await readRawBody(req);
-  const body = parseFormBody(raw);
-  const from    = body.From  || '';
-  const msgText = (body.Body  || '').trim();
-
-  if (!msgText) {
-    res.setHeader('Content-Type', 'text/xml');
-    res.end(twiml('👋 Bot TETRAPP activo'));
-    return;
-  }
-
-  // Clientes
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const db = createClient(
-    process.env.SUPA_URL,
-    process.env.SUPA_SERVICE_KEY || process.env.SUPA_KEY
-  );
-
-  const { fecha, hora } = fechaGT();
-
-  // ¿Hay estado pendiente de un mensaje anterior?
-  let estadoPrevio = null;
-  try { estadoPrevio = await getEstado(db, from); } catch(_) {}
-
-  // Construir el mensaje para Claude
-  let userContent = msgText;
-  if (estadoPrevio) {
-    userContent =
-      `DATOS INCOMPLETOS DEL MENSAJE ANTERIOR:\n${JSON.stringify(estadoPrevio, null, 2)}\n\n` +
-      `RESPUESTA DE ÁLVARO: "${msgText}"\n\n` +
-      `Completa los datos faltantes y retorna el registro completo.`;
-  }
-
-  // ── Llamada a Claude ──────────────────────────────────────────
-  let parsed;
-  let rawText = '';
   try {
-    const aiResp = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userContent }]
-    });
-    rawText = aiResp.content[0].text.trim()
-      .replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim();
-  } catch(e) {
-    console.error('[TETRAPP-BOT] Error llamada Anthropic:', e.message);
-    res.setHeader('Content-Type', 'text/xml');
-    res.end(twiml('❌ Error API: ' + e.message.slice(0, 100)));
-    return;
-  }
-  try {
-    parsed = JSON.parse(rawText);
-  } catch(e) {
-    console.error('[TETRAPP-BOT] JSON inválido de Claude:', rawText.slice(0, 200));
-    res.setHeader('Content-Type', 'text/xml');
-    res.end(twiml('❌ Respuesta inesperada de Claude. Intenta de nuevo.'));
-    return;
-  }
+    // Parsear body form-encoded de Twilio
+    const raw  = await readRawBody(req);
+    const body = parseFormBody(raw);
+    const from    = body.From  || '';
+    const msgText = (body.Body  || '').trim();
 
-  // ── Mensaje que se debe ignorar ───────────────────────────────
-  if (parsed.ignorar) {
-    res.setHeader('Content-Type', 'text/xml');
-    res.end(twiml('👍'));
-    return;
-  }
+    console.log('[TETRAPP-BOT] from:', from, '| msg:', msgText.slice(0, 80));
+    console.log('[TETRAPP-BOT] env check — SUPA_URL:', !!process.env.SUPA_URL,
+      '| SUPA_SERVICE_KEY:', !!process.env.SUPA_SERVICE_KEY,
+      '| ANTHROPIC_API_KEY:', !!process.env.ANTHROPIC_API_KEY);
 
-  // ── Falta un dato crítico: guardar estado y preguntar ─────────
-  if (parsed.pregunta_pendiente) {
+    if (!msgText) {
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml('👋 Bot TETRAPP activo'));
+      return;
+    }
+
+    // Clientes
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const db = createClient(
+      process.env.SUPA_URL,
+      process.env.SUPA_SERVICE_KEY || process.env.SUPA_KEY
+    );
+
+    const { fecha, hora } = fechaGT();
+
+    // ¿Hay estado pendiente de un mensaje anterior?
+    let estadoPrevio = null;
+    try { estadoPrevio = await getEstado(db, from); } catch(_) {}
+
+    // Construir el mensaje para Claude
+    let userContent = msgText;
+    if (estadoPrevio) {
+      userContent =
+        `DATOS INCOMPLETOS DEL MENSAJE ANTERIOR:\n${JSON.stringify(estadoPrevio, null, 2)}\n\n` +
+        `RESPUESTA DE ÁLVARO: "${msgText}"\n\n` +
+        `Completa los datos faltantes y retorna el registro completo.`;
+    }
+
+    // ── Llamada a Claude ──────────────────────────────────────────
+    let parsed;
+    let rawText = '';
     try {
-      await setEstado(db, from, { tipo: parsed.tipo, datos: parsed.datos || {} });
-    } catch(_) {}
-    res.setHeader('Content-Type', 'text/xml');
-    res.end(twiml('❓ ' + parsed.pregunta_pendiente));
-    return;
-  }
+      const aiResp = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userContent }]
+      });
+      rawText = aiResp.content[0].text.trim()
+        .replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim();
+    } catch(e) {
+      console.error('[TETRAPP-BOT] Error llamada Anthropic:', e.message);
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml('❌ Error API: ' + e.message.slice(0, 100)));
+      return;
+    }
+    try {
+      parsed = JSON.parse(rawText);
+    } catch(e) {
+      console.error('[TETRAPP-BOT] JSON inválido de Claude:', rawText.slice(0, 200));
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml('❌ Respuesta inesperada de Claude. Intenta de nuevo.'));
+      return;
+    }
 
-  // ── Datos completos: insertar en Supabase ─────────────────────
-  try {
-    const ok = await insertar(db, parsed.tipo, parsed.datos || {}, fecha, hora);
-    await clearEstado(db, from).catch(() => {});
+    // ── Mensaje que se debe ignorar ───────────────────────────────
+    if (parsed.ignorar) {
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml('👍'));
+      return;
+    }
 
-    const resp = ok
-      ? '✅ ' + (parsed.mensaje_confirmacion || 'Registro guardado · ' + fecha)
-      : '⚠️ Tipo no reconocido: ' + parsed.tipo + '. Escribe "ayuda" para ver los formatos.';
+    // ── Falta un dato crítico: guardar estado y preguntar ─────────
+    if (parsed.pregunta_pendiente) {
+      try {
+        await setEstado(db, from, { tipo: parsed.tipo, datos: parsed.datos || {} });
+      } catch(_) {}
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml('❓ ' + parsed.pregunta_pendiente));
+      return;
+    }
 
-    res.setHeader('Content-Type', 'text/xml');
-    res.end(twiml(resp));
+    // ── Datos completos: insertar en Supabase ─────────────────────
+    try {
+      const ok = await insertar(db, parsed.tipo, parsed.datos || {}, fecha, hora);
+      await clearEstado(db, from).catch(() => {});
+
+      const resp = ok
+        ? '✅ ' + (parsed.mensaje_confirmacion || 'Registro guardado · ' + fecha)
+        : '⚠️ Tipo no reconocido: ' + parsed.tipo + '. Escribe "ayuda" para ver los formatos.';
+
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml(resp));
+    } catch(e) {
+      console.error('[TETRAPP-BOT] Error BD:', e.message);
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml('❌ Error BD: ' + e.message));
+    }
   } catch(e) {
-    res.setHeader('Content-Type', 'text/xml');
-    res.end(twiml('❌ Error BD: ' + e.message));
+    console.error('[TETRAPP-BOT] Error global no manejado:', e.message, e.stack);
+    try {
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml('❌ Error interno: ' + e.message.slice(0, 100)));
+    } catch(_) {}
   }
 };
