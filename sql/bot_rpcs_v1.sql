@@ -12,6 +12,9 @@
 -- Llena TODAS las columnas del formulario real (registro-serigrafia.html
 -- línea 1512). Por WhatsApp no hay operador: código vacío ('' — el lector
 -- de Productividad lo ignora) y nombre marcado como 'WhatsApp' para trazabilidad.
+-- Drop previo por si existe una versión con firma distinta (evita "not unique").
+drop function if exists public.bot_insertar_tiro(date, text, text, int, text, int);
+drop function if exists public.bot_insertar_tiro(date, text, text, int, text, int, text, text);
 create or replace function public.bot_insertar_tiro(
   p_fecha     date,
   p_area      text,
@@ -79,7 +82,8 @@ begin
 end $$;
 
 -- ── Dar permiso al rol anon (clave publishable del bot) ───────
-grant execute on function public.bot_insertar_tiro     to anon;
+-- Firma explícita en tiro por si coexiste otra versión (evita "not unique").
+grant execute on function public.bot_insertar_tiro(date, text, text, int, text, int, text, text) to anon;
 grant execute on function public.bot_insertar_flameado to anon;
 grant execute on function public.bot_insertar_empaque  to anon;
 
