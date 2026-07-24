@@ -2697,12 +2697,6 @@ function boardBuildSinBlock(items) {
         var nListos    = gItems.filter(function(i){ return i.estado === 'lista' || getTier(i) === 2; }).length;
         var nParciales = gItems.filter(function(i){ return getTier(i) === 1 && i.estado !== 'lista'; }).length;
         var nPendientes= gItems.filter(function(i){ return getTier(i) === 0 && i.estado !== 'lista'; }).length;
-        var _pill = 'display:inline-block;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:800;margin-left:4px';
-        var pedidosTxt = nTotal + ' pedido' + (nTotal !== 1 ? 's' : '') +
-          (nListos    > 0 ? '<span style="' + _pill + ';background:rgba(21,128,61,.25);color:#bbf7d0;border:1px solid rgba(21,128,61,.45)">' + nListos + ' ✓</span>' : '') +
-          (nParciales > 0 ? '<span style="' + _pill + ';background:rgba(217,119,6,.25);color:#fde68a;border:1px solid rgba(217,119,6,.45)">' + nParciales + ' ~</span>' : '') +
-          (nPendientes > 0 ? '<span style="' + _pill + ';background:rgba(185,28,28,.25);color:#fca5a5;border:1px solid rgba(185,28,28,.45)">' + nPendientes + ' ●</span>' : '');
-        var undTxt = totalG > 0 ? totalG.toLocaleString() + ' und' : '';
         // Unidades por estado + % entregado
         var undVerde  = gItems.filter(function(i){ return getTier(i) === 2 || i.estado === 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
         var undAmb    = gItems.filter(function(i){ return getTier(i) === 1 && i.estado !== 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
@@ -2710,12 +2704,33 @@ function boardBuildSinBlock(items) {
         var totalEntG = gItems.reduce(function(s,i){ return s+(entregadoMap[i.solId]||0); },0);
         var pctEnt    = totalG > 0 ? Math.round(totalEntG / totalG * 100) : 0;
         var pctClr    = pctEnt >= 100 ? '#bbf7d0' : pctEnt > 0 ? '#fde68a' : 'rgba(255,255,255,.45)';
-        var undDetalleParts = [];
-        if (undVerde > 0) undDetalleParts.push('<span style="color:#bbf7d0">✅ ' + undVerde.toLocaleString() + ' und</span>');
-        if (undAmb   > 0) undDetalleParts.push('<span style="color:#fde68a">🟡 ' + undAmb.toLocaleString()   + ' und</span>');
-        if (undRojo  > 0) undDetalleParts.push('<span style="color:#fca5a5">🔴 ' + undRojo.toLocaleString()   + ' und</span>');
-        undDetalleParts.push('<span style="color:' + pctClr + ';font-weight:700">' + pctEnt + '% entregado</span>');
-        var undDetalleHtml = '<span style="display:flex;flex-wrap:wrap;gap:6px;font-size:10px;margin-top:1px">' + undDetalleParts.join('') + '</span>';
+        // Grid: columna = count de pedidos arriba + und abajo, % en esquina derecha
+        var _pill = 'display:inline-block;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:800';
+        var _col  = 'display:flex;flex-direction:column;align-items:flex-start;gap:2px';
+        var _und  = 'font-size:10px;margin-top:1px';
+        var metaGridHtml =
+          '<div style="display:flex;gap:8px;align-items:flex-start">' +
+            '<div style="' + _col + '">' +
+              '<span style="font-size:11px;font-weight:700;color:rgba(255,255,255,.9)">' + nTotal + ' pedido' + (nTotal!==1?'s':'') + '</span>' +
+              (totalG > 0 ? '<span style="' + _und + ';color:rgba(255,255,255,.6)">' + totalG.toLocaleString() + ' und</span>' : '') +
+            '</div>' +
+            (nListos > 0 ?
+              '<div style="' + _col + '">' +
+                '<span style="' + _pill + ';background:rgba(21,128,61,.25);color:#bbf7d0;border:1px solid rgba(21,128,61,.45)">' + nListos + ' ✓</span>' +
+                '<span style="' + _und + ';color:#bbf7d0">' + undVerde.toLocaleString() + ' und</span>' +
+              '</div>' : '') +
+            (nParciales > 0 ?
+              '<div style="' + _col + '">' +
+                '<span style="' + _pill + ';background:rgba(217,119,6,.25);color:#fde68a;border:1px solid rgba(217,119,6,.45)">' + nParciales + ' ~</span>' +
+                '<span style="' + _und + ';color:#fde68a">' + undAmb.toLocaleString() + ' und</span>' +
+              '</div>' : '') +
+            (nPendientes > 0 ?
+              '<div style="' + _col + '">' +
+                '<span style="' + _pill + ';background:rgba(185,28,28,.25);color:#fca5a5;border:1px solid rgba(185,28,28,.45)">' + nPendientes + ' ●</span>' +
+                '<span style="' + _und + ';color:#fca5a5">' + undRojo.toLocaleString() + ' und</span>' +
+              '</div>' : '') +
+            '<span style="margin-left:auto;font-size:10px;font-weight:700;color:' + pctClr + ';align-self:flex-end">' + pctEnt + '% ent</span>' +
+          '</div>';
         // Solo calcular tiempo para fichas amarillas (parcial) y rojas (sin entrega) — excluir LISTA y verde
         var horasG = gItems.reduce(function(sum, item) {
           if (item.estado === 'lista' || getTier(item) === 2) return sum;
@@ -2749,9 +2764,7 @@ function boardBuildSinBlock(items) {
             '<div class="sin-grupo-info">' +
               '<span class="sin-grupo-nombre">' + cli + '</span>' +
               '<div class="sin-grupo-meta">' +
-                '<span>' + pedidosTxt + '</span>' +
-                (undTxt ? '<span>' + undTxt + '</span>' : '') +
-                (totalG > 0 ? undDetalleHtml : '') +
+                metaGridHtml +
                 (tiempoTxt ? '<span>' + tiempoTxt + '</span>' : '') +
               '</div>' +
             '</div>' +
