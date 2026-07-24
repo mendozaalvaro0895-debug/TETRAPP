@@ -1036,14 +1036,27 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
       <button class="m-close" onclick="cerrarModalMovSerig()">✕</button>
     </div>
     <div class="mb">
-      <div class="fg full" style="margin-bottom:10px;padding:9px 11px;background:var(--serig-l,#EEF2FF);border:1px dashed var(--serig-m,#818CF8);border-radius:9px">
-        <div class="fl" style="margin-bottom:4px">📋 Pegar requi del sistema (PDF) — llena Requi, Fecha, SKU y Cantidad</div>
-        <textarea id="movSPaste" rows="3" placeholder="Abrí el PDF de la salida, Ctrl+A · Ctrl+C, y pegá el texto aquí…" style="width:100%;box-sizing:border-box;font-size:11px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:'DM Mono',monospace;resize:vertical"></textarea>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
-          <button type="button" onclick="leerDesdeImagen('salida')" id="btnImgSalida" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">📷 Leer imagen</button>
-          <button type="button" onclick="rellenarDesdeRequi()" style="background:var(--serig-m,#4F46E5);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">✨ Rellenar texto</button>
-          <span id="movSPasteMsg" style="font-size:11px;color:#64748b"></span>
+      <div class="fg full" style="margin-bottom:10px">
+        <!-- Zona de pegado de imagen -->
+        <div id="imgZoneS" tabindex="0" onclick="this.focus()"
+             onpaste="capturarImagenPegada(event,'salida')"
+             onfocus="this.style.borderColor='#0d9488'" onblur="this.style.borderColor='#0f766e'"
+             style="border:2px dashed #0f766e;border-radius:10px;padding:12px 14px;cursor:pointer;text-align:center;background:#f0fdf4;outline:none;margin-bottom:8px;transition:border-color .15s">
+          <div id="imgZoneSLbl" style="font-size:13px;font-weight:800;color:#0f766e">📋 Clic aquí y pegá la imagen · Ctrl+V</div>
+          <div style="font-size:10px;color:#64748b;margin-top:2px">ó <span onclick="event.stopPropagation();leerDesdeImagen('salida')" style="cursor:pointer;text-decoration:underline;color:#6366f1">seleccioná un archivo</span></div>
+          <img id="imgPrevS" style="display:none;max-width:100%;max-height:110px;border-radius:6px;margin-top:8px;object-fit:contain">
         </div>
+        <!-- Alternativa: texto de PDF -->
+        <details style="margin-top:2px">
+          <summary style="font-size:10px;color:#64748b;cursor:pointer;padding:2px 0">📄 O pegá el texto del PDF</summary>
+          <div style="margin-top:6px;padding:9px 11px;background:var(--serig-l,#EEF2FF);border:1px dashed var(--serig-m,#818CF8);border-radius:9px">
+            <textarea id="movSPaste" rows="3" placeholder="Ctrl+A · Ctrl+C en el PDF y pegá aquí…" style="width:100%;box-sizing:border-box;font-size:11px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:'DM Mono',monospace;resize:vertical"></textarea>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+              <button type="button" onclick="rellenarDesdeRequi()" style="background:var(--serig-m,#4F46E5);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">✨ Rellenar texto</button>
+              <span id="movSPasteMsg" style="font-size:11px;color:#64748b"></span>
+            </div>
+          </div>
+        </details>
       </div>
       <div class="fr">
         <div class="fg">
@@ -4561,10 +4574,15 @@ function abrirFormEntregado() {
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
         '<span style="font-size:14px;font-weight:800;color:var(--serig-m)">📦 Registrar entregado</span>' +
         '<div style="display:flex;gap:6px">' +
-          '<button type="button" onclick="leerDesdeImagen(\'ingreso\')" id="btnImgIngreso" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer">📷 Leer Requi</button>' +
           '<button onclick="guardarEntregadoManual()" style="background:var(--serig-m);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>' +
           '<button onclick="cerrarFormEntregado()" style="background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">✕</button>' +
         '</div>' +
+      '</div>' +
+      // Zona de pegado de imagen
+      '<div id="imgZoneI" tabindex="0" onclick="this.focus()" onpaste="capturarImagenPegada(event,\'ingreso\')" onfocus="this.style.borderColor=\'#0d9488\'" onblur="this.style.borderColor=\'#0f766e\'" style="border:2px dashed #0f766e;border-radius:10px;padding:10px 14px;cursor:pointer;text-align:center;background:#f0fdf4;outline:none;margin-bottom:10px;transition:border-color .15s">' +
+        '<div id="imgZoneILbl" style="font-size:13px;font-weight:800;color:#0f766e">📋 Clic aquí y pegá la imagen · Ctrl+V</div>' +
+        '<div style="font-size:10px;color:#64748b;margin-top:2px">ó <span onclick="event.stopPropagation();leerDesdeImagen(\'ingreso\')" style="cursor:pointer;text-decoration:underline;color:#6366f1">seleccioná un archivo</span></div>' +
+        '<img id="imgPrevI" style="display:none;max-width:100%;max-height:100px;border-radius:6px;margin-top:6px;object-fit:contain">' +
       '</div>' +
       // Fila 2: Requi + Fecha
       '<div style="display:grid;grid-template-columns:220px 150px;gap:6px;margin-bottom:7px">' +
@@ -8062,51 +8080,52 @@ function parseRequiTexto(txt) {
 }
 
 // ── Lector de imagen (Claude Vision) ─────────────────────────────
+
+// Maneja Ctrl+V sobre la zona de pegado
+function capturarImagenPegada(event, tipo) {
+  var items = (event.clipboardData || {}).items || [];
+  var imageItem = null;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') >= 0) { imageItem = items[i]; break; }
+  }
+  if (!imageItem) return;
+  event.preventDefault();
+  var blob = imageItem.getAsFile();
+  var lblId = tipo === 'salida' ? 'imgZoneSLbl' : 'imgZoneILbl';
+  var prevId = tipo === 'salida' ? 'imgPrevS' : 'imgPrevI';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var prev = document.getElementById(prevId);
+    if (prev) { prev.src = e.target.result; prev.style.display = 'block'; }
+    var lbl = document.getElementById(lblId);
+    if (lbl) { lbl.style.color = '#0f766e'; lbl.textContent = '⏳ Analizando con IA…'; }
+    var img = new Image();
+    img.onload = function() { _enviarParseDoc(img, tipo, lblId); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(blob);
+}
+
+// Fallback: selector de archivo
 function leerDesdeImagen(tipo) {
   var inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
+  inp.type = 'file'; inp.accept = 'image/*';
   inp.style.display = 'none';
   document.body.appendChild(inp);
   inp.addEventListener('change', function() {
     var file = inp.files && inp.files[0];
     document.body.removeChild(inp);
     if (!file) return;
-    var btnId = tipo === 'salida' ? 'btnImgSalida' : 'btnImgIngreso';
-    var btn = document.getElementById(btnId);
-    if (btn) { btn.textContent = '⏳ Leyendo…'; btn.disabled = true; }
-    var msgEl = tipo === 'salida' ? document.getElementById('movSPasteMsg') : null;
-    if (msgEl) { msgEl.style.color = '#64748b'; msgEl.textContent = 'Analizando imagen con IA…'; }
-
+    var lblId = tipo === 'salida' ? 'imgZoneSLbl' : 'imgZoneILbl';
+    var prevId = tipo === 'salida' ? 'imgPrevS' : 'imgPrevI';
     var reader = new FileReader();
     reader.onload = function(e) {
-      // Comprimir con Canvas antes de enviar
+      var prev = document.getElementById(prevId);
+      if (prev) { prev.src = e.target.result; prev.style.display = 'block'; }
+      var lbl = document.getElementById(lblId);
+      if (lbl) { lbl.style.color = '#0f766e'; lbl.textContent = '⏳ Analizando con IA…'; }
       var img = new Image();
-      img.onload = function() {
-        var MAX = 1400;
-        var w = img.width, h = img.height;
-        if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-        var canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        var b64 = canvas.toDataURL('image/jpeg', 0.88).split(',')[1];
-
-        fetch('/api/parse-doc', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_base64: b64, mime_type: 'image/jpeg', tipo: tipo })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(result) {
-          if (result.error) throw new Error(result.error);
-          if (tipo === 'salida') _aplicarResultadoSalida(result);
-          else                   _aplicarResultadoIngreso(result);
-        })
-        .catch(function(err) {
-          if (btn) { btn.textContent = '📷 Leer imagen'; btn.disabled = false; }
-          if (msgEl) { msgEl.style.color = '#b91c1c'; msgEl.textContent = '❌ ' + err.message; }
-          else showToast('❌ Error al leer imagen: ' + err.message, '#b91c1c');
-        });
-      };
+      img.onload = function() { _enviarParseDoc(img, tipo, lblId); };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
@@ -8114,9 +8133,34 @@ function leerDesdeImagen(tipo) {
   inp.click();
 }
 
-function _aplicarResultadoSalida(result) {
-  var btn = document.getElementById('btnImgSalida');
-  var msg = document.getElementById('movSPasteMsg');
+// Comprimir → llamar API → aplicar resultado
+function _enviarParseDoc(imgEl, tipo, lblId) {
+  var MAX = 1400;
+  var w = imgEl.width, h = imgEl.height;
+  if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+  var canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(imgEl, 0, 0, w, h);
+  var b64 = canvas.toDataURL('image/jpeg', 0.88).split(',')[1];
+
+  fetch('/api/parse-doc', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image_base64: b64, mime_type: 'image/jpeg', tipo: tipo })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(result) {
+    if (result.error) throw new Error(result.error);
+    if (tipo === 'salida') _aplicarResultadoSalida(result, lblId);
+    else                   _aplicarResultadoIngreso(result, lblId);
+  })
+  .catch(function(err) {
+    var lbl = document.getElementById(lblId);
+    if (lbl) { lbl.style.color = '#b91c1c'; lbl.textContent = '❌ ' + err.message.slice(0, 80); }
+  });
+}
+
+function _aplicarResultadoSalida(result, lblId) {
   if (result.requi) document.getElementById('movSRequi').value = result.requi;
   if (result.fecha) document.getElementById('movSFecha').value = result.fecha;
 
@@ -8134,17 +8178,19 @@ function _aplicarResultadoSalida(result) {
     agregarLineaMovS();
   }
 
-  var resumen = '✅ ' + (result.requi || 'Sin requi')
+  var ok = !result.warnings || !result.warnings.length;
+  var txt = '✅ ' + (result.requi || 'Sin requi')
     + (result.fecha ? ' · ' + result.fecha : '')
     + (result.descripcion ? ' · ' + result.descripcion : '')
     + ' · ' + prods.length + ' productos';
-  if (result.warnings && result.warnings.length) resumen += '  ⚠️ ' + result.warnings.join('; ');
-  if (msg) { msg.style.color = result.warnings && result.warnings.length ? '#b45309' : '#059669'; msg.textContent = resumen; }
-  if (btn) { btn.textContent = '📷 Leer imagen'; btn.disabled = false; }
+  if (!ok) txt += '  ⚠️ ' + result.warnings.join('; ');
+  var lbl = document.getElementById(lblId || 'imgZoneSLbl');
+  if (lbl) { lbl.style.color = ok ? '#059669' : '#b45309'; lbl.textContent = txt; }
+  var msg = document.getElementById('movSPasteMsg');
+  if (msg) { msg.style.color = ok ? '#059669' : '#b45309'; msg.textContent = txt; }
 }
 
-function _aplicarResultadoIngreso(result) {
-  var btn = document.getElementById('btnImgIngreso');
+function _aplicarResultadoIngreso(result, lblId) {
   var rEl = document.getElementById('eRequi');
   var fEl = document.getElementById('eFecha');
   var nEl = document.getElementById('eNota');
@@ -8152,7 +8198,6 @@ function _aplicarResultadoIngreso(result) {
   if (fEl && result.fecha) fEl.value = result.fecha;
   if (nEl && result.descripcion) nEl.value = result.descripcion;
 
-  // Reconstruir líneas de producto
   var prods = result.productos || [];
   if (prods.length) {
     eEntregadoSkus = {}; eLineasCount = 0;
@@ -8165,12 +8210,13 @@ function _aplicarResultadoIngreso(result) {
     });
   }
 
-  var resumen = '✅ ' + (result.requi || 'Sin requi')
+  var ok = !result.warnings || !result.warnings.length;
+  var txt = '✅ ' + (result.requi || 'Sin requi')
     + (result.fecha ? ' · ' + result.fecha : '')
     + ' · ' + prods.length + ' productos leídos';
-  if (result.warnings && result.warnings.length) resumen += '  ⚠️ ' + result.warnings.join('; ');
-  showToast(resumen, result.warnings && result.warnings.length ? '#92400e' : '#059669');
-  if (btn) { btn.textContent = '📷 Leer Requi'; btn.disabled = false; }
+  if (!ok) txt += '  ⚠️ ' + result.warnings.join('; ');
+  var lbl = document.getElementById(lblId || 'imgZoneILbl');
+  if (lbl) { lbl.style.color = ok ? '#059669' : '#b45309'; lbl.textContent = txt; }
 }
 
 function rellenarDesdeRequi() {
