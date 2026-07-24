@@ -81,11 +81,40 @@ begin
   values (p_fecha, p_hora, p_descripcion, p_sku, p_cantidad, p_operador_codigo, p_area_origen);
 end $$;
 
+-- ── 4. Buscar SKU por descripción (trazabilidad) ──────────────
+-- Recibe el texto del diseño/producto ("Morton Gelo") y devuelve los SKUs
+-- del inventario que más palabras comparten. El bot vincula el SKU si el
+-- mejor candidato cubre TODAS las palabras y es único. Igual criterio que
+-- el autocomplete del formulario real (acGen en registro-serigrafia.html).
+create or replace function public.bot_buscar_sku(p_texto text)
+returns table(sku text, descripcion text, hits int)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with toks as (
+    select tok
+    from unnest(string_to_array(lower(trim(p_texto)), ' ')) as tok
+    where length(tok) >= 2
+  )
+  select
+    i.sku::text,
+    i.descripcion,
+    (select count(*)::int from toks t where lower(i.descripcion) like '%' || t.tok || '%') as hits
+  from inventario i
+  where i.activo = true
+    and trim(coalesce(p_texto, '')) <> ''
+  order by hits desc, length(i.descripcion) asc
+  limit 5;
+$$;
+
 -- ── Dar permiso al rol anon (clave publishable del bot) ───────
 -- Firma explícita en tiro por si coexiste otra versión (evita "not unique").
 grant execute on function public.bot_insertar_tiro(date, text, text, int, text, int, text, text) to anon;
 grant execute on function public.bot_insertar_flameado to anon;
 grant execute on function public.bot_insertar_empaque  to anon;
+grant execute on function public.bot_buscar_sku(text)  to anon;
 
 -- Recargar el cache de esquema de PostgREST (para que reconozca los args nuevos)
 notify pgrst, 'reload schema';

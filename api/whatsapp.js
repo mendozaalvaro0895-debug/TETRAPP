@@ -118,6 +118,35 @@ async function insertar(db, tipo, datos, fecha, hora) {
   return false; // tipo desconocido
 }
 
+// ── Resolver SKU desde la descripción (trazabilidad) ──────────────
+// Busca en inventario el SKU que coincide con el texto del diseño/producto,
+// igual que el autocomplete del formulario real (acGen). Muta `datos` para
+// agregar sku + descripción oficial. Devuelve una nota corta para la respuesta.
+async function resolverSku(db, datos) {
+  var texto = (datos.descripcion || datos.diseno || '').trim();
+  if (!texto || datos.sku) return '';            // ya trae sku o no hay texto
+
+  var r;
+  try { r = await db.rpc('bot_buscar_sku', { p_texto: texto }); }
+  catch(_) { return ''; }
+  if (r.error || !r.data || !r.data.length) return ' · ⚠️ sin SKU';
+
+  var toks = texto.toLowerCase().split(/\s+/).filter(function(t){ return t.length >= 2; });
+  var top = r.data[0];
+  var second = r.data[1];
+  var unico = !second || second.hits < top.hits;
+
+  // Coincidencia confiable: el mejor cubre TODAS las palabras y es único
+  if (top.hits >= toks.length && unico) {
+    datos.sku = String(top.sku);
+    datos.descripcion = top.descripcion;         // descripción oficial del inventario
+    return ' · 🔗 SKU ' + top.sku;
+  }
+  // Ambiguo: varias opciones con el mismo puntaje → no vincular, avisar
+  return ' · ⚠️ SKU ambiguo (' +
+    r.data.slice(0, 3).map(function(x){ return x.sku; }).join(' / ') + ')';
+}
+
 // ── Prompt del sistema ────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `Eres el asistente interno de TETRAPP para la planta de Serigrafía de Tetraplastic Guatemala.
@@ -271,11 +300,13 @@ module.exports = async function handler(req, res) {
 
     // ── Datos completos: insertar en Supabase ─────────────────────
     try {
-      const ok = await insertar(db, parsed.tipo, parsed.datos || {}, fecha, hora);
+      const datos = parsed.datos || {};
+      const notaSku = await resolverSku(db, datos);   // vincula SKU antes de guardar
+      const ok = await insertar(db, parsed.tipo, datos, fecha, hora);
       await clearEstado(db, from).catch(() => {});
 
       const resp = ok
-        ? '✅ ' + (parsed.mensaje_confirmacion || 'Registro guardado · ' + fecha)
+        ? '✅ ' + (parsed.mensaje_confirmacion || 'Registro guardado · ' + fecha) + notaSku
         : '⚠️ Tipo no reconocido: ' + parsed.tipo + '. Escribe "ayuda" para ver los formatos.';
 
       res.setHeader('Content-Type', 'text/xml');
