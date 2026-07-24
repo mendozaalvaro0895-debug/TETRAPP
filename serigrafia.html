@@ -1040,7 +1040,8 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
         <div class="fl" style="margin-bottom:4px">📋 Pegar requi del sistema (PDF) — llena Requi, Fecha, SKU y Cantidad</div>
         <textarea id="movSPaste" rows="3" placeholder="Abrí el PDF de la salida, Ctrl+A · Ctrl+C, y pegá el texto aquí…" style="width:100%;box-sizing:border-box;font-size:11px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:'DM Mono',monospace;resize:vertical"></textarea>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
-          <button type="button" onclick="rellenarDesdeRequi()" style="background:var(--serig-m,#4F46E5);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">✨ Rellenar</button>
+          <button type="button" onclick="leerDesdeImagen('salida')" id="btnImgSalida" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">📷 Leer imagen</button>
+          <button type="button" onclick="rellenarDesdeRequi()" style="background:var(--serig-m,#4F46E5);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">✨ Rellenar texto</button>
           <span id="movSPasteMsg" style="font-size:11px;color:#64748b"></span>
         </div>
       </div>
@@ -4560,6 +4561,7 @@ function abrirFormEntregado() {
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
         '<span style="font-size:14px;font-weight:800;color:var(--serig-m)">📦 Registrar entregado</span>' +
         '<div style="display:flex;gap:6px">' +
+          '<button type="button" onclick="leerDesdeImagen(\'ingreso\')" id="btnImgIngreso" style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer">📷 Leer Requi</button>' +
           '<button onclick="guardarEntregadoManual()" style="background:var(--serig-m);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>' +
           '<button onclick="cerrarFormEntregado()" style="background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">✕</button>' +
         '</div>' +
@@ -8057,6 +8059,118 @@ function parseRequiTexto(txt) {
     out.warnings.push('SKU(' + skus.length + ') y cantidades(' + cants.length + ') no coinciden — revisá');
   }
   return out;
+}
+
+// ── Lector de imagen (Claude Vision) ─────────────────────────────
+function leerDesdeImagen(tipo) {
+  var inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
+  inp.style.display = 'none';
+  document.body.appendChild(inp);
+  inp.addEventListener('change', function() {
+    var file = inp.files && inp.files[0];
+    document.body.removeChild(inp);
+    if (!file) return;
+    var btnId = tipo === 'salida' ? 'btnImgSalida' : 'btnImgIngreso';
+    var btn = document.getElementById(btnId);
+    if (btn) { btn.textContent = '⏳ Leyendo…'; btn.disabled = true; }
+    var msgEl = tipo === 'salida' ? document.getElementById('movSPasteMsg') : null;
+    if (msgEl) { msgEl.style.color = '#64748b'; msgEl.textContent = 'Analizando imagen con IA…'; }
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      // Comprimir con Canvas antes de enviar
+      var img = new Image();
+      img.onload = function() {
+        var MAX = 1400;
+        var w = img.width, h = img.height;
+        if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        var b64 = canvas.toDataURL('image/jpeg', 0.88).split(',')[1];
+
+        fetch('/api/parse-doc', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_base64: b64, mime_type: 'image/jpeg', tipo: tipo })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+          if (result.error) throw new Error(result.error);
+          if (tipo === 'salida') _aplicarResultadoSalida(result);
+          else                   _aplicarResultadoIngreso(result);
+        })
+        .catch(function(err) {
+          if (btn) { btn.textContent = '📷 Leer imagen'; btn.disabled = false; }
+          if (msgEl) { msgEl.style.color = '#b91c1c'; msgEl.textContent = '❌ ' + err.message; }
+          else showToast('❌ Error al leer imagen: ' + err.message, '#b91c1c');
+        });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+  inp.click();
+}
+
+function _aplicarResultadoSalida(result) {
+  var btn = document.getElementById('btnImgSalida');
+  var msg = document.getElementById('movSPasteMsg');
+  if (result.requi) document.getElementById('movSRequi').value = result.requi;
+  if (result.fecha) document.getElementById('movSFecha').value = result.fecha;
+
+  movSLineasCount = 0; movSSkus = {}; movSSolIds = {};
+  var cont = document.getElementById('movSLineasContainer');
+  if (cont) cont.innerHTML = '';
+  var prods = result.productos || [];
+  if (prods.length) {
+    prods.forEach(function(pr) {
+      var inv = (inventarioCache || []).find(function(x){ return String(x.sku) === String(pr.sku); });
+      var desc = inv ? pr.sku + ' — ' + inv.descripcion : (pr.sku ? pr.sku + (pr.desc ? ' — ' + pr.desc : '') : pr.desc || '');
+      agregarLineaMovS(desc, pr.sku || '', pr.cant || '');
+    });
+  } else {
+    agregarLineaMovS();
+  }
+
+  var resumen = '✅ ' + (result.requi || 'Sin requi')
+    + (result.fecha ? ' · ' + result.fecha : '')
+    + (result.descripcion ? ' · ' + result.descripcion : '')
+    + ' · ' + prods.length + ' productos';
+  if (result.warnings && result.warnings.length) resumen += '  ⚠️ ' + result.warnings.join('; ');
+  if (msg) { msg.style.color = result.warnings && result.warnings.length ? '#b45309' : '#059669'; msg.textContent = resumen; }
+  if (btn) { btn.textContent = '📷 Leer imagen'; btn.disabled = false; }
+}
+
+function _aplicarResultadoIngreso(result) {
+  var btn = document.getElementById('btnImgIngreso');
+  var rEl = document.getElementById('eRequi');
+  var fEl = document.getElementById('eFecha');
+  var nEl = document.getElementById('eNota');
+  if (rEl && result.requi) rEl.value = result.requi;
+  if (fEl && result.fecha) fEl.value = result.fecha;
+  if (nEl && result.descripcion) nEl.value = result.descripcion;
+
+  // Reconstruir líneas de producto
+  var prods = result.productos || [];
+  if (prods.length) {
+    eEntregadoSkus = {}; eLineasCount = 0;
+    var cont = document.getElementById('eLineasContainer');
+    if (cont) cont.innerHTML = '';
+    prods.forEach(function(pr) {
+      var inv = (inventarioCache || []).find(function(x){ return String(x.sku) === String(pr.sku); });
+      var desc = inv ? pr.sku + ' — ' + inv.descripcion : (pr.sku ? pr.sku + (pr.desc ? ' — ' + pr.desc : '') : pr.desc || '');
+      agregarLineaEntregado(desc, pr.sku || null, pr.cant || '', '');
+    });
+  }
+
+  var resumen = '✅ ' + (result.requi || 'Sin requi')
+    + (result.fecha ? ' · ' + result.fecha : '')
+    + ' · ' + prods.length + ' productos leídos';
+  if (result.warnings && result.warnings.length) resumen += '  ⚠️ ' + result.warnings.join('; ');
+  showToast(resumen, result.warnings && result.warnings.length ? '#92400e' : '#059669');
+  if (btn) { btn.textContent = '📷 Leer Requi'; btn.disabled = false; }
 }
 
 function rellenarDesdeRequi() {
