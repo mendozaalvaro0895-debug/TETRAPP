@@ -76,9 +76,18 @@ Reglas: cantidad siempre entero · omitir filas de subtotal/total · si un campo
       }]
     });
 
-    const raw = aiResp.content[0].text.trim()
+    // Buscar el bloque de texto (Sonnet puede devolver otros tipos de bloque primero)
+    const textBlock = (aiResp.content || []).find(function(b) { return b.type === 'text' && b.text; });
+    if (!textBlock) throw new Error('La IA no devolvió texto legible');
+    const raw = textBlock.text.trim()
       .replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim();
-    const parsed = JSON.parse(raw);
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch(pe) {
+      console.error('[parse-doc] JSON inválido:', raw.slice(0, 300));
+      throw new Error('Respuesta no es JSON válido');
+    }
     res.json(parsed);
   } catch(e) {
     console.error('[parse-doc]', e.message);
