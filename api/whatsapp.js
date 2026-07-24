@@ -119,32 +119,35 @@ async function insertar(db, tipo, datos, fecha, hora) {
 }
 
 // ── Resolver SKU desde la descripción (trazabilidad) ──────────────
-// Busca en inventario el SKU que coincide con el texto del diseño/producto,
-// igual que el autocomplete del formulario real (acGen). Muta `datos` para
-// agregar sku + descripción oficial. Devuelve una nota corta para la respuesta.
+// Devuelve { nota, opciones? }
+//   · 1 coincidencia clara → muta datos con sku/descripcion oficial, nota con SKU
+//   · varias opciones      → nota vacía + opciones[] para que el operador elija
+//   · ninguna              → nota de aviso
 async function resolverSku(db, datos) {
   var texto = (datos.descripcion || datos.diseno || '').trim();
-  if (!texto || datos.sku) return '';            // ya trae sku o no hay texto
+  if (!texto || datos.sku) return { nota: '' };
 
   var r;
   try { r = await db.rpc('bot_buscar_sku', { p_texto: texto }); }
-  catch(_) { return ''; }
-  if (r.error || !r.data || !r.data.length) return ' · ⚠️ sin SKU';
+  catch(_) { return { nota: '' }; }
+  if (r.error || !r.data) return { nota: '' };
+
+  var conHits = r.data.filter(function(x){ return x.hits > 0; });
+  if (!conHits.length) return { nota: ' · ⚠️ sin SKU en inventario' };
 
   var toks = texto.toLowerCase().split(/\s+/).filter(function(t){ return t.length >= 2; });
-  var top = r.data[0];
-  var second = r.data[1];
-  var unico = !second || second.hits < top.hits;
+  var top = conHits[0];
+  var unico = conHits.length === 1 || conHits[1].hits < top.hits;
 
-  // Coincidencia confiable: el mejor cubre TODAS las palabras y es único
+  // Coincidencia confiable: top cubre TODAS las palabras y no hay empate
   if (top.hits >= toks.length && unico) {
     datos.sku = String(top.sku);
-    datos.descripcion = top.descripcion;         // descripción oficial del inventario
-    return ' · 🔗 SKU ' + top.sku;
+    datos.descripcion = top.descripcion;
+    return { nota: ' · 🔗 SKU ' + top.sku };
   }
-  // Ambiguo: varias opciones con el mismo puntaje → no vincular, avisar
-  return ' · ⚠️ SKU ambiguo (' +
-    r.data.slice(0, 3).map(function(x){ return x.sku; }).join(' / ') + ')';
+
+  // Varias opciones → devolver lista para que el operador elija
+  return { opciones: conHits.slice(0, 5), nota: '' };
 }
 
 // ── Prompt del sistema ────────────────────────────────────────────
@@ -245,9 +248,58 @@ module.exports = async function handler(req, res) {
     let estadoPrevio = null;
     try { estadoPrevio = await getEstado(db, from); } catch(_) {}
 
-    // Construir el mensaje para Claude
+    // ── ¿El operador está eligiendo un SKU de la lista? ──────────
+    if (estadoPrevio && estadoPrevio.pendiente_sku) {
+      const ops   = estadoPrevio.pendiente_sku.opciones || [];
+      const datos = estadoPrevio.pendiente_sku.datos    || {};
+      const tipo  = estadoPrevio.pendiente_sku.tipo;
+      const sel   = parseInt(msgText.trim());
+      const limpiar = msgText.toLowerCase();
+
+      // 0 o "ninguno" → guardar sin SKU
+      if (sel === 0 || limpiar.includes('ninguno') || limpiar.includes('sin sku')) {
+        try {
+          await insertar(db, tipo, datos, fecha, hora);
+          await clearEstado(db, from).catch(() => {});
+          res.setHeader('Content-Type', 'text/xml');
+          res.end(twiml('✅ Registrado sin SKU · ' + fecha));
+        } catch(e) {
+          res.setHeader('Content-Type', 'text/xml');
+          res.end(twiml('❌ Error BD: ' + e.message));
+        }
+        return;
+      }
+
+      // Número válido → vincular SKU seleccionado
+      if (sel >= 1 && sel <= ops.length) {
+        datos.sku         = String(ops[sel - 1].sku);
+        datos.descripcion = ops[sel - 1].descripcion;
+        try {
+          await insertar(db, tipo, datos, fecha, hora);
+          await clearEstado(db, from).catch(() => {});
+          res.setHeader('Content-Type', 'text/xml');
+          res.end(twiml(
+            '✅ Registrado · 🔗 ' + datos.sku + ' · ' + datos.descripcion.slice(0, 45)
+          ));
+        } catch(e) {
+          res.setHeader('Content-Type', 'text/xml');
+          res.end(twiml('❌ Error BD: ' + e.message));
+        }
+        return;
+      }
+
+      // Entrada inválida → repetir lista
+      const lista = ops.map(function(o, i){
+        return (i + 1) + ') ' + o.sku + ' · ' + o.descripcion.slice(0, 40);
+      }).join('\n');
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml('⚠️ Elegí un número:\n' + lista + '\n0) Sin SKU'));
+      return;
+    }
+
+    // Construir el mensaje para Claude (flujo normal)
     let userContent = msgText;
-    if (estadoPrevio) {
+    if (estadoPrevio && !estadoPrevio.pendiente_sku) {
       userContent =
         `DATOS INCOMPLETOS DEL MENSAJE ANTERIOR:\n${JSON.stringify(estadoPrevio, null, 2)}\n\n` +
         `RESPUESTA DE ÁLVARO: "${msgText}"\n\n` +
@@ -298,15 +350,32 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // ── Datos completos: insertar en Supabase ─────────────────────
+    // ── Datos completos: resolver SKU e insertar ─────────────────
     try {
       const datos = parsed.datos || {};
-      const notaSku = await resolverSku(db, datos);   // vincula SKU antes de guardar
+      const skuRes = await resolverSku(db, datos);
+
+      // Varias opciones → preguntar al operador sin insertar todavía
+      if (skuRes.opciones && skuRes.opciones.length) {
+        const lista = skuRes.opciones.map(function(o, i){
+          return (i + 1) + ') ' + o.sku + ' · ' + o.descripcion.slice(0, 40);
+        }).join('\n');
+        try {
+          await setEstado(db, from, {
+            pendiente_sku: { tipo: parsed.tipo, datos, opciones: skuRes.opciones }
+          });
+        } catch(_) {}
+        res.setHeader('Content-Type', 'text/xml');
+        res.end(twiml('❓ ¿Cuál producto?\n' + lista + '\n0) Sin SKU'));
+        return;
+      }
+
+      // SKU resuelto (único) o sin coincidencia → insertar directamente
       const ok = await insertar(db, parsed.tipo, datos, fecha, hora);
       await clearEstado(db, from).catch(() => {});
 
       const resp = ok
-        ? '✅ ' + (parsed.mensaje_confirmacion || 'Registro guardado · ' + fecha) + notaSku
+        ? '✅ ' + (parsed.mensaje_confirmacion || 'Registro guardado · ' + fecha) + skuRes.nota
         : '⚠️ Tipo no reconocido: ' + parsed.tipo + '. Escribe "ayuda" para ver los formatos.';
 
       res.setHeader('Content-Type', 'text/xml');

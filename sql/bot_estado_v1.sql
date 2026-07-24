@@ -12,15 +12,22 @@ CREATE TABLE IF NOT EXISTS public.bot_estado (
   updated_at      timestamptz DEFAULT now()
 );
 
--- El bot usa service_role key (bypasses RLS) pero igual activamos RLS
+-- El bot usa la clave publishable (rol anon) via RPCs SECURITY DEFINER.
+-- Le damos acceso directo a bot_estado para que pueda guardar el estado
+-- de conversación (selección de SKU pendiente, datos incompletos, etc.).
 ALTER TABLE public.bot_estado ENABLE ROW LEVEL SECURITY;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.bot_estado TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.bot_estado TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.bot_estado TO anon;
 
 DROP POLICY IF EXISTS bs_master ON public.bot_estado;
 CREATE POLICY bs_master ON public.bot_estado
   FOR ALL TO authenticated USING (public.es_master()) WITH CHECK (public.es_master());
+
+DROP POLICY IF EXISTS bs_anon ON public.bot_estado;
+CREATE POLICY bs_anon ON public.bot_estado
+  FOR ALL TO anon USING (true) WITH CHECK (true);
 
 NOTIFY pgrst, 'reload schema';
 
