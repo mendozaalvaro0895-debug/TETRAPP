@@ -4063,33 +4063,78 @@ function exportarBoardPDF() {
 
   function buildSinAsignarHtml(items) {
     if (!items.length) return '<p style="color:#9ca3af;font-size:10px;font-style:italic">Sin pedidos</p>';
-    var grupoMap = {}, grupoKeys = [];
+    var MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+    // Agrupar por mes (YYYY-MM de fecha_lim) → cliente
+    var mesMap = {}, mesKeys = [];
     items.forEach(function(s) {
+      var mesKey = (s.fecha_lim && s.fecha_lim.length >= 7) ? s.fecha_lim.slice(0,7) : '9999-99';
+      if (!mesMap[mesKey]) { mesMap[mesKey] = {}; mesKeys.push(mesKey); }
       var cli = s.cliente || '(Sin cliente)';
-      if (!grupoMap[cli]) { grupoMap[cli] = []; grupoKeys.push(cli); }
-      grupoMap[cli].push(s);
+      if (!mesMap[mesKey][cli]) mesMap[mesKey][cli] = [];
+      mesMap[mesKey][cli].push(s);
     });
-    grupoKeys.sort(function(a,b){ return a.toLowerCase() < b.toLowerCase() ? -1 : 1; });
-    return grupoKeys.map(function(cli) {
-      var gItems = grupoMap[cli].slice().sort(function(a,b){
-        var ta = getTier(a), tb = getTier(b);
-        if (ta !== tb) return ta - tb;
-        return (a.created_at||'')<(b.created_at||'') ? -1 : 1;
-      });
-      var nRojo  = gItems.filter(function(s){ return getTier(s)===0; }).length;
-      var nAmb   = gItems.filter(function(s){ return getTier(s)===1; }).length;
-      var nVerde = gItems.filter(function(s){ return getTier(s)===2; }).length;
-      var totalUnd = gItems.reduce(function(sum,s){ return sum+(s.cant||0); }, 0);
-      var rows = gItems.map(buildSinRow).join('');
-      return '<div class="seccion">' +
-        '<h3>' + escHtml(cli) + ' <span class="badge-count">' + gItems.length + ' pedidos · ' + totalUnd.toLocaleString() + ' und' +
-          (nRojo  ? ' · 🔴 ' + nRojo  : '') +
-          (nAmb   ? ' · 🟡 ' + nAmb   : '') +
-          (nVerde ? ' · 🟢 ' + nVerde : '') +
-        '</span></h3>' +
-        '<table><thead><tr><th>Código</th><th>Descripción</th><th style="text-align:right">Cant.</th><th style="text-align:center">Estado real</th></tr></thead>' +
-        '<tbody>' + rows + '</tbody></table>' +
-        '</div>';
+    mesKeys.sort();
+
+    return mesKeys.map(function(mesKey) {
+      var cliMap = mesMap[mesKey];
+      var cliKeys = Object.keys(cliMap).sort(function(a,b){ return a.toLowerCase()<b.toLowerCase()?-1:1; });
+
+      // Totales del mes
+      var mesItems = [];
+      cliKeys.forEach(function(c){ mesItems = mesItems.concat(cliMap[c]); });
+      var mesTotal = mesItems.reduce(function(s,i){return s+(i.cant||0);},0);
+      var mesRojo  = mesItems.filter(function(s){return getTier(s)===0;}).length;
+      var mesAmb   = mesItems.filter(function(s){return getTier(s)===1;}).length;
+      var mesVerde = mesItems.filter(function(s){return getTier(s)===2;}).length;
+
+      // Etiqueta del mes
+      var isSinFecha = mesKey === '9999-99';
+      var mesLabel, mesColor, mesIcon;
+      if (isSinFecha) {
+        mesLabel = 'Sin fecha límite'; mesColor = '#9ca3af'; mesIcon = '📌';
+      } else {
+        var partes = mesKey.split('-');
+        mesLabel = MESES_ES[parseInt(partes[1],10)-1] + ' ' + partes[0];
+        mesColor = mesRojo > 0 ? '#dc2626' : mesAmb > 0 ? '#d97706' : '#1a6b5b';
+        mesIcon = mesRojo > 0 ? '🔴' : mesAmb > 0 ? '🟡' : '📅';
+      }
+
+      var separador = '<div style="display:flex;align-items:center;gap:10px;margin:20px 0 10px">' +
+        '<span style="font-size:13px;font-weight:900;color:'+mesColor+';white-space:nowrap">' + mesIcon + ' ' + mesLabel + '</span>' +
+        '<span style="font-size:10px;color:#9ca3af;white-space:nowrap">' +
+          mesItems.length + ' ped · ' + mesTotal.toLocaleString() + ' und' +
+          (mesRojo  ? ' · 🔴 '+mesRojo  : '') +
+          (mesAmb   ? ' · 🟡 '+mesAmb   : '') +
+          (mesVerde ? ' · 🟢 '+mesVerde : '') +
+        '</span>' +
+        '<div style="flex:1;height:2px;background:' + (isSinFecha ? '#e5e7eb' : mesColor) + ';opacity:0.35;border-radius:2px"></div>' +
+      '</div>';
+
+      var cliHtml = cliKeys.map(function(cli) {
+        var gItems = cliMap[cli].slice().sort(function(a,b){
+          var ta=getTier(a),tb=getTier(b);
+          if(ta!==tb) return ta-tb;
+          return (a.created_at||'')<(b.created_at||'')?-1:1;
+        });
+        var nRojo  = gItems.filter(function(s){return getTier(s)===0;}).length;
+        var nAmb   = gItems.filter(function(s){return getTier(s)===1;}).length;
+        var nVerde = gItems.filter(function(s){return getTier(s)===2;}).length;
+        var totalUnd = gItems.reduce(function(sum,s){return sum+(s.cant||0);},0);
+        var rows = gItems.map(buildSinRow).join('');
+        return '<div class="seccion">' +
+          '<h3>' + escHtml(cli) + ' <span class="badge-count">' + gItems.length + ' pedidos · ' + totalUnd.toLocaleString() + ' und' +
+            (nRojo  ? ' · 🔴 ' + nRojo  : '') +
+            (nAmb   ? ' · 🟡 ' + nAmb   : '') +
+            (nVerde ? ' · 🟢 ' + nVerde : '') +
+          '</span></h3>' +
+          '<table><thead><tr><th>Código</th><th>Descripción</th><th style="text-align:right">Cant.</th><th style="text-align:center">Estado real</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody></table>' +
+          '</div>';
+      }).join('');
+
+      return separador + cliHtml;
     }).join('');
   }
 
