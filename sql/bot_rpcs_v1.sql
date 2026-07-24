@@ -9,13 +9,18 @@
 -- ═══════════════════════════════════════════════════════════════
 
 -- ── 1. Insertar tiro de impresión ─────────────────────────────
+-- Llena TODAS las columnas del formulario real (registro-serigrafia.html
+-- línea 1512). Por WhatsApp no hay operador: código vacío ('' — el lector
+-- de Productividad lo ignora) y nombre marcado como 'WhatsApp' para trazabilidad.
 create or replace function public.bot_insertar_tiro(
   p_fecha     date,
   p_area      text,
   p_hora      text,
   p_linea_id  int,
   p_momento   text,
-  p_contador  int
+  p_contador  int,
+  p_diseno    text default '',
+  p_sku       text default ''
 )
 returns void
 language plpgsql
@@ -23,8 +28,14 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into registro_tiros_serig(fecha, area, hora, linea_id, momento, contador)
-  values (p_fecha, p_area, p_hora, p_linea_id, p_momento, p_contador);
+  insert into registro_tiros_serig(
+    fecha, area, hora, linea_id, momento, contador,
+    diseno, sku, operador_codigo, operador_nombre
+  )
+  values (
+    p_fecha, p_area, nullif(p_hora, '')::time, p_linea_id, p_momento, p_contador,
+    coalesce(p_diseno, ''), coalesce(p_sku, ''), '', 'WhatsApp'
+  );
 end $$;
 
 -- ── 2. Insertar flameado ──────────────────────────────────────
@@ -71,6 +82,9 @@ end $$;
 grant execute on function public.bot_insertar_tiro     to anon;
 grant execute on function public.bot_insertar_flameado to anon;
 grant execute on function public.bot_insertar_empaque  to anon;
+
+-- Recargar el cache de esquema de PostgREST (para que reconozca los args nuevos)
+notify pgrst, 'reload schema';
 
 -- Verificación
 select proname, prosecdef

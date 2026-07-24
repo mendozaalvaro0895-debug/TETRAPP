@@ -80,6 +80,8 @@ async function insertar(db, tipo, datos, fecha, hora) {
       p_linea_id: Number(datos.linea_id),
       p_momento:  datos.momento,
       p_contador: Number(datos.contador),
+      p_diseno:   datos.descripcion || datos.diseno || '',
+      p_sku:      datos.sku || '',
     });
     if (r.error) throw new Error('tiros: ' + r.error.message);
     return true;
