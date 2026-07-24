@@ -96,7 +96,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .kpi-s{font-size:8px;color:var(--gray-l);margin-top:1px}
 
 /* ── HUB CARDS ────────────────────────────────────────────── */
-.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.hub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
 .hub-card{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;transition:all .16s;display:flex;flex-direction:row;align-items:center;gap:10px}
 .hub-card:hover{border-color:var(--serig-m);box-shadow:0 4px 18px rgba(90,45,158,.13);transform:translateY(-2px)}
 .hub-card-ico{font-size:20px;margin-bottom:0}
@@ -3249,7 +3249,7 @@ function renderProdMensual() {
     prevM = curM;
     var esFuturo = f > todayStr;
     var val = esFuturo ? 0 : (porFecha[f] || 0);
-    var px  = esFuturo ? 2 : (val ? Math.max(Math.round((val / maxVal) * 60), 5) : 2);
+    var px  = esFuturo ? 2 : (val ? Math.max(Math.round((val / maxVal) * 120), 5) : 2);
     var numDia = parseInt(f.slice(8));
     var dow    = new Date(f + 'T12:00:00').getDay(); // 0=Dom, 1=Lun…
     var esDom  = dow === 0;
@@ -3284,7 +3284,7 @@ function renderProdMensual() {
       '<span style="font-size:11px;color:var(--gray-l);text-transform:capitalize">' + mesStr + '</span>' +
     '</div>' +
     '<div class="prod-mens-chart" id="prodChartScroll" style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px">' +
-      '<div style="display:flex;align-items:flex-end;gap:3px;min-height:88px;width:max-content;min-width:100%">' + cols + '</div>' +
+      '<div style="display:flex;align-items:flex-end;gap:3px;min-height:150px;width:max-content;min-width:100%">' + cols + '</div>' +
     '</div>' +
     '<div class="prod-mens-total">' +
       '<div class="prod-stat"><span class="prod-stat-val">' + totalMes.toLocaleString() + '</span><span class="prod-stat-lbl">und totales</span></div>' +
@@ -4135,14 +4135,27 @@ function exportarBoardPDF() {
         var nRojo  = gItems.filter(function(s){return getTier(s)===0;}).length;
         var nAmb   = gItems.filter(function(s){return getTier(s)===1;}).length;
         var nVerde = gItems.filter(function(s){return getTier(s)===2;}).length;
-        var totalUnd = gItems.reduce(function(sum,s){return sum+(s.cant||0);},0);
+        var totalUnd  = gItems.reduce(function(sum,s){return sum+(s.cant||0);},0);
+        var undRojo   = gItems.filter(function(s){return getTier(s)===0;}).reduce(function(sum,s){return sum+(s.cant||0);},0);
+        var undAmb    = gItems.filter(function(s){return getTier(s)===1;}).reduce(function(sum,s){return sum+(s.cant||0);},0);
+        var undVerde  = gItems.filter(function(s){return getTier(s)===2;}).reduce(function(sum,s){return sum+(s.cant||0);},0);
+        var totalEnt  = gItems.reduce(function(sum,s){return sum+(entregadoMap[s.id]||0);},0);
+        var pctEnt    = totalUnd > 0 ? Math.round(totalEnt / totalUnd * 100) : 0;
         var rows = gItems.map(buildSinRow).join('');
+        var undLinea = '<div style="font-size:10px;font-weight:500;color:var(--gray-l);margin:-4px 0 6px;display:flex;flex-wrap:wrap;align-items:center;gap:8px">' +
+          '<span style="color:var(--ink);font-weight:700">' + totalUnd.toLocaleString() + ' und</span>' +
+          (undVerde ? '<span style="color:#15803d">✅ ' + undVerde.toLocaleString() + ' und</span>' : '') +
+          (undAmb   ? '<span style="color:#92400e">🟡 ' + undAmb.toLocaleString()   + ' und</span>' : '') +
+          (undRojo  ? '<span style="color:#991b1b">🔴 ' + undRojo.toLocaleString()   + ' und</span>' : '') +
+          '<span style="margin-left:2px;font-weight:700;color:' + (pctEnt>=100?'#15803d':pctEnt>0?'#92400e':'#9ca3af') + '">' + pctEnt + '% entregado</span>' +
+          '</div>';
         return '<div class="seccion">' +
-          '<h3>' + escHtml(cli) + ' <span class="badge-count">' + gItems.length + ' pedidos · ' + totalUnd.toLocaleString() + ' und' +
+          '<h3>' + escHtml(cli) + ' <span class="badge-count">' + gItems.length + ' pedidos' +
             (nRojo  ? ' · 🔴 ' + nRojo  : '') +
             (nAmb   ? ' · 🟡 ' + nAmb   : '') +
             (nVerde ? ' · 🟢 ' + nVerde : '') +
           '</span></h3>' +
+          undLinea +
           '<table><thead><tr><th>Código</th><th>Descripción</th><th style="text-align:right">Cant.</th><th style="text-align:center">Estado real</th></tr></thead>' +
           '<tbody>' + rows + '</tbody></table>' +
           '</div>';
