@@ -2703,6 +2703,19 @@ function boardBuildSinBlock(items) {
           (nParciales > 0 ? '<span style="' + _pill + ';background:rgba(217,119,6,.25);color:#fde68a;border:1px solid rgba(217,119,6,.45)">' + nParciales + ' ~</span>' : '') +
           (nPendientes > 0 ? '<span style="' + _pill + ';background:rgba(185,28,28,.25);color:#fca5a5;border:1px solid rgba(185,28,28,.45)">' + nPendientes + ' ●</span>' : '');
         var undTxt = totalG > 0 ? totalG.toLocaleString() + ' und' : '';
+        // Unidades por estado + % entregado
+        var undVerde  = gItems.filter(function(i){ return getTier(i) === 2 || i.estado === 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
+        var undAmb    = gItems.filter(function(i){ return getTier(i) === 1 && i.estado !== 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
+        var undRojo   = gItems.filter(function(i){ return getTier(i) === 0 && i.estado !== 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
+        var totalEntG = gItems.reduce(function(s,i){ return s+(entregadoMap[i.solId]||0); },0);
+        var pctEnt    = totalG > 0 ? Math.round(totalEntG / totalG * 100) : 0;
+        var pctClr    = pctEnt >= 100 ? '#bbf7d0' : pctEnt > 0 ? '#fde68a' : 'rgba(255,255,255,.45)';
+        var undDetalleParts = [];
+        if (undVerde > 0) undDetalleParts.push('<span style="color:#bbf7d0">✅ ' + undVerde.toLocaleString() + ' und</span>');
+        if (undAmb   > 0) undDetalleParts.push('<span style="color:#fde68a">🟡 ' + undAmb.toLocaleString()   + ' und</span>');
+        if (undRojo  > 0) undDetalleParts.push('<span style="color:#fca5a5">🔴 ' + undRojo.toLocaleString()   + ' und</span>');
+        undDetalleParts.push('<span style="color:' + pctClr + ';font-weight:700">' + pctEnt + '% entregado</span>');
+        var undDetalleHtml = '<span style="display:flex;flex-wrap:wrap;gap:6px;font-size:10px;margin-top:1px">' + undDetalleParts.join('') + '</span>';
         // Solo calcular tiempo para fichas amarillas (parcial) y rojas (sin entrega) — excluir LISTA y verde
         var horasG = gItems.reduce(function(sum, item) {
           if (item.estado === 'lista' || getTier(item) === 2) return sum;
@@ -2738,6 +2751,7 @@ function boardBuildSinBlock(items) {
               '<div class="sin-grupo-meta">' +
                 '<span>' + pedidosTxt + '</span>' +
                 (undTxt ? '<span>' + undTxt + '</span>' : '') +
+                (totalG > 0 ? undDetalleHtml : '') +
                 (tiempoTxt ? '<span>' + tiempoTxt + '</span>' : '') +
               '</div>' +
             '</div>' +
