@@ -3276,7 +3276,7 @@ function renderProdMensual() {
     prevM = curM;
     var esFuturo = f > todayStr;
     var val = esFuturo ? 0 : (porFecha[f] || 0);
-    var px  = esFuturo ? 2 : (val ? Math.max(Math.round((val / maxVal) * 120), 5) : 2);
+    var px  = esFuturo ? 2 : (val ? Math.max(Math.round((val / maxVal) * 180), 5) : 2);
     var numDia = parseInt(f.slice(8));
     var dow    = new Date(f + 'T12:00:00').getDay(); // 0=Dom, 1=Lun…
     var esDom  = dow === 0;
@@ -3298,9 +3298,9 @@ function renderProdMensual() {
       (esDom ? ';background:rgba(0,0,0,.04);border-radius:3px' : '');
     cols += '<div' + barId + clickProd + ' style="' + colStyle + '"' + tip + '>' +
       '<div class="prod-bar" style="width:100%;height:' + px + 'px;background:' + barColor + bStyle + '"></div>' +
-      '<div style="font-size:8px;color:' + (esDom ? 'var(--amber)' : 'var(--gray-l)') + ';line-height:1.1;margin-top:2px;text-align:center;flex-shrink:0;' + (esFuturo?'opacity:.3':'') + '">' +
-        '<div>' + lbl + '</div>' +
-        '<div style="font-size:7px;font-weight:' + (esDom ? '800' : '400') + '">' + (esDom || esSel || esHoy ? abbr : '') + '</div>' +
+      '<div style="height:24px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;margin-top:2px;overflow:hidden;' + (esFuturo?'opacity:.3':'') + '">' +
+        '<div style="font-size:8px;line-height:1.2;color:' + (esDom ? 'var(--amber)' : 'var(--gray-l)') + '">' + lbl + '</div>' +
+        '<div style="font-size:7px;line-height:1.2;font-weight:' + (esDom ? '800' : '400') + ';color:' + (esDom ? 'var(--amber)' : 'var(--gray-l)') + '">' + (esDom || esSel || esHoy ? abbr : '') + '</div>' +
       '</div>' +
     '</div>';
   });
@@ -3311,7 +3311,7 @@ function renderProdMensual() {
       '<span style="font-size:11px;color:var(--gray-l);text-transform:capitalize">' + mesStr + '</span>' +
     '</div>' +
     '<div class="prod-mens-chart" id="prodChartScroll" style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px">' +
-      '<div style="display:flex;align-items:flex-end;gap:3px;min-height:150px;width:max-content;min-width:100%">' + cols + '</div>' +
+      '<div style="display:flex;align-items:flex-end;gap:3px;min-height:210px;width:max-content;min-width:100%">' + cols + '</div>' +
     '</div>' +
     '<div class="prod-mens-total">' +
       '<div class="prod-stat"><span class="prod-stat-val">' + totalMes.toLocaleString() + '</span><span class="prod-stat-lbl">und totales</span></div>' +
