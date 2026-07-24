@@ -1075,6 +1075,7 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
           </div>
         </div>
       </div>
+      <div id="movSSolDetalle" style="display:none;background:var(--serig-l,#EEF2FF);border:1.5px solid var(--serig-m,#818CF8);border-radius:8px;padding:10px 13px;margin-bottom:4px;font-size:12px"></div>
       <div class="fr">
         <div class="fg">
           <div class="fl">No. DE REQUI *</div>
@@ -8353,6 +8354,8 @@ function movSClienteChange() {
   movSSolId = null;
   var inp = document.getElementById('movSSolInp');
   if (inp) inp.value = '';
+  var det = document.getElementById('movSSolDetalle');
+  if (det) { det.style.display = 'none'; det.innerHTML = ''; }
   cerrarMovSHdrSolDrop();
 }
 
@@ -8384,6 +8387,28 @@ function movSHdrSolInput(val) {
   drop.classList.add('open');
 }
 
+function buildMovSSolDetalle(s) {
+  var lineas = s.lineas || [];
+  var rows = lineas.map(function(l) {
+    return '<tr>' +
+      '<td style="font-family:var(--mono);font-size:10px;color:var(--serig-m);padding:3px 10px 3px 0;white-space:nowrap;vertical-align:top">' + escHtml(l.sku || '—') + '</td>' +
+      '<td style="padding:3px 10px 3px 0;color:var(--ink);vertical-align:top">' + escHtml(l.desc || '—') + '</td>' +
+      '<td style="text-align:right;font-weight:700;padding:3px 0;white-space:nowrap;vertical-align:top">' + (l.cant || 0).toLocaleString() + ' und</td>' +
+    '</tr>';
+  }).join('');
+  return '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">' +
+    '<span style="font-weight:800;color:var(--serig-m);font-size:13px">' + escHtml(s.id_display || '') + ' · ' + escHtml(s.cliente || '') + '</span>' +
+    '<span style="font-size:10px;color:var(--gray-l);background:var(--bg2);border-radius:4px;padding:1px 6px">' + escHtml(s.estado || '') + '</span>' +
+  '</div>' +
+  '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
+    rows +
+    (lineas.length > 1 ? '<tr style="border-top:1px solid rgba(129,140,248,.35)">' +
+      '<td colspan="2" style="padding-top:5px;font-weight:700;color:var(--gray-l)">Total</td>' +
+      '<td style="text-align:right;font-weight:800;padding-top:5px;color:var(--serig-m)">' + (s.cant || 0).toLocaleString() + ' und</td>' +
+    '</tr>' : '') +
+  '</table>';
+}
+
 function seleccionarMovSHdrSol(solId) {
   var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!s) return;
@@ -8394,6 +8419,8 @@ function seleccionarMovSHdrSol(solId) {
   if (sel && s.cliente) sel.value = s.cliente;
   var reqInp = document.getElementById('movSRequi');
   if (reqInp && !reqInp.value.trim()) reqInp.value = s.id_display || '';
+  var det = document.getElementById('movSSolDetalle');
+  if (det) { det.style.display = ''; det.innerHTML = buildMovSSolDetalle(s); }
   cerrarMovSHdrSolDrop();
 }
 
@@ -8422,6 +8449,8 @@ function abrirModalMovSerig() {
   if (cliSel) cliSel.innerHTML = movSClientesOptsHtml;
   var solInp = document.getElementById('movSSolInp');
   if (solInp) solInp.value = '';
+  var det = document.getElementById('movSSolDetalle');
+  if (det) { det.style.display = 'none'; det.innerHTML = ''; }
   var container = document.getElementById('movSLineasContainer');
   if (container) container.innerHTML = '';
   agregarLineaMovS();
