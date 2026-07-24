@@ -67,41 +67,47 @@ async function clearEstado(db, from) {
   await db.from('bot_estado').delete().eq('whatsapp_from', from);
 }
 
-// ── Insertar registro en Supabase ─────────────────────────────────
+// ── Insertar registro en Supabase vía RPC (SECURITY DEFINER) ─────────
+// Las funciones bot_insertar_* corren con privilegios del dueño
+// y saltan RLS — sin necesitar service_role key.
 
 async function insertar(db, tipo, datos, fecha, hora) {
   if (tipo === 'tiros') {
-    const r = await db.from('registro_tiros_serig').insert({
-      fecha, area: 'serig', hora,
-      linea_id: Number(datos.linea_id),
-      momento:  datos.momento,
-      contador: Number(datos.contador),
+    const r = await db.rpc('bot_insertar_tiro', {
+      p_fecha:    fecha,
+      p_area:     'serig',
+      p_hora:     hora,
+      p_linea_id: Number(datos.linea_id),
+      p_momento:  datos.momento,
+      p_contador: Number(datos.contador),
     });
     if (r.error) throw new Error('tiros: ' + r.error.message);
     return true;
   }
 
   if (tipo === 'flameado') {
-    const r = await db.from('registro_flameado_serig').insert({
-      fecha, hora,
-      flameador:   datos.flameador  || 'Sin especificar',
-      descripcion: datos.descripcion,
-      sku:         datos.sku        || null,
-      cantidad:    Number(datos.cantidad),
-      para_linea:  datos.para_linea ? Number(datos.para_linea) : null,
+    const r = await db.rpc('bot_insertar_flameado', {
+      p_fecha:       fecha,
+      p_hora:        hora,
+      p_flameador:   datos.flameador  || 'Sin especificar',
+      p_descripcion: datos.descripcion,
+      p_sku:         datos.sku        || null,
+      p_cantidad:    Number(datos.cantidad),
+      p_para_linea:  datos.para_linea ? Number(datos.para_linea) : null,
     });
     if (r.error) throw new Error('flameado: ' + r.error.message);
     return true;
   }
 
   if (tipo === 'empaque') {
-    const r = await db.from('registro_empaque_serig').insert({
-      fecha, hora,
-      descripcion:     datos.descripcion,
-      sku:             datos.sku || null,
-      cantidad:        Number(datos.cantidad),
-      operador_codigo: datos.operador_codigo || null,
-      area_origen:     datos.operador_codigo ? null : 'serig',
+    const r = await db.rpc('bot_insertar_empaque', {
+      p_fecha:           fecha,
+      p_hora:            hora,
+      p_descripcion:     datos.descripcion,
+      p_sku:             datos.sku || null,
+      p_cantidad:        Number(datos.cantidad),
+      p_operador_codigo: datos.operador_codigo || null,
+      p_area_origen:     datos.operador_codigo ? null : 'serig',
     });
     if (r.error) throw new Error('empaque: ' + r.error.message);
     return true;
