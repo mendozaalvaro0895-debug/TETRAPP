@@ -35,6 +35,14 @@ Extraé EXACTAMENTE estos campos:
     – desc: Descripción del producto (columna "Producto" o "Descripción")
     – cant: Cantidad como entero (columna "Cantidad" — 2850.0000 → 2850; ignorar filas de Total)
 
+⚠️ MÁXIMA PRECISIÓN EN LOS DÍGITOS — es un inventario, un dígito mal invalida el registro:
+• Leé cada código y cada cantidad DÍGITO POR DÍGITO, sin adivinar.
+• Distinguí con cuidado los pares que se confunden: 0/8, 3/8, 6/8, 2/3, 5/6, 1/7, 9/0, 4/9.
+• Los códigos son enteros de 5 o 6 dígitos. Las cantidades son el entero ANTES del ".0000".
+• Si un dígito NO es claramente legible, poné el código/cantidad en warnings en vez de inventar uno.
+• Un producto que ocupa 2 renglones (descripción larga) es UNA sola fila; no lo dupliques.
+• Contá los renglones: la cantidad de productos debe coincidir con las filas visibles de la tabla.
+
 Respondé SOLO con JSON válido, sin markdown, sin texto adicional:
 {
   "requi": "PRI2 476",
@@ -50,8 +58,8 @@ Reglas: cantidad siempre entero · omitir filas de subtotal/total · si un campo
 
   try {
     const aiResp = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
+      model: 'claude-sonnet-5',
+      max_tokens: 4096,
       messages: [{
         role: 'user',
         content: [
@@ -59,7 +67,7 @@ Reglas: cantidad siempre entero · omitir filas de subtotal/total · si un campo
             type: 'image',
             source: {
               type: 'base64',
-              media_type: mime_type || 'image/jpeg',
+              media_type: mime_type || 'image/png',
               data: image_base64
             }
           },

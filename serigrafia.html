@@ -1042,9 +1042,9 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
              onpaste="capturarImagenPegada(event,'salida')"
              onfocus="this.style.borderColor='#0d9488'" onblur="this.style.borderColor='#0f766e'"
              style="border:2px dashed #0f766e;border-radius:10px;padding:12px 14px;cursor:pointer;text-align:center;background:#f0fdf4;outline:none;margin-bottom:8px;transition:border-color .15s">
-          <div id="imgZoneSLbl" style="font-size:13px;font-weight:800;color:#0f766e">📋 Clic aquí y pegá la imagen · Ctrl+V</div>
+          <div id="imgZoneSLbl" style="font-size:13px;font-weight:800;color:#0f766e">📋 Clic aquí y pegá la imagen · Ctrl+V  ·  (doble clic en la imagen = ampliar)</div>
           <div style="font-size:10px;color:#64748b;margin-top:2px">ó <span onclick="event.stopPropagation();leerDesdeImagen('salida')" style="cursor:pointer;text-decoration:underline;color:#6366f1">seleccioná un archivo</span></div>
-          <img id="imgPrevS" style="display:none;max-width:100%;max-height:110px;border-radius:6px;margin-top:8px;object-fit:contain">
+          <img id="imgPrevS" ondblclick="event.stopPropagation();ampliarImagen(this.src)" title="Doble clic para ampliar" style="display:none;max-width:100%;max-height:110px;border-radius:6px;margin-top:8px;object-fit:contain;cursor:zoom-in">
         </div>
         <!-- Alternativa: texto de PDF -->
         <details style="margin-top:2px">
@@ -4580,9 +4580,9 @@ function abrirFormEntregado() {
       '</div>' +
       // Zona de pegado de imagen
       '<div id="imgZoneI" tabindex="0" onclick="this.focus()" onpaste="capturarImagenPegada(event,\'ingreso\')" onfocus="this.style.borderColor=\'#0d9488\'" onblur="this.style.borderColor=\'#0f766e\'" style="border:2px dashed #0f766e;border-radius:10px;padding:10px 14px;cursor:pointer;text-align:center;background:#f0fdf4;outline:none;margin-bottom:10px;transition:border-color .15s">' +
-        '<div id="imgZoneILbl" style="font-size:13px;font-weight:800;color:#0f766e">📋 Clic aquí y pegá la imagen · Ctrl+V</div>' +
+        '<div id="imgZoneILbl" style="font-size:13px;font-weight:800;color:#0f766e">📋 Clic aquí y pegá la imagen · Ctrl+V  ·  (doble clic en la imagen = ampliar)</div>' +
         '<div style="font-size:10px;color:#64748b;margin-top:2px">ó <span onclick="event.stopPropagation();leerDesdeImagen(\'ingreso\')" style="cursor:pointer;text-decoration:underline;color:#6366f1">seleccioná un archivo</span></div>' +
-        '<img id="imgPrevI" style="display:none;max-width:100%;max-height:100px;border-radius:6px;margin-top:6px;object-fit:contain">' +
+        '<img id="imgPrevI" ondblclick="event.stopPropagation();ampliarImagen(this.src)" title="Doble clic para ampliar" style="display:none;max-width:100%;max-height:100px;border-radius:6px;margin-top:6px;object-fit:contain;cursor:zoom-in">' +
       '</div>' +
       // Fila 2: Requi + Fecha
       '<div style="display:grid;grid-template-columns:220px 150px;gap:6px;margin-bottom:7px">' +
@@ -8133,15 +8133,37 @@ function leerDesdeImagen(tipo) {
   inp.click();
 }
 
+// Lightbox: ampliar la imagen pegada a pantalla completa
+function ampliarImagen(src) {
+  if (!src) return;
+  var ov = document.getElementById('imgLightbox');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'imgLightbox';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px;box-sizing:border-box';
+    ov.onclick = function() { ov.style.display = 'none'; };
+    ov.innerHTML = '<img id="imgLightboxImg" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,.6)">' +
+      '<div style="position:absolute;top:16px;right:22px;color:#fff;font-size:30px;font-weight:300;cursor:pointer">✕</div>';
+    document.body.appendChild(ov);
+  }
+  document.getElementById('imgLightboxImg').src = src;
+  ov.style.display = 'flex';
+}
+
 // Comprimir → llamar API → aplicar resultado
 function _enviarParseDoc(imgEl, tipo, lblId) {
-  var MAX = 1400;
+  // Escalar por el lado LARGO a 1568px (óptimo para Claude Vision) — PNG sin pérdida
+  // para preservar la nitidez de los dígitos en tablas densas.
+  var MAX = 1568;
   var w = imgEl.width, h = imgEl.height;
-  if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+  var scale = Math.min(1, MAX / Math.max(w, h));
+  w = Math.round(w * scale); h = Math.round(h * scale);
   var canvas = document.createElement('canvas');
   canvas.width = w; canvas.height = h;
-  canvas.getContext('2d').drawImage(imgEl, 0, 0, w, h);
-  var b64 = canvas.toDataURL('image/jpeg', 0.88).split(',')[1];
+  var ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(imgEl, 0, 0, w, h);
+  var b64 = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
 
   fetch('/api/parse-doc', {
     method: 'POST',
@@ -8158,6 +8180,13 @@ function _enviarParseDoc(imgEl, tipo, lblId) {
     var lbl = document.getElementById(lblId);
     if (lbl) { lbl.style.color = '#b91c1c'; lbl.textContent = '❌ ' + err.message.slice(0, 80); }
   });
+}
+
+// Códigos que Claude leyó pero NO existen en el inventario → probable dígito mal leído
+function _skusDesconocidos(prods) {
+  return (prods || []).filter(function(pr) {
+    return pr.sku && !(inventarioCache || []).some(function(x){ return String(x.sku) === String(pr.sku); });
+  }).map(function(pr){ return String(pr.sku); });
 }
 
 function _aplicarResultadoSalida(result, lblId) {
@@ -8178,12 +8207,15 @@ function _aplicarResultadoSalida(result, lblId) {
     agregarLineaMovS();
   }
 
-  var ok = !result.warnings || !result.warnings.length;
-  var txt = '✅ ' + (result.requi || 'Sin requi')
+  var warns = (result.warnings || []).slice();
+  var noEnc = _skusDesconocidos(prods);
+  if (noEnc.length) warns.push('⚠️ Códigos que NO existen en inventario — revisá los dígitos: ' + noEnc.join(', '));
+  var ok = !warns.length;
+  var txt = (ok ? '✅ ' : '⚠️ ') + (result.requi || 'Sin requi')
     + (result.fecha ? ' · ' + result.fecha : '')
     + (result.descripcion ? ' · ' + result.descripcion : '')
     + ' · ' + prods.length + ' productos';
-  if (!ok) txt += '  ⚠️ ' + result.warnings.join('; ');
+  if (!ok) txt += '  ' + warns.join(' · ');
   var lbl = document.getElementById(lblId || 'imgZoneSLbl');
   if (lbl) { lbl.style.color = ok ? '#059669' : '#b45309'; lbl.textContent = txt; }
   var msg = document.getElementById('movSPasteMsg');
@@ -8210,11 +8242,14 @@ function _aplicarResultadoIngreso(result, lblId) {
     });
   }
 
-  var ok = !result.warnings || !result.warnings.length;
-  var txt = '✅ ' + (result.requi || 'Sin requi')
+  var warns = (result.warnings || []).slice();
+  var noEnc = _skusDesconocidos(prods);
+  if (noEnc.length) warns.push('⚠️ Códigos que NO existen en inventario — revisá los dígitos: ' + noEnc.join(', '));
+  var ok = !warns.length;
+  var txt = (ok ? '✅ ' : '⚠️ ') + (result.requi || 'Sin requi')
     + (result.fecha ? ' · ' + result.fecha : '')
     + ' · ' + prods.length + ' productos leídos';
-  if (!ok) txt += '  ⚠️ ' + result.warnings.join('; ');
+  if (!ok) txt += '  ' + warns.join(' · ');
   var lbl = document.getElementById(lblId || 'imgZoneILbl');
   if (lbl) { lbl.style.color = ok ? '#059669' : '#b45309'; lbl.textContent = txt; }
 }
