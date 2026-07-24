@@ -1069,8 +1069,8 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
           <div class="fl">BUSCAR PEDIDO</div>
           <div class="sku-wrap-s">
             <input class="fi" id="movSSolInp" placeholder="🔗 S-001, descripción…" autocomplete="off"
-              oninput="movSSolInput(this.value)" onfocus="movSSolInput(this.value)"
-              onblur="setTimeout(cerrarMovSSolDrop,200)">
+              oninput="movSHdrSolInput(this.value)" onfocus="movSHdrSolInput(this.value)"
+              onblur="setTimeout(cerrarMovSHdrSolDrop,200)">
             <div class="sku-drop-s" id="movSSolDrop"></div>
           </div>
         </div>
@@ -8353,46 +8353,51 @@ function movSClienteChange() {
   movSSolId = null;
   var inp = document.getElementById('movSSolInp');
   if (inp) inp.value = '';
-  cerrarMovSSolDrop();
+  cerrarMovSHdrSolDrop();
 }
 
-function movSSolInput(val) {
+function movSHdrSolInput(val) {
   var drop = document.getElementById('movSSolDrop');
   if (!drop) return;
   movSSolId = null;
   var cli = (document.getElementById('movSClienteSel') || {}).value || '';
-  var v = val.trim().toLowerCase();
-  var matches = solicitudes.filter(function(s) {
-    if (cli && (s.cliente || '') !== cli) return false;
-    if (!v) return s.estado !== 'entregada';
-    return (s.id_display || '').toLowerCase().indexOf(v) >= 0
-        || (s.cliente || '').toLowerCase().indexOf(v) >= 0;
-  }).slice(0, 12);
+  var v = (val || '').trim().toLowerCase();
+  var candidatos = solicitudes.filter(function(s) { return s.estado !== 'entregada'; });
+  if (cli) candidatos = candidatos.filter(function(s) { return (s.cliente || '') === cli; });
+  var matches = v.length === 0
+    ? candidatos.slice(0, 12)
+    : candidatos.filter(function(s) {
+        return (s.id_display || '').toLowerCase().indexOf(v) >= 0
+            || (s.cliente || '').toLowerCase().indexOf(v) >= 0;
+      }).slice(0, 12);
   if (!matches.length) { drop.classList.remove('open'); return; }
   drop.innerHTML = matches.map(function(s) {
-    return '<div class="sku-item-s" onmousedown="seleccionarMovSSol(\'' + escHtml(s.id) + '\')">' +
-      '<strong>' + escHtml(s.id_display || s.id) + '</strong> · ' + escHtml(s.cliente || '') + '</div>';
+    var sid = s.id.replace(/'/g, "\\'");
+    return '<div class="sku-item-s" onmousedown="seleccionarMovSHdrSol(\'' + sid + '\')">' +
+      '<strong>' + escHtml(s.id_display || '') + '</strong> · ' + escHtml(s.cliente || '') + '</div>';
   }).join('');
-  var rect = document.getElementById('movSSolInp').getBoundingClientRect();
-  drop.style.left = rect.left + 'px'; drop.style.top = (rect.bottom + 2) + 'px'; drop.style.width = rect.width + 'px';
+  var inp2 = document.getElementById('movSSolInp');
+  if (inp2) {
+    var r = inp2.getBoundingClientRect();
+    drop.style.left = r.left + 'px'; drop.style.top = (r.bottom + 2) + 'px'; drop.style.width = r.width + 'px';
+  }
   drop.classList.add('open');
 }
 
-function seleccionarMovSSol(solId) {
+function seleccionarMovSHdrSol(solId) {
   var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!s) return;
   movSSolId = solId;
   var inp = document.getElementById('movSSolInp');
-  if (inp) inp.value = (s.id_display || s.id) + ' · ' + (s.cliente || '').slice(0, 24);
+  if (inp) inp.value = (s.id_display || '') + ' · ' + (s.cliente || '').slice(0, 24);
   var sel = document.getElementById('movSClienteSel');
   if (sel && s.cliente) sel.value = s.cliente;
-  // Pre-rellenar requi si el campo está vacío
   var reqInp = document.getElementById('movSRequi');
   if (reqInp && !reqInp.value.trim()) reqInp.value = s.id_display || '';
-  cerrarMovSSolDrop();
+  cerrarMovSHdrSolDrop();
 }
 
-function cerrarMovSSolDrop() {
+function cerrarMovSHdrSolDrop() {
   var d = document.getElementById('movSSolDrop');
   if (d) d.classList.remove('open');
 }
