@@ -3982,8 +3982,8 @@ function exportarAsistGridPDF() {
         if (f === hoy && !daysByP[f]) return true; // pendiente implícito, no cuenta aún
         return (daysByP[f] || 'presente') === 'presente';
       });
-      var nameBg  = isFullGreen ? '#dcfce7' : '#fff';
-      var nameClr = isFullGreen ? '#15803d' : '#111';
+      var nameBg  = isFullGreen ? '#6ee7b7' : '#fff';
+      var nameClr = isFullGreen ? '#065f46' : '#111';
       html += '<tr>';
       html += '<td style="background:' + nameBg + ';color:' + nameClr + ';font-size:8px;font-weight:' + (isFullGreen?'700':'600') + ';padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + '</td>';
       dias.forEach(function(f) {
@@ -3992,15 +3992,15 @@ function exportarAsistGridPDF() {
         var esPendiente = f === hoy && !daysByP[f];
         var est = esPendiente ? 'pendiente' : (daysByP[f] || (f > hoy ? '' : (esFin ? 'finde' : 'presente')));
         var domTrab = esFin && (est === 'presente' || est === 'tarde' || est === 'velada');
-        var bg  = (esFin && !domTrab) ? '#eef2f7'
+        var bg  = (esFin && !domTrab) ? '#94a3b8'
                 : est === 'pendiente' ? '#e2e8f0'
-                : est === 'ausente'   ? '#fee2e2'
-                : est === 'tarde'     ? '#fef3c7'
-                : est === 'velada'    ? '#ede9fe'
-                : est === 'presente'  ? '#dcfce7'
+                : est === 'ausente'   ? '#fca5a5'
+                : est === 'tarde'     ? '#fde68a'
+                : est === 'velada'    ? '#c4b5fd'
+                : est === 'presente'  ? '#6ee7b7'
                 : '#f8fafc';
-        if (domTrab) bg = 'rgba(220,252,231,.8)';
-        var clr = (esFin && !domTrab) ? '#94a3b8'
+        if (domTrab) bg = '#6ee7b7';
+        var clr = (esFin && !domTrab) ? '#fff'
                 : est === 'ausente'   ? '#b91c1c'
                 : est === 'tarde'     ? '#92400e'
                 : est === 'velada'    ? '#6d28d9'
