@@ -142,7 +142,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .asist-table tbody tr:hover td{background:var(--bg)}
 .asist-btn-grp{display:flex;gap:5px}
 .asist-btn{border:1.5px solid var(--border);background:var(--bg2);border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;color:var(--gray)}
-.asist-btn.ab-p.active{background:#dcfce7;border-color:#16a34a;color:#15803d}
+.asist-btn.ab-p.active{background:#dcfce7;border-color:#22c55e;color:#15803d}
 .asist-btn.ab-a.active{background:#fee2e2;border-color:#dc2626;color:#b91c1c}
 .asist-btn.ab-t.active{background:#fef3c7;border-color:#d97706;color:#92400e}
 .vel-op-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bg2);transition:background .1s}
@@ -292,11 +292,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .faltas-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:1px;flex:1;min-width:14px;border-right:1px solid var(--border);padding:0 2px}
 .faltas-bars-grp{display:flex;align-items:flex-end;gap:1px;width:100%}
 .faltas-bar{flex:1;border-radius:3px 3px 0 0;min-height:2px;transition:height .3s}
-.faltas-bar.presente{background:#16a34a}
+.faltas-bar.presente{background:#22c55e}
 .faltas-bar.ausente{background:#dc2626}
 .faltas-bar.prestado{background:#d97706}
 .faltas-bar.cero{opacity:.25}
-.faltas-bar.presente.cero{background:#16a34a}
+.faltas-bar.presente.cero{background:#22c55e}
 .faltas-bar.ausente.cero{background:#dc2626}
 .faltas-bar.prestado.cero{background:#d97706}
 .faltas-day{font-size:8px;color:var(--gray-l);text-align:center;line-height:1;margin-top:3px}
@@ -339,14 +339,14 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
 .ag-cell{width:26px;min-width:26px;height:26px;text-align:center;vertical-align:middle;cursor:pointer;border:1px solid rgba(0,0,0,.06);font-size:9px;font-weight:700;transition:opacity .1s;user-select:none;position:relative}
 .ag-cell.velada{background:#7c3aed;color:#fff}
 .ag-cell:hover{opacity:.7}
-.ag-cell.presente{background:#16a34a;color:#fff}
+.ag-cell.presente{background:#22c55e;color:#fff}
 .ag-cell.ausente{background:#dc2626;color:#fff}
 .ag-cell.tarde{background:#d97706;color:#fff}
 .ag-cell.futuro{background:#f8fafc;cursor:default;color:transparent}
 .ag-cell.pendiente{background:#cbd5e1;color:#64748b}
 .ag-th.finde{background:#64748b;color:#fff}
 .ag-cell.finde{background:#475569 !important;color:#fff !important;opacity:1}
-.ag-cell.finde.dom-trabajado{background:#16a34a !important;color:#fff !important;opacity:1}
+.ag-cell.finde.dom-trabajado{background:#22c55e !important;color:#fff !important;opacity:1}
 .ag-row-full .ag-td-name{color:#14532d;font-weight:700}
 .ag-row-inactivo .ag-td-name{opacity:.55}
 .ag-row-inactivo .ag-cell{opacity:.55}
@@ -2152,7 +2152,7 @@ function boardBuildCard(item) {
   var tiroMax = Math.max(item.tiros || 1, item.tiro_actual || 1);
   var tiroRow = (item.linea_id && tiroMax > 1) ? buildTiroRow(item, tiroMax) : '';
   var cantLabel = entregado > 0
-    ? '<span style="color:#16a34a;font-weight:800">' + entregado.toLocaleString() + '</span>' +
+    ? '<span style="color:#22c55e;font-weight:800">' + entregado.toLocaleString() + '</span>' +
       '<span style="font-weight:400;color:var(--gray-l)"> / </span>' + (item.cant||0).toLocaleString() +
       ' <span style="font-size:10px;font-weight:400;color:var(--gray)">und</span>'
     : (item.cant||0).toLocaleString() + ' <span style="font-size:10px;font-weight:400;color:var(--gray)">und</span>';
@@ -2256,13 +2256,13 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
   var cardBdr  = isComplete ? '#86efac' : isPartial ? '#fde68a' : '#fca5a5';
   var descClr  = isComplete ? 'var(--gray)' : '#111';
   var descWt   = isComplete ? '400' : '700';
-  var cantClr1 = isComplete ? '#16a34a' : isPartial ? '#92400e' : '#111';
-  var cantClr2 = isComplete ? '#16a34a' : isPartial ? '#92400e' : '#374151';
+  var cantClr1 = isComplete ? '#22c55e' : isPartial ? '#92400e' : '#111';
+  var cantClr2 = isComplete ? '#22c55e' : isPartial ? '#92400e' : '#374151';
   var desc = (item.sku ? item.sku + ' · ' : '') + (item.desc || '—');
   var cantHtml =
     '<span style="color:' + cantClr1 + ';font-weight:800;font-size:11px">' + entregado.toLocaleString() + '</span>' +
     '<span style="color:' + cantClr2 + ';font-size:10px;font-weight:' + (isComplete ? '400' : '700') + '"> / ' + total.toLocaleString() + ' und</span>';
-  var requiAccent = isComplete ? '#16a34a' : isPartial ? '#92400e' : '#b91c1c';
+  var requiAccent = isComplete ? '#22c55e' : isPartial ? '#92400e' : '#b91c1c';
   var requiRow = requis.length
     ? '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed ' + cardBdr + ';display:flex;flex-wrap:wrap;gap:4px">' +
         requis.map(function(r) {
@@ -3510,7 +3510,7 @@ function renderAsistHoy() {
   function buildRows(grupo) {
     return grupo.map(function(p) {
       var est = asistHoyCache[p.codigo] || 'presente';
-      var dot = est === 'ausente' ? '#dc2626' : est === 'tarde' ? '#d97706' : est === 'velada' ? '#7c3aed' : '#16a34a';
+      var dot = est === 'ausente' ? '#dc2626' : est === 'tarde' ? '#d97706' : est === 'velada' ? '#7c3aed' : '#22c55e';
       var tachado = est === 'ausente' ? 'color:var(--gray-l);text-decoration:line-through' : '';
       var cod = p.codigo.replace(/'/g, "\\'");
       return '<div class="asist-hoy-row">' +
@@ -3684,7 +3684,7 @@ async function renderFaltasChart() {
   var totalPrt  = dias.reduce(function(s,f){ return s+(prtMap[f]||[]).length;  }, 0);
   var leyenda =
     '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gray)">' +
-      '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#16a34a"></span>Presentes: ' + totalPres +
+      '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#22c55e"></span>Presentes: ' + totalPres +
     '</span>' +
     '&nbsp;&nbsp;<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--gray)">' +
       '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#dc2626"></span>Ausentes: ' + totalAus +
@@ -3982,7 +3982,7 @@ function exportarAsistGridPDF() {
         if (f === hoy && !daysByP[f]) return true; // pendiente implícito, no cuenta aún
         return (daysByP[f] || 'presente') === 'presente';
       });
-      var nameBg  = isFullGreen ? '#16a34a' : '#fff';
+      var nameBg  = isFullGreen ? '#22c55e' : '#fff';
       var nameClr = isFullGreen ? '#fff' : '#111';
       html += '<tr>';
       html += '<td style="background:' + nameBg + ';color:' + nameClr + ';font-size:8px;font-weight:' + (isFullGreen?'700':'600') + ';padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + '</td>';
@@ -3997,9 +3997,9 @@ function exportarAsistGridPDF() {
                 : est === 'ausente'   ? '#dc2626'
                 : est === 'tarde'     ? '#d97706'
                 : est === 'velada'    ? '#7c3aed'
-                : est === 'presente'  ? '#16a34a'
+                : est === 'presente'  ? '#22c55e'
                 : '#f8fafc';
-        if (domTrab) bg = '#16a34a';
+        if (domTrab) bg = '#22c55e';
         var clr = '#fff';
         var lbl = est === 'ausente' ? '&#10007;' : est === 'tarde' ? '!' : est === 'velada' ? '&#9790;' : '';
         html += '<td style="background:' + bg + ';color:' + clr + ';font-size:7px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
@@ -4083,7 +4083,7 @@ function exportarAsistGridPDF() {
         buildResumenBloque('⏰ Llegadas tarde', resTardanzas, '#f59e0b') +
         buildResumenBloque('🌙 Veladas',        resVeladas,   '#7c3aed') +
         buildResumenBloque('📅 Domingos trab.', resDomingos,  '#0ea5e9') +
-        buildResumenBloque('🟢 Inicios',        resInicios,   '#16a34a') +
+        buildResumenBloque('🟢 Inicios',        resInicios,   '#22c55e') +
         buildResumenBloque('🔴 Bajas',          resBajas,     '#6b7280') +
       '</div>' +
     '</div>';
@@ -4424,7 +4424,7 @@ function verDetalleAsistencia(fecha, evt) {
     return h + '</div>';
   }
 
-  var body = grupoHtml(presentes, '#16a34a', 'Presentes') +
+  var body = grupoHtml(presentes, '#22c55e', 'Presentes') +
              grupoHtml(ausentes,  '#dc2626', 'Ausentes') +
              grupoHtml(prestados, '#d97706', 'Prestados');
 
@@ -4494,14 +4494,14 @@ async function exportarAsistenciaMes() {
         if (!est) return '<td style="background:#f3f4f6;color:#9ca3af;text-align:center">—</td>';
         if (est === 'ausente') { ausencias++; return '<td style="background:#fee2e2;color:#dc2626;font-weight:700;text-align:center">A</td>'; }
         presentes++;
-        return '<td style="background:#dcfce7;color:#16a34a;font-weight:700;text-align:center">P</td>';
+        return '<td style="background:#dcfce7;color:#22c55e;font-weight:700;text-align:center">P</td>';
       }).join('');
       return '<tr>' +
         '<td style="white-space:nowrap;font-weight:600;padding:4px 8px">' + info.nombre + '</td>' +
         '<td style="color:#6b7280;font-size:10px;white-space:nowrap;padding:4px 6px">' + (info.rol || '') + '</td>' +
         celdas +
         '<td style="background:#fee2e2;color:#dc2626;font-weight:800;text-align:center">' + ausencias + '</td>' +
-        '<td style="background:#dcfce7;color:#16a34a;font-weight:800;text-align:center">' + presentes + '</td>' +
+        '<td style="background:#dcfce7;color:#22c55e;font-weight:800;text-align:center">' + presentes + '</td>' +
       '</tr>';
     }).join('');
 
@@ -9869,7 +9869,7 @@ function renderAsistRows() {
   if (!tbody) return;
   tbody.innerHTML = lista.map(function(p) {
     var est = asistCache[p.codigo] || 'presente';
-    var dot = est === 'presente' ? '#16a34a' : est === 'ausente' ? '#dc2626' : '#d97706';
+    var dot = est === 'presente' ? '#22c55e' : est === 'ausente' ? '#dc2626' : '#d97706';
     return '<tr>' +
       '<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + dot + ';margin-right:8px"></span>' +
         '<strong>' + p.nombre + '</strong>' +
