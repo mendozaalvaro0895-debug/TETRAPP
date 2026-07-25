@@ -4004,6 +4004,79 @@ function exportarAsistGridPDF() {
   var tableRows = buildPersonaRows(plazaFija, null);
   if (prestados.length) tableRows += buildPersonaRows(prestados, 'Prestados');
 
+  // ── Calcular resumen por categoría ────────────────────────────
+  var resAusentes  = [];
+  var resTardanzas = [];
+  var resVeladas   = [];
+  var resDomingos  = [];
+  var resInicios   = [];
+  var resBajas     = [];
+
+  var todasPDF = plazaFija.concat(prestados);
+  todasPDF.forEach(function(p) {
+    var daysByP = byPD[p.codigo] || {};
+    var fAus = [], fTard = [], fVel = [], fDom = [];
+    dias.forEach(function(f) {
+      if (f > hoy) return;
+      var dow = new Date(f+'T12:00:00').getDay();
+      var est = daysByP[f];
+      if (!est || est === 'pendiente') return;
+      if (est === 'ausente') fAus.push(parseInt(f.slice(8)));
+      if (est === 'tarde')   fTard.push(parseInt(f.slice(8)));
+      if (est === 'velada')  fVel.push(parseInt(f.slice(8)));
+      if (dow === 0 && (est === 'presente' || est === 'tarde' || est === 'velada')) fDom.push(parseInt(f.slice(8)));
+    });
+    var nom = p.nombre || p.codigo;
+    if (fAus.length)  resAusentes.push({nombre: nom, fechas: fAus});
+    if (fTard.length) resTardanzas.push({nombre: nom, fechas: fTard});
+    if (fVel.length)  resVeladas.push({nombre: nom, fechas: fVel});
+    if (fDom.length)  resDomingos.push({nombre: nom, fechas: fDom});
+    if (p.fecha_inicio && p.fecha_inicio.slice(0,7) === mesStr)
+      resInicios.push({nombre: nom, fecha: parseInt(p.fecha_inicio.slice(8)) + '/' + p.fecha_inicio.slice(5,7)});
+    if (p.fecha_baja && p.fecha_baja.slice(0,7) === mesStr)
+      resBajas.push({nombre: nom, fecha: parseInt(p.fecha_baja.slice(8)) + '/' + p.fecha_baja.slice(5,7)});
+  });
+  // Bajas de personas inactivas con registros en el mes
+  (personalData && personalData.serig ? personalData.serig : []).forEach(function(p) {
+    if (p.activo) return;
+    if (p.fecha_baja && p.fecha_baja.slice(0,7) === mesStr) {
+      var ya = resBajas.some(function(x){ return x.nombre === (p.nombre || p.codigo); });
+      if (!ya) resBajas.push({nombre: p.nombre || p.codigo, fecha: parseInt(p.fecha_baja.slice(8)) + '/' + p.fecha_baja.slice(5,7)});
+    }
+  });
+
+  function buildResumenBloque(titulo, items, colorHdr) {
+    var sinItems = !items.length;
+    var total = sinItems ? 0 : items.reduce(function(s, it){ return s + (it.fechas ? it.fechas.length : 1); }, 0);
+    var hdrTxt = titulo + (total ? ' (' + total + ')' : '');
+    var body = sinItems
+      ? '<div style="color:#9ca3af;font-size:8px;font-style:italic;padding:4px 0">Ninguno este mes</div>'
+      : items.map(function(it) {
+          return '<div style="margin-bottom:4px;line-height:1.3">' +
+            '<span style="font-weight:700;font-size:8.5px;color:#1e293b">' + escHtml(it.nombre) + '</span>' +
+            '<span style="font-size:8px;color:#475569;margin-left:5px">' +
+              (it.fechas ? 'días ' + it.fechas.join(', ') : it.fecha) +
+            '</span></div>';
+        }).join('');
+    return '<div style="break-inside:avoid">' +
+      '<div style="background:' + colorHdr + ';color:#fff;font-size:8px;font-weight:800;padding:5px 9px;border-radius:4px 4px 0 0;letter-spacing:.3px">' + hdrTxt + '</div>' +
+      '<div style="border:1.5px solid ' + colorHdr + ';border-top:none;padding:8px 9px;border-radius:0 0 4px 4px;min-height:32px">' + body + '</div>' +
+    '</div>';
+  }
+
+  var resumenHtml =
+    '<div style="margin-top:18px;page-break-inside:avoid">' +
+      '<div style="font-size:10px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">Resumen del mes</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px">' +
+        buildResumenBloque('⛔ Inasistencias',  resAusentes,  '#ef4444') +
+        buildResumenBloque('⏰ Llegadas tarde', resTardanzas, '#f59e0b') +
+        buildResumenBloque('🌙 Veladas',        resVeladas,   '#7c3aed') +
+        buildResumenBloque('📅 Domingos trab.', resDomingos,  '#0ea5e9') +
+        buildResumenBloque('🟢 Inicios',        resInicios,   '#16a34a') +
+        buildResumenBloque('🔴 Bajas',          resBajas,     '#6b7280') +
+      '</div>' +
+    '</div>';
+
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
     '<title>Asistencia ' + mesNombre + '</title>' +
     '<style>' +
@@ -4026,8 +4099,10 @@ function exportarAsistGridPDF() {
       '<span><span class="leg-dot" style="background:#dcfce7;border:1px solid #86efac"></span>P = Presente</span>' +
       '<span><span class="leg-dot" style="background:#fee2e2;border:1px solid #fca5a5"></span>A = Ausente</span>' +
       '<span><span class="leg-dot" style="background:#fef3c7;border:1px solid #fde68a"></span>T = Tarde</span>' +
+      '<span><span class="leg-dot" style="background:#ede9fe;border:1px solid #c4b5fd"></span>V = Velada</span>' +
       '<span><span class="leg-dot" style="background:#dcfce7;border:1px solid #86efac"></span>Fila verde = asistencia completa</span>' +
     '</div>' +
+    resumenHtml +
     '<script>window.onload=function(){window.print();}<\/script>' +
     '</body></html>';
 
