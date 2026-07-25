@@ -3990,11 +3990,24 @@ function exportarAsistGridPDF() {
         var dow = new Date(f+'T12:00:00').getDay();
         var esFin = dow === 0;
         var esPendiente = f === hoy && !daysByP[f];
-        var est = esPendiente ? 'pendiente' : (daysByP[f] || (f > hoy ? '' : 'presente'));
-        var bg  = esFin ? '#f1f5f9' : est === 'pendiente' ? '#e2e8f0' : est === 'ausente' ? '#fee2e2' : est === 'tarde' ? '#fef3c7' : est === 'presente' ? '#dcfce7' : '#f8fafc';
-        var clr = est === 'ausente' ? '#b91c1c' : est === 'tarde' ? '#92400e' : est === 'pendiente' ? '#94a3b8' : '#15803d';
-        var lbl = est === 'ausente' ? 'A' : est === 'tarde' ? 'T' : est === 'pendiente' ? '·' : (f <= hoy && !esFin) ? 'P' : '';
-        html += '<td style="background:' + bg + ';color:' + clr + ';font-size:6px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
+        var est = esPendiente ? 'pendiente' : (daysByP[f] || (f > hoy ? '' : (esFin ? 'finde' : 'presente')));
+        var domTrab = esFin && (est === 'presente' || est === 'tarde' || est === 'velada');
+        var bg  = (esFin && !domTrab) ? '#eef2f7'
+                : est === 'pendiente' ? '#e2e8f0'
+                : est === 'ausente'   ? '#fee2e2'
+                : est === 'tarde'     ? '#fef3c7'
+                : est === 'velada'    ? '#ede9fe'
+                : est === 'presente'  ? '#dcfce7'
+                : '#f8fafc';
+        if (domTrab) bg = 'rgba(220,252,231,.8)';
+        var clr = (esFin && !domTrab) ? '#94a3b8'
+                : est === 'ausente'   ? '#b91c1c'
+                : est === 'tarde'     ? '#92400e'
+                : est === 'velada'    ? '#6d28d9'
+                : est === 'pendiente' ? '#94a3b8'
+                : '#15803d';
+        var lbl = est === 'ausente' ? '&#10007;' : est === 'tarde' ? '!' : est === 'velada' ? '&#9790;' : '';
+        html += '<td style="background:' + bg + ';color:' + clr + ';font-size:7px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
       });
       html += '</tr>';
     });
@@ -4049,14 +4062,17 @@ function exportarAsistGridPDF() {
     var sinItems = !items.length;
     var total = sinItems ? 0 : items.reduce(function(s, it){ return s + (it.fechas ? it.fechas.length : 1); }, 0);
     var hdrTxt = titulo + (total ? ' (' + total + ')' : '');
+    var mm = mesN < 10 ? '0' + mesN : '' + mesN;
     var body = sinItems
       ? '<div style="color:#9ca3af;font-size:8px;font-style:italic;padding:4px 0">Ninguno este mes</div>'
       : items.map(function(it) {
-          return '<div style="margin-bottom:4px;line-height:1.3">' +
-            '<span style="font-weight:700;font-size:8.5px;color:#1e293b">' + escHtml(it.nombre) + '</span>' +
-            '<span style="font-size:8px;color:#475569;margin-left:5px">' +
-              (it.fechas ? 'días ' + it.fechas.join(', ') : it.fecha) +
-            '</span></div>';
+          var fechasTxt = it.fechas
+            ? it.fechas.map(function(d){ return (d < 10 ? '0'+d : d) + '/' + mm; }).join('  ·  ')
+            : it.fecha;
+          return '<div style="margin-bottom:6px">' +
+            '<div style="font-weight:700;font-size:8.5px;color:#1e293b">' + escHtml(it.nombre) + '</div>' +
+            '<div style="font-size:7.5px;color:#64748b;padding-left:6px;margin-top:1px">' + fechasTxt + '</div>' +
+          '</div>';
         }).join('');
     return '<div style="break-inside:avoid">' +
       '<div style="background:' + colorHdr + ';color:#fff;font-size:8px;font-weight:800;padding:5px 9px;border-radius:4px 4px 0 0;letter-spacing:.3px">' + hdrTxt + '</div>' +
