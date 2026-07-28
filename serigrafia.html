@@ -2328,7 +2328,9 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     (salidaRequisSin.length ? '<span style="color:var(--teal-dark);font-weight:700">📤 Salida: ' + escHtml(salidaRequisSin[0]) + (salidaRequisSin.length > 1 ? ' +' + (salidaRequisSin.length - 1) : '') + '</span>' : '') +
     (fechaEntregado ? '<span style="color:#15803d;font-weight:700">✅ Entregado: ' + fmtFechaCorta(fechaEntregado) + '</span>' : '') +
     '</div>';
-  return '<div class="board-card" draggable="true"' +
+  var esNueva3 = item.createdAt && item.createdAt.slice(0,10) >= '2026-07-28';
+  var badgeAgo3 = esNueva3 ? '<span class="badge-ago">AGO</span>' : '';
+  return '<div class="board-card' + (esNueva3 ? ' nueva-orden' : '') + '" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
     ' onclick="mostrarDetalle(\'' + item.solId + '\')"' +
@@ -2336,6 +2338,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     '<div style="display:flex;align-items:center;gap:6px">' +
       grip +
       '<span style="font-family:var(--mono);font-size:10px;font-weight:800;color:' + (isComplete ? '#15803d' : 'var(--serig-m)') + ';flex-shrink:0">' + escHtml(item.solCodigo) + '</span>' +
+      badgeAgo3 +
       '<span onclick="event.stopPropagation();abrirEstadoSin(event,\'' + item.solId + '\',\'' + (item.lineaDbId || '') + '\')" title="Cambiar estado" style="background:' + badgeBg + ';color:' + badgeClr + ';border:1.5px solid ' + badgeBdr + ';border-radius:5px;padding:3px 8px;font-size:9px;font-weight:800;flex-shrink:0;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.10);letter-spacing:.3px;display:inline-flex;align-items:center;gap:4px">' + badgeTxt + ' <span style="font-size:8px;opacity:.7">▾</span></span>' +
       '<span style="flex:1"></span>' +
       '<span style="flex-shrink:0;text-align:right;white-space:nowrap">' + cantHtml + '</span>' +
