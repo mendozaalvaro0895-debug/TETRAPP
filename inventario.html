@@ -328,6 +328,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 // SUPA_URL, SUPA_KEY y db vienen de shared/auth.js
 
 var todosLosItems = [];
+var todosLosInsumosB7 = [];
 var filtrados    = [];
 var mostrarInactivos = false;
 var bodegaFiltro = 'all';
@@ -369,6 +370,10 @@ async function cargarTodo() {
       desde += BATCH;
     }
     todosLosItems = todos;
+    var rb7 = await db.from('insumos_b7')
+      .select('sku,descripcion,existencia,activo,stock_minimo')
+      .order('sku', { ascending: true });
+    todosLosInsumosB7 = rb7.error ? [] : (rb7.data || []);
     actualizarStats();
     aplicarFiltro();
   } catch(e) {
@@ -377,16 +382,20 @@ async function cargarTodo() {
 }
 
 function actualizarStats() {
-  var activos = todosLosItems.filter(function(i) { return i.activo; });
-  var b7 = activos.filter(function(i) { return (i.bodega || 'B2') === 'B7'; });
-  var bajoMin = b7.filter(function(i) { return i.stock_minimo != null && (i.existencia || 0) <= i.stock_minimo; }).length;
-  document.getElementById('statTotal').textContent   = todosLosItems.length;
-  document.getElementById('statActivos').textContent = activos.length;
-  document.getElementById('statCeroStock').textContent = activos.filter(function(i) { return (i.existencia || 0) === 0; }).length;
+  var b7activos = todosLosInsumosB7.filter(function(i) { return i.activo !== false; });
+  var bajoMin = b7activos.filter(function(i) { return i.stock_minimo != null && (i.existencia || 0) <= i.stock_minimo; }).length;
   var chip = document.getElementById('chipBajoMin');
-  if (chip) {
-    document.getElementById('statBajoMin').textContent = bajoMin;
-    chip.style.display = bodegaFiltro === 'B7' ? 'flex' : 'none';
+  if (bodegaFiltro === 'B7') {
+    document.getElementById('statTotal').textContent     = todosLosInsumosB7.length;
+    document.getElementById('statActivos').textContent   = b7activos.length;
+    document.getElementById('statCeroStock').textContent = b7activos.filter(function(i) { return (i.existencia || 0) === 0; }).length;
+    if (chip) { document.getElementById('statBajoMin').textContent = bajoMin; chip.style.display = 'flex'; }
+  } else {
+    var activos = todosLosItems.filter(function(i) { return i.activo; });
+    document.getElementById('statTotal').textContent     = todosLosItems.length;
+    document.getElementById('statActivos').textContent   = activos.length;
+    document.getElementById('statCeroStock').textContent = activos.filter(function(i) { return (i.existencia || 0) === 0; }).length;
+    if (chip) { document.getElementById('statBajoMin').textContent = bajoMin; chip.style.display = 'none'; }
   }
 }
 
@@ -398,9 +407,10 @@ function filtrarTabla(q) {
 
 function aplicarFiltro(q) {
   var query = (q || document.getElementById('searchInput').value || '').toLowerCase().trim();
-  filtrados = todosLosItems.filter(function(i) {
+  var fuente = bodegaFiltro === 'B7' ? todosLosInsumosB7 : todosLosItems;
+  filtrados = fuente.filter(function(i) {
     if (!mostrarInactivos && !i.activo) return false;
-    if (bodegaFiltro !== 'all' && (i.bodega || 'B2') !== bodegaFiltro) return false;
+    if (bodegaFiltro === 'B2' && (i.bodega || 'B2') !== 'B2') return false;
     if (!query) return true;
     return (i.sku || '').toLowerCase().includes(query) ||
            (i.descripcion || '').toLowerCase().includes(query);
@@ -532,7 +542,7 @@ function buildFila(item) {
 function editarExist(sku) {
   var span = document.getElementById('ev-' + sku);
   if (!span) return;
-  var item = todosLosItems.find(function(i) { return i.sku === sku; });
+  var item = (bodegaFiltro === 'B7' ? todosLosInsumosB7 : todosLosItems).find(function(i) { return i.sku === sku; });
   if (!item) return;
   var actual = item.existencia || 0;
   var skuAt = escHtml(sku.replace(/'/g, "\\'"));
@@ -548,7 +558,7 @@ function existKeydown(e, sku) {
 }
 
 function cancelarExist(sku) {
-  var item = todosLosItems.find(function(i) { return i.sku === sku; });
+  var item = (bodegaFiltro === 'B7' ? todosLosInsumosB7 : todosLosItems).find(function(i) { return i.sku === sku; });
   var span = document.getElementById('ev-' + sku);
   if (span && item) span.innerHTML = (item.existencia || 0).toLocaleString();
 }
@@ -559,10 +569,12 @@ async function guardarExist(sku) {
   var val = parseFloat(inp.value) || 0;
   var span = document.getElementById('ev-' + sku);
   if (span) span.innerHTML = fmtExist(val);
+  var isB7 = bodegaFiltro === 'B7';
+  var cache = isB7 ? todosLosInsumosB7 : todosLosItems;
   try {
-    var r = await db.from('inventario').update({ existencia: val }).eq('sku', sku);
+    var r = await db.from(isB7 ? 'insumos_b7' : 'inventario').update({ existencia: val }).eq('sku', sku);
     if (r.error) throw r.error;
-    var item = todosLosItems.find(function(i) { return i.sku === sku; });
+    var item = cache.find(function(i) { return i.sku === sku; });
     if (item) item.existencia = val;
     actualizarStats();
     toast('Existencia actualizada', 'ok');
@@ -575,10 +587,12 @@ async function guardarExist(sku) {
 // ── TOGGLE ACTIVO ───────────────────────────────────────────
 async function toggleActivo(sku, activo) {
   var nuevo = !activo;
+  var isB7 = bodegaFiltro === 'B7';
+  var cache = isB7 ? todosLosInsumosB7 : todosLosItems;
   try {
-    var r = await db.from('inventario').update({ activo: nuevo }).eq('sku', sku);
+    var r = await db.from(isB7 ? 'insumos_b7' : 'inventario').update({ activo: nuevo }).eq('sku', sku);
     if (r.error) throw r.error;
-    var item = todosLosItems.find(function(i) { return i.sku === sku; });
+    var item = cache.find(function(i) { return i.sku === sku; });
     if (item) item.activo = nuevo;
     actualizarStats();
     aplicarFiltro();
@@ -648,7 +662,7 @@ function setBodega(val) {
 function editarMinimo(sku) {
   var span = document.getElementById('mv-' + sku);
   if (!span) return;
-  var item = todosLosItems.find(function(i) { return i.sku === sku; });
+  var item = todosLosInsumosB7.find(function(i) { return i.sku === sku; });
   if (!item) return;
   var actual = item.stock_minimo != null ? item.stock_minimo : '';
   var skuAt = escHtml(sku.replace(/'/g, "\\'"));
@@ -664,7 +678,7 @@ function minimoKeydown(e, sku) {
 }
 
 function cancelarMinimo(sku) {
-  var item = todosLosItems.find(function(i) { return i.sku === sku; });
+  var item = todosLosInsumosB7.find(function(i) { return i.sku === sku; });
   var span = document.getElementById('mv-' + sku);
   if (span && item) span.innerHTML = item.stock_minimo != null ? fmtExist(item.stock_minimo) : '—';
 }
@@ -678,9 +692,9 @@ async function guardarMinimo(sku) {
   var span = document.getElementById('mv-' + sku);
   if (span) span.innerHTML = val != null ? fmtExist(val) : '—';
   try {
-    var r = await db.from('inventario').update({ stock_minimo: val }).eq('sku', sku);
+    var r = await db.from('insumos_b7').update({ stock_minimo: val }).eq('sku', sku);
     if (r.error) throw r.error;
-    var item = todosLosItems.find(function(i) { return i.sku === sku; });
+    var item = todosLosInsumosB7.find(function(i) { return i.sku === sku; });
     if (item) item.stock_minimo = val;
     actualizarStats();
     toast('Mínimo actualizado', 'ok');
@@ -866,8 +880,9 @@ function fmtExist(v) {
 }
 
 function mostrarPreviewImport(productos, filename) {
+  var fuente = importBodega === 'bodega7' ? todosLosInsumosB7 : todosLosItems;
   var skuActuales = {};
-  todosLosItems.forEach(function(i) { skuActuales[i.sku] = i; });
+  fuente.forEach(function(i) { skuActuales[i.sku] = i; });
 
   var actualizados = [];
   var nuevos       = [];
@@ -1070,8 +1085,76 @@ function cerrarSiOverlayImport(e) {
   if (e.target === document.getElementById('modalImport')) cerrarImport();
 }
 
+async function confirmarImportB7() {
+  if (importPendiente.length === 0) return;
+  var btn = document.getElementById('btnConfirmImport');
+  btn.disabled = true;
+  btn.textContent = 'Procesando…';
+  document.getElementById('importProgress').style.display = 'block';
+
+  var PARALLEL = 20;
+  var BATCH    = 200;
+  var total    = importPendiente.length;
+  var hecho    = 0;
+  var errores  = 0;
+
+  function setProgress(n) {
+    document.getElementById('importBar').style.width = Math.round((n / total) * 100) + '%';
+    document.getElementById('importStatus').textContent = 'Procesando ' + n + ' / ' + total + '…';
+  }
+
+  try {
+    var skuActuales = {};
+    todosLosInsumosB7.forEach(function(i) { skuActuales[i.sku] = true; });
+
+    var existentes = importPendiente.filter(function(p) { return skuActuales[p.sku]; });
+    var nuevos     = importPendiente.filter(function(p) { return !skuActuales[p.sku]; });
+
+    for (var i = 0; i < existentes.length; i += PARALLEL) {
+      var chunk = existentes.slice(i, i + PARALLEL);
+      var results = await Promise.all(chunk.map(function(p) {
+        return db.from('insumos_b7').update({ existencia: p.existencia }).eq('sku', p.sku);
+      }));
+      results.forEach(function(r) { if (r.error) errores++; });
+      hecho += chunk.length;
+      setProgress(hecho);
+    }
+
+    for (var j = 0; j < nuevos.length; j += BATCH) {
+      var loteN = nuevos.slice(j, j + BATCH);
+      var payloadN = loteN.map(function(p) {
+        return { sku: p.sku, descripcion: p.descripcion, existencia: p.existencia, activo: true };
+      });
+      var rN = await db.from('insumos_b7').insert(payloadN);
+      if (rN.error) { errores += loteN.length; }
+      hecho += loteN.length;
+      setProgress(hecho);
+    }
+
+    document.getElementById('importProgress').style.display = 'none';
+    document.getElementById('importStatus').textContent = '';
+    cerrarImport();
+
+    var msg = total + ' insumos procesados';
+    if (nuevos.length) msg += ' · ' + nuevos.length + ' nuevos';
+    if (errores) msg += ' · ' + errores + ' errores';
+    toast(msg, errores ? 'err' : 'ok');
+    if (!errores) {
+      registrarImportDiario();
+      saveLastImport(importBodega, total);
+    }
+    await cargarTodo();
+  } catch(err) {
+    document.getElementById('importStatus').textContent = 'Error: ' + err.message;
+    btn.disabled = false;
+    btn.textContent = 'Reintentar';
+    toast('Error al importar insumos', 'err');
+  }
+}
+
 async function confirmarImport() {
   if (importTipo === 'ventas') { confirmarImportVentas(); return; }
+  if (importBodega === 'bodega7') { await confirmarImportB7(); return; }
   if (importPendiente.length === 0) return;
   var btn = document.getElementById('btnConfirmImport');
   btn.disabled = true;
@@ -1089,10 +1172,10 @@ async function confirmarImport() {
   }
 
   try {
-    // Clave de bodega según qué se está importando
-    var bodeganKey = importBodega === 'bodega7' ? 'B7' : importBodega === 'bodega5' ? 'B5' : 'B2';
+    // B7 ya se manejó arriba — aquí solo B2/B5
+    var bodeganKey = importBodega === 'bodega5' ? 'B5' : 'B2';
 
-    // Solo considerar SKUs que pertenecen a esta bodega (protege la otra)
+    // Solo considerar SKUs que pertenecen a esta bodega (protege las otras)
     var skuActuales = {};
     todosLosItems.forEach(function(i) {
       if ((i.bodega || 'B2') === bodeganKey) skuActuales[i.sku] = true;

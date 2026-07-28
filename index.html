@@ -306,9 +306,8 @@ setInterval(cargarKPIs, 30000);
 // ── ALERTAS INSUMOS B7 ──────────────────────────────────────
 async function cargarAlertasInsumos() {
   try {
-    var r = await db.from('inventario')
+    var r = await db.from('insumos_b7')
       .select('sku,descripcion,existencia,stock_minimo')
-      .eq('bodega', 'B7')
       .eq('activo', true)
       .not('stock_minimo', 'is', null)
       .order('existencia', { ascending: true });
