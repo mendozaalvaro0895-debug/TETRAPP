@@ -661,13 +661,19 @@ async function cargarOperarios() {
         lineasSinBase.forEach(function(ln) {
           var last = ultimoPorLinea[ln];
           if (!last || !last.sku) return;
+          var skuBaseStr = String(last.sku);
+          var fichaP3 = { sku: '', diseno: '', sku_base: skuBaseStr, descripcion: last.descripcion || '', solicitud_id: null };
           if (!skuEnLineaMap[ln]) {
-            skuEnLineaMap[ln] = { sku: '', diseno: '', sku_base: String(last.sku), descripcion: last.descripcion || '', solicitud_id: null };
+            skuEnLineaMap[ln] = fichaP3;
           } else {
-            skuEnLineaMap[ln].sku_base = String(last.sku);
+            skuEnLineaMap[ln].sku_base = skuBaseStr;
             if (!skuEnLineaMap[ln].descripcion && last.descripcion)
               skuEnLineaMap[ln].descripcion = last.descripcion;
           }
+          // También agregar a skuLineaFichas para que mostrarChipsEnvaseFlam lo incluya
+          if (!skuLineaFichas[ln]) skuLineaFichas[ln] = [];
+          if (!skuLineaFichas[ln].some(function(f){ return String(f.sku_base) === skuBaseStr; }))
+            skuLineaFichas[ln].push(fichaP3);
         });
       }
     } catch(e4) { /* no critico */ }
@@ -1634,27 +1640,34 @@ function mostrarChipsEnvaseFlam() {
   if (!container) return;
   var chips = '';
   var hayAlguno = false;
+  var vistos = {}; // dedup por ln+sku_base
   LINEAS_OK.forEach(function(ln) {
-    var d = skuEnLineaMap[ln];
-    if (!d || !d.sku_base) return;
-    hayAlguno = true;
-    var skuB = String(d.sku_base);
-    var cachedBase = inventarioCache.find(function(x){ return String(x.sku) === skuB; });
-    var lbl = skuB + (cachedBase && cachedBase.descripcion ? ' — ' + cachedBase.descripcion : '');
-    chips += '<button type="button" onclick="usarEnvaseBase(' + ln + ')" ' +
-      'style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit;text-align:left;width:100%">' +
-      '<span style="color:#7C3AED;font-weight:800;font-size:11px;margin-right:8px">L' + ln + '</span>' +
-      '<strong style="color:#e2e8f0">' + escHtml(lbl.slice(0, 50)) + '</strong>' +
-    '</button>';
+    // Todas las fichas de la línea; fallback a ficha primaria si no hay array
+    var fichas = (skuLineaFichas[ln] && skuLineaFichas[ln].length)
+      ? skuLineaFichas[ln]
+      : (skuEnLineaMap[ln] ? [skuEnLineaMap[ln]] : []);
+    fichas.forEach(function(ficha) {
+      var skuB = ficha.sku_base ? String(ficha.sku_base) : '';
+      if (!skuB) return;
+      var key = ln + '_' + skuB;
+      if (vistos[key]) return;
+      vistos[key] = true;
+      hayAlguno = true;
+      var cachedBase = inventarioCache.find(function(x){ return String(x.sku) === skuB; });
+      var lbl = skuB + (cachedBase && cachedBase.descripcion ? ' — ' + cachedBase.descripcion : '');
+      chips += '<button type="button" onclick="usarEnvaseBase(\'' + skuB + '\')" ' +
+        'style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit;text-align:left;width:100%">' +
+        '<span style="color:#7C3AED;font-weight:800;font-size:11px;margin-right:8px">L' + ln + '</span>' +
+        '<strong style="color:#e2e8f0">' + escHtml(lbl.slice(0, 50)) + '</strong>' +
+      '</button>';
+    });
   });
   container.innerHTML = '<span style="color:#64748b;font-size:11px;width:100%;margin-bottom:4px">Envase base por línea:</span>' + chips;
   container.style.display = hayAlguno ? 'flex' : 'none';
 }
 
-function usarEnvaseBase(ln) {
-  var d = skuEnLineaMap[ln];
-  if (!d || !d.sku_base) return;
-  var skuB = String(d.sku_base);
+function usarEnvaseBase(skuB) {
+  skuB = String(skuB);
   var cachedBase = inventarioCache.find(function(x){ return String(x.sku) === skuB; });
   var inp = document.getElementById('fFlamEnvase');
   inp.value = skuB + (cachedBase && cachedBase.descripcion ? ' — ' + cachedBase.descripcion : '');
