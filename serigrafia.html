@@ -1434,11 +1434,19 @@ var MESES_PER_C = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','
 var MESES_PER_L = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
                    'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 
+// Arranque del sistema de períodos. Todo lo ingresado ANTES de esta fecha
+// es backlog acumulado (junio + julio) y cae en UNA sola ficha histórica,
+// sin importar en qué mes entró. Desde esta fecha rige el corte del día 28.
+var PERIODO_BASE = '2026-07-28';
+var PERIODO_HIST = { key: '2026-06', corto: 'JUN', largo: 'JUNIO 2026' };
+
 function periodoDe(iso) {
   var vacio = { key: '0000-00', corto: '—', largo: 'SIN FECHA' };
   if (!iso) return vacio;
-  var d = new Date(String(iso).slice(0, 10) + 'T12:00:00');
+  var f = String(iso).slice(0, 10);
+  var d = new Date(f + 'T12:00:00');
   if (isNaN(d.getTime())) return vacio;
+  if (f < PERIODO_BASE) return PERIODO_HIST;
   // setDate(1) antes de avanzar el mes: evita que un 30/01 salte a marzo
   if (d.getDate() >= 28) { d.setDate(1); d.setMonth(d.getMonth() + 1); }
   var m = d.getMonth(), y = d.getFullYear();
