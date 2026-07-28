@@ -588,7 +588,7 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
             <span>⚠️</span>
             <span class="b7-alert-ttl">Bajo stock — Insumos Serigrafía</span>
             <span class="b7-alert-cnt" id="b7AlertCnt">0</span>
-            <button class="b7-alert-btn" onclick="event.stopPropagation();descargarAlertasB7()" title="Descargar lista">⬇ CSV</button>
+            <button class="b7-alert-btn" onclick="event.stopPropagation();descargarAlertasB7()" title="Descargar PDF">⬇ PDF</button>
             <span class="b7-alert-chev">▾</span>
           </div>
           <div class="b7-alert-list" id="b7AlertList"></div>
@@ -5775,18 +5775,45 @@ function toggleB7Alert() {
 
 function descargarAlertasB7() {
   if (!b7AlertasData.length) return;
-  var fecha = new Date().toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-  var csv = 'SKU,Descripcion,Existencia,Minimo\n';
-  b7AlertasData.forEach(function(i) {
-    var desc = (i.descripcion || '').replace(/,/g, ';');
-    csv += i.sku + ',' + desc + ',' + (i.existencia || 0) + ',' + (i.stock_minimo || 0) + '\n';
-  });
-  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  var url  = URL.createObjectURL(blob);
-  var a    = document.createElement('a');
-  a.href = url; a.download = 'bajo_stock_serig_' + fecha + '.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+  var fecha = new Date().toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  var filas = b7AlertasData.map(function(i) {
+    var exist = i.existencia || 0;
+    var cero  = exist === 0;
+    var existFmt = exist % 1 === 0 ? exist.toLocaleString() : exist.toFixed(2);
+    var minFmt   = (i.stock_minimo || 0) % 1 === 0 ? (i.stock_minimo||0).toLocaleString() : (i.stock_minimo||0).toFixed(2);
+    var rowBg = cero ? '#FEF2F2' : '#FFFBEB';
+    var numColor = cero ? '#B83232' : '#B87200';
+    return '<tr style="background:' + rowBg + '">' +
+      '<td style="font-family:monospace;font-size:11px;color:#6B6B6A;padding:7px 10px;border-bottom:1px solid #eee">' + i.sku + '</td>' +
+      '<td style="font-size:12px;font-weight:600;padding:7px 10px;border-bottom:1px solid #eee">' + (i.descripcion || '') + '</td>' +
+      '<td style="font-family:monospace;font-size:12px;font-weight:700;color:' + numColor + ';text-align:right;padding:7px 10px;border-bottom:1px solid #eee">' + existFmt + '</td>' +
+      '<td style="font-family:monospace;font-size:11px;text-align:right;padding:7px 10px;border-bottom:1px solid #eee;color:#6B6B6A">mín. ' + minFmt + '</td>' +
+    '</tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<title>Bajo Stock Serigrafía — ' + fecha + '</title>' +
+    '<style>*{box-sizing:border-box;margin:0;padding:0}' +
+    'body{font-family:"DM Sans",Arial,sans-serif;padding:32px;color:#0C0C0B}' +
+    'h1{font-size:18px;font-weight:700;margin-bottom:4px}' +
+    '.sub{font-size:12px;color:#6B6B6A;margin-bottom:20px}' +
+    'table{width:100%;border-collapse:collapse;font-size:12px}' +
+    'thead tr{background:#1A6B5B;color:#fff}' +
+    'th{padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase}' +
+    'th:nth-child(3),th:nth-child(4){text-align:right}' +
+    '@media print{body{padding:16px}}' +
+    '</style></head><body>' +
+    '<h1>⚠️ Insumos Serigrafía — Bajo Stock</h1>' +
+    '<div class="sub">Generado: ' + fecha + ' · ' + b7AlertasData.length + ' ítem(s)</div>' +
+    '<table><thead><tr><th>SKU</th><th>Descripción</th><th style="text-align:right">Existencia</th><th style="text-align:right">Mínimo</th></tr></thead>' +
+    '<tbody>' + filas + '</tbody></table>' +
+    '</body></html>';
+
+  var win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(function() { win.print(); }, 400);
 }
 
 function escHtml(s) {
