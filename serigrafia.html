@@ -261,6 +261,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-cards-wrap{padding:7px;display:flex;flex-direction:column;gap:6px;min-height:96px;flex:1}
 .board-card{background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:9px 10px;cursor:grab;user-select:none;transition:box-shadow .15s,transform .12s,opacity .15s}
 .board-card:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px);border-color:var(--serig-m)}
+.board-card.nueva-orden{border-left:3px solid var(--teal);background:#f8fffe}
+.badge-ago{display:inline-block;background:var(--teal);color:#fff;border-radius:3px;padding:1px 5px;font-size:8px;font-weight:800;letter-spacing:.3px;flex-shrink:0}
 .board-card.dragging{opacity:.4;transform:scale(.97)}
 .board-empty-lane{text-align:center;padding:18px 0;font-size:11px;color:var(--gray-l);grid-column:1/-1}
 .board-therm-wrap{background:rgba(0,0,0,.08);border-radius:3px;height:5px;margin-top:6px}
@@ -2216,13 +2218,15 @@ function boardBuildCard(item) {
       '</div>' +
       (item.prog > 0 ? '<div style="margin-top:5px;background:var(--border);border-radius:3px;height:3px"><div style="background:' + progColor + ';height:3px;border-radius:3px;width:' + item.prog + '%"></div></div>' : '') +
       requiRow;
-  return '<div class="board-card" draggable="true"' +
+  var esNueva = item.createdAt && item.createdAt.slice(0,10) >= '2026-07-28';
+  var badgeAgo = esNueva ? '<span class="badge-ago">AGO</span>' : '';
+  return '<div class="board-card' + (esNueva ? ' nueva-orden' : '') + '" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
     ' onclick="mostrarDetalle(\'' + item.solId + '\')">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;margin-bottom:3px">' +
       '<span style="font-size:10px;font-weight:700;color:var(--serig-m);font-family:var(--mono)">' + item.solCodigo + '</span>' +
-      badge +
+      '<span style="display:flex;gap:4px;align-items:center">' + badgeAgo + badge + '</span>' +
     '</div>' +
     '<div style="font-size:12px;font-weight:700;color:var(--ink);line-height:1.2;margin-bottom:2px">' + item.cliente + '</div>' +
     '<div style="font-size:11px;line-height:1.4;margin-bottom:4px;word-break:break-word">' + descTxt + '</div>' +
@@ -2241,13 +2245,15 @@ function boardBuildCardCompact(item) {
   var badge = '<span style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:3px;padding:1px 4px;font-size:8px;font-weight:800;flex-shrink:0">' + badgeTxt + '</span>';
   var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var descFull = (item.sku ? item.sku + ' · ' : '') + (item.desc || '—');
-  return '<div class="board-card" style="padding:6px 8px" draggable="true"' +
+  var esNueva2 = item.createdAt && item.createdAt.slice(0,10) >= '2026-07-28';
+  var badgeAgo2 = esNueva2 ? '<span class="badge-ago">AGO</span>' : '';
+  return '<div class="board-card' + (esNueva2 ? ' nueva-orden' : '') + '" style="padding:6px 8px" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
     ' onclick="mostrarDetalle(\'' + item.solId + '\')">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;margin-bottom:2px">' +
       '<span style="font-size:10px;font-weight:700;color:var(--serig-m);font-family:var(--mono)">' + item.solCodigo + '</span>' +
-      badge +
+      '<span style="display:flex;gap:4px;align-items:center">' + badgeAgo2 + badge + '</span>' +
     '</div>' +
     '<div style="font-size:11px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:1px">' + (item.cliente || '—') + '</div>' +
     '<div style="font-size:10px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px" title="' + descFull.replace(/"/g, '&quot;') + '">' + descFull + '</div>' +
