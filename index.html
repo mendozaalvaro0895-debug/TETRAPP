@@ -93,23 +93,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .footer-info{padding:32px 24px 48px;max-width:1100px;margin:0 auto;text-align:center;color:var(--gray);font-size:12px}
 .footer-info code{font-family:var(--mono);background:var(--card);padding:2px 6px;border-radius:4px;font-size:11px;border:1px solid var(--border)}
 
-/* ── Alertas Insumos ──────────────────────────────────────── */
-.alertas-wrap{max-width:1100px;margin:0 auto 8px;padding:0 24px;display:none}
-.alertas-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.alertas-ttl{font-size:13px;font-weight:700;color:#92400E}
-.alertas-cnt{background:#FDE68A;color:#92400E;border-radius:20px;font-size:10px;font-weight:800;padding:2px 9px;min-width:20px;text-align:center}
-.alertas-link{margin-left:auto;font-size:11px;color:#92400E;font-weight:600;text-decoration:none;opacity:.7}
-.alertas-link:hover{opacity:1}
-.alertas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
-.alerta-card{background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:10px;padding:11px 13px}
-.alerta-card.critico{background:#FEF2F2;border-color:#FECACA}
-.alerta-sku{font-family:var(--mono);font-size:10px;color:var(--gray-l);margin-bottom:2px}
-.alerta-desc{font-size:11px;font-weight:600;color:var(--ink);line-height:1.35;margin-bottom:7px;min-height:28px}
-.alerta-nums{display:flex;align-items:baseline;gap:5px}
-.alerta-exist{font-family:var(--mono);font-weight:700;font-size:18px;color:#B87200}
-.alerta-card.critico .alerta-exist{color:#B83232}
-.alerta-min{font-size:10px;color:var(--gray);font-family:var(--mono)}
-@media(max-width:480px){.alertas-wrap{padding:0 14px}.alertas-grid{grid-template-columns:repeat(2,1fr)}}
 
 /* ── Responsive móvil ─────────────────────────────────────────── */
 @media(max-width:480px){
@@ -158,16 +141,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   <div class="kpi-badge" id="fugasBadge">📉 Fugas: —</div>
 </div>
 
-<!-- ALERTAS INSUMOS SERIGRAFÍA -->
-<div class="alertas-wrap" id="alertasWrap">
-  <div class="alertas-hdr">
-    <span style="font-size:18px">⚠️</span>
-    <span class="alertas-ttl">Alertas de Bajo Stock — Insumos Serigrafía</span>
-    <span class="alertas-cnt" id="alertasCnt">0</span>
-    <a href="inventario.html" class="alertas-link">Ver Bodega 7 →</a>
-  </div>
-  <div class="alertas-grid" id="alertasGrid"></div>
-</div>
 
 <div class="areas-grid">
 
@@ -303,44 +276,9 @@ async function cargarKPIs() {
 cargarKPIs();
 setInterval(cargarKPIs, 30000);
 
-// ── ALERTAS INSUMOS B7 ──────────────────────────────────────
-async function cargarAlertasInsumos() {
-  try {
-    var r = await db.from('insumos_b7')
-      .select('sku,descripcion,existencia,stock_minimo')
-      .eq('activo', true)
-      .not('stock_minimo', 'is', null)
-      .order('existencia', { ascending: true });
-    if (r.error || !r.data) return;
-    var alertas = r.data.filter(function(i) {
-      return (i.existencia || 0) <= (i.stock_minimo || 0);
-    });
-    if (!alertas.length) return;
-    document.getElementById('alertasWrap').style.display = 'block';
-    document.getElementById('alertasCnt').textContent = alertas.length;
-    document.getElementById('alertasGrid').innerHTML = alertas.map(function(i) {
-      var exist = i.existencia || 0;
-      var isCrit = exist === 0;
-      var existFmt = exist % 1 === 0 ? exist.toLocaleString() : exist.toFixed(2);
-      var minFmt   = (i.stock_minimo || 0) % 1 === 0 ? (i.stock_minimo||0).toLocaleString() : (i.stock_minimo||0).toFixed(2);
-      var desc = (i.descripcion || '').substring(0, 48);
-      return '<div class="alerta-card' + (isCrit ? ' critico' : '') + '">' +
-        '<div class="alerta-sku">' + escHtml(String(i.sku)) + '</div>' +
-        '<div class="alerta-desc">' + escHtml(desc) + '</div>' +
-        '<div class="alerta-nums">' +
-          '<span class="alerta-exist">' + existFmt + '</span>' +
-          '<span class="alerta-min">/ mín. ' + minFmt + '</span>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  } catch(e) { /* silencioso — no crítico */ }
-}
-
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-cargarAlertasInsumos();
 
 // ── BADGE INVENTARIO ────────────────────────────────────────
 (function() {

@@ -95,6 +95,25 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .kpi-v{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--ink);line-height:1.1}
 .kpi-s{font-size:8px;color:var(--gray-l);margin-top:1px}
 
+/* ── ALERTAS STOCK B7 ─────────────────────────────────────── */
+.b7-alert-wrap{background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:10px;margin-bottom:14px;overflow:hidden;display:none}
+.b7-alert-wrap.critico-hay{background:#FEF2F2;border-color:#FECACA}
+.b7-alert-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(0,0,0,.06)}
+.b7-alert-ttl{font-size:12px;font-weight:700;color:#92400E;flex:1}
+.b7-alert-wrap.critico-hay .b7-alert-ttl{color:#B83232}
+.b7-alert-cnt{background:#FDE68A;color:#92400E;border-radius:20px;font-size:10px;font-weight:800;padding:1px 8px}
+.b7-alert-wrap.critico-hay .b7-alert-cnt{background:#FECACA;color:#B83232}
+.b7-alert-link{font-size:10px;color:#92400E;font-weight:600;text-decoration:none;opacity:.7}
+.b7-alert-link:hover{opacity:1}
+.b7-alert-list{max-height:160px;overflow-y:auto;padding:4px 0}
+.b7-alert-row{display:flex;align-items:center;gap:8px;padding:5px 12px;border-bottom:1px solid rgba(0,0,0,.05)}
+.b7-alert-row:last-child{border-bottom:none}
+.b7-alert-row.cero{background:rgba(184,50,50,.05)}
+.b7-alert-sku{font-family:var(--mono);font-size:10px;color:var(--gray);min-width:36px}
+.b7-alert-desc{font-size:11px;font-weight:600;color:var(--ink);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b7-alert-nums{font-family:var(--mono);font-size:11px;font-weight:700;color:#B87200;white-space:nowrap}
+.b7-alert-row.cero .b7-alert-nums{color:#B83232}
+
 /* ── HUB CARDS ────────────────────────────────────────────── */
 .hub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
 .hub-card{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;transition:all .16s;display:flex;flex-direction:row;align-items:center;gap:10px}
@@ -561,6 +580,17 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
             <div><div class="hub-card-title">Dashboard</div>
             <div class="hub-card-sub">KPIs ejecutivos →</div></div>
           </div>
+        </div>
+
+        <!-- Alertas bajo stock Bodega 7 -->
+        <div class="b7-alert-wrap" id="b7AlertWrap">
+          <div class="b7-alert-hdr">
+            <span>⚠️</span>
+            <span class="b7-alert-ttl">Bajo stock — Insumos Serigrafía</span>
+            <span class="b7-alert-cnt" id="b7AlertCnt">0</span>
+            <a href="inventario.html" class="b7-alert-link" onclick="event.stopPropagation()">Ver Bodega 7 →</a>
+          </div>
+          <div class="b7-alert-list" id="b7AlertList"></div>
         </div>
 
         <!-- Barra de día compartida — afecta Personal+Roles y Asistencia Mensual -->
@@ -5702,6 +5732,35 @@ function cerrarForm() {
   document.getElementById('btnSave').textContent = 'Guardar';
 }
 
+async function cargarAlertasB7() {
+  try {
+    var r = await db.from('insumos_b7')
+      .select('sku,descripcion,existencia,stock_minimo')
+      .eq('activo', true)
+      .not('stock_minimo', 'is', null)
+      .order('existencia', { ascending: true });
+    if (r.error || !r.data) return;
+    var alertas = r.data.filter(function(i) { return (i.existencia || 0) <= (i.stock_minimo || 0); });
+    var wrap = document.getElementById('b7AlertWrap');
+    if (!wrap || !alertas.length) return;
+    var hayCero = alertas.some(function(i) { return (i.existencia || 0) === 0; });
+    wrap.style.display = 'block';
+    wrap.classList.toggle('critico-hay', hayCero);
+    document.getElementById('b7AlertCnt').textContent = alertas.length;
+    document.getElementById('b7AlertList').innerHTML = alertas.map(function(i) {
+      var exist = i.existencia || 0;
+      var cero  = exist === 0;
+      var existFmt = exist % 1 === 0 ? exist.toLocaleString() : exist.toFixed(2);
+      var minFmt   = (i.stock_minimo || 0) % 1 === 0 ? (i.stock_minimo||0).toLocaleString() : (i.stock_minimo||0).toFixed(2);
+      return '<div class="b7-alert-row' + (cero ? ' cero' : '') + '">' +
+        '<span class="b7-alert-sku">' + escHtml(i.sku) + '</span>' +
+        '<span class="b7-alert-desc">' + escHtml(i.descripcion || '') + '</span>' +
+        '<span class="b7-alert-nums">' + existFmt + ' / mín. ' + minFmt + '</span>' +
+      '</div>';
+    }).join('');
+  } catch(e) { /* silencioso */ }
+}
+
 function escHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -9984,6 +10043,7 @@ async function init() {
   await freezeDiaCompleto();    // congela el roster de hoy tal como está al abrir
   renderDiaBar();
   await cargarSolicitudes(); // llama renderInicio() internamente
+  cargarAlertasB7();
 
   switchTab('inicio');
 
