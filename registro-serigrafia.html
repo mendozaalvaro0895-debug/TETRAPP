@@ -639,6 +639,39 @@ async function cargarOperarios() {
       });
     } catch(e2) { operadorLineaMap = {}; }
 
+    // PRIORIDAD 3: último envase flameado por línea
+    // Si solicitud_lineas.sku_base está vacío (o la línea no tiene pedido),
+    // usamos el SKU del registro más reciente de flameado en esa línea.
+    try {
+      var lineasSinBase = LINEAS_OK.filter(function(ln) {
+        var d = skuEnLineaMap[ln];
+        return !d || !d.sku_base;
+      });
+      if (lineasSinBase.length) {
+        var rf = await db.from('registro_flameado_serig')
+          .select('para_linea, sku, descripcion')
+          .eq('area', 'serig')
+          .in('para_linea', lineasSinBase)
+          .order('created_at', { ascending: false })
+          .limit(40);
+        var ultimoPorLinea = {};
+        (rf.data || []).forEach(function(row) {
+          if (row.para_linea && !ultimoPorLinea[row.para_linea]) ultimoPorLinea[row.para_linea] = row;
+        });
+        lineasSinBase.forEach(function(ln) {
+          var last = ultimoPorLinea[ln];
+          if (!last || !last.sku) return;
+          if (!skuEnLineaMap[ln]) {
+            skuEnLineaMap[ln] = { sku: '', diseno: '', sku_base: String(last.sku), descripcion: last.descripcion || '', solicitud_id: null };
+          } else {
+            skuEnLineaMap[ln].sku_base = String(last.sku);
+            if (!skuEnLineaMap[ln].descripcion && last.descripcion)
+              skuEnLineaMap[ln].descripcion = last.descripcion;
+          }
+        });
+      }
+    } catch(e4) { /* no critico */ }
+
     // Mapa linea → nombre: solo operarios con rol Impresión, asignados por nombre
     lineaOpNombreMap = {};
     operarios.forEach(function(op) {
@@ -1630,10 +1663,10 @@ function usarEnvaseBase(ln) {
   inp.focus();
 }
 
-function elegirFlameador(codigo) {
+async function elegirFlameador(codigo) {
   flamOpActual = operarios.find(function(o){ return o.codigo === codigo; });
   if (!flamOpActual) return;
-  cargarInventario();
+  if (!inventarioCache.length) await cargarInventario();
   document.getElementById('qAvFlam').textContent = flamOpActual.iniciales || '?';
   document.getElementById('qAvFlam').style.background = flamOpActual.color_hex || '#D97706';
   document.getElementById('qNombreFlam').textContent = flamOpActual.nombre;
