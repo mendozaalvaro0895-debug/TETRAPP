@@ -237,7 +237,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-sin-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--serig-m);display:flex;align-items:center;gap:8px;white-space:nowrap}
 .board-sin-count{font-size:11px;background:#fff;color:var(--serig-m);border-radius:12px;padding:2px 10px;font-weight:700}
 .board-sin-cards{padding:8px 12px 12px;min-height:96px;display:flex;flex-direction:row;gap:10px;overflow-x:auto;align-items:flex-start}
-.sin-grupo{flex:0 0 440px;background:var(--bg2);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;transition:box-shadow .15s}
+.sin-cli-col{flex:0 0 440px;display:flex;flex-direction:column;gap:8px;align-self:flex-start}
+.sin-grupo{width:100%;background:var(--bg2);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;transition:box-shadow .15s}
 .sin-grupo.drag-grupo-over{box-shadow:inset 0 0 0 2px var(--serig-m)}
 .sin-grupo-hdr{display:flex;align-items:flex-start;gap:6px;padding:8px 10px;background:var(--serig-m);cursor:grab;user-select:none}
 .sin-grupo-hdr:active{cursor:grabbing}
@@ -254,7 +255,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sin-grupo-chev:hover{opacity:1}
 .sin-grupo.collapsed .sin-grupo-chev{transform:rotate(-90deg)}
 .sin-grupo.collapsed .sin-grupo-cards{display:none}
-.sin-grupo.collapsed{flex:0 0 340px;opacity:.9}
+.sin-grupo.collapsed{opacity:.9}
 .sin-card-wrap{border-radius:8px;transition:box-shadow .1s}
 .sin-card-wrap.drop-before{box-shadow:0 -3px 0 0 var(--serig-m)}
 .sin-card-wrap.drop-after{box-shadow:0 3px 0 0 var(--serig-m)}
@@ -2806,9 +2807,7 @@ function boardBuildSinBlock(items) {
     return 0;                            // rojo (sin entregas)
   }
 
-  var gruposHtml = grupoKeys.length === 0
-    ? '<div class="board-empty-lane">No hay pedidos sin asignar</div>'
-    : grupoKeys.map(function(gk) {
+  var fichas = grupoKeys.map(function(gk) {
         var grupo  = grupoMap[gk];
         var cli    = grupo.cli;
         var per    = grupo.per;
@@ -2911,6 +2910,22 @@ function boardBuildSinBlock(items) {
           '</div>' +
           '<div class="sin-grupo-cards">' + cardsHtml + '</div>' +
         '</div>';
+      });
+
+  // Una columna por cliente: sus períodos se apilan verticalmente.
+  // grupoKeys ya viene ordenado (cliente por prioridad, período reciente primero),
+  // así que basta con recorrerlo y repartir las fichas en su columna.
+  var colKeys = [], colMap = {};
+  grupoKeys.forEach(function(gk, i) {
+    var c = grupoMap[gk].cli;
+    if (!colMap[c]) { colMap[c] = []; colKeys.push(c); }
+    colMap[c].push(fichas[i]);
+  });
+
+  var gruposHtml = colKeys.length === 0
+    ? '<div class="board-empty-lane">No hay pedidos sin asignar</div>'
+    : colKeys.map(function(c) {
+        return '<div class="sin-cli-col">' + colMap[c].join('') + '</div>';
       }).join('');
 
   return '<div class="board-sin" id="bl-0"' +
