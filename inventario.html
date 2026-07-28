@@ -138,6 +138,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .progress-bar-wrap{background:var(--bg);border-radius:6px;height:8px;overflow:hidden;margin:8px 0}
 .progress-bar{height:8px;background:var(--inv);border-radius:6px;transition:width .3s;width:0%}
 
+/* BODEGA TABS */
+.bod-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.bod-tab{padding:6px 16px;border-radius:8px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--gray);transition:all .15s}
+.bod-tab.active{background:var(--inv);color:#fff;border-color:var(--inv)}
+.bod-tab:hover:not(.active){border-color:var(--inv);color:var(--inv)}
+/* Filas con alerta de stock mínimo */
+.tbl tbody tr.row-alerta td{background:#FFFBEB}
+.tbl tbody tr.row-critico td{background:#FEF2F2}
+/* Columna de mínimo */
+.min-cell{text-align:right;font-family:var(--mono);font-size:12px;cursor:default}
+.min-input{width:72px;padding:3px 8px;border:1.5px solid var(--inv);border-radius:6px;font-family:var(--mono);font-size:12px;text-align:right;outline:none}
+
 /* TOAST */
 .toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
 .toast.show{opacity:1;transform:translateY(0)}
@@ -203,6 +215,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="stat-chip"><strong id="statTotal">—</strong>Total SKUs</div>
     <div class="stat-chip"><strong id="statActivos">—</strong>Activos</div>
     <div class="stat-chip"><strong id="statCeroStock">—</strong>Stock en cero</div>
+    <div class="stat-chip" id="chipBajoMin" style="display:none;border-color:#FDE68A;background:#FFFBEB"><strong id="statBajoMin" style="color:#B87200">—</strong>Bajo mínimo</div>
+  </div>
+
+  <!-- BODEGA TABS -->
+  <div class="bod-tabs">
+    <button class="bod-tab active" id="btAll" onclick="setBodega('all')">Todos</button>
+    <button class="bod-tab" id="btB2" onclick="setBodega('B2')">📦 Bodega 2 — Productos</button>
+    <button class="bod-tab" id="btB7" onclick="setBodega('B7')">🧪 Bodega 7 — Insumos</button>
   </div>
 
   <!-- TOOLBAR -->
@@ -234,6 +254,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <th class="sortable" onclick="ordenar('sku')" id="th-sku">SKU<span class="sort-ico">↕</span></th>
           <th class="sortable" onclick="ordenar('descripcion')" id="th-descripcion">Descripción<span class="sort-ico">↕</span></th>
           <th class="sortable" onclick="ordenar('existencia')" id="th-existencia" style="text-align:right">Existencia<span class="sort-ico">↕</span></th>
+          <th id="th-minimo" style="text-align:right;display:none">Mínimo</th>
           <th class="sortable" onclick="ordenar('activo')" id="th-activo">Estado<span class="sort-ico">↕</span></th>
           <th></th>
         </tr>
@@ -309,6 +330,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 var todosLosItems = [];
 var filtrados    = [];
 var mostrarInactivos = false;
+var bodegaFiltro = 'all';
 var pag = 0;
 var POR_PAG = 50;
 var sortCol = 'sku';
@@ -338,7 +360,7 @@ async function cargarTodo() {
     var BATCH = 1000;
     while (true) {
       var r = await db.from('inventario')
-        .select('sku,descripcion,existencia,facturable,activo')
+        .select('sku,descripcion,existencia,facturable,activo,bodega,stock_minimo')
         .order('sku', { ascending: true })
         .range(desde, desde + BATCH - 1);
       if (r.error) throw r.error;
@@ -356,9 +378,16 @@ async function cargarTodo() {
 
 function actualizarStats() {
   var activos = todosLosItems.filter(function(i) { return i.activo; });
+  var b7 = activos.filter(function(i) { return (i.bodega || 'B2') === 'B7'; });
+  var bajoMin = b7.filter(function(i) { return i.stock_minimo != null && (i.existencia || 0) <= i.stock_minimo; }).length;
   document.getElementById('statTotal').textContent   = todosLosItems.length;
   document.getElementById('statActivos').textContent = activos.length;
   document.getElementById('statCeroStock').textContent = activos.filter(function(i) { return (i.existencia || 0) === 0; }).length;
+  var chip = document.getElementById('chipBajoMin');
+  if (chip) {
+    document.getElementById('statBajoMin').textContent = bajoMin;
+    chip.style.display = bodegaFiltro === 'B7' ? 'flex' : 'none';
+  }
 }
 
 // ── FILTRO ──────────────────────────────────────────────────
@@ -371,6 +400,7 @@ function aplicarFiltro(q) {
   var query = (q || document.getElementById('searchInput').value || '').toLowerCase().trim();
   filtrados = todosLosItems.filter(function(i) {
     if (!mostrarInactivos && !i.activo) return false;
+    if (bodegaFiltro !== 'all' && (i.bodega || 'B2') !== bodegaFiltro) return false;
     if (!query) return true;
     return (i.sku || '').toLowerCase().includes(query) ||
            (i.descripcion || '').toLowerCase().includes(query);
@@ -435,8 +465,9 @@ function sortFiltrados() {
 // ── RENDER ──────────────────────────────────────────────────
 function renderTabla() {
   var tbody = document.getElementById('tblBody');
+  var cols = bodegaFiltro === 'B7' ? 6 : 5;
   if (filtrados.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Sin resultados</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="' + cols + '">Sin resultados</td></tr>';
     document.getElementById('pagination').style.display = 'none';
     return;
   }
@@ -469,12 +500,26 @@ function buildFila(item) {
   var exist = fmtExist(item.existencia || 0);
   var toggleLabel = item.activo ? 'Desactivar' : 'Activar';
   var skuEsc = escHtml(item.sku.replace(/'/g, "\\'"));
-  return '<tr>' +
+
+  var rowClass = '';
+  var minimoTd = '';
+  if (bodegaFiltro === 'B7') {
+    var existN = item.existencia || 0;
+    if (item.stock_minimo != null) {
+      if (existN === 0)                     rowClass = 'row-critico';
+      else if (existN <= item.stock_minimo) rowClass = 'row-alerta';
+    }
+    var minLbl = item.stock_minimo != null ? fmtExist(item.stock_minimo) : '—';
+    minimoTd = '<td class="min-cell"><span id="mv-' + escHtml(item.sku) + '" ondblclick="editarMinimo(\'' + skuEsc + '\')" title="Doble clic para editar mínimo">' + minLbl + '</span></td>';
+  }
+
+  return '<tr class="' + rowClass + '">' +
     '<td class="sku-cell">' + escHtml(item.sku) + '</td>' +
     '<td class="desc-cell">' + escHtml(item.descripcion || '—') + '</td>' +
     '<td class="exist-cell">' +
       '<span id="ev-' + escHtml(item.sku) + '" ondblclick="editarExist(\'' + skuEsc + '\')" title="Doble clic para editar">' + exist + '</span>' +
     '</td>' +
+    minimoTd +
     '<td>' + badge + '</td>' +
     '<td><div class="act-btns">' +
       '<button class="btn btn-ghost btn-sm" onclick="editarExist(\'' + skuEsc + '\')" title="Actualizar existencia">📝</button>' +
@@ -582,6 +627,66 @@ async function guardarNuevo() {
     await cargarTodo();
   } catch(e) {
     toast('Error al guardar: ' + e.message, 'err');
+  }
+}
+
+// ── BODEGA TABS ─────────────────────────────────────────────
+function setBodega(val) {
+  bodegaFiltro = val;
+  ['all','B2','B7'].forEach(function(v) {
+    var btn = document.getElementById('bt' + (v === 'all' ? 'All' : v));
+    if (btn) btn.classList.toggle('active', v === val);
+  });
+  var thMin = document.getElementById('th-minimo');
+  if (thMin) thMin.style.display = val === 'B7' ? 'table-cell' : 'none';
+  pag = 0;
+  actualizarStats();
+  aplicarFiltro();
+}
+
+// ── EDITAR MÍNIMO INLINE (solo Bodega 7) ────────────────────
+function editarMinimo(sku) {
+  var span = document.getElementById('mv-' + sku);
+  if (!span) return;
+  var item = todosLosItems.find(function(i) { return i.sku === sku; });
+  if (!item) return;
+  var actual = item.stock_minimo != null ? item.stock_minimo : '';
+  var skuAt = escHtml(sku.replace(/'/g, "\\'"));
+  span.innerHTML = '<input class="min-input" id="mi-' + escHtml(sku) + '" type="number" step="1" min="0" value="' + actual + '"' +
+    ' onblur="guardarMinimo(\'' + skuAt + '\')" onkeydown="minimoKeydown(event,\'' + skuAt + '\')" autofocus>';
+  var inp = document.getElementById('mi-' + sku);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function minimoKeydown(e, sku) {
+  if (e.key === 'Enter')  { e.target.blur(); }
+  if (e.key === 'Escape') { cancelarMinimo(sku); }
+}
+
+function cancelarMinimo(sku) {
+  var item = todosLosItems.find(function(i) { return i.sku === sku; });
+  var span = document.getElementById('mv-' + sku);
+  if (span && item) span.innerHTML = item.stock_minimo != null ? fmtExist(item.stock_minimo) : '—';
+}
+
+async function guardarMinimo(sku) {
+  var inp = document.getElementById('mi-' + sku);
+  if (!inp) return;
+  var raw = inp.value.trim();
+  var val = raw === '' ? null : parseFloat(raw);
+  if (val !== null && (isNaN(val) || val < 0)) { cancelarMinimo(sku); return; }
+  var span = document.getElementById('mv-' + sku);
+  if (span) span.innerHTML = val != null ? fmtExist(val) : '—';
+  try {
+    var r = await db.from('inventario').update({ stock_minimo: val }).eq('sku', sku);
+    if (r.error) throw r.error;
+    var item = todosLosItems.find(function(i) { return i.sku === sku; });
+    if (item) item.stock_minimo = val;
+    actualizarStats();
+    toast('Mínimo actualizado', 'ok');
+  } catch(e) {
+    toast('Error al guardar mínimo', 'err');
+    cancelarMinimo(sku);
   }
 }
 
@@ -984,29 +1089,36 @@ async function confirmarImport() {
   }
 
   try {
+    // Clave de bodega según qué se está importando
+    var bodeganKey = importBodega === 'bodega7' ? 'B7' : importBodega === 'bodega5' ? 'B5' : 'B2';
+
+    // Solo considerar SKUs que pertenecen a esta bodega (protege la otra)
     var skuActuales = {};
-    todosLosItems.forEach(function(i) { skuActuales[i.sku] = true; });
+    todosLosItems.forEach(function(i) {
+      if ((i.bodega || 'B2') === bodeganKey) skuActuales[i.sku] = true;
+    });
 
     // Separar nuevos vs actualizaciones
     var existentes = importPendiente.filter(function(p) { return skuActuales[p.sku]; });
     var nuevos     = importPendiente.filter(function(p) { return !skuActuales[p.sku]; });
 
-    // Actualizar existencias en paralelo (20 a la vez) usando update individual
+    // Actualizar existencias en paralelo (20 a la vez) — solo toca filas de esta bodega
     var PARALLEL = 20;
     for (var i = 0; i < existentes.length; i += PARALLEL) {
       var chunk = existentes.slice(i, i + PARALLEL);
       var results = await Promise.all(chunk.map(function(p) {
-        return db.from('inventario').update({ existencia: p.existencia }).eq('sku', p.sku);
+        return db.from('inventario').update({ existencia: p.existencia })
+          .eq('sku', p.sku).eq('bodega', bodeganKey);
       }));
       results.forEach(function(r) { if (r.error) errores++; });
       hecho += chunk.length;
       setProgress(hecho);
     }
 
-    // Insertar productos nuevos con datos completos
+    // Insertar productos nuevos con datos completos (incluyendo bodega)
     for (var j = 0; j < nuevos.length; j += BATCH) {
       var loteN = nuevos.slice(j, j + BATCH);
-      var payloadN = loteN.map(function(p) { return { sku: p.sku, descripcion: p.descripcion, existencia: p.existencia, facturable: true, activo: true }; });
+      var payloadN = loteN.map(function(p) { return { sku: p.sku, descripcion: p.descripcion, existencia: p.existencia, facturable: true, activo: true, bodega: bodeganKey }; });
       var rN = await db.from('inventario').insert(payloadN);
       if (rN.error) { errores += loteN.length; }
       hecho += loteN.length;
