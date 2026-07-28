@@ -243,10 +243,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sin-grupo-hdr:active{cursor:grabbing}
 .sin-grupo-handle{font-size:13px;color:#fff;opacity:.6;flex-shrink:0;margin-top:2px}
 .sin-grupo-info{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
-.sin-grupo-nombre{font-size:13px;font-weight:900;color:#fff;letter-spacing:.3px;text-transform:uppercase;line-height:1.25;word-break:break-word}
+.sin-grupo-nombre{font-size:13px;font-weight:900;color:#fff;letter-spacing:.3px;text-transform:uppercase;line-height:1.25;word-break:break-word;flex:0 1 auto;min-width:0}
 .sin-grupo-meta{display:flex;flex-direction:column;gap:2px}
 .sin-grupo-meta span{font-size:12px;color:rgba(255,255,255,.9);font-weight:600;line-height:1.4}
 .sin-grupo-cards{display:flex;flex-direction:column;gap:0;padding:2px 4px;max-height:540px;overflow-y:auto}
+.sin-grupo-top{display:flex;align-items:center;gap:7px}
+.sin-grupo-per{font-size:9.5px;font-weight:900;letter-spacing:.5px;color:#fff;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.38);border-radius:4px;padding:1px 6px;flex-shrink:0;white-space:nowrap}
+.sin-grupo-per.per-actual{background:#fff;color:var(--serig-m);border-color:#fff}
+.sin-grupo-chev{margin-left:auto;color:#fff;opacity:.75;font-size:13px;cursor:pointer;padding:0 2px;flex-shrink:0;transition:transform .2s}
+.sin-grupo-chev:hover{opacity:1}
+.sin-grupo.collapsed .sin-grupo-chev{transform:rotate(-90deg)}
+.sin-grupo.collapsed .sin-grupo-cards{display:none}
+.sin-grupo.collapsed{flex:0 0 340px;opacity:.9}
 .sin-card-wrap{border-radius:8px;transition:box-shadow .1s}
 .sin-card-wrap.drop-before{box-shadow:0 -3px 0 0 var(--serig-m)}
 .sin-card-wrap.drop-after{box-shadow:0 3px 0 0 var(--serig-m)}
@@ -263,6 +271,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-card:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px);border-color:var(--serig-m)}
 .board-card.nueva-orden{border-left:3px solid var(--teal);background:#f8fffe}
 .badge-ago{display:inline-block;background:var(--teal);color:#fff;border-radius:3px;padding:1px 5px;font-size:8px;font-weight:800;letter-spacing:.3px;flex-shrink:0}
+.badge-ago.badge-ago-old{background:var(--gray-l);opacity:.8}
 .board-card.dragging{opacity:.4;transform:scale(.97)}
 .board-empty-lane{text-align:center;padding:18px 0;font-size:11px;color:var(--gray-l);grid-column:1/-1}
 .board-therm-wrap{background:rgba(0,0,0,.08);border-radius:3px;height:5px;margin-top:6px}
@@ -1416,6 +1425,31 @@ function fechaHoy() {
     String(d.getDate()).padStart(2, '0');
 }
 
+// ── Períodos de producción ───────────────────────────────────────────
+// El período arranca el día 28 del mes anterior: un pedido ingresado el
+// 28/07/2026 pertenece a AGOSTO; el 27/07/2026 pertenece a JULIO.
+// Se autocorrige cada mes — no hay fechas de corte hardcodeadas.
+var MESES_PER_C = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+var MESES_PER_L = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
+                   'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+function periodoDe(iso) {
+  var vacio = { key: '0000-00', corto: '—', largo: 'SIN FECHA' };
+  if (!iso) return vacio;
+  var d = new Date(String(iso).slice(0, 10) + 'T12:00:00');
+  if (isNaN(d.getTime())) return vacio;
+  // setDate(1) antes de avanzar el mes: evita que un 30/01 salte a marzo
+  if (d.getDate() >= 28) { d.setDate(1); d.setMonth(d.getMonth() + 1); }
+  var m = d.getMonth(), y = d.getFullYear();
+  return {
+    key:   y + '-' + String(m + 1).padStart(2, '0'),
+    corto: MESES_PER_C[m],
+    largo: MESES_PER_L[m] + ' ' + y
+  };
+}
+
+function periodoActualKey() { return periodoDe(fechaHoy()).key; }
+
 // ── Meta-encoding (envase/cap/tiros en campo notas) ──────────
 var META_SEP = '__M__';
 
@@ -2218,8 +2252,10 @@ function boardBuildCard(item) {
       '</div>' +
       (item.prog > 0 ? '<div style="margin-top:5px;background:var(--border);border-radius:3px;height:3px"><div style="background:' + progColor + ';height:3px;border-radius:3px;width:' + item.prog + '%"></div></div>' : '') +
       requiRow;
-  var esNueva = item.createdAt && item.createdAt.slice(0,10) >= '2026-07-28';
-  var badgeAgo = esNueva ? '<span class="badge-ago">AGO</span>' : '';
+  var perC     = periodoDe(item.createdAt);
+  var esNueva  = perC.key === periodoActualKey();
+  var badgeAgo = perC.key === '0000-00' ? ''
+    : '<span class="badge-ago' + (esNueva ? '' : ' badge-ago-old') + '" title="Período ' + perC.largo + '">' + perC.corto + '</span>';
   return '<div class="board-card' + (esNueva ? ' nueva-orden' : '') + '" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
@@ -2245,8 +2281,10 @@ function boardBuildCardCompact(item) {
   var badge = '<span style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:3px;padding:1px 4px;font-size:8px;font-weight:800;flex-shrink:0">' + badgeTxt + '</span>';
   var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var descFull = (item.sku ? item.sku + ' · ' : '') + (item.desc || '—');
-  var esNueva2 = item.createdAt && item.createdAt.slice(0,10) >= '2026-07-28';
-  var badgeAgo2 = esNueva2 ? '<span class="badge-ago">AGO</span>' : '';
+  var perC2     = periodoDe(item.createdAt);
+  var esNueva2  = perC2.key === periodoActualKey();
+  var badgeAgo2 = perC2.key === '0000-00' ? ''
+    : '<span class="badge-ago' + (esNueva2 ? '' : ' badge-ago-old') + '" title="Período ' + perC2.largo + '">' + perC2.corto + '</span>';
   return '<div class="board-card' + (esNueva2 ? ' nueva-orden' : '') + '" style="padding:6px 8px" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
@@ -2328,8 +2366,10 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     (salidaRequisSin.length ? '<span style="color:var(--teal-dark);font-weight:700">📤 Salida: ' + escHtml(salidaRequisSin[0]) + (salidaRequisSin.length > 1 ? ' +' + (salidaRequisSin.length - 1) : '') + '</span>' : '') +
     (fechaEntregado ? '<span style="color:#15803d;font-weight:700">✅ Entregado: ' + fmtFechaCorta(fechaEntregado) + '</span>' : '') +
     '</div>';
-  var esNueva3 = item.createdAt && item.createdAt.slice(0,10) >= '2026-07-28';
-  var badgeAgo3 = esNueva3 ? '<span class="badge-ago">AGO</span>' : '';
+  var perC3     = periodoDe(item.createdAt);
+  var esNueva3  = perC3.key === periodoActualKey();
+  var badgeAgo3 = perC3.key === '0000-00' ? ''
+    : '<span class="badge-ago' + (esNueva3 ? '' : ' badge-ago-old') + '" title="Período ' + perC3.largo + '">' + perC3.corto + '</span>';
   return '<div class="board-card' + (esNueva3 ? ' nueva-orden' : '') + '" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
@@ -2648,6 +2688,23 @@ function sinCardDrop(e, targetSolId, cliente) {
 
 var sinGrupoOrdenCache = [];
 
+// ── Colapso de grupos de Sin asignar (clave = cliente§periodo) ──────
+// Local al navegador: es preferencia de vista, no dato compartido.
+function getSinGrupoCol() {
+  try { return JSON.parse(localStorage.getItem('sin_grupo_col') || '{}'); }
+  catch (e) { return {}; }
+}
+
+function toggleSinGrupo(e, gkey) {
+  e.stopPropagation();
+  var caja = e.currentTarget.closest('.sin-grupo');
+  if (!caja) return;
+  var col = caja.classList.toggle('collapsed');
+  var st = getSinGrupoCol();
+  st[gkey] = col ? 1 : 0;
+  localStorage.setItem('sin_grupo_col', JSON.stringify(st));
+}
+
 function getSinGrupoOrden() { return sinGrupoOrdenCache; }
 function saveSinGrupoOrden(arr) {
   sinGrupoOrdenCache = arr;
@@ -2677,9 +2734,13 @@ function sinGrupoDrop(e, targetCliente) {
   if (!sinGrupoArrastre || sinGrupoArrastre === targetCliente) { sinGrupoArrastre = null; return; }
 
   var orden = getSinGrupoOrden();
-  // Si no hay orden guardada, construir desde el DOM actual
+  // Si no hay orden guardada, construir desde el DOM actual.
+  // Un mismo cliente aparece una vez por período — se deduplica.
   if (orden.length === 0) {
-    document.querySelectorAll('.sin-grupo-nombre').forEach(function(el){ orden.push(el.textContent); });
+    document.querySelectorAll('.sin-grupo-nombre').forEach(function(el){
+      var n = el.textContent;
+      if (orden.indexOf(n) === -1) orden.push(n);
+    });
   }
   orden = orden.filter(function(c){ return c !== sinGrupoArrastre; });
   var rect = e.currentTarget.getBoundingClientRect();
@@ -2697,24 +2758,33 @@ function boardBuildSinBlock(items) {
   var total = items.reduce(function(s,i){ return s + (i.cant||0); }, 0);
   var countTxt = items.length + (total > 0 ? ' · ' + total.toLocaleString() + ' und' : '');
 
-  // Agrupar por cliente (ya vienen ordenados FIFO dentro de cada grupo)
+  // Agrupar por cliente + período (ya vienen ordenados FIFO dentro de cada grupo).
+  // Separar por período aísla el % entregado: los pedidos nuevos no diluyen el
+  // avance ya logrado en el período anterior.
   var grupoMap = {};
   var grupoKeys = [];
   items.forEach(function(item) {
     var cli = item.cliente || '(Sin cliente)';
-    if (!grupoMap[cli]) { grupoMap[cli] = []; grupoKeys.push(cli); }
-    grupoMap[cli].push(item);
+    var per = periodoDe(item.createdAt);
+    var gk  = cli + '§' + per.key;
+    if (!grupoMap[gk]) { grupoMap[gk] = { cli: cli, per: per, items: [] }; grupoKeys.push(gk); }
+    grupoMap[gk].items.push(item);
   });
 
-  // Aplicar orden guardado
+  // Orden: el guardado sigue indexado por CLIENTE (no por período) para no perder
+  // la prioridad ya definida; dentro de cada cliente, período más reciente primero.
   var orden = getSinGrupoOrden();
-  if (orden.length > 0) {
-    grupoKeys.sort(function(a, b) {
-      var ia = orden.indexOf(a); var ib = orden.indexOf(b);
-      ia = ia === -1 ? 9999 : ia; ib = ib === -1 ? 9999 : ib;
-      return ia - ib;
-    });
-  }
+  grupoKeys.sort(function(a, b) {
+    var ga = grupoMap[a], gb = grupoMap[b];
+    var ia = orden.indexOf(ga.cli); var ib = orden.indexOf(gb.cli);
+    ia = ia === -1 ? 9999 : ia; ib = ib === -1 ? 9999 : ib;
+    if (ia !== ib) return ia - ib;
+    if (ga.cli !== gb.cli) return ga.cli < gb.cli ? -1 : 1;
+    return ga.per.key < gb.per.key ? 1 : -1;
+  });
+
+  var perHoy   = periodoActualKey();
+  var colState = getSinGrupoCol();
 
   var allCardOrden = getSinCardOrden();
 
@@ -2738,8 +2808,11 @@ function boardBuildSinBlock(items) {
 
   var gruposHtml = grupoKeys.length === 0
     ? '<div class="board-empty-lane">No hay pedidos sin asignar</div>'
-    : grupoKeys.map(function(cli) {
-        var gItems = grupoMap[cli].slice();
+    : grupoKeys.map(function(gk) {
+        var grupo  = grupoMap[gk];
+        var cli    = grupo.cli;
+        var per    = grupo.per;
+        var gItems = grupo.items.slice();
         // Ordenar: primero por tier (rojo→amarillo→verde), luego por orden manual guardado
         var cliOrden = allCardOrden[cli] || [];
         gItems.sort(function(a, b) {
@@ -2812,7 +2885,11 @@ function boardBuildSinBlock(items) {
             boardBuildCardSinRow(item, solEsc, cliEsc) +
           '</div>';
         }).join('');
-        return '<div class="sin-grupo"' +
+        // Colapsado: lo guardado manda; por defecto solo el período en curso abierto
+        var gkEsc     = gk.replace(/'/g, "\\'");
+        var colapsado = colState[gk] === undefined ? (per.key !== perHoy) : colState[gk] === 1;
+        var perClase  = 'sin-grupo-per' + (per.key === perHoy ? ' per-actual' : '');
+        return '<div class="sin-grupo' + (colapsado ? ' collapsed' : '') + '"' +
           ' ondragover="sinGrupoDragOver(event,\'' + cliEsc + '\')"' +
           ' ondragleave="this.classList.remove(\'drag-grupo-over\')"' +
           ' ondrop="sinGrupoDrop(event,\'' + cliEsc + '\')">' +
@@ -2820,7 +2897,12 @@ function boardBuildSinBlock(items) {
             ' ondragstart="sinGrupoDragStart(event,\'' + cliEsc + '\')">' +
             '<span class="sin-grupo-handle">⠿</span>' +
             '<div class="sin-grupo-info">' +
-              '<span class="sin-grupo-nombre">' + cli + '</span>' +
+              '<div class="sin-grupo-top">' +
+                '<span class="sin-grupo-nombre">' + escHtml(cli) + '</span>' +
+                '<span class="' + perClase + '">' + per.largo + '</span>' +
+                '<span class="sin-grupo-chev" onclick="toggleSinGrupo(event,\'' + gkEsc + '\')"' +
+                  ' title="Mostrar/ocultar pedidos">▾</span>' +
+              '</div>' +
               '<div class="sin-grupo-meta">' +
                 metaGridHtml +
                 (tiempoTxt ? '<span>' + tiempoTxt + '</span>' : '') +
