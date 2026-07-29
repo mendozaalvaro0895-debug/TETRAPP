@@ -4056,10 +4056,16 @@ async function renderAsistGrid() {
       '</div>' +
     '</div>';
 
+  var _agSavedScroll = null;
+  var _agExistingScroll = document.querySelector('.asist-grid-scroll');
+  if (_agExistingScroll) _agSavedScroll = _agExistingScroll.scrollLeft;
+
   _agTargets.forEach(function(t) { t.innerHTML = _agHtml; });
 
   setTimeout(function() {
-    document.querySelectorAll('.asist-grid-scroll').forEach(function(sc) { sc.scrollLeft = 0; });
+    document.querySelectorAll('.asist-grid-scroll').forEach(function(sc) {
+      sc.scrollLeft = _agSavedScroll !== null ? _agSavedScroll : 0;
+    });
   }, 60);
 }
 
