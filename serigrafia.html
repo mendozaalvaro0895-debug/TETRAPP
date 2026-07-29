@@ -5241,12 +5241,15 @@ async function renderConsolidadoEnvases() {
   var ESTADOS_VIVOS = ['nueva','programada','proceso','parcial'];
   var perHoy = periodoActualKey();
 
-  // Construir mapa sku_base → datos
+  // Construir mapa sku_base → datos.
+  // Se usa el estado EFECTIVO de cada línea (l.estado || s.estado) para que
+  // las líneas marcadas 'lista' queden fuera aunque su solicitud padre no lo esté.
   var mapa = {};
   solicitudes.forEach(function(s) {
     if (ESTADOS_VIVOS.indexOf(s.estado) < 0) return;
     var esAgo = periodoDe(s.created_at).key === perHoy;
     (s.lineas || []).forEach(function(l) {
+      if ((l.estado || s.estado) === 'lista') return;
       var kb = (l.sku_base || '').trim();
       if (!kb) return;
       if (!mapa[kb]) mapa[kb] = { kb: kb, desc: l.desc_base || '', pedidos: {}, ago: 0, back: 0 };
@@ -5257,11 +5260,12 @@ async function renderConsolidadoEnvases() {
     });
   });
 
-  // Pedidos sin sku_base (huecos)
+  // Huecos: líneas sin sku_base que SÍ afectan al cálculo (excluye 'lista')
   var huecos = [];
   solicitudes.forEach(function(s) {
     if (ESTADOS_VIVOS.indexOf(s.estado) < 0) return;
     (s.lineas || []).forEach(function(l) {
+      if ((l.estado || s.estado) === 'lista') return;
       if (!(l.sku_base || '').trim()) {
         huecos.push({ sol: s.id_display || s.id.slice(0,8), cli: s.cliente, sku: l.sku, desc: l.desc, cant: l.cant });
       }
