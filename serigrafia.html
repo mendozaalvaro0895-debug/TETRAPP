@@ -276,6 +276,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .env-ped-frow-cant{font-family:var(--mono);font-size:10px;color:var(--gray);white-space:nowrap}
 .env-ped-frow-est{font-size:8px;font-weight:800;border-radius:4px;padding:2px 5px;white-space:nowrap}
 .env-ped-frow-hint{font-size:9px;color:var(--gray-l);opacity:0;transition:opacity .1s;grid-column:1/-1;margin-top:-4px;padding-bottom:2px}
+.env-ped-frow-skus{font-size:9px;color:var(--gray);grid-column:1/-1;margin-top:-3px;padding-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:italic}
 .board-sin.drag-over{box-shadow:0 0 0 4px rgba(108,46,163,.18)}
 .board-sin-hdr{padding:12px 16px;border-bottom:1px solid var(--border);background:var(--serig-l);display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px}
 .board-sin-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--serig-m);display:flex;align-items:center;gap:8px;white-space:nowrap}
@@ -5276,9 +5277,12 @@ async function renderConsolidadoEnvases() {
       if (!entry.pedidos[s.id]) {
         entry.pedidos[s.id] = { id: s.id, codigo: s.id_display || s.id.slice(0,8),
                                  cliente: s.cliente || '—', estado: l.estado || s.estado, cant: 0,
-                                 esAgo: esAgo };
+                                 esAgo: esAgo, skus: [] };
       }
       entry.pedidos[s.id].cant += (l.cant || 0);
+      if (l.sku && !entry.pedidos[s.id].skus.some(function(x){ return x.sku === l.sku; })) {
+        entry.pedidos[s.id].skus.push({ sku: l.sku, desc: l.desc || l.descripcion || '' });
+      }
       if (esAgo) entry.ago  += (l.cant || 0);
       else       entry.back += (l.cant || 0);
     });
@@ -5468,11 +5472,15 @@ function envTogglePedDrop(e, kb) {
   var rows = peds.map(function(p) {
     var clr = (EST[p.estado] || '#f1f5f9|#64748b').split('|');
     var bg = clr[0], fg = clr[1];
+    var skuLine = (p.skus && p.skus.length)
+      ? '<span class="env-ped-frow-skus">' + p.skus.map(function(x){ return escHtml(x.desc || x.sku || '—'); }).join(' · ') + '</span>'
+      : '';
     return '<div class="env-ped-frow" onclick="envPedDetalle(\'' + p.id.replace(/'/g,"\\'") + '\')">' +
       '<span class="env-ped-frow-cod">' + escHtml(p.codigo) + '</span>' +
       '<span class="env-ped-frow-cli">' + escHtml(p.cliente) + '</span>' +
       '<span class="env-ped-frow-cant">' + (p.cant||0).toLocaleString() + ' und</span>' +
       '<span class="env-ped-frow-est" style="background:' + bg + ';color:' + fg + '">' + (p.estado||'?').toUpperCase() + '</span>' +
+      skuLine +
     '</div>';
   }).join('');
   f.innerHTML =
