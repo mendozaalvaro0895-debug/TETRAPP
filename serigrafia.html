@@ -96,7 +96,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .kpi-s{font-size:8px;color:var(--gray-l);margin-top:1px}
 
 /* ── ALERTAS STOCK B7 ─────────────────────────────────────── */
-.b7-alert-wrap{background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:10px;margin-bottom:14px;overflow:hidden;display:none}
+.alertas-row{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}
+.alertas-slot-r{flex:1;min-width:0}
+.b7-alert-wrap{background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:10px;overflow:hidden;display:none;flex:1;min-width:0}
 .b7-alert-wrap.critico-hay{background:#FEF2F2;border-color:#FECACA}
 .b7-alert-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;user-select:none;border-bottom:1px solid rgba(0,0,0,.06)}
 .b7-alert-wrap.collapsed .b7-alert-hdr{border-bottom:none}
@@ -639,16 +641,21 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
           </div>
         </div>
 
-        <!-- Alertas bajo stock Bodega 7 -->
-        <div class="b7-alert-wrap" id="b7AlertWrap">
-          <div class="b7-alert-hdr" onclick="toggleB7Alert()">
-            <span>⚠️</span>
-            <span class="b7-alert-ttl">Bajo stock — Insumos Serigrafía</span>
-            <span class="b7-alert-cnt" id="b7AlertCnt">0</span>
-            <button class="b7-alert-btn" onclick="event.stopPropagation();descargarAlertasB7()" title="Descargar PDF">⬇ PDF</button>
-            <span class="b7-alert-chev">▾</span>
+        <!-- Fila de alertas (½ izquierda + ½ derecha para futuras alertas) -->
+        <div class="alertas-row">
+          <!-- Bajo stock Bodega 7 -->
+          <div class="b7-alert-wrap" id="b7AlertWrap">
+            <div class="b7-alert-hdr" onclick="toggleB7Alert()">
+              <span>⚠️</span>
+              <span class="b7-alert-ttl">Bajo stock — Insumos Serigrafía</span>
+              <span class="b7-alert-cnt" id="b7AlertCnt">0</span>
+              <button class="b7-alert-btn" onclick="event.stopPropagation();descargarAlertasB7()" title="Descargar PDF">⬇ PDF</button>
+              <span class="b7-alert-chev">▾</span>
+            </div>
+            <div class="b7-alert-list" id="b7AlertList"></div>
           </div>
-          <div class="b7-alert-list" id="b7AlertList"></div>
+          <!-- Slot para futuras alertas -->
+          <div class="alertas-slot-r" id="alertasSlotR"></div>
         </div>
 
         <!-- Barra de día compartida — afecta Personal+Roles y Asistencia Mensual -->
