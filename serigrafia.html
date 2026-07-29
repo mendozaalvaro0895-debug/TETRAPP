@@ -304,6 +304,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sin-grupo-top{display:flex;align-items:center;gap:7px}
 .sin-grupo-per{font-size:9.5px;font-weight:900;letter-spacing:.5px;color:#fff;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.38);border-radius:4px;padding:1px 6px;flex-shrink:0;white-space:nowrap}
 .sin-grupo-per.per-actual{background:#fff;color:var(--serig-m);border-color:#fff}
+.sin-grupo-cerrado{font-size:9px;font-weight:800;color:#fff;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.3);border-radius:4px;padding:1px 6px;flex-shrink:0;white-space:nowrap}
+.sin-grupo-vacio{padding:12px;font-size:11px;color:rgba(255,255,255,.7);font-style:italic;text-align:center}
 .sin-grupo-chev{margin-left:auto;color:#fff;opacity:.75;font-size:13px;cursor:pointer;padding:0 2px;flex-shrink:0;transition:transform .2s}
 .sin-grupo-chev:hover{opacity:1}
 .sin-grupo.collapsed .sin-grupo-chev{transform:rotate(-90deg)}
@@ -326,6 +328,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-card.nueva-orden{border-left:3px solid var(--teal);background:#f8fffe}
 .badge-ago{display:inline-block;background:var(--teal);color:#fff;border-radius:3px;padding:1px 5px;font-size:8px;font-weight:800;letter-spacing:.3px;flex-shrink:0}
 .badge-ago.badge-ago-old{background:var(--gray-l);opacity:.8}
+.badge-traslado{display:inline-block;background:#ede9fe;color:#6d28d9;border:1px solid #ddd6fe;border-radius:3px;padding:1px 5px;font-size:8px;font-weight:800;letter-spacing:.2px;flex-shrink:0;white-space:nowrap}
 .board-card.dragging{opacity:.4;transform:scale(.97)}
 .board-empty-lane{text-align:center;padding:18px 0;font-size:11px;color:var(--gray-l);grid-column:1/-1}
 .board-therm-wrap{background:rgba(0,0,0,.08);border-radius:3px;height:5px;margin-top:6px}
@@ -1518,6 +1521,123 @@ function periodoDe(iso) {
 
 function periodoActualKey() { return periodoDe(fechaHoy()).key; }
 
+// Reconstruye el objeto {key,corto,largo} a partir de una key 'YYYY-MM'
+// guardada como periodo_efectivo (override manual tras un cierre de mes).
+function periodoPorKey(key) {
+  if (!key) return periodoDe(null);
+  if (key === PERIODO_HIST.key) return PERIODO_HIST;
+  var partes = key.split('-');
+  var y = parseInt(partes[0], 10), m = parseInt(partes[1], 10) - 1;
+  if (isNaN(y) || isNaN(m) || !MESES_PER_C[m]) return periodoDe(null);
+  return { key: key, corto: MESES_PER_C[m], largo: MESES_PER_L[m] + ' ' + y };
+}
+
+// Período EFECTIVO de un item de board: el override manual (tras cierre
+// de mes) manda sobre el período calculado de su fecha de ingreso.
+function periodoEfectivoDe(item) {
+  return item.periodoEfectivo ? periodoPorKey(item.periodoEfectivo) : periodoDe(item.createdAt);
+}
+
+// ── Cierre mensual de fichas "Sin asignar" ────────────────────────
+// periodoCierresCache: { 'CLIENTE§2026-07': {snapshot congelado} }
+var periodoCierresCache = {};
+var periodoCierresLoaded = false;
+var cierreDeMesEnProceso = false;
+
+async function cargarPeriodoCierres() {
+  try {
+    var r = await db.from('periodo_cierres').select('*').eq('area', 'serig');
+    if (r.error) throw r.error;
+    periodoCierresCache = {};
+    (r.data || []).forEach(function(row) {
+      periodoCierresCache[row.cliente + '§' + row.periodo_key] = row;
+    });
+  } catch(e) { /* tabla aún no creada — se ignora hasta correr el SQL */ }
+  periodoCierresLoaded = true;
+}
+
+// Revisa las fichas "Sin asignar" que quedaron en un período ya vencido
+// y aún no tienen cierre guardado. Si encuentra alguna: congela su
+// snapshot en periodo_cierres y traslada los pedidos NO completos al
+// período actual (periodo_efectivo) para que sigan atendiéndose ahí.
+// No duplica ningún pedido — solo reasigna su período efectivo.
+async function verificarCierresPeriodo(itemsSin) {
+  if (!periodoCierresLoaded || cierreDeMesEnProceso) return;
+  var perHoy = periodoActualKey();
+  var grupos = {};
+  itemsSin.forEach(function(item) {
+    var per = periodoEfectivoDe(item);
+    if (per.key === perHoy || per.key === '0000-00') return; // solo períodos vencidos
+    var cli = item.cliente || '(Sin cliente)';
+    var gk  = cli + '§' + per.key;
+    if (periodoCierresCache[gk]) return; // ya cerrado
+    if (!grupos[gk]) grupos[gk] = { cli: cli, key: per.key, label: per.largo, items: [] };
+    grupos[gk].items.push(item);
+  });
+  var keys = Object.keys(grupos);
+  if (!keys.length) return;
+
+  cierreDeMesEnProceso = true;
+  try {
+    var manuales = getEntregasManuales() || [];
+    var entregadoMap = {};
+    manuales.forEach(function(m) {
+      if (m.lineas && m.lineas.length) {
+        m.lineas.forEach(function(l){ if (l.solId) entregadoMap[l.solId] = (entregadoMap[l.solId]||0) + (l.cant||0); });
+      } else if (m.solId) {
+        entregadoMap[m.solId] = (entregadoMap[m.solId]||0) + (m.cant||0);
+      }
+    });
+    function tier(item) {
+      var ent = entregadoMap[item.solId] || 0, tot = item.cant || 0;
+      if (ent > 0 && ent >= tot) return 2;
+      if (ent > 0) return 1;
+      return 0;
+    }
+    var huboCierre = false;
+    for (var i = 0; i < keys.length; i++) {
+      var g = grupos[keys[i]];
+      var totalUnd    = g.items.reduce(function(s,it){ return s+(it.cant||0); }, 0);
+      var totalEntUnd = g.items.reduce(function(s,it){ return s+(entregadoMap[it.solId]||0); }, 0);
+      var pctEnt      = totalUnd > 0 ? Math.round(totalEntUnd/totalUnd*100) : 0;
+      var nListos     = g.items.filter(function(it){ return it.estado==='lista' || tier(it)===2; }).length;
+      var nParciales  = g.items.filter(function(it){ return tier(it)===1 && it.estado!=='lista'; }).length;
+      var nPendientes = g.items.filter(function(it){ return tier(it)===0 && it.estado!=='lista'; }).length;
+      var undVerde    = g.items.filter(function(it){ return it.estado==='lista' || tier(it)===2; }).reduce(function(s,it){return s+(it.cant||0);},0);
+      var undAmb      = g.items.filter(function(it){ return tier(it)===1 && it.estado!=='lista'; }).reduce(function(s,it){return s+(it.cant||0);},0);
+      var undRojo     = g.items.filter(function(it){ return tier(it)===0 && it.estado!=='lista'; }).reduce(function(s,it){return s+(it.cant||0);},0);
+
+      // Pedidos (por solId, no por línea) que aún no están 100% completos
+      // → se trasladan al período actual para seguir atendiéndose ahí.
+      var bySol = {};
+      g.items.forEach(function(it) { (bySol[it.solId] = bySol[it.solId] || []).push(it); });
+      var idsPendientes = Object.keys(bySol).filter(function(solId) {
+        return !bySol[solId].every(function(it){ return it.estado==='lista' || tier(it)===2; });
+      });
+
+      if (idsPendientes.length) {
+        var ru = await db.from('solicitudes').update({ periodo_efectivo: perHoy }).in('id', idsPendientes);
+        if (ru.error) throw ru.error;
+      }
+      var rc = await db.from('periodo_cierres').insert({
+        cliente: g.cli, periodo_key: g.key, periodo_label: g.label,
+        pct_entregado: pctEnt, n_total: g.items.length,
+        n_listos: nListos, n_parciales: nParciales, n_pendientes: nPendientes,
+        und_total: totalUnd, und_verde: undVerde, und_ambar: undAmb, und_rojo: undRojo,
+        area: 'serig'
+      }).select().single();
+      if (rc.error) throw rc.error;
+      periodoCierresCache[keys[i]] = rc.data;
+      huboCierre = true;
+    }
+    if (huboCierre) await cargarSolicitudes(); // refleja los periodo_efectivo recién asignados
+  } catch(e) {
+    console.error('Error al cerrar período:', e);
+  } finally {
+    cierreDeMesEnProceso = false;
+  }
+}
+
 // ── Meta-encoding (envase/cap/tiros en campo notas) ──────────
 var META_SEP = '__M__';
 
@@ -1704,7 +1824,8 @@ async function cargarSolicitudes() {
         proc_estado: decodeMeta(s.notas || '').proc_estado,
         tiro_actual: decodeMeta(s.notas || '').tiro_actual,
         created: new Date(s.created_at).toLocaleString('es-GT'),
-        created_at: s.created_at
+        created_at: s.created_at,
+        periodo_efectivo: s.periodo_efectivo || null
       };
     });
 
@@ -2438,6 +2559,10 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
   var esNueva3  = perC3.key === periodoActualKey();
   var badgeAgo3 = perC3.key === '0000-00' ? ''
     : '<span class="badge-ago' + (esNueva3 ? '' : ' badge-ago-old') + '" title="Período ' + perC3.largo + '">' + perC3.corto + '</span>';
+  var trasladado3 = item.periodoEfectivo && item.periodoEfectivo !== perC3.key;
+  var badgeTraslado3 = trasladado3
+    ? '<span class="badge-traslado" title="Pendiente de ' + perC3.largo + ', trasladado al mes actual">↩ de ' + perC3.corto + '</span>'
+    : '';
   return '<div class="board-card' + (esNueva3 ? ' nueva-orden' : '') + '" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
@@ -2447,6 +2572,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
       grip +
       '<span style="font-family:var(--mono);font-size:10px;font-weight:800;color:' + (isComplete ? '#15803d' : 'var(--serig-m)') + ';flex-shrink:0">' + escHtml(item.solCodigo) + '</span>' +
       badgeAgo3 +
+      badgeTraslado3 +
       '<span onclick="event.stopPropagation();abrirEstadoSin(event,\'' + item.solId + '\',\'' + (item.lineaDbId || '') + '\')" title="Cambiar estado" style="background:' + badgeBg + ';color:' + badgeClr + ';border:1.5px solid ' + badgeBdr + ';border-radius:5px;padding:3px 8px;font-size:9px;font-weight:800;flex-shrink:0;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.10);letter-spacing:.3px;display:inline-flex;align-items:center;gap:4px">' + badgeTxt + ' <span style="font-size:8px;opacity:.7">▾</span></span>' +
       '<span style="flex:1"></span>' +
       '<span style="flex-shrink:0;text-align:right;white-space:nowrap">' + cantHtml + '</span>' +
@@ -2833,10 +2959,21 @@ function boardBuildSinBlock(items) {
   var grupoKeys = [];
   items.forEach(function(item) {
     var cli = item.cliente || '(Sin cliente)';
-    var per = periodoDe(item.createdAt);
+    var per = periodoEfectivoDe(item);
     var gk  = cli + '§' + per.key;
     if (!grupoMap[gk]) { grupoMap[gk] = { cli: cli, per: per, items: [] }; grupoKeys.push(gk); }
     grupoMap[gk].items.push(item);
+  });
+
+  // Fichas cerradas (congeladas) sin ningún pedido pendiente que las
+  // mantenga vivas igual deben seguir mostrándose — son el registro
+  // histórico permanente del período.
+  Object.keys(periodoCierresCache).forEach(function(gk) {
+    if (grupoMap[gk]) return;
+    var c = periodoCierresCache[gk];
+    if (c.area && c.area !== 'serig') return;
+    grupoMap[gk] = { cli: c.cliente, per: periodoPorKey(c.periodo_key), items: [] };
+    grupoKeys.push(gk);
   });
 
   // Orden: el guardado sigue indexado por CLIENTE (no por período) para no perder
@@ -2889,17 +3026,28 @@ function boardBuildSinBlock(items) {
           if (ia !== ib) return ia - ib;
           return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
         });
-        var totalG     = gItems.reduce(function(s,i){ return s+(i.cant||0); }, 0);
-        var nTotal     = gItems.length;
-        var nListos    = gItems.filter(function(i){ return i.estado === 'lista' || getTier(i) === 2; }).length;
-        var nParciales = gItems.filter(function(i){ return getTier(i) === 1 && i.estado !== 'lista'; }).length;
-        var nPendientes= gItems.filter(function(i){ return getTier(i) === 0 && i.estado !== 'lista'; }).length;
-        // Unidades por estado + % entregado
-        var undVerde  = gItems.filter(function(i){ return getTier(i) === 2 || i.estado === 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
-        var undAmb    = gItems.filter(function(i){ return getTier(i) === 1 && i.estado !== 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
-        var undRojo   = gItems.filter(function(i){ return getTier(i) === 0 && i.estado !== 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
-        var totalEntG = gItems.reduce(function(s,i){ return s+(entregadoMap[i.solId]||0); },0);
-        var pctEnt    = totalG > 0 ? Math.round(totalEntG / totalG * 100) : 0;
+        // Ficha cerrada (mes ya congelado): los números vienen fijos del
+        // snapshot guardado — NO se recalculan en vivo desde gItems (que
+        // ya solo contendría lo que quedó sin trasladar).
+        var cerrado = periodoCierresCache[gk];
+        var totalG, nTotal, nListos, nParciales, nPendientes, undVerde, undAmb, undRojo, pctEnt;
+        if (cerrado) {
+          totalG = cerrado.und_total; nTotal = cerrado.n_total;
+          nListos = cerrado.n_listos; nParciales = cerrado.n_parciales; nPendientes = cerrado.n_pendientes;
+          undVerde = cerrado.und_verde; undAmb = cerrado.und_ambar; undRojo = cerrado.und_rojo;
+          pctEnt = cerrado.pct_entregado;
+        } else {
+          totalG     = gItems.reduce(function(s,i){ return s+(i.cant||0); }, 0);
+          nTotal     = gItems.length;
+          nListos    = gItems.filter(function(i){ return i.estado === 'lista' || getTier(i) === 2; }).length;
+          nParciales = gItems.filter(function(i){ return getTier(i) === 1 && i.estado !== 'lista'; }).length;
+          nPendientes= gItems.filter(function(i){ return getTier(i) === 0 && i.estado !== 'lista'; }).length;
+          undVerde  = gItems.filter(function(i){ return getTier(i) === 2 || i.estado === 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
+          undAmb    = gItems.filter(function(i){ return getTier(i) === 1 && i.estado !== 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
+          undRojo   = gItems.filter(function(i){ return getTier(i) === 0 && i.estado !== 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
+          var totalEntG = gItems.reduce(function(s,i){ return s+(entregadoMap[i.solId]||0); },0);
+          pctEnt    = totalG > 0 ? Math.round(totalEntG / totalG * 100) : 0;
+        }
         var pctClr    = pctEnt >= 100 ? '#bbf7d0' : pctEnt > 0 ? '#fde68a' : 'rgba(255,255,255,.45)';
         // Grid: columna = count de pedidos arriba + und abajo, % en esquina derecha
         var _pill = 'display:inline-block;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:800';
@@ -2966,6 +3114,7 @@ function boardBuildSinBlock(items) {
               '<div class="sin-grupo-top">' +
                 '<span class="sin-grupo-nombre">' + escHtml(cli) + '</span>' +
                 '<span class="' + perClase + '">' + per.largo + '</span>' +
+                (cerrado ? '<span class="sin-grupo-cerrado" title="Cerrado el ' + fmtFechaCorta((cerrado.fecha_cierre||'').slice(0,10)) + ' · avance congelado">🔒 Cerrado</span>' : '') +
                 '<span class="sin-grupo-chev" onclick="toggleSinGrupo(event,\'' + gkEsc + '\')"' +
                   ' title="Mostrar/ocultar pedidos">▾</span>' +
               '</div>' +
@@ -2975,7 +3124,7 @@ function boardBuildSinBlock(items) {
               '</div>' +
             '</div>' +
           '</div>' +
-          '<div class="sin-grupo-cards">' + cardsHtml + '</div>' +
+          '<div class="sin-grupo-cards">' + (cardsHtml || (cerrado ? '<div class="sin-grupo-vacio">Todos los pedidos de este período se trasladaron al mes actual</div>' : '')) + '</div>' +
         '</div>';
       });
 
@@ -3064,7 +3213,8 @@ function renderBoard() {
         tiros:       sTiros,
         tiro_actual: s.tiro_actual || 1,
         notas:       s.notas || '',
-        createdAt: s.created_at || ''
+        createdAt: s.created_at || '',
+        periodoEfectivo: s.periodo_efectivo || null
       });
     } else {
       s.lineas.forEach(function(l) {
@@ -3083,7 +3233,8 @@ function renderBoard() {
           tiros:       sTiros,
           tiro_actual: s.tiro_actual || 1,
           notas:       s.notas || '',
-          createdAt: s.created_at || ''
+          createdAt: s.created_at || '',
+          periodoEfectivo: s.periodo_efectivo || null
         });
       });
     }
@@ -3110,6 +3261,7 @@ function renderBoard() {
     html += boardBuildLane(ln.id, lanes[ln.id] || [], ln.nombre, ln.activa);
   });
   contLines.innerHTML = html;
+  verificarCierresPeriodo(lanes[0]); // fire-and-forget: cierra períodos vencidos si aplica
 }
 
 // ── Auto-scroll al arrastrar fichas cerca del borde de pantalla ──
@@ -10602,6 +10754,7 @@ async function init() {
   await cargarPosDia(posFecha); // posiciones guardadas del día (matriz por día)
   await freezeDiaCompleto();    // congela el roster de hoy tal como está al abrir
   renderDiaBar();
+  await cargarPeriodoCierres(); // cierres de mes ya congelados (antes de renderizar el board)
   await cargarSolicitudes(); // llama renderInicio() internamente
   cargarAlertasB7();
 
