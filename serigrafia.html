@@ -1435,10 +1435,11 @@ var MESES_PER_L = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
                    'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 
 // Arranque del sistema de períodos. Todo lo ingresado ANTES de esta fecha
-// es backlog acumulado (junio + julio) y cae en UNA sola ficha histórica,
-// sin importar en qué mes entró. Desde esta fecha rige el corte del día 28.
+// son los pedidos de JULIO, aunque muchos se hayan ingresado en junio:
+// el período es el mes al que sirve el pedido, no el mes en que se digitó.
+// Caen todos en UNA sola ficha; desde esta fecha rige el corte del día 28.
 var PERIODO_BASE = '2026-07-28';
-var PERIODO_HIST = { key: '2026-06', corto: 'JUN', largo: 'JUNIO 2026' };
+var PERIODO_HIST = { key: '2026-07', corto: 'JUL', largo: 'JULIO 2026' };
 
 function periodoDe(iso) {
   var vacio = { key: '0000-00', corto: '—', largo: 'SIN FECHA' };
