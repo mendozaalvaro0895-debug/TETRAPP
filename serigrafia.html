@@ -1544,6 +1544,11 @@ var periodoCierresCache = {};
 var periodoCierresLoaded = false;
 var cierreDeMesEnProceso = false;
 
+// Excepciones puntuales: pedidos que deben quedar congelados en su
+// período original y NUNCA trasladarse automáticamente al período
+// actual (ej. se creará un pedido nuevo aparte para el mes siguiente).
+var NO_TRASLADAR_CODIGOS = ['S-015'];
+
 async function cargarPeriodoCierres() {
   try {
     var r = await db.from('periodo_cierres').select('*').eq('area', 'serig');
@@ -1608,11 +1613,17 @@ async function verificarCierresPeriodo(itemsSin) {
       var undRojo     = g.items.filter(function(it){ return tier(it)===0 && it.estado!=='lista'; }).reduce(function(s,it){return s+(it.cant||0);},0);
 
       // Pedidos (por solId, no por línea) que aún no están 100% completos
-      // → se trasladan al período actual para seguir atendiéndose ahí.
+      // → se trasladan al período actual para seguir atendiéndose ahí,
+      // salvo los que están en NO_TRASLADAR_CODIGOS (quedan congelados
+      // en su período original tal cual estén, sin arrastrarse).
       var bySol = {};
       g.items.forEach(function(it) { (bySol[it.solId] = bySol[it.solId] || []).push(it); });
       var idsPendientes = Object.keys(bySol).filter(function(solId) {
-        return !bySol[solId].every(function(it){ return it.estado==='lista' || tier(it)===2; });
+        var completo = bySol[solId].every(function(it){ return it.estado==='lista' || tier(it)===2; });
+        if (completo) return false;
+        var cod = bySol[solId][0].solCodigo;
+        if (NO_TRASLADAR_CODIGOS.indexOf(cod) >= 0) return false;
+        return true;
       });
 
       if (idsPendientes.length) {
