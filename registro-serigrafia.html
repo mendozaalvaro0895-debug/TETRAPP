@@ -101,6 +101,8 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .hoy-meta{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.15);display:flex;justify-content:space-between;align-items:center}
 .hoy-meta-val{font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:#C4B5FD}
 .hoy-meta-lbl{font-size:10px;color:rgba(255,255,255,.5)}
+.hoy-progress-track{margin-top:8px;background:rgba(255,255,255,.12);border-radius:8px;height:10px;overflow:hidden}
+.hoy-progress-fill{height:100%;border-radius:8px;width:0%;transition:width 1s cubic-bezier(.4,0,.2,1);background:#7C3AED}
 
 /* BOTONES PRINCIPALES */
 .btn-guardar{background:#5B21B6;color:#fff;border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;width:100%;font-family:'DM Sans',sans-serif;letter-spacing:.3px}
@@ -281,6 +283,12 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
       <div class="hoy-meta">
         <span class="hoy-meta-lbl">Tiros producidos hoy / meta 10,000</span>
         <span class="hoy-meta-val" id="hoyDelta">—</span>
+      </div>
+      <div class="hoy-progress-track">
+        <div class="hoy-progress-fill" id="hoyProgressFill"></div>
+      </div>
+      <div style="text-align:right;margin-top:4px">
+        <span id="hoyProgressPct" style="font-family:'DM Mono',monospace;font-size:11px;font-weight:800;color:#7C3AED">0%</span>
       </div>
     </div>
 
@@ -1070,9 +1078,10 @@ function renderHoyLinea() {
   box.style.display = 'block';
   document.getElementById('hoyFilas').innerHTML = lecturasHoyLinea.map(function(l){
     var horaLbl = l.hora ? l.hora.slice(0,5) : (l.created_at ? l.created_at.slice(11,16) : '');
+    var descTxt = (l.diseno || l.sku || '').slice(0, 34);
     return '<div class="hoy-row">'
-      + '<span>' + (MOMENTO_LBL[l.momento] || l.momento) + (l.sku ? ' · ' + escHtml(l.sku) : '') + '</span>'
-      + '<span style="display:flex;gap:12px;align-items:center">'
+      + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:58%">' + (MOMENTO_LBL[l.momento] || l.momento) + (descTxt ? ' · ' + escHtml(descTxt) : '') + '</span>'
+      + '<span style="display:flex;gap:12px;align-items:center;flex-shrink:0">'
       + (horaLbl ? '<span style="font-family:\'DM Mono\',monospace;font-size:11px;color:#C4B5FD">⏰ ' + escHtml(horaLbl) + '</span>' : '')
       + '<span>' + (l.contador||0).toLocaleString() + '</span>'
       + '</span>'
@@ -1081,6 +1090,18 @@ function renderHoyLinea() {
   var contadores = lecturasHoyLinea.map(function(l){ return l.contador || 0; });
   var delta = Math.max.apply(null, contadores) - Math.min.apply(null, contadores);
   document.getElementById('hoyDelta').textContent = delta.toLocaleString() + ' / ' + META_LINEA.toLocaleString();
+
+  var pctDec  = Math.min(1, META_LINEA > 0 ? delta / META_LINEA : 0);
+  var pctPct  = Math.round(pctDec * 100);
+  var pctClr  = pctDec >= 1 ? '#16A34A' : pctDec >= 0.5 ? '#D97706' : '#7C3AED';
+  var fillEl  = document.getElementById('hoyProgressFill');
+  var pctLbl  = document.getElementById('hoyProgressPct');
+  if (pctLbl) { pctLbl.textContent = pctPct + '%'; pctLbl.style.color = pctClr; }
+  if (fillEl) {
+    fillEl.style.background = pctClr;
+    fillEl.style.width = '0%';
+    setTimeout(function(){ fillEl.style.width = pctPct + '%'; }, 60);
+  }
 }
 
 // Habilita el siguiente momento según el último registrado (alternancia inicio ↔ paro).
