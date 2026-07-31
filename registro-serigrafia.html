@@ -1345,6 +1345,13 @@ function _okFmtFecha(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
+var DIA_SEM_CORTO = ['DOM','LUN','MAR','MIÉ','JUE','VIE','SÁB'];
+var DIA_SEM_LARGO = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+function _okDiaSemana(fechaIso, corto) {
+  var d = new Date(fechaIso + 'T12:00:00');
+  return (corto ? DIA_SEM_CORTO : DIA_SEM_LARGO)[d.getDay()];
+}
+
 // Devuelve el arreglo de fechas (YYYY-MM-DD) del periodo elegido
 function okFechasPeriodo(periodo) {
   var hoy = fechaHoy();
@@ -1440,9 +1447,10 @@ async function renderOkChart(lineaActual, periodo) {
   }
   if (wrap) wrap.style.display = 'block';
 
-  // Etiquetas del eje X según periodo
+  // Etiquetas del eje X según periodo (incluye día de la semana)
   var labels = fechas.map(function(f){
-    return periodo === 'mes' ? String(parseInt(f.slice(8,10), 10)) : (f.slice(8,10) + '/' + f.slice(5,7));
+    var fechaCorta = periodo === 'mes' ? String(parseInt(f.slice(8,10), 10)) : (f.slice(8,10) + '/' + f.slice(5,7));
+    return _okDiaSemana(f, true) + ' ' + fechaCorta;
   });
 
   // Totales acumulados por línea (para el ranking)
@@ -1509,7 +1517,10 @@ async function renderOkChart(lineaActual, periodo) {
         legend: { position: 'top', labels: { font: { size: 10 }, usePointStyle: true, boxWidth: 7, padding: 8 } },
         tooltip: {
           callbacks: {
-            title: function(items){ return fechas[items[0].dataIndex]; },
+            title: function(items){
+              var f = fechas[items[0].dataIndex];
+              return _okDiaSemana(f, false) + ' ' + f.slice(8,10) + '/' + f.slice(5,7) + '/' + f.slice(0,4);
+            },
             label: function(ctx) {
               var v = ctx.parsed.y;
               if (v === null || v === undefined) return '';
