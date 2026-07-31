@@ -7478,6 +7478,13 @@ function prodSetChartPeriodo(p) {
   renderProductividadChart(p);
 }
 
+var DIA_SEM_CORTO = ['DOM','LUN','MAR','MIÉ','JUE','VIE','SÁB'];
+var DIA_SEM_LARGO = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+function prodDiaSemana(fechaIso, corto) {
+  var d = new Date(fechaIso + 'T12:00:00');
+  return (corto ? DIA_SEM_CORTO : DIA_SEM_LARGO)[d.getDay()];
+}
+
 async function renderProductividadChart(periodo) {
   periodo = periodo || _prodChartPeriodo || 'mes';
   _prodChartPeriodo = periodo;
@@ -7522,7 +7529,8 @@ async function renderProductividadChart(periodo) {
   });
 
   var labels = todasFechas.map(function(f) {
-    return periodo === 'mes' ? String(parseInt(f.slice(8,10), 10)) : (f.slice(8,10) + '/' + f.slice(5,7));
+    var fechaCorta = periodo === 'mes' ? String(parseInt(f.slice(8,10), 10)) : (f.slice(8,10) + '/' + f.slice(5,7));
+    return prodDiaSemana(f, true) + ' ' + fechaCorta;
   });
 
   // Productos por fecha/línea → tooltip
@@ -7626,7 +7634,10 @@ async function renderProductividadChart(periodo) {
           bodyFont:  { family: 'DM Sans', size: 11 },
           padding: 12,
           callbacks: {
-            title: function(items) { return todasFechas[items[0].dataIndex]; },
+            title: function(items) {
+              var f = todasFechas[items[0].dataIndex];
+              return prodDiaSemana(f, false) + ' ' + f.slice(8,10) + '/' + f.slice(5,7) + '/' + f.slice(0,4);
+            },
             label: function(ctx) {
               var ds = ctx.dataset || {};
               if (ds._kind === 'meta') return '  Meta: ' + META_TIROS_LINEA.toLocaleString();
