@@ -7528,9 +7528,11 @@ async function renderProductividadChart(periodo) {
     });
   });
 
+  // [número/fecha, día abreviado] — se dibujan apiladas (no lado a lado) vía
+  // el plugin prodTwoLineXPlugin para no ensanchar el eje X.
   var labels = todasFechas.map(function(f) {
     var fechaCorta = periodo === 'mes' ? String(parseInt(f.slice(8,10), 10)) : (f.slice(8,10) + '/' + f.slice(5,7));
-    return prodDiaSemana(f, true) + ' ' + fechaCorta;
+    return [fechaCorta, prodDiaSemana(f, true)];
   });
 
   // Productos por fecha/línea → tooltip
@@ -7608,10 +7610,40 @@ async function renderProductividadChart(periodo) {
   container.style.display = '';
   _prodChartCtx = { todasFechas: todasFechas, byDL: byDL };
 
+  // Dibuja las 2 líneas del eje X manualmente (número en negrita arriba,
+  // día abreviado en fuente menor abajo) — los ticks nativos de Chart.js
+  // no soportan tamaños distintos por línea dentro de una misma etiqueta.
+  var prodTwoLineXPlugin = {
+    id: 'prodTwoLineX',
+    afterDraw: function(chart) {
+      var xScale = chart.scales.x;
+      if (!xScale) return;
+      var ctx = chart.ctx;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      var yNum = xScale.top + 14;
+      var yDia = xScale.top + 26;
+      xScale.ticks.forEach(function(t, i) {
+        var pair = labels[t.value];
+        if (!pair) return;
+        var x = xScale.getPixelForTick(i);
+        ctx.font = '700 10px "DM Sans", sans-serif';
+        ctx.fillStyle = '#374151';
+        ctx.fillText(pair[0], x, yNum);
+        ctx.font = '600 8px "DM Sans", sans-serif';
+        ctx.fillStyle = '#9CA3AF';
+        ctx.fillText(pair[1], x, yDia);
+      });
+      ctx.restore();
+    }
+  };
+
   buildProdLegend(datasets);
   _prodChart = new Chart(canvas, {
     type: 'line',
     data: { labels: labels, datasets: datasets },
+    plugins: [prodTwoLineXPlugin],
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -7672,7 +7704,8 @@ async function renderProductividadChart(periodo) {
         },
         x: {
           grid: { color: '#F0EDE8' },
-          ticks: { font: { family: 'DM Sans', size: 10 }, maxRotation: 0, autoSkip: false }
+          ticks: { display: false, maxRotation: 0, autoSkip: false },
+          afterFit: function(scale) { scale.height = 34; }
         }
       }
     }
