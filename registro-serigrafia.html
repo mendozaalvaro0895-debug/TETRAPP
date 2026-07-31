@@ -1084,22 +1084,24 @@ function renderHoyLinea() {
 }
 
 // Habilita el siguiente momento según el último registrado (alternancia inicio ↔ paro).
-// Inicio y Paro pueden repetirse N veces; Velada cierra el día.
+// Velada SIEMPRE está disponible: la línea puede arrancar el turno directo con
+// velada (sin haber trabajado de día) y no cierra el turno — después de una
+// velada se puede seguir registrando (otro paro, otra lectura de madrugada).
 function actualizarMomentosDisponibles() {
   var ultimo = lecturasHoyLinea.length
     ? lecturasHoyLinea[lecturasHoyLinea.length - 1].momento
     : null;
 
-  // Qué botones están disponibles según el último momento
-  var habilitados = {};
+  var habilitados = { velada: true };
   if (!ultimo) {
-    habilitados['inicio'] = true;                  // sin registros → solo Inicio
+    habilitados['inicio'] = true;                  // sin registros → Inicio o Velada
   } else if (ultimo === 'inicio') {
-    habilitados['fin'] = true; habilitados['velada'] = true; // arrancó → puede parar o velada
+    habilitados['fin'] = true;                      // arrancó → puede parar o velada
   } else if (ultimo === 'fin') {
-    habilitados['inicio'] = true; habilitados['velada'] = true; // paró → puede reiniciar o velada
+    habilitados['inicio'] = true;                   // paró → puede reiniciar o velada
+  } else if (ultimo === 'velada') {
+    habilitados['inicio'] = true; habilitados['fin'] = true; // velada ya NO cierra el turno
   }
-  // ultimo === 'velada' → nada habilitado, turno cerrado
 
   document.querySelectorAll('#momentoTog .momento-btn').forEach(function(b){
     b.classList.toggle('disabled', !habilitados[b.dataset.m]);
@@ -1113,13 +1115,8 @@ function actualizarMomentosDisponibles() {
   }
 
   var btn = document.getElementById('btnGuardar');
-  if (!Object.keys(habilitados).length) {
-    btn.disabled = true;
-    btn.textContent = '✅ Turno finalizado';
-  } else {
-    btn.disabled = false;
-    btn.textContent = '💾 Guardar lectura';
-  }
+  btn.disabled = false;
+  btn.textContent = '💾 Guardar lectura';
   mostrarSugerenciaContador(momentoActual);
 }
 
