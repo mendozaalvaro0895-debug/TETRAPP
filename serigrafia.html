@@ -7552,12 +7552,12 @@ async function renderProductividadChart(periodo) {
 
   var COLS = ['#2A8B75','#D97706','#1D4ED8','#16A34A'];
 
-  // Series de día (turno diurno) por línea
+  // Series de día (turno diurno) por línea — order:0, quedan detrás de velada
   var datasets = LINEAS_PRODUCCION.map(function(ln, i) {
     var op = operadorPorLinea && operadorPorLinea[ln.id];
     return {
       label: ln.nombre + (op ? ' · ' + op : ''),
-      _kind: 'dia', _linea: ln.id, _nombre: ln.nombre,
+      _kind: 'dia', _linea: ln.id, _nombre: ln.nombre, order: 0,
       data: todasFechas.map(function(f) {
         var d = byDL[f] && byDL[f][ln.id];
         if (!d) return null;
@@ -7575,20 +7575,24 @@ async function renderProductividadChart(periodo) {
     };
   });
 
-  // Series de velada (turno nocturno) por línea — punteadas
+  // Series de velada (turno nocturno) por línea — punteadas. Radio mayor que
+  // el punto de día + se redibuja al frente con brillo (glow, vía
+  // prodVeladaFrontPlugin) para que se note aunque caiga en la misma fecha y
+  // cantidad que el turno diurno.
   LINEAS_PRODUCCION.forEach(function(ln, i) {
     datasets.push({
       label: ln.nombre + ' 🌙',
-      _kind: 'velada', _linea: ln.id, _nombre: ln.nombre,
+      _kind: 'velada', _linea: ln.id, _nombre: ln.nombre, order: 1,
       data: todasFechas.map(function(f) { return prodVeladaDelta(byDL[f] && byDL[f][ln.id]); }),
       borderColor: COLS[i],
       backgroundColor: 'transparent',
-      borderWidth: 2,
+      borderWidth: 3,
       borderDash: [3,3],
-      pointRadius: 3,
-      pointHoverRadius: 6,
+      pointRadius: 8,
+      pointHoverRadius: 10,
       pointStyle: 'rectRot',
       pointBackgroundColor: '#fff',
+      pointBorderWidth: 2.5,
       tension: 0.25,
       fill: false,
       spanGaps: false
@@ -7597,7 +7601,7 @@ async function renderProductividadChart(periodo) {
 
   datasets.push({
     label: 'Meta (' + META_TIROS_LINEA.toLocaleString() + '/día)',
-    _kind: 'meta',
+    _kind: 'meta', order: 0,
     data: todasFechas.map(function(){ return META_TIROS_LINEA; }),
     borderColor: '#EF4444',
     borderWidth: 1.5,
@@ -7639,11 +7643,37 @@ async function renderProductividadChart(periodo) {
     }
   };
 
+  // Fuerza los rombos de velada a quedar SIEMPRE por delante: en vez de
+  // depender del orden de dibujo interno de Chart.js (dataset "order"),
+  // se vuelven a dibujar a mano después de que TODO el gráfico terminó de
+  // pintarse — garantiza que queden arriba aunque caigan en la misma fecha
+  // y cantidad que el punto del turno diurno. De paso, se les agrega un
+  // brillo (glow) para que resalten incluso más.
+  var prodVeladaFrontPlugin = {
+    id: 'prodVeladaFront',
+    afterDatasetsDraw: function(chart) {
+      var ctx = chart.ctx;
+      chart.data.datasets.forEach(function(ds, i) {
+        if (ds._kind !== 'velada') return;
+        var meta = chart.getDatasetMeta(i);
+        if (!meta || meta.hidden) return;
+        ctx.save();
+        ctx.shadowColor = ds.borderColor;
+        ctx.shadowBlur = 12;
+        meta.data.forEach(function(point) {
+          if (!point || point.skip) return;
+          point.draw(ctx, chart.chartArea);
+        });
+        ctx.restore();
+      });
+    }
+  };
+
   buildProdLegend(datasets);
   _prodChart = new Chart(canvas, {
     type: 'line',
     data: { labels: labels, datasets: datasets },
-    plugins: [prodTwoLineXPlugin],
+    plugins: [prodTwoLineXPlugin, prodVeladaFrontPlugin],
     options: {
       responsive: true,
       maintainAspectRatio: false,
