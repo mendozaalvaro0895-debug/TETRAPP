@@ -443,6 +443,11 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
 .ag-row-inactivo .ag-td-name{opacity:.55}
 .ag-row-inactivo .ag-cell{opacity:.55}
 .ag-section-hdr td{background:var(--bg2);padding:3px 10px;font-size:9px;font-weight:800;color:var(--gray-l);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border)}
+.ag-th-anterior{background:#FFFBEB;color:#92400E}
+.ag-th-anterior.hoy{color:var(--serig-m)}
+.ag-th-mes{display:block;font-size:7px;font-weight:800;letter-spacing:.3px;margin-top:1px;opacity:.85}
+.ag-divider-th{border-right:3px solid #D97706 !important}
+.ag-divider-cell{border-right:3px solid #D97706 !important}
 .prod-mens-hdr{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .prod-mens-hdr span:first-child{font-size:12px;font-weight:800;color:var(--ink)}
 .prod-mens-chart{padding:10px 14px 8px}
@@ -3842,6 +3847,10 @@ async function guardarRolDiario(codigo, rol) {
 }
 
 var ASIST_FECHA_MIN = '2026-06-20';
+// El corte de nómina es el 25 de cada mes: lo trabajado del 26 en adelante
+// se paga hasta el siguiente corte. Por eso Asistencia Mensual siempre
+// adelanta los últimos días del mes anterior junto al mes que se ve.
+var ASIST_DIAS_ANTERIOR = 5;
 var ASIST_FECHA_INICIO = {
   'ANDERSON': '2026-06-24',
   'GLADYS':   '2026-06-24'
@@ -4109,9 +4118,22 @@ async function renderAsistGrid() {
   var año    = parseInt(mesStr.slice(0,4));
   var mesN   = parseInt(mesStr.slice(5,7));
 
+  // Últimos N días del mes ANTERIOR — se muestran junto al mes actual para
+  // no perder de vista lo trabajado después del corte del 25 (se paga hasta
+  // el siguiente corte, pero hay que poder marcarlo/verlo ya).
+  var ultimoDiaAnteriorDate = new Date(año, mesN - 1, 0); // día 0 del mes actual = último día del anterior
+  var diasAnterior = [];
+  for (var ka = ASIST_DIAS_ANTERIOR - 1; ka >= 0; ka--) {
+    var da = new Date(ultimoDiaAnteriorDate);
+    da.setDate(ultimoDiaAnteriorDate.getDate() - ka);
+    diasAnterior.push(da.getFullYear() + '-' + String(da.getMonth()+1).padStart(2,'0') + '-' + String(da.getDate()).padStart(2,'0'));
+  }
+  var esAnteriorSet = {};
+  diasAnterior.forEach(function(f){ esAnteriorSet[f] = true; });
+
   if (!asistGridCache || asistGridCache._mes !== mesStr) {
     try {
-      var inicio = mesStr + '-01';
+      var inicio = diasAnterior.length ? diasAnterior[0] : (mesStr + '-01');
       var ultimoDia = new Date(año, mesN, 0).getDate();
       var fin = mesStr + '-' + (ultimoDia < 10 ? '0'+ultimoDia : ultimoDia);
       var rr  = await db.from('asistencia_diaria')
@@ -4131,10 +4153,12 @@ async function renderAsistGrid() {
 
   var byPD = asistGridCache.byPersonDay;
   var diasMes = new Date(año, mesN, 0).getDate();
-  var dias = [];
+  var diasActual = [];
   for (var dd = 1; dd <= diasMes; dd++) {
-    dias.push(mesStr + '-' + (dd < 10 ? '0'+dd : dd));
+    diasActual.push(mesStr + '-' + (dd < 10 ? '0'+dd : dd));
   }
+  var dias = diasAnterior.concat(diasActual);
+  var ultimoDiaAnterior = diasAnterior.length ? diasAnterior[diasAnterior.length - 1] : null;
 
   var todaLista = (personalData && personalData.serig ? personalData.serig : []).filter(function(p) {
     if (p.activo) return true;
@@ -4153,8 +4177,10 @@ async function renderAsistGrid() {
   var thDays = dias.map(function(f) {
     var dn   = parseInt(f.slice(8));
     var dow  = new Date(f + 'T12:00:00').getDay();
-    var cls  = 'ag-th' + (f === hoy ? ' hoy' : '') + (dow === 0 ? ' finde' : '') + (f === posFecha ? ' ag-col-sel' : '');
-    var lbl  = dn;
+    var esAnt = !!esAnteriorSet[f];
+    var cls  = 'ag-th' + (f === hoy ? ' hoy' : '') + (dow === 0 ? ' finde' : '') + (f === posFecha ? ' ag-col-sel' : '') +
+      (esAnt ? ' ag-th-anterior' : '') + (f === ultimoDiaAnterior ? ' ag-divider-th' : '');
+    var lbl  = esAnt ? (dn + '<span class="ag-th-mes">' + MESES_PER_C[parseInt(f.slice(5,7),10)-1] + '</span>') : dn;
     var clk  = (f <= hoy && f >= ASIST_FECHA_MIN) ? ' onclick="irDiaEspecifico(\'' + f + '\')" style="cursor:pointer" title="Ver este día en Personal y Roles"' : '';
     return '<th class="' + cls + '"' + clk + '>' + lbl + '</th>';
   }).join('');
@@ -4166,7 +4192,7 @@ async function renderAsistGrid() {
       var daysByP = byPD[p.codigo] || {};
       var fechaInicio = p.fecha_inicio || (p.created_at ? p.created_at.slice(0,10) : null);
       var isFullGreen = true;
-      dias.forEach(function(f) {
+      diasActual.forEach(function(f) { // racha del mes ACTUAL — la cola del mes anterior no cuenta
         if (f > hoy) return;
         if (fechaInicio && f < fechaInicio) return; // antes de ingreso — no cuenta para racha
         var dow = new Date(f + 'T12:00:00').getDay();
@@ -4188,9 +4214,10 @@ async function renderAsistGrid() {
         var esAntesIngreso = fechaInicio && f < fechaInicio;
         var dow = new Date(f + 'T12:00:00').getDay();
         var esFinde = dow === 0;
+        var divCls = f === ultimoDiaAnterior ? ' ag-divider-cell' : '';
         if (esFuturo || esAntesIngreso) {
           var titAnt = esAntesIngreso ? 'Antes de ingreso (' + fechaInicio + ')' : '';
-          html += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + (f === posFecha ? ' ag-col-sel' : '') + '" title="' + titAnt + '"></td>';
+          html += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + (f === posFecha ? ' ag-col-sel' : '') + divCls + '" title="' + titAnt + '"></td>';
         } else {
           var esPendiente = f === hoy && !daysByP[f];
           var est = esPendiente ? 'pendiente' : (daysByP[f] || (esFinde ? 'finde' : 'presente'));
@@ -4199,7 +4226,7 @@ async function renderAsistGrid() {
           var notaPend = esPendiente ? ' · Aún no se toma asistencia' : (est === 'pendiente' ? ' · Sin registrar (ej. antes de ingresar)' : '');
           var domTrabajado = esFinde && daysByP[f] === 'presente';
           var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esFinde && !domTrabajado ? ' · Domingo (no cuenta)' : '') + notaPend;
-          html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrabajado ? ' dom-trabajado' : '') + (f === posFecha ? ' ag-col-sel' : '') + '" onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + '</td>';
+          html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrabajado ? ' dom-trabajado' : '') + (f === posFecha ? ' ag-col-sel' : '') + divCls + '" onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + '</td>';
         }
       });
       html += '</tr>';
@@ -4329,8 +4356,19 @@ function exportarAsistGridPDF() {
   var mesN   = parseInt(mesStr.slice(5,7));
   var hoy    = fechaHoy();
   var ultimoDia = new Date(año, mesN, 0).getDate();
-  var dias = [];
-  for (var dd = 1; dd <= ultimoDia; dd++) dias.push(mesStr + '-' + (dd < 10 ? '0'+dd : dd));
+  var diasActual = [];
+  for (var dd = 1; dd <= ultimoDia; dd++) diasActual.push(mesStr + '-' + (dd < 10 ? '0'+dd : dd));
+
+  var ultimoDiaAnteriorDate = new Date(año, mesN - 1, 0);
+  var diasAnterior = [];
+  for (var ka = ASIST_DIAS_ANTERIOR - 1; ka >= 0; ka--) {
+    var da = new Date(ultimoDiaAnteriorDate);
+    da.setDate(ultimoDiaAnteriorDate.getDate() - ka);
+    diasAnterior.push(da.getFullYear() + '-' + String(da.getMonth()+1).padStart(2,'0') + '-' + String(da.getDate()).padStart(2,'0'));
+  }
+  var esAnteriorSet = {};
+  diasAnterior.forEach(function(f){ esAnteriorSet[f] = true; });
+  var dias = diasAnterior.concat(diasActual);
 
   var personas = (personalData && personalData.serig ? personalData.serig : []).filter(function(p){ return p.activo; });
   var plazaFija = personas.filter(function(p){ return (p.proceso_hab||'') !== 'Prestado'; });
@@ -4342,8 +4380,12 @@ function exportarAsistGridPDF() {
     return dias.map(function(f) {
       var dow = new Date(f+'T12:00:00').getDay();
       var esFin = dow === 0;
-      var bg = esFin ? '#e2e8f0' : f === hoy ? '#dbeafe' : '#f8fafc';
-      return '<th style="background:' + bg + ';width:18px;min-width:18px;font-size:7px;font-weight:700;text-align:center;padding:3px 0;border:1px solid #cbd5e1">' + parseInt(f.slice(8)) + '</th>';
+      var esAnt = !!esAnteriorSet[f];
+      var bg = esAnt ? '#fffbeb' : esFin ? '#e2e8f0' : f === hoy ? '#dbeafe' : '#f8fafc';
+      var lbl = esAnt
+        ? parseInt(f.slice(8)) + '<div style="font-size:5.5px;font-weight:800;color:#92400e">' + MESES_PER_C[parseInt(f.slice(5,7),10)-1] + '</div>'
+        : parseInt(f.slice(8));
+      return '<th style="background:' + bg + ';width:18px;min-width:18px;font-size:7px;font-weight:700;text-align:center;padding:3px 0;border:1px solid #cbd5e1">' + lbl + '</th>';
     }).join('');
   }
 
@@ -4354,7 +4396,7 @@ function exportarAsistGridPDF() {
     }
     lista.forEach(function(p) {
       var daysByP = byPD[p.codigo] || {};
-      var isFullGreen = dias.every(function(f) {
+      var isFullGreen = diasActual.every(function(f) { // la cola del mes anterior no cuenta para la racha
         if (f > hoy) return true;
         var dow = new Date(f+'T12:00:00').getDay();
         if (dow === 0) return true;
@@ -4404,7 +4446,7 @@ function exportarAsistGridPDF() {
   todasPDF.forEach(function(p) {
     var daysByP = byPD[p.codigo] || {};
     var fAus = [], fTard = [], fVel = [], fDom = [];
-    dias.forEach(function(f) {
+    diasActual.forEach(function(f) { // resumen = solo el mes actual; la cola del anterior es de otro corte
       if (f > hoy) return;
       var dow = new Date(f+'T12:00:00').getDay();
       var est = daysByP[f];
