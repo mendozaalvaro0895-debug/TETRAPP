@@ -123,7 +123,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 /* IMPORT PREVIEW */
 .imp-summary{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
-.imp-stat{flex:1;min-width:100px;background:var(--bg);border-radius:10px;padding:12px 14px;text-align:center}
+.imp-stat{flex:1;min-width:100px;background:var(--bg);border-radius:10px;padding:12px 14px;text-align:center;cursor:pointer;border:1.5px solid transparent;transition:border-color .12s,background .12s}
+.imp-stat:hover{background:var(--inv-xl)}
+.imp-stat.active{border-color:var(--inv);background:var(--inv-xl)}
 .imp-stat strong{display:block;font-family:var(--mono);font-size:22px;font-weight:700;color:var(--inv)}
 .imp-stat span{font-size:11px;color:var(--gray)}
 .imp-stat.new strong{color:#065F46}
@@ -879,6 +881,28 @@ function fmtExist(v) {
   return n % 1 === 0 ? n.toLocaleString() : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 });
 }
 
+// Fila de detalle: detecta nuevo vs. actualizado por la forma del objeto
+// (los "nuevos" no tienen existAntes/existDespues).
+function buildImportRow(r) {
+  if (r.existAntes === undefined) {
+    return '<tr><td><span class="tag-new">NUEVO</span></td>' +
+      '<td style="font-family:var(--mono);font-weight:700">' + escHtml(r.sku) + '</td>' +
+      '<td>' + escHtml(r.descripcion.substring(0,45)) + '</td>' +
+      '<td style="text-align:right;font-family:var(--mono)">' + fmtExist(r.existencia) + '</td></tr>';
+  }
+  var diff = Math.round((r.existDespues - r.existAntes) * 1000) / 1000;
+  var diffStr = diff > 0 ? '<span style="color:var(--green)">+' + fmtExist(diff) + '</span>'
+             : diff < 0 ? '<span style="color:var(--red)">'  + fmtExist(diff) + '</span>'
+             : '<span style="color:var(--gray)">±0</span>';
+  return '<tr><td><span class="tag-upd">ACT</span></td>' +
+    '<td style="font-family:var(--mono);font-weight:700">' + escHtml(r.sku) + '</td>' +
+    '<td>' + escHtml(r.desc.substring(0,45)) + '</td>' +
+    '<td style="text-align:right;font-family:var(--mono)">' + fmtExist(r.existAntes) + ' → ' + fmtExist(r.existDespues) + ' ' + diffStr + '</td></tr>';
+}
+
+var importPreviewCats   = null; // { todos, cambiados, nuevos, sinCambio, sampleHtml, sampleN }
+var importPreviewFiltro = null; // ficha activa, o null = muestra de todas las categorías
+
 function mostrarPreviewImport(productos, filename) {
   var fuente = importBodega === 'bodega7' ? todosLosInsumosB7 : todosLosItems;
   var skuActuales = {};
@@ -896,26 +920,16 @@ function mostrarPreviewImport(productos, filename) {
 
   importPendiente = productos;
 
-  var preview5 = actualizados.slice(0, 5).concat(nuevos.slice(0, 3));
-  var filasSample = preview5.map(function(r) {
-    if (r.existAntes !== undefined) {
-      var diff = Math.round((r.existDespues - r.existAntes) * 1000) / 1000;
-      var diffStr = diff > 0 ? '<span style="color:var(--green)">+' + fmtExist(diff) + '</span>'
-                 : diff < 0 ? '<span style="color:var(--red)">'  + fmtExist(diff) + '</span>'
-                 : '<span style="color:var(--gray)">±0</span>';
-      return '<tr><td><span class="tag-upd">ACT</span></td>' +
-        '<td style="font-family:var(--mono);font-weight:700">' + escHtml(r.sku) + '</td>' +
-        '<td>' + escHtml(r.desc.substring(0,45)) + '</td>' +
-        '<td style="text-align:right;font-family:var(--mono)">' + fmtExist(r.existAntes) + ' → ' + fmtExist(r.existDespues) + ' ' + diffStr + '</td></tr>';
-    } else {
-      return '<tr><td><span class="tag-new">NUEVO</span></td>' +
-        '<td style="font-family:var(--mono);font-weight:700">' + escHtml(r.sku) + '</td>' +
-        '<td>' + escHtml(r.descripcion.substring(0,45)) + '</td>' +
-        '<td style="text-align:right;font-family:var(--mono)">' + fmtExist(r.existencia) + '</td></tr>';
-    }
-  }).join('');
+  var cambiados = actualizados.filter(function(r) { return r.existDespues !== r.existAntes; });
+  var sinCambio = actualizados.filter(function(r) { return r.existDespues === r.existAntes; });
+  var todos     = actualizados.concat(nuevos);
 
-  var totalConCambio = actualizados.filter(function(r) { return r.existDespues !== r.existAntes; }).length;
+  var preview5 = actualizados.slice(0, 5).concat(nuevos.slice(0, 3));
+  importPreviewCats = {
+    todos: todos, cambiados: cambiados, nuevos: nuevos, sinCambio: sinCambio,
+    sampleHtml: preview5.map(buildImportRow).join(''), sampleN: preview5.length
+  };
+  importPreviewFiltro = null;
 
   document.getElementById('importBody').innerHTML =
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
@@ -923,23 +937,58 @@ function mostrarPreviewImport(productos, filename) {
       '<span style="font-size:11px;color:var(--gray-l)">·</span>' +
       '<span style="font-size:11px;color:var(--gray)">' + escHtml(filename) + '</span>' +
     '</div>' +
-    '<div class="imp-summary">' +
-      '<div class="imp-stat"><strong>' + productos.length + '</strong><span>En el Excel</span></div>' +
-      '<div class="imp-stat"><strong>' + totalConCambio + '</strong><span>Existencias cambian</span></div>' +
-      '<div class="imp-stat new"><strong>' + nuevos.length + '</strong><span>Productos nuevos</span></div>' +
-      '<div class="imp-stat"><strong>' + (actualizados.length - totalConCambio) + '</strong><span>Sin cambio</span></div>' +
+    '<div class="imp-summary" id="importStatsRow">' +
+      '<div class="imp-stat" data-filtro="todos" onclick="filtrarImportPreview(\'todos\')"><strong>' + productos.length + '</strong><span>En el Excel</span></div>' +
+      '<div class="imp-stat" data-filtro="cambiados" onclick="filtrarImportPreview(\'cambiados\')"><strong>' + cambiados.length + '</strong><span>Existencias cambian</span></div>' +
+      '<div class="imp-stat new" data-filtro="nuevos" onclick="filtrarImportPreview(\'nuevos\')"><strong>' + nuevos.length + '</strong><span>Productos nuevos</span></div>' +
+      '<div class="imp-stat" data-filtro="sinCambio" onclick="filtrarImportPreview(\'sinCambio\')"><strong>' + sinCambio.length + '</strong><span>Sin cambio</span></div>' +
     '</div>' +
     '<div class="imp-table-wrap">' +
       '<table class="imp-table"><thead><tr><th></th><th>SKU</th><th>Descripción</th><th style="text-align:right">Existencia</th></tr></thead>' +
-      '<tbody>' + filasSample + '</tbody></table>' +
+      '<tbody id="importTableBody">' + importPreviewCats.sampleHtml + '</tbody></table>' +
     '</div>' +
-    (preview5.length < (actualizados.length + nuevos.length) ? '<div style="font-size:11px;color:var(--gray-l);text-align:center;margin-bottom:8px">Mostrando ' + preview5.length + ' de ' + (actualizados.length + nuevos.length) + ' productos</div>' : '') +
+    '<div style="font-size:11px;color:var(--gray-l);text-align:center;margin-bottom:8px" id="importTableNota">' +
+      (preview5.length < todos.length ? 'Mostrando ' + preview5.length + ' de ' + todos.length + ' productos · clic en una ficha de arriba para ver el detalle completo' : '') +
+    '</div>' +
     '<div class="progress-bar-wrap" id="importProgress" style="display:none"><div class="progress-bar" id="importBar"></div></div>' +
     '<div id="importStatus" style="font-size:12px;color:var(--gray);text-align:center;min-height:18px"></div>';
 
   document.getElementById('btnConfirmImport').disabled = false;
   document.getElementById('btnConfirmImport').textContent = 'Aplicar actualización';
   document.getElementById('modalImport').classList.add('open');
+}
+
+// Clic en una ficha de resumen → despliega el detalle completo de esa
+// categoría en el cuadro de abajo. Clic de nuevo sobre la misma ficha
+// vuelve a la muestra mixta inicial.
+function filtrarImportPreview(filtro) {
+  if (!importPreviewCats) return;
+  importPreviewFiltro = (importPreviewFiltro === filtro) ? null : filtro;
+
+  var row = document.getElementById('importStatsRow');
+  if (row) {
+    row.querySelectorAll('.imp-stat').forEach(function(el) {
+      el.classList.toggle('active', el.dataset.filtro === importPreviewFiltro);
+    });
+  }
+
+  var tbody = document.getElementById('importTableBody');
+  var nota  = document.getElementById('importTableNota');
+  if (!tbody) return;
+
+  if (!importPreviewFiltro) {
+    tbody.innerHTML = importPreviewCats.sampleHtml;
+    if (nota) nota.textContent = importPreviewCats.sampleN < importPreviewCats.todos.length
+      ? 'Mostrando ' + importPreviewCats.sampleN + ' de ' + importPreviewCats.todos.length + ' productos · clic en una ficha de arriba para ver el detalle completo'
+      : '';
+    return;
+  }
+
+  var lista = importPreviewCats[importPreviewFiltro] || [];
+  tbody.innerHTML = lista.length
+    ? lista.map(buildImportRow).join('')
+    : '<tr><td colspan="4" style="text-align:center;color:var(--gray-l);padding:16px">Sin productos en esta categoría</td></tr>';
+  if (nota) nota.textContent = lista.length + ' producto' + (lista.length !== 1 ? 's' : '');
 }
 
 // ── VENTAS: PARSER ──────────────────────────────────────────
