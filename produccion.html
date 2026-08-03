@@ -280,9 +280,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <table class="tbl">
           <thead><tr>
             <th>Fecha</th><th>Turno</th><th class="ctr">Máquinas</th>
-            <th class="num">SKUs</th><th class="num">Unidades</th><th class="ctr">Sin asignar</th><th></th>
+            <th class="num">SKUs</th><th class="num">Unidades</th><th class="ctr">Sin asignar</th>
+            <th>Requis</th><th></th>
           </tr></thead>
-          <tbody id="ultBody"><tr class="empty-row"><td colspan="7">Cargando…</td></tr></tbody>
+          <tbody id="ultBody"><tr class="empty-row"><td colspan="8">Cargando…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -353,7 +354,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="tbl-scroll">
           <table class="tbl">
             <thead><tr id="semHead"></tr></thead>
-            <tbody id="semBody"><tr class="empty-row"><td colspan="22">Cargando…</td></tr></tbody>
+            <tbody id="semBody"><tr class="empty-row"><td colspan="21">Cargando…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -626,33 +627,59 @@ function filasDeLineas(lineas) {
   return out;
 }
 
-// Deduce fecha y turno del nombre del archivo y del texto del documento
+// Deduce documento, fecha y turno.
+// Prioridad de la fecha: la que el propio documento declara ("Fecha 13/05/2026")
+// gana sobre el nombre del archivo — los nombres se repiten y a veces mienten
+// (hay archivos "13MAY DIA" cuyo texto dice 12/05/2026).
 function metaDeDoc(nombre, lineas) {
   var n = String(nombre || '').toUpperCase();
   var texto = lineas.join(' \n ');
   var tUp = texto.toUpperCase();
 
+  // correlativo de la requi: "PRI2 421 14/05/26 ..."
+  var documento = null;
+  var md = texto.match(/\b(PRI\d*)\s+(\d+)\b/i);
+  if (md) documento = md[1].toUpperCase() + '-' + md[2];
+
+  // turno: lo que declara el documento manda sobre el nombre
   var turno = null;
-  if (/NOCHE/.test(n)) turno = 'noche';
-  else if (/\bD[IÍ]A\b/.test(n)) turno = 'dia';
+  if (/TURNO\s+NOCHE/.test(tUp)) turno = 'noche';
+  else if (/TURNO\s+D[IÍ]A/.test(tUp)) turno = 'dia';
+  if (!turno) {
+    if (/NOCHE/.test(n)) turno = 'noche';
+    else if (/\bD[IÍ]A\b/.test(n)) turno = 'dia';
+  }
   if (!turno) {
     if (/NOCHE/.test(tUp)) turno = 'noche';
     else if (/\bD[IÍ]A\b/.test(tUp)) turno = 'dia';
   }
 
+  var fecha = null;
+  // 1) fecha explícita en la descripción de la requi
+  var mDesc = texto.match(/FECHA\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+  if (mDesc) {
+    fecha = mDesc[3] + '-' + ('0' + parseInt(mDesc[2], 10)).slice(-2) + '-' + ('0' + parseInt(mDesc[1], 10)).slice(-2);
+  }
+  // año de referencia, de la fecha de emisión
   var anio = null;
   var ma = texto.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
   if (ma) anio = ma[3].length === 2 ? 2000 + parseInt(ma[3], 10) : parseInt(ma[3], 10);
 
-  var fecha = null;
-  var mf = n.match(/(\d{1,2})\s*(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)/);
-  if (mf && anio) {
-    fecha = anio + '-' + ('0' + MESES_ABR[mf[2]]).slice(-2) + '-' + ('0' + mf[1]).slice(-2);
+  // 2) nombre del archivo (01JUN)
+  if (!fecha) {
+    var mf = n.match(/(\d{1,2})\s*(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)/);
+    if (mf && anio) fecha = anio + '-' + ('0' + MESES_ABR[mf[2]]).slice(-2) + '-' + ('0' + mf[1]).slice(-2);
   }
+  // 3) fecha de emisión del documento
   if (!fecha && ma) {
     fecha = anio + '-' + ('0' + parseInt(ma[2], 10)).slice(-2) + '-' + ('0' + parseInt(ma[1], 10)).slice(-2);
   }
-  return { fecha: fecha || fechaHoy(), turno: turno || 'dia' };
+  return {
+    fecha: fecha || fechaHoy(),
+    turno: turno || 'dia',
+    documento: documento || 'PDF-SIN-CORRELATIVO',
+    fechaDeclarada: !!mDesc
+  };
 }
 
 async function onPdfChange(e) {
@@ -693,12 +720,15 @@ function abrirPreview(filas, meta, nombre) {
       enCatalogo: !!inv
     };
   });
-  prevMeta = { fecha: meta.fecha, turno: meta.turno, nombre: nombre };
+  prevMeta = {
+    fecha: meta.fecha, turno: meta.turno, nombre: nombre,
+    documento: meta.documento, fechaDeclarada: meta.fechaDeclarada
+  };
   repintarPreview();
   document.getElementById('modalPrev').classList.add('open');
 }
 
-var prevMeta = { fecha: '', turno: 'dia', nombre: '' };
+var prevMeta = { fecha: '', turno: 'dia', nombre: '', documento: 'MANUAL', fechaDeclarada: false };
 
 function leerPrevMeta() {
   var f = document.getElementById('prevFecha');
@@ -740,7 +770,18 @@ function buildPreviewHtml() {
     aviso += '<div class="aviso aviso-info">' + nuevos + ' código(s) no están en inventario. Se guardarán igual, pero no tendrán meta ni precio hasta darlos de alta.</div>';
   }
 
-  return '<div style="font-size:12px;color:var(--gray);margin-bottom:12px">📄 ' + esc(prevMeta.nombre) + '</div>' +
+  var fuenteFecha = prevMeta.fechaDeclarada
+    ? 'fecha tomada del texto de la requi'
+    : 'fecha deducida del nombre del archivo — verifícala';
+  var cab = '<div style="font-size:12px;color:var(--gray);margin-bottom:12px">📄 ' + esc(prevMeta.nombre) +
+    ' · requi <b style="font-family:var(--mono);color:var(--prod)">' + esc(prevMeta.documento) + '</b>' +
+    ' · <span style="font-style:italic">' + fuenteFecha + '</span></div>';
+  if (!prevMeta.fechaDeclarada) {
+    aviso = '<div class="aviso aviso-info">Este documento no declara su fecha de producción en el texto, ' +
+      'así que se dedujo del nombre del archivo. Confírmala antes de guardar.</div>' + aviso;
+  }
+
+  return cab +
     '<div class="ctrl-bar" style="margin-bottom:14px">' +
     '<span class="ctrl-lbl">Fecha de producción</span>' +
     '<input type="date" class="ctrl-in" id="prevFecha" value="' + esc(prevMeta.fecha) + '" onchange="leerPrevMeta()">' +
@@ -797,9 +838,10 @@ async function guardarPreview() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span>Guardando…';
   try {
-    var n = await guardarTurno(prevMeta.fecha, prevMeta.turno, prevRows, 'pdf');
+    var n = await guardarTurno(prevMeta.fecha, prevMeta.turno, prevRows, 'pdf', prevMeta.documento);
     await recordarMaquinas(prevRows);
-    toast('✅ ' + n + ' líneas guardadas · ' + prevMeta.fecha + ' ' + prevMeta.turno, 'ok');
+    toast('✅ ' + n + ' líneas guardadas · requi ' + prevMeta.documento + ' · ' +
+      prevMeta.fecha + ' ' + prevMeta.turno, 'ok');
     cerrarPrev();
     await cargarUltimos();
   } catch (err) {
@@ -821,9 +863,12 @@ function mensajeError(err) {
 /* ══════════════════════════════════════════════════════════════
    GUARDADO
    ══════════════════════════════════════════════════════════════ */
-async function guardarTurno(fecha, turno, filas, origen) {
-  // se reemplaza el turno completo → permite recargar un turno corregido sin duplicar
-  var del = await db.from('produccion_diaria').delete().eq('fecha', fecha).eq('turno', turno);
+// Un turno puede tener varias requis con cantidades distintas que se suman.
+// Por eso se reemplaza SOLO lo de este documento, no el turno completo.
+async function guardarTurno(fecha, turno, filas, origen, documento) {
+  var doc = documento || 'MANUAL';
+  var del = await db.from('produccion_diaria').delete()
+    .eq('fecha', fecha).eq('turno', turno).eq('documento', doc);
   if (del.error) throw del.error;
 
   // consolidar por (maquina, sku) para respetar el índice único
@@ -834,7 +879,8 @@ async function guardarTurno(fecha, turno, filas, origen) {
     if (!agg[k]) {
       agg[k] = {
         fecha: fecha, turno: turno, maquina: r.maquina || 0, sku: r.sku,
-        descripcion: r.descripcion || null, cantidad: 0, origen: origen
+        descripcion: r.descripcion || null, cantidad: 0,
+        documento: doc, origen: origen
       };
     }
     agg[k].cantidad += r.cantidad;
@@ -948,9 +994,10 @@ async function guardarManual() {
   if (!filas.length) { toast('Agrega al menos una fila con código y cantidad', 'err'); return; }
 
   try {
-    var n = await guardarTurno(fecha, turno, filas, 'manual');
+    var n = await guardarTurno(fecha, turno, filas, 'manual', 'MANUAL');
     await recordarMaquinas(filas);
-    toast('✅ ' + n + ' líneas guardadas · ' + fecha + ' ' + turno, 'ok');
+    toast('✅ ' + n + ' líneas guardadas · ' + fecha + ' ' + turno +
+      '\n(reemplazan solo lo capturado a mano; lo que venga de requis PDF se conserva)', 'ok');
     document.getElementById('manRows').innerHTML = '';
     addManRow(); addManRow(); addManRow();
     await cargarUltimos();
@@ -966,16 +1013,17 @@ async function cargarUltimos() {
   var body = document.getElementById('ultBody');
   try {
     var r = await db.from('produccion_diaria')
-      .select('fecha,turno,maquina,sku,cantidad')
+      .select('fecha,turno,maquina,sku,cantidad,documento')
       .order('fecha', { ascending: false })
-      .limit(3000);
+      .limit(5000);
     if (r.error) throw r.error;
     var agg = {};
     (r.data || []).forEach(function (p) {
       var k = p.fecha + '|' + p.turno;
-      if (!agg[k]) agg[k] = { fecha: p.fecha, turno: p.turno, maq: {}, skus: {}, u: 0, sin: 0 };
+      if (!agg[k]) agg[k] = { fecha: p.fecha, turno: p.turno, maq: {}, skus: {}, docs: {}, u: 0, sin: 0 };
       if (p.maquina) agg[k].maq[p.maquina] = 1; else agg[k].sin++;
       agg[k].skus[p.sku] = 1;
+      agg[k].docs[p.documento || 'MANUAL'] = 1;
       agg[k].u += numVal(p.cantidad);
     });
     var todos = Object.keys(agg).map(function (k) { return agg[k]; });
@@ -989,7 +1037,7 @@ async function cargarUltimos() {
       : 'Sin turnos cargados todavía';
 
     if (!lista.length) {
-      body.innerHTML = '<tr class="empty-row"><td colspan="7">Aún no hay producción cargada. Sube un PDF o captura un turno manualmente.</td></tr>';
+      body.innerHTML = '<tr class="empty-row"><td colspan="8">Aún no hay producción cargada. Sube un PDF o captura un turno manualmente.</td></tr>';
       return;
     }
     var html = '';
@@ -997,7 +1045,7 @@ async function cargarUltimos() {
     body.innerHTML = html;
   } catch (err) {
     var m = err && err.message ? err.message : String(err);
-    body.innerHTML = '<tr class="empty-row"><td colspan="7">' + esc(m) + '</td></tr>';
+    body.innerHTML = '<tr class="empty-row"><td colspan="8">' + esc(m) + '</td></tr>';
     document.getElementById('ultSub').textContent = /does not exist|schema cache/i.test(m)
       ? 'Falta correr sql/produccion_v1.sql en Supabase' : 'Error al cargar';
   }
@@ -1014,6 +1062,8 @@ function buildUltRow(t) {
     '<td class="num">' + Object.keys(t.skus).length + '</td>' +
     '<td class="num">' + fmtU(t.u) + '</td>' +
     '<td class="ctr">' + sinTxt + '</td>' +
+    '<td style="font-family:var(--mono);font-size:11px;white-space:normal;max-width:180px">' +
+      esc(Object.keys(t.docs).sort().join(', ')) + '</td>' +
     '<td><button class="btn btn-ghost btn-sm" onclick="verSemanaDe(\'' + t.fecha + '\')">Ver semana</button></td>' +
     '</tr>';
 }
@@ -1132,7 +1182,7 @@ function pintarTablaSemanal(ini) {
     html += buildSemRow(g, ini, meta, turnos, ef, pr, pot, sep);
   });
 
-  document.getElementById('semBody').innerHTML = html || '<tr class="empty-row"><td colspan="22">Sin datos</td></tr>';
+  document.getElementById('semBody').innerHTML = html || '<tr class="empty-row"><td colspan="21">Sin datos</td></tr>';
 
   // KPIs
   var efGlobal = capac > 0 ? prodConMeta / capac : null;

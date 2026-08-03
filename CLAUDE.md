@@ -147,7 +147,7 @@ Apoyo externo: operador_codigo=null + area_origen (tapas/produccion/bodega/otra)
 | `solicitud_historial` | Historial de cambios de estado |
 | `personal` | Operarios/supervisores (codigo UNIQUE, proceso_hab, color_hex, rol: 'operador'\|'supervisor') — fuente única de verdad; registro-tapas.html lee el supervisor activo de aquí, no lo hardcodea |
 | `inventario` | 2358 SKUs activos (sku, descripcion, existencia, facturable, activo). +3 columnas de producción (sql/produccion_v1.sql): `meta_12hrs` (capacidad por turno de 12h, base de la eficiencia), `maquina_default` (máquina habitual del SKU, la escribe produccion.html al guardar un turno), `precio_ponderado_manual` (respaldo solo para SKUs que se producen pero nunca se facturan, ej. 214774/214776) |
-| `produccion_diaria` | Producción de sopladoras: una fila por (fecha, turno 'dia'\|'noche', maquina, sku) + descripcion, cantidad, origen 'pdf'\|'manual'. Índice único en esas 4 columnas; el guardado borra el turno completo y reinserta, así se puede recargar un turno corregido sin duplicar. maquina=0 significa sin asignar (sql/produccion_v1.sql) |
+| `produccion_diaria` | Producción de sopladoras: una fila por (fecha, turno 'dia'\|'noche', maquina, sku, **documento**) + descripcion, cantidad, origen 'pdf'\|'manual'\|'sheets'. ⚠️ `documento` (correlativo de la requi, ej. PRI2-421) entra en la llave única porque **un turno puede tener varias requis distintas** (ingresos anticipados + la principal) con cantidades que se SUMAN — verificado en 13-may-2026: PRI2-412, 418 y 421 traen cantidades diferentes del mismo turno. Recargar una requi reemplaza solo sus líneas. El ingreso manual usa documento='MANUAL'. maquina=0 = sin asignar / producto que no es de sopladora (sql/produccion_v1.sql) |
 | `movimientos_materiales` | Trazabilidad (tipo: 'salida_bodega' \| 'entrada_pt') |
 | `rechazos` | ✅ Existe (la creó movimientos_serigrafia_v1.sql) — RLS pendiente: correr sql/rechazos_rls_fix.sql |
 | `perfiles` | Roles de acceso: master / visor / operativo / operativo_serig |
@@ -190,6 +190,12 @@ animPop y CSS huérfano (.rechazo-*, .rbadge, --serig-m, --gold).
 5. `sql/produccion_v1.sql` — crea `produccion_diaria` + agrega meta_12hrs / maquina_default /
    precio_ponderado_manual a `inventario`, con RLS. Sin él produccion.html avisa en rojo
    ("falta correr sql/produccion_v1.sql") y no puede guardar turnos
+6. `sql/produccion_seed_historico.sql` — carga la historia que ya existía en el Google Sheets
+   de Álvaro (Plantilla_Produccion_Mayo_V3_Fechas): 831 líneas del 5-may al 6-jun 2026
+   (53 turnos, 4.9M und) con documento='SHEETS', + meta_12hrs de 84 SKUs, precio de respaldo
+   de 77 y maquina_default de 73 deducida del histórico. Correr DESPUÉS del punto 5.
+   ⚠️ Si luego subes el PDF de un turno ya sembrado, sus líneas entran con su propio
+   correlativo y se SUMARÍAN; borra antes las de ese turno con documento='SHEETS'
 
 ### SQL ya corridos (referencia, jul/2026)
 - `sql/seguridad_v1.sql` — blindaje: perfiles + rol_actual()/es_master() + anon sin privilegios.

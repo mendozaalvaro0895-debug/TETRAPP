@@ -23,9 +23,14 @@ create table if not exists public.produccion_diaria (
   sku         text        not null,
   descripcion text,
   cantidad    numeric     not null default 0,
-  origen      text,                              -- 'pdf' | 'manual'
+  documento   text        not null default 'MANUAL',  -- correlativo de la requi (PRI2-421)
+  origen      text,                              -- 'pdf' | 'manual' | 'sheets'
   created_at  timestamptz not null default now()
 );
+
+-- si la tabla ya existía sin la columna
+alter table public.produccion_diaria
+  add column if not exists documento text not null default 'MANUAL';
 
 -- turno solo acepta dia/noche
 do $$
@@ -40,9 +45,12 @@ begin
   end if;
 end $$;
 
--- una sola fila por combinación → permite recargar un turno corregido
-create unique index if not exists ux_prod_fecha_turno_maq_sku
-  on public.produccion_diaria (fecha, turno, maquina, sku);
+-- Un turno puede tener VARIAS requis (ingresos anticipados + la principal), con
+-- cantidades distintas que se suman. Por eso el documento entra en la llave:
+-- recargar una requi corregida reemplaza solo sus líneas, sin borrar las demás.
+drop index if exists ux_prod_fecha_turno_maq_sku;
+create unique index if not exists ux_prod_fecha_turno_maq_sku_doc
+  on public.produccion_diaria (fecha, turno, maquina, sku, documento);
 
 create index if not exists idx_prod_fecha   on public.produccion_diaria (fecha);
 create index if not exists idx_prod_sku     on public.produccion_diaria (sku);
