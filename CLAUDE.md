@@ -37,7 +37,7 @@ Los `.js` en shared/ eran huérfanos y se borraron (jul/2026).
 | `dashboard.html` | ✅ Activo | KPIs ejecutivos globales |
 | `inventario.html` | ✅ Activo | Gestión de SKUs, existencias, importación Excel |
 | `ventas.html` | ✅ Activo | Módulo Ventas y Financiero (ago/2026): tabs Resumen (KPIs del mes en foco + gráfico mensual de barras CSS + familias + top clientes) · Productos (top por periodo, Δ vs mes anterior, búsqueda) · Clientes (concentración top 3, Δ) · botón Importar facturación (Excel/CSV del reporte "VENTAS DISTRIBUCION" cols A-R; reemplaza por rango de fechas para poder recargar meses sin duplicar). Lee/escribe tabla `ventas`. Fases futuras: costos, comisiones, proyecciones |
-| `produccion.html` | 🔒 Placeholder | "En desarrollo" — sin funcionalidad real |
+| `produccion.html` | ✅ Activo | Módulo Producción · Sopladoras (ago/2026): tab Ingreso (sube el PDF de requi que emite el sistema local — se parsea con pdf.js, deduce fecha/turno del nombre y del texto, pre-asigna máquina por `inventario.maquina_default` y la recuerda al guardar · también ingreso manual fila por fila con autocomplete de SKU) · tab Reporte Semanal (pivote máquina×SKU con 12 columnas Lun-Sáb día/noche, eficiencia = total ÷ (meta_12hrs × turnos), precio ponderado automático desde `ventas` y venta potencial vs facturado real). Replica la hoja de cálculo `Plantilla_Produccion` de Álvaro |
 
 ### Módulos bloqueados (nav-locked vía CSS)
 - Bodega: `<a class="nav-locked">` — bloqueado en toda la navegación global
@@ -146,7 +146,8 @@ Apoyo externo: operador_codigo=null + area_origen (tapas/produccion/bodega/otra)
 | `solicitud_operadores` | Asignación de operadores |
 | `solicitud_historial` | Historial de cambios de estado |
 | `personal` | Operarios/supervisores (codigo UNIQUE, proceso_hab, color_hex, rol: 'operador'\|'supervisor') — fuente única de verdad; registro-tapas.html lee el supervisor activo de aquí, no lo hardcodea |
-| `inventario` | 2358 SKUs activos (sku, descripcion, existencia, facturable, activo) |
+| `inventario` | 2358 SKUs activos (sku, descripcion, existencia, facturable, activo). +3 columnas de producción (sql/produccion_v1.sql): `meta_12hrs` (capacidad por turno de 12h, base de la eficiencia), `maquina_default` (máquina habitual del SKU, la escribe produccion.html al guardar un turno), `precio_ponderado_manual` (respaldo solo para SKUs que se producen pero nunca se facturan, ej. 214774/214776) |
+| `produccion_diaria` | Producción de sopladoras: una fila por (fecha, turno 'dia'\|'noche', maquina, sku) + descripcion, cantidad, origen 'pdf'\|'manual'. Índice único en esas 4 columnas; el guardado borra el turno completo y reinserta, así se puede recargar un turno corregido sin duplicar. maquina=0 significa sin asignar (sql/produccion_v1.sql) |
 | `movimientos_materiales` | Trazabilidad (tipo: 'salida_bodega' \| 'entrada_pt') |
 | `rechazos` | ✅ Existe (la creó movimientos_serigrafia_v1.sql) — RLS pendiente: correr sql/rechazos_rls_fix.sql |
 | `perfiles` | Roles de acceso: master / visor / operativo / operativo_serig |
@@ -186,6 +187,9 @@ animPop y CSS huérfano (.rechazo-*, .rbadge, --serig-m, --gold).
 4. `sql/ventas_financiero_v1.sql` — prepara la tabla `ventas` para ventas.html: columnas
    familia/descripcion_familia/codigo_cliente, fecha texto→DATE, índices, RLS (lectura con
    perfil, escritura solo master). Sin él, el importador de ventas.html falla con aviso claro
+5. `sql/produccion_v1.sql` — crea `produccion_diaria` + agrega meta_12hrs / maquina_default /
+   precio_ponderado_manual a `inventario`, con RLS. Sin él produccion.html avisa en rojo
+   ("falta correr sql/produccion_v1.sql") y no puede guardar turnos
 
 ### SQL ya corridos (referencia, jul/2026)
 - `sql/seguridad_v1.sql` — blindaje: perfiles + rol_actual()/es_master() + anon sin privilegios.
