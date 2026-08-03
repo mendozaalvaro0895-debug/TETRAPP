@@ -736,10 +736,13 @@ function onFileChange(e) {
   var reader = new FileReader();
   reader.onload = function (ev) {
     try {
-      var wb = XLSX.read(ev.target.result, { type: 'array' });
+      var wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
       var rows = parseVentasArchivo(wb);
       if (rows.length === 0) {
-        toast('No se encontraron líneas de venta en el archivo', 'err');
+        var sheet2 = wb.Sheets[wb.SheetNames[0]];
+        var muestra = XLSX.utils.sheet_to_json(sheet2, { header: 1, defval: '', raw: false });
+        var hint = muestra.slice(0, 12).map(function(r){ return r.slice(0,5).join(' | '); }).join('\n');
+        toast('No se encontraron líneas de venta. Primeras filas:\n' + hint, 'err');
         return;
       }
       mostrarPreview(rows, file.name);
@@ -750,9 +753,15 @@ function onFileChange(e) {
   reader.readAsArrayBuffer(file);
 }
 
-// Convierte '5/01/2026' (D/MM/YYYY, formato Guatemala) o ISO → 'YYYY-MM-DD'
-function fechaISO(str) {
-  var s = String(str || '').trim().split(' ')[0];
+// Convierte fecha de Excel (Date object con cellDates:true), '5/01/2026' (D/MM/YYYY) o ISO → 'YYYY-MM-DD'
+function fechaISO(val) {
+  if (val instanceof Date && !isNaN(val)) {
+    var y = val.getFullYear();
+    var mo = ('0' + (val.getMonth() + 1)).slice(-2);
+    var d = ('0' + val.getDate()).slice(-2);
+    return y + '-' + mo + '-' + d;
+  }
+  var s = String(val || '').trim().split(' ')[0];
   var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m) {
     var dd = ('0' + m[1]).slice(-2);
@@ -776,7 +785,7 @@ function parseVentasArchivo(wb) {
     var r = aoa[i];
     var serie = String(r[0] || '').trim();
     if (!serie || serie === 'Serie' || !/^[A-Z]/.test(serie) || /^Total/i.test(serie)) continue;
-    var sku = String(r[10] || '').trim().replace(/\.0$/, '');
+    var sku = String(r[10] || '').trim().replace(/\.0+$/, '');
     if (!/^\d+$/.test(sku)) continue;
     var fecha = fechaISO(r[2]);
     if (!fecha) continue;
