@@ -61,6 +61,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .btn-ghost:hover{border-color:var(--ven);color:var(--ven)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
+/* IVA TOGGLE */
+.iva-toggle{display:flex;align-items:center;gap:0;background:var(--bg2);border:1.5px solid var(--border);border-radius:20px;padding:3px 4px;cursor:pointer;position:relative;user-select:none;height:32px}
+.iva-lbl{font-size:11px;font-weight:700;padding:0 9px;color:var(--gray);transition:color .2s;z-index:1;position:relative;white-space:nowrap}
+.iva-lbl.iva-active{color:var(--gray)}
+.iva-knob{position:absolute;left:3px;top:3px;height:calc(100% - 6px);width:calc(50% - 2px);background:var(--card);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.12);transition:left .22s cubic-bezier(.4,0,.2,1)}
+.iva-toggle.on .iva-knob{left:calc(50% + 1px)}
+.iva-toggle.on .iva-lbl:first-child{color:var(--gray)}
+.iva-toggle.on .iva-lbl.iva-active{color:var(--ven)}
+.iva-toggle:not(.on) .iva-lbl:first-child{color:var(--ink)}
+.iva-toggle:not(.on) .iva-lbl.iva-active{color:var(--gray)}
+
 /* KPI STRIP */
 .kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
 .kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
@@ -223,6 +234,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <button class="tab" id="tab-productos" onclick="switchTab('productos')">📦 Productos</button>
     <button class="tab" id="tab-clientes" onclick="switchTab('clientes')">🤝 Clientes</button>
     <div class="tabs-r">
+      <div class="iva-toggle" id="ivaToggle" onclick="toggleIVA()" title="Los precios del reporte son sin IVA. Haz clic para ver con IVA (×1.12)">
+        <span class="iva-lbl">sin IVA</span>
+        <span class="iva-lbl iva-active">con IVA</span>
+        <span class="iva-knob" id="ivaKnob"></span>
+      </div>
       <button class="btn btn-ven" id="btnImportar" onclick="abrirImport()">📥 Importar facturación</button>
     </div>
   </div>
@@ -394,10 +410,21 @@ var mesSel = 'todo';      // mes en foco ('YYYY-MM' o 'todo')
 var importPendiente = []; // filas parseadas del archivo, listas para insertar
 
 var MESES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+var conIVA = false;
 
 // ── Helpers de formato ──────────────────────────────────────────
+function qVal(n) { return conIVA ? n * 1.12 : n; }
 function fmtQ(n) {
-  return 'Q ' + Math.round(n).toLocaleString('es-GT');
+  return 'Q ' + Math.round(qVal(n)).toLocaleString('es-GT');
+}
+function fmtQAlt(n) {
+  return 'Q ' + Math.round(conIVA ? n : n * 1.12).toLocaleString('es-GT');
+}
+function toggleIVA() {
+  conIVA = !conIVA;
+  var tog = document.getElementById('ivaToggle');
+  if (tog) tog.classList.toggle('on', conIVA);
+  renderTodo();
 }
 function fmtU(n) {
   return Math.round(n).toLocaleString('es-GT');
@@ -531,7 +558,11 @@ function renderResumen() {
   var nFact = Object.keys(fact).length;
 
   document.getElementById('kpiVentas').textContent = fmtQ(q);
-  document.getElementById('kpiVentasSub').textContent = mesLabel(mesSel);
+  document.getElementById('kpiVentasSub').innerHTML =
+    '<span style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--ven);margin-right:6px">' +
+    (conIVA ? 'con IVA 12%' : 'sin IVA') + '</span>' +
+    (conIVA ? fmtQAlt(q) + ' sin IVA' : fmtQAlt(q) + ' con IVA') +
+    ' · ' + mesLabel(mesSel);
   document.getElementById('kpiUnidades').textContent = fmtU(u);
   document.getElementById('kpiFacturas').textContent = nFact.toLocaleString('es-GT');
   document.getElementById('kpiFacturasSub').textContent = Object.keys(clientes).length + ' clientes · ' + (nFact ? fmtQ(q / nFact) : '—') + ' por factura';
