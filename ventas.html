@@ -736,7 +736,8 @@ function onFileChange(e) {
   var reader = new FileReader();
   reader.onload = function (ev) {
     try {
-      var wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
+      var isCsv = file.name.toLowerCase().endsWith('.csv');
+      var wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true, FS: isCsv ? ';' : undefined });
       var rows = parseVentasArchivo(wb);
       if (rows.length === 0) {
         var sheet2 = wb.Sheets[wb.SheetNames[0]];
