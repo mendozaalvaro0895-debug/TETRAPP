@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0C0C0B">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>TETRAPLASTIC — Ventas y Financiero</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="shared/auth.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+:root{
+  --ink:#0C0C0B;--ven:#1D4ED8;--ven-l:#BFDBFE;--ven-xl:#EFF6FF;--ven-dark:#1E3A8A;
+  --bg:#F7F6F2;--bg2:#F0EDEA;--card:#FFFFFF;--border:#E0DED8;
+  --gray:#6B6B6A;--gray-l:#A8A6A0;--red:#B83232;--red-l:#FEE2E2;
+  --green:#065F46;--green-l:#ECFDF5;--amber:#B87200;--amber-l:#FFFBEB;
+  --font:'DM Sans',sans-serif;--display:'Playfair Display',serif;--mono:'DM Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:var(--ink);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;color:#fff;position:sticky;top:0;z-index:100}
+.logo{font-family:var(--display);font-size:18px;font-weight:900;color:#fff}
+.logo span{color:#7ECEC0}
+.logo-wrap{position:relative;cursor:pointer;user-select:none;display:flex;align-items:center}
+.logo-chevron{font-size:10px;color:rgba(255,255,255,.4);margin-left:6px;transition:transform .2s}
+.logo-chevron.open{transform:rotate(180deg);color:#7ECEC0}
+.logo-nav{display:none;position:absolute;top:calc(100% + 8px);left:0;background:#1A1A19;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:6px;min-width:214px;box-shadow:0 8px 28px rgba(0,0,0,.5);z-index:9999}
+.logo-nav.open{display:block}
+.logo-nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,.8);text-decoration:none;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;transition:background .12s}
+.logo-nav a:hover{background:rgba(255,255,255,.09);color:#fff}
+.logo-nav a.nav-active{background:var(--ven);color:#fff}
+.logo-nav-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
+.user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:5px 12px;border-radius:20px;font-size:12px}
+.user-av{width:24px;height:24px;border-radius:50%;background:var(--ven);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+
+/* LAYOUT */
+.page{max-width:1100px;margin:0 auto;padding:24px}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px}
+.page-title{font-family:var(--display);font-size:26px;font-weight:700}
+.page-sub{font-size:13px;color:var(--gray);margin-top:2px}
+
+/* TABS */
+.tabs{display:flex;gap:2px;border-bottom:1.5px solid var(--border);margin-bottom:18px;align-items:center;flex-wrap:wrap}
+.tab{padding:10px 18px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--gray);background:none;border:none;cursor:pointer;transition:color .15s}
+.tab:hover{color:var(--ven)}
+.tab.active{color:var(--ven)}
+.tab.active::after{background:var(--ven)}
+.tabs-r{margin-left:auto;display:flex;gap:8px;align-items:center;padding-bottom:6px}
+
+/* BOTONES */
+.btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;border:none;transition:all .15s}
+.btn-ven{background:var(--ven);color:#fff}
+.btn-ven:hover{background:var(--ven-dark)}
+.btn-ghost{background:var(--card);color:var(--ink);border:1.5px solid var(--border)}
+.btn-ghost:hover{border-color:var(--ven);color:var(--ven)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* KPI STRIP */
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi-l{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray)}
+.kpi-v{font-family:var(--mono);font-size:22px;font-weight:700;margin-top:4px;line-height:1.2}
+.kpi-s{font-size:11px;color:var(--gray-l);margin-top:2px}
+.delta-up{color:#059669;font-weight:700}
+.delta-down{color:var(--red);font-weight:700}
+
+/* SELECTOR DE MES */
+.mes-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.mes-lbl{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray)}
+.mes-sel{padding:7px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;font-family:var(--font);background:var(--card);outline:none;cursor:pointer}
+.mes-sel:focus{border-color:var(--ven)}
+.search-wrap{position:relative;flex:1;min-width:220px}
+.search-wrap input{width:100%;padding:8px 12px 8px 34px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--card);outline:none;transition:border-color .15s}
+.search-wrap input:focus{border-color:var(--ven)}
+.search-wrap::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none}
+
+/* GRÁFICO MENSUAL (barras CSS) */
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:18px}
+.chart-title{font-size:13px;font-weight:700;margin-bottom:14px}
+.chart-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.chart{display:flex;align-items:flex-end;gap:10px;height:190px;min-width:480px;padding-top:24px}
+.cbar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer;min-width:44px}
+.cbar-val{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--gray);margin-bottom:4px;white-space:nowrap}
+.cbar{width:100%;max-width:52px;background:var(--bg2);border:1px solid var(--border);border-bottom:none;border-radius:6px 6px 0 0;transition:height .5s cubic-bezier(0.4,0,0.2,1),background .15s;min-height:3px}
+.cbar-wrap:hover .cbar{background:var(--ven-l)}
+.cbar-wrap.sel .cbar{background:var(--ven);border-color:var(--ven)}
+.cbar-wrap.sel .cbar-val{color:var(--ven);font-weight:700}
+.cbar-mes{font-size:10px;font-weight:700;color:var(--gray);margin-top:6px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.cbar-wrap.sel .cbar-mes{color:var(--ven)}
+
+/* GRID 2 COLUMNAS */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+
+/* TABLE */
+.tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:18px}
+.tbl-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px}
+.tbl-head-t{font-size:13px;font-weight:700}
+.tbl-head-s{font-size:11px;color:var(--gray-l)}
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);padding:9px 14px;border-bottom:1px solid var(--border);background:var(--bg);text-align:left;white-space:nowrap}
+.tbl th.num{text-align:right}
+.tbl td{padding:9px 14px;font-size:12px;border-bottom:1px solid var(--bg);vertical-align:middle}
+.tbl td.num{text-align:right;font-family:var(--mono);font-weight:600;white-space:nowrap}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover td{background:var(--ven-xl)}
+.sku-cell{font-family:var(--mono);font-weight:700;color:var(--ven);font-size:11px;white-space:nowrap}
+.desc-cell{max-width:340px}
+.fam-pill{display:inline-block;background:var(--bg2);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;color:var(--gray);white-space:nowrap}
+.pct-cell{font-family:var(--mono);font-size:11px;color:var(--gray)}
+.empty-row td{text-align:center;padding:36px;color:var(--gray);font-size:13px}
+
+/* BARRA % dentro de tabla */
+.mini-bar{height:5px;background:var(--bg2);border-radius:99px;overflow:hidden;margin-top:4px;min-width:70px}
+.mini-bar i{display:block;height:100%;background:var(--ven);border-radius:99px}
+
+/* EMPTY STATE */
+.empty-mod{background:var(--card);border:1.5px dashed var(--border);border-radius:14px;padding:56px 24px;text-align:center;margin-bottom:18px}
+.empty-ico{font-size:52px;margin-bottom:12px}
+.empty-t{font-family:var(--display);font-size:20px;font-weight:700;margin-bottom:6px}
+.empty-s{font-size:13px;color:var(--gray);max-width:420px;margin:0 auto 18px;line-height:1.6}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--card);border-radius:16px;width:600px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2);display:flex;flex-direction:column;max-height:90vh}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid var(--border)}
+.mh-title{font-family:var(--display);font-size:18px;font-weight:700}
+.m-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray)}
+.mb{padding:20px;overflow-y:auto;flex:1}
+.mf{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--border)}
+
+/* IMPORT PREVIEW */
+.imp-summary{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.imp-stat{flex:1;min-width:96px;background:var(--bg);border-radius:10px;padding:12px 14px;text-align:center}
+.imp-stat strong{display:block;font-family:var(--mono);font-size:20px;font-weight:700;color:var(--ven)}
+.imp-stat span{font-size:11px;color:var(--gray)}
+.imp-table-wrap{max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:12px}
+.imp-table{width:100%;border-collapse:collapse;font-size:11px}
+.imp-table th{background:var(--bg);padding:6px 10px;text-align:left;font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--gray);position:sticky;top:0;border-bottom:1px solid var(--border)}
+.imp-table td{padding:6px 10px;border-bottom:1px solid var(--bg)}
+.imp-table tr:last-child td{border-bottom:none}
+.imp-aviso{font-size:11px;background:var(--amber-l);border:1px solid #FDE68A;color:#92400E;border-radius:7px;padding:7px 12px;margin-bottom:12px;line-height:1.5}
+.imp-err{font-size:12px;background:var(--red-l);border:1.5px solid var(--red);color:var(--red);border-radius:8px;padding:10px 14px;margin-top:10px;line-height:1.5;display:none}
+.progress-bar-wrap{background:var(--bg);border-radius:6px;height:8px;overflow:hidden;margin:8px 0}
+.progress-bar{height:8px;background:var(--ven);border-radius:6px;transition:width .3s;width:0%}
+.drop-zone{border:2px dashed var(--border);border-radius:12px;padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop-zone:hover{border-color:var(--ven);background:var(--ven-xl)}
+.drop-ico{font-size:36px;margin-bottom:8px}
+.drop-t{font-size:14px;font-weight:700;margin-bottom:4px}
+.drop-s{font-size:12px;color:var(--gray)}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{background:var(--green)}
+.toast.err{background:var(--red)}
+
+/* RESPONSIVE */
+@media(max-width:1024px){
+  .kpi-strip{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:768px){
+  .topbar{padding:8px 12px;height:auto;min-height:52px;flex-wrap:wrap;gap:8px}
+  .page{padding:14px}
+  .grid-2{grid-template-columns:1fr}
+  .tbl{min-width:560px}
+  .desc-cell{max-width:200px}
+  .tabs-r{margin-left:0;width:100%;padding-top:4px}
+  .btn{min-height:38px}
+}
+@media(max-width:480px){
+  .page-title{font-size:20px}
+  .kpi-strip{grid-template-columns:1fr 1fr}
+  .kpi-v{font-size:18px}
+  .user-pill span{display:none}
+  .search-wrap{min-width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo-wrap" onclick="toggleLogoNav(event)">
+    <div class="logo">TETRA<span>PLASTIC</span><span class="logo-chevron" id="logoChev">▾</span></div>
+    <div class="logo-nav" id="logoNav">
+      <a href="index.html">🏠 Inicio</a>
+      <div class="logo-nav-sep"></div>
+      <a href="tapas.html">🏷 Tapas</a>
+      <a href="serigrafia.html">🎨 Serigrafía</a>
+      <a href="dashboard.html">📊 Dashboard</a>
+      <div class="logo-nav-sep"></div>
+      <a href="inventario.html">📦 Inventario</a>
+      <div class="logo-nav-sep"></div>
+      <a href="produccion.html">🏭 Producción</a>
+      <a href="ventas.html" class="nav-active">💼 Ventas</a>
+      <a class="nav-locked">📦 Bodega</a>
+    </div>
+  </div>
+  <div class="user-pill"><div class="user-av">AM</div>Alvaro Mendoza</div>
+</div>
+
+<!-- PAGE -->
+<div class="page">
+
+  <div class="page-header">
+    <div>
+      <div class="page-title">💼 Ventas y Financiero</div>
+      <div class="page-sub">Facturación, análisis de productos y clientes · fuente: detalle de ventas importado</div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" id="tab-resumen" onclick="switchTab('resumen')">📊 Resumen</button>
+    <button class="tab" id="tab-productos" onclick="switchTab('productos')">📦 Productos</button>
+    <button class="tab" id="tab-clientes" onclick="switchTab('clientes')">🤝 Clientes</button>
+    <div class="tabs-r">
+      <button class="btn btn-ven" id="btnImportar" onclick="abrirImport()">📥 Importar facturación</button>
+    </div>
+  </div>
+
+  <!-- ══ VIEW RESUMEN ══════════════════════════════════════════ -->
+  <div id="view-resumen">
+
+    <div class="empty-mod" id="emptyState" style="display:none">
+      <div class="empty-ico">💼</div>
+      <div class="empty-t">Aún no hay facturación cargada</div>
+      <div class="empty-s">Importa el detalle de ventas (Excel o CSV del sistema de facturación) para empezar a analizar productos, clientes y meses. Los datos se guardan en Supabase y quedan disponibles para todos los módulos.</div>
+      <button class="btn btn-ven" onclick="abrirImport()">📥 Importar primer archivo</button>
+    </div>
+
+    <div id="resumenContent" style="display:none">
+
+      <div class="mes-bar">
+        <span class="mes-lbl">Mes en foco</span>
+        <select class="mes-sel" id="mesSelResumen" onchange="setMes(this.value)"></select>
+      </div>
+
+      <div class="kpi-strip">
+        <div class="kpi">
+          <div class="kpi-l">Ventas del mes</div>
+          <div class="kpi-v" id="kpiVentas">—</div>
+          <div class="kpi-s" id="kpiVentasSub">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l">vs mes anterior</div>
+          <div class="kpi-v" id="kpiDelta">—</div>
+          <div class="kpi-s" id="kpiDeltaSub">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l">Unidades</div>
+          <div class="kpi-v" id="kpiUnidades">—</div>
+          <div class="kpi-s" id="kpiUnidadesSub">facturadas en el mes</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l">Facturas</div>
+          <div class="kpi-v" id="kpiFacturas">—</div>
+          <div class="kpi-s" id="kpiFacturasSub">—</div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Ventas por mes (Q) — clic en una barra para enfocar ese mes</div>
+        <div class="chart-scroll"><div class="chart" id="chartMeses"></div></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="tbl-wrap" style="margin-bottom:0">
+          <div class="tbl-head">
+            <div><div class="tbl-head-t">Por familia</div><div class="tbl-head-s" id="famSub">—</div></div>
+          </div>
+          <div class="tbl-scroll">
+            <table class="tbl" style="min-width:0">
+              <thead><tr><th>Familia</th><th class="num">Quetzales</th><th class="num">% mes</th><th class="num">Unidades</th></tr></thead>
+              <tbody id="famBody"><tr class="empty-row"><td colspan="4">Cargando…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tbl-wrap" style="margin-bottom:0">
+          <div class="tbl-head">
+            <div><div class="tbl-head-t">Top clientes del mes</div><div class="tbl-head-s" id="cliTopSub">—</div></div>
+          </div>
+          <div class="tbl-scroll">
+            <table class="tbl" style="min-width:0">
+              <thead><tr><th>Cliente</th><th class="num">Quetzales</th><th class="num">% mes</th></tr></thead>
+              <tbody id="cliTopBody"><tr class="empty-row"><td colspan="3">Cargando…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ VIEW PRODUCTOS ════════════════════════════════════════ -->
+  <div id="view-productos" style="display:none">
+    <div class="mes-bar">
+      <span class="mes-lbl">Periodo</span>
+      <select class="mes-sel" id="mesSelProductos" onchange="setMes(this.value)"></select>
+      <div class="search-wrap"><input id="prodBuscar" type="text" placeholder="Buscar por SKU o descripción…" oninput="renderProductos()"></div>
+    </div>
+    <div class="tbl-wrap">
+      <div class="tbl-head">
+        <div><div class="tbl-head-t">Productos más vendidos</div><div class="tbl-head-s" id="prodSub">—</div></div>
+      </div>
+      <div class="tbl-scroll">
+        <table class="tbl">
+          <thead><tr>
+            <th>#</th><th>SKU</th><th>Descripción</th><th>Familia</th>
+            <th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th><th class="num">Δ vs mes ant.</th>
+          </tr></thead>
+          <tbody id="prodBody"><tr class="empty-row"><td colspan="8">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ VIEW CLIENTES ═════════════════════════════════════════ -->
+  <div id="view-clientes" style="display:none">
+    <div class="mes-bar">
+      <span class="mes-lbl">Periodo</span>
+      <select class="mes-sel" id="mesSelClientes" onchange="setMes(this.value)"></select>
+    </div>
+    <div class="kpi-strip" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi">
+        <div class="kpi-l">Clientes activos</div>
+        <div class="kpi-v" id="kpiCliN">—</div>
+        <div class="kpi-s">con compras en el periodo</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-l">Concentración top 3</div>
+        <div class="kpi-v" id="kpiCliConc">—</div>
+        <div class="kpi-s">% de la venta en 3 clientes</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-l">Cliente #1</div>
+        <div class="kpi-v" id="kpiCli1" style="font-size:15px;font-family:var(--font)">—</div>
+        <div class="kpi-s" id="kpiCli1Sub">—</div>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <div class="tbl-head">
+        <div><div class="tbl-head-t">Ventas por cliente</div><div class="tbl-head-s" id="cliSub">—</div></div>
+      </div>
+      <div class="tbl-scroll">
+        <table class="tbl">
+          <thead><tr>
+            <th>#</th><th>Cliente</th>
+            <th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th><th class="num">Facturas</th><th class="num">Δ vs mes ant.</th>
+          </tr></thead>
+          <tbody id="cliBody"><tr class="empty-row"><td colspan="7">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL IMPORTAR -->
+<div class="overlay" id="modalImport" onclick="cerrarSiOverlay(event)">
+  <div class="modal">
+    <div class="mh">
+      <div class="mh-title">📥 Importar facturación</div>
+      <button class="m-close" onclick="cerrarImport()">✕</button>
+    </div>
+    <div class="mb" id="importBody"></div>
+    <div class="mf" id="importFooter">
+      <button class="btn btn-ghost" onclick="cerrarImport()">Cancelar</button>
+      <button class="btn btn-ven" id="btnConfirmImport" onclick="confirmarImport()" style="display:none">Importar</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="onFileChange(event)">
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// VENTAS Y FINANCIERO — SUPA_URL, SUPA_KEY, db y escHtml vienen de shared/auth.js
+// ════════════════════════════════════════════════════════════════
+
+var VENTAS = [];          // todas las filas de la tabla ventas
+var MESES = [];           // claves 'YYYY-MM' con datos, ordenadas asc
+var mesSel = 'todo';      // mes en foco ('YYYY-MM' o 'todo')
+var importPendiente = []; // filas parseadas del archivo, listas para insertar
+
+var MESES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+// ── Helpers de formato ──────────────────────────────────────────
+function fmtQ(n) {
+  return 'Q ' + Math.round(n).toLocaleString('es-GT');
+}
+function fmtU(n) {
+  return Math.round(n).toLocaleString('es-GT');
+}
+function fmtPct(n) {
+  return (Math.round(n * 10) / 10).toFixed(1) + '%';
+}
+function mesLabel(key) {
+  if (key === 'todo') return 'Todo el periodo';
+  var p = key.split('-');
+  return MESES_ES[parseInt(p[1], 10) - 1] + ' ' + p[0];
+}
+function mesAnterior(key) {
+  var i = MESES.indexOf(key);
+  return i > 0 ? MESES[i - 1] : null;
+}
+function deltaHtml(actual, anterior) {
+  if (anterior === null || anterior === undefined) return '<span class="pct-cell">—</span>';
+  if (anterior === 0) return actual > 0 ? '<span class="delta-up">nuevo</span>' : '<span class="pct-cell">—</span>';
+  var pct = (actual - anterior) / anterior * 100;
+  var cls = pct >= 0 ? 'delta-up' : 'delta-down';
+  var signo = pct >= 0 ? '+' : '';
+  return '<span class="' + cls + '">' + signo + fmtPct(pct) + '</span>';
+}
+
+// ── Carga de datos (paginada, lotes de 1000) ────────────────────
+async function cargarVentas() {
+  VENTAS = [];
+  var desde = 0, LOTE = 1000;
+  while (true) {
+    var r = await db.from('ventas')
+      .select('fecha,serie,docu,cliente,familia,descripcion_familia,sku,descripcion,total_quetzales,total_unidades,costo')
+      .order('fecha', { ascending: true })
+      .order('id', { ascending: true })
+      .range(desde, desde + LOTE - 1);
+    if (r.error) throw r.error;
+    var lote = r.data || [];
+    for (var i = 0; i < lote.length; i++) {
+      var v = lote[i];
+      v.mes = String(v.fecha || '').slice(0, 7);
+      v.total_quetzales = parseFloat(v.total_quetzales) || 0;
+      v.total_unidades = parseFloat(v.total_unidades) || 0;
+      VENTAS.push(v);
+    }
+    if (lote.length < LOTE) break;
+    desde += LOTE;
+  }
+  var mset = {};
+  VENTAS.forEach(function (v) { if (v.mes && v.mes.length === 7) mset[v.mes] = 1; });
+  MESES = Object.keys(mset).sort();
+}
+
+// ── Filtro por periodo seleccionado ─────────────────────────────
+function filasDelPeriodo(key) {
+  if (key === 'todo') return VENTAS;
+  return VENTAS.filter(function (v) { return v.mes === key; });
+}
+
+// ── Agregadores genéricos ───────────────────────────────────────
+function agrupar(filas, keyFn) {
+  var map = {};
+  filas.forEach(function (v) {
+    var k = keyFn(v);
+    if (!map[k]) map[k] = { q: 0, u: 0, facturas: {}, muestra: v };
+    map[k].q += v.total_quetzales;
+    map[k].u += v.total_unidades;
+    map[k].facturas[v.serie + '-' + v.docu] = 1;
+  });
+  return map;
+}
+function totalQ(filas) {
+  var t = 0;
+  filas.forEach(function (v) { t += v.total_quetzales; });
+  return t;
+}
+
+// ── Tabs ────────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['resumen', 'productos', 'clientes'].forEach(function (t) {
+    document.getElementById('view-' + t).style.display = t === tab ? 'block' : 'none';
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
+  renderTodo();
+}
+
+// ── Selector de mes (compartido entre vistas) ───────────────────
+function setMes(key) {
+  mesSel = key;
+  ['mesSelResumen', 'mesSelProductos', 'mesSelClientes'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el && el.value !== key) el.value = key;
+  });
+  renderTodo();
+}
+
+function poblarSelectores() {
+  var opts = '';
+  for (var i = MESES.length - 1; i >= 0; i--) {
+    opts += '<option value="' + MESES[i] + '">' + mesLabel(MESES[i]) + '</option>';
+  }
+  opts += '<option value="todo">Todo el periodo</option>';
+  ['mesSelResumen', 'mesSelProductos', 'mesSelClientes'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) { el.innerHTML = opts; el.value = mesSel; }
+  });
+}
+
+// ── RENDER: orquestador ─────────────────────────────────────────
+function renderTodo() {
+  var hay = VENTAS.length > 0;
+  document.getElementById('emptyState').style.display = hay ? 'none' : 'block';
+  document.getElementById('resumenContent').style.display = hay ? 'block' : 'none';
+  if (!hay) return;
+  renderResumen();
+  renderProductos();
+  renderClientes();
+}
+
+// ── RENDER: Resumen ─────────────────────────────────────────────
+function renderResumen() {
+  var filas = filasDelPeriodo(mesSel);
+  var q = totalQ(filas);
+  var u = 0;
+  var fact = {};
+  var clientes = {};
+  filas.forEach(function (v) {
+    u += v.total_unidades;
+    fact[v.serie + '-' + v.docu] = 1;
+    clientes[v.cliente] = 1;
+  });
+  var nFact = Object.keys(fact).length;
+
+  document.getElementById('kpiVentas').textContent = fmtQ(q);
+  document.getElementById('kpiVentasSub').textContent = mesLabel(mesSel);
+  document.getElementById('kpiUnidades').textContent = fmtU(u);
+  document.getElementById('kpiFacturas').textContent = nFact.toLocaleString('es-GT');
+  document.getElementById('kpiFacturasSub').textContent = Object.keys(clientes).length + ' clientes · ' + (nFact ? fmtQ(q / nFact) : '—') + ' por factura';
+
+  var ant = mesSel === 'todo' ? null : mesAnterior(mesSel);
+  if (ant) {
+    var qAnt = totalQ(filasDelPeriodo(ant));
+    document.getElementById('kpiDelta').innerHTML = deltaHtml(q, qAnt);
+    document.getElementById('kpiDeltaSub').textContent = mesLabel(ant) + ': ' + fmtQ(qAnt);
+  } else {
+    document.getElementById('kpiDelta').textContent = '—';
+    document.getElementById('kpiDeltaSub').textContent = mesSel === 'todo' ? 'selecciona un mes' : 'primer mes con datos';
+  }
+
+  renderChart();
+  renderFamilias(filas, q);
+  renderTopClientes(filas, q);
+}
+
+function buildMesBar(key, q, maxQ) {
+  var h = maxQ > 0 ? Math.max(2, Math.round(q / maxQ * 100)) : 2;
+  var sel = key === mesSel ? ' sel' : '';
+  var miles = q >= 1000000 ? (q / 1000000).toFixed(2) + 'M' : Math.round(q / 1000) + 'k';
+  return '<div class="cbar-wrap' + sel + '" onclick="setMes(\'' + key + '\')" title="' + mesLabel(key) + ': ' + fmtQ(q) + '">' +
+    '<div class="cbar-val">' + miles + '</div>' +
+    '<div class="cbar" style="height:' + h + '%"></div>' +
+    '<div class="cbar-mes">' + mesLabel(key) + '</div>' +
+    '</div>';
+}
+
+function renderChart() {
+  var porMes = agrupar(VENTAS, function (v) { return v.mes; });
+  var maxQ = 0;
+  MESES.forEach(function (m) { if (porMes[m] && porMes[m].q > maxQ) maxQ = porMes[m].q; });
+  var html = '';
+  MESES.forEach(function (m) {
+    html += buildMesBar(m, porMes[m] ? porMes[m].q : 0, maxQ);
+  });
+  document.getElementById('chartMeses').innerHTML = html;
+}
+
+function buildFamRow(nombre, dat, total) {
+  var pct = total > 0 ? dat.q / total * 100 : 0;
+  return '<tr>' +
+    '<td><span class="fam-pill">' + escHtml(nombre) + '</span>' +
+    '<div class="mini-bar"><i style="width:' + Math.min(100, Math.round(pct)) + '%"></i></div></td>' +
+    '<td class="num">' + fmtQ(dat.q) + '</td>' +
+    '<td class="num pct-cell">' + fmtPct(pct) + '</td>' +
+    '<td class="num">' + fmtU(dat.u) + '</td>' +
+    '</tr>';
+}
+
+function renderFamilias(filas, total) {
+  var porFam = agrupar(filas, function (v) { return v.descripcion_familia || v.familia || 'SIN FAMILIA'; });
+  var noms = Object.keys(porFam).sort(function (a, b) { return porFam[b].q - porFam[a].q; });
+  document.getElementById('famSub').textContent = mesLabel(mesSel) + ' · ' + noms.length + ' familias';
+  var html = '';
+  noms.forEach(function (n) { html += buildFamRow(n, porFam[n], total); });
+  document.getElementById('famBody').innerHTML = html ||
+    '<tr class="empty-row"><td colspan="4">Sin datos en este periodo</td></tr>';
+}
+
+function buildTopCliRow(nombre, dat, total) {
+  var pct = total > 0 ? dat.q / total * 100 : 0;
+  return '<tr>' +
+    '<td class="desc-cell" title="' + escHtml(nombre) + '">' + escHtml(nombre.length > 34 ? nombre.slice(0, 34) + '…' : nombre) + '</td>' +
+    '<td class="num">' + fmtQ(dat.q) + '</td>' +
+    '<td class="num pct-cell">' + fmtPct(pct) + '</td>' +
+    '</tr>';
+}
+
+function renderTopClientes(filas, total) {
+  var porCli = agrupar(filas, function (v) { return v.cliente || '—'; });
+  var noms = Object.keys(porCli).sort(function (a, b) { return porCli[b].q - porCli[a].q; }).slice(0, 8);
+  document.getElementById('cliTopSub').textContent = mesLabel(mesSel);
+  var html = '';
+  noms.forEach(function (n) { html += buildTopCliRow(n, porCli[n], total); });
+  document.getElementById('cliTopBody').innerHTML = html ||
+    '<tr class="empty-row"><td colspan="3">Sin datos en este periodo</td></tr>';
+}
+
+// ── RENDER: Productos ───────────────────────────────────────────
+function buildProdRow(idx, sku, dat, total, qAntMap) {
+  var m = dat.muestra;
+  var pct = total > 0 ? dat.q / total * 100 : 0;
+  var delta = qAntMap === null ? null : (qAntMap[sku] ? qAntMap[sku].q : 0);
+  return '<tr>' +
+    '<td class="pct-cell">' + idx + '</td>' +
+    '<td class="sku-cell">' + escHtml(sku) + '</td>' +
+    '<td class="desc-cell" title="' + escHtml(m.descripcion || '') + '">' + escHtml(m.descripcion || '—') + '</td>' +
+    '<td><span class="fam-pill">' + escHtml(m.descripcion_familia || '—') + '</span></td>' +
+    '<td class="num">' + fmtQ(dat.q) + '</td>' +
+    '<td class="num pct-cell">' + fmtPct(pct) + '</td>' +
+    '<td class="num">' + fmtU(dat.u) + '</td>' +
+    '<td class="num">' + (qAntMap === null ? '<span class="pct-cell">—</span>' : deltaHtml(dat.q, delta)) + '</td>' +
+    '</tr>';
+}
+
+function renderProductos() {
+  var filas = filasDelPeriodo(mesSel);
+  var total = totalQ(filas);
+  var buscar = (document.getElementById('prodBuscar').value || '').toLowerCase().trim();
+  var porProd = agrupar(filas, function (v) { return v.sku; });
+
+  var ant = mesSel === 'todo' ? null : mesAnterior(mesSel);
+  var qAntMap = ant ? agrupar(filasDelPeriodo(ant), function (v) { return v.sku; }) : null;
+
+  var skus = Object.keys(porProd).sort(function (a, b) { return porProd[b].q - porProd[a].q; });
+  if (buscar) {
+    skus = skus.filter(function (s) {
+      var m = porProd[s].muestra;
+      return s.toLowerCase().indexOf(buscar) !== -1 ||
+        String(m.descripcion || '').toLowerCase().indexOf(buscar) !== -1;
+    });
+  }
+  var mostrar = buscar ? skus : skus.slice(0, 100);
+  document.getElementById('prodSub').textContent = mesLabel(mesSel) + ' · ' + skus.length + ' SKUs' +
+    (!buscar && skus.length > 100 ? ' · mostrando top 100' : '');
+
+  var html = '';
+  mostrar.forEach(function (s, i) { html += buildProdRow(i + 1, s, porProd[s], total, qAntMap); });
+  document.getElementById('prodBody').innerHTML = html ||
+    '<tr class="empty-row"><td colspan="8">Sin productos en este periodo</td></tr>';
+}
+
+// ── RENDER: Clientes ────────────────────────────────────────────
+function buildCliRow(idx, nombre, dat, total, qAntMap) {
+  var pct = total > 0 ? dat.q / total * 100 : 0;
+  var delta = qAntMap === null ? null : (qAntMap[nombre] ? qAntMap[nombre].q : 0);
+  return '<tr>' +
+    '<td class="pct-cell">' + idx + '</td>' +
+    '<td class="desc-cell" title="' + escHtml(nombre) + '">' + escHtml(nombre) +
+    '<div class="mini-bar"><i style="width:' + Math.min(100, Math.round(pct)) + '%"></i></div></td>' +
+    '<td class="num">' + fmtQ(dat.q) + '</td>' +
+    '<td class="num pct-cell">' + fmtPct(pct) + '</td>' +
+    '<td class="num">' + fmtU(dat.u) + '</td>' +
+    '<td class="num">' + Object.keys(dat.facturas).length + '</td>' +
+    '<td class="num">' + (qAntMap === null ? '<span class="pct-cell">—</span>' : deltaHtml(dat.q, delta)) + '</td>' +
+    '</tr>';
+}
+
+function renderClientes() {
+  var filas = filasDelPeriodo(mesSel);
+  var total = totalQ(filas);
+  var porCli = agrupar(filas, function (v) { return v.cliente || '—'; });
+  var noms = Object.keys(porCli).sort(function (a, b) { return porCli[b].q - porCli[a].q; });
+
+  var ant = mesSel === 'todo' ? null : mesAnterior(mesSel);
+  var qAntMap = ant ? agrupar(filasDelPeriodo(ant), function (v) { return v.cliente || '—'; }) : null;
+
+  document.getElementById('kpiCliN').textContent = noms.length;
+  var top3 = 0;
+  noms.slice(0, 3).forEach(function (n) { top3 += porCli[n].q; });
+  document.getElementById('kpiCliConc').textContent = total > 0 ? fmtPct(top3 / total * 100) : '—';
+  if (noms.length) {
+    var n1 = noms[0];
+    document.getElementById('kpiCli1').textContent = n1.length > 28 ? n1.slice(0, 28) + '…' : n1;
+    document.getElementById('kpiCli1Sub').textContent = fmtQ(porCli[n1].q) + ' · ' + fmtPct(porCli[n1].q / total * 100) + ' del periodo';
+  } else {
+    document.getElementById('kpiCli1').textContent = '—';
+    document.getElementById('kpiCli1Sub').textContent = '—';
+  }
+  document.getElementById('cliSub').textContent = mesLabel(mesSel) + ' · ' + noms.length + ' clientes';
+
+  var html = '';
+  noms.forEach(function (n, i) { html += buildCliRow(i + 1, n, porCli[n], total, qAntMap); });
+  document.getElementById('cliBody').innerHTML = html ||
+    '<tr class="empty-row"><td colspan="7">Sin clientes en este periodo</td></tr>';
+}
+
+// ════════════════════════════════════════════════════════════════
+// IMPORTADOR — Excel/CSV del detalle de ventas (mismo layout que
+// el reporte "VENTAS DISTRIBUCION": columnas A-R, fila Serie/Docu/…)
+// ════════════════════════════════════════════════════════════════
+
+function abrirImport() {
+  importPendiente = [];
+  document.getElementById('btnConfirmImport').style.display = 'none';
+  document.getElementById('importBody').innerHTML =
+    '<div class="drop-zone" onclick="document.getElementById(\'fileInput\').click()">' +
+    '<div class="drop-ico">📄</div>' +
+    '<div class="drop-t">Selecciona el archivo de detalle de ventas</div>' +
+    '<div class="drop-s">Excel (.xlsx) o CSV del sistema de facturación · columnas Serie, Docu, Fecha, Cliente, Familia, Producto…</div>' +
+    '</div>' +
+    '<div class="imp-aviso" style="margin-top:12px">Puede ser el archivo de un día, un mes o varios meses. Las fechas que ya existan en la base se <b>reemplazan</b> con lo que traiga el archivo (así puedes recargar un mes corregido sin duplicar).</div>';
+  document.getElementById('modalImport').classList.add('open');
+}
+
+function cerrarImport() {
+  document.getElementById('modalImport').classList.remove('open');
+  importPendiente = [];
+  document.getElementById('fileInput').value = '';
+}
+
+function cerrarSiOverlay(e) {
+  if (e.target === document.getElementById('modalImport')) cerrarImport();
+}
+
+function onFileChange(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function (ev) {
+    try {
+      var wb = XLSX.read(ev.target.result, { type: 'array' });
+      var rows = parseVentasArchivo(wb);
+      if (rows.length === 0) {
+        toast('No se encontraron líneas de venta en el archivo', 'err');
+        return;
+      }
+      mostrarPreview(rows, file.name);
+    } catch (err) {
+      toast('Error al leer el archivo: ' + err.message, 'err');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Convierte '5/01/2026' (D/MM/YYYY, formato Guatemala) o ISO → 'YYYY-MM-DD'
+function fechaISO(str) {
+  var s = String(str || '').trim().split(' ')[0];
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    var dd = ('0' + m[1]).slice(-2);
+    var mm = ('0' + m[2]).slice(-2);
+    return m[3] + '-' + mm + '-' + dd;
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  return null;
+}
+
+function numVal(x) {
+  var n = parseFloat(String(x).replace(/,/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+function parseVentasArchivo(wb) {
+  var sheet = wb.Sheets[wb.SheetNames[0]];
+  var aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+  var rows = [];
+  for (var i = 0; i < aoa.length; i++) {
+    var r = aoa[i];
+    var serie = String(r[0] || '').trim();
+    if (!serie || serie === 'Serie' || !/^[A-Z]/.test(serie) || /^Total/i.test(serie)) continue;
+    var sku = String(r[10] || '').trim().replace(/\.0$/, '');
+    if (!/^\d+$/.test(sku)) continue;
+    var fecha = fechaISO(r[2]);
+    if (!fecha) continue;
+    rows.push({
+      serie: serie,
+      docu: parseInt(r[1], 10) || 0,
+      fecha: fecha,
+      codigo_cliente: String(r[3] || '').trim(),
+      nit: String(r[4] || '').trim(),
+      cliente: String(r[5] || '').trim(),
+      familia: String(r[8] || '').trim(),
+      descripcion_familia: String(r[9] || '').trim().toUpperCase(),
+      sku: sku,
+      descripcion: String(r[11] || '').trim().toUpperCase(),
+      precio_unidad: numVal(r[13]),
+      total_quetzales: numVal(r[14]),
+      total_unidades: numVal(r[15]),
+      costo: numVal(r[16]),
+      utilidad: numVal(r[17])
+    });
+  }
+  return rows;
+}
+
+function buildPreviewRow(r) {
+  return '<tr>' +
+    '<td style="white-space:nowrap">' + escHtml(r.fecha) + '</td>' +
+    '<td style="font-family:var(--mono);font-weight:700">' + escHtml(r.serie) + '-' + r.docu + '</td>' +
+    '<td class="sku-cell">' + escHtml(r.sku) + '</td>' +
+    '<td>' + escHtml((r.descripcion || '').slice(0, 30)) + '</td>' +
+    '<td>' + escHtml((r.cliente || '').slice(0, 20)) + '</td>' +
+    '<td style="text-align:right;font-family:var(--mono)">' + fmtU(r.total_unidades) + '</td>' +
+    '<td style="text-align:right;font-family:var(--mono)">' + fmtQ(r.total_quetzales) + '</td>' +
+    '</tr>';
+}
+
+function mostrarPreview(rows, filename) {
+  importPendiente = rows;
+  var fechas = rows.map(function (r) { return r.fecha; });
+  var fMin = fechas.reduce(function (a, b) { return a < b ? a : b; });
+  var fMax = fechas.reduce(function (a, b) { return a > b ? a : b; });
+  var fact = {}, clientes = {};
+  var tQ = 0, tU = 0;
+  rows.forEach(function (r) {
+    fact[r.serie + '-' + r.docu] = 1;
+    clientes[r.cliente] = 1;
+    tQ += r.total_quetzales;
+    tU += r.total_unidades;
+  });
+  var sample = rows.slice(0, 6);
+  var filasHtml = '';
+  sample.forEach(function (r) { filasHtml += buildPreviewRow(r); });
+
+  document.getElementById('importBody').innerHTML =
+    '<div style="font-size:12px;color:var(--gray);margin-bottom:10px">📄 ' + escHtml(filename) + '</div>' +
+    '<div class="imp-aviso">📅 Rango del archivo: <b>' + fMin + '</b> → <b>' + fMax + '</b>. ' +
+    'Todo lo que ya exista en la base entre esas fechas será <b>reemplazado</b> por el contenido del archivo.</div>' +
+    '<div class="imp-summary">' +
+    '<div class="imp-stat"><strong>' + Object.keys(fact).length.toLocaleString() + '</strong><span>Facturas</span></div>' +
+    '<div class="imp-stat"><strong>' + rows.length.toLocaleString() + '</strong><span>Líneas</span></div>' +
+    '<div class="imp-stat"><strong>' + fmtU(tU) + '</strong><span>Unidades</span></div>' +
+    '<div class="imp-stat"><strong>' + fmtQ(tQ) + '</strong><span>' + Object.keys(clientes).length + ' clientes</span></div>' +
+    '</div>' +
+    '<div class="imp-table-wrap"><table class="imp-table"><thead><tr>' +
+    '<th>Fecha</th><th>Factura</th><th>SKU</th><th>Producto</th><th>Cliente</th>' +
+    '<th style="text-align:right">Unid.</th><th style="text-align:right">Total</th>' +
+    '</tr></thead><tbody>' + filasHtml + '</tbody></table></div>' +
+    (rows.length > 6 ? '<div style="font-size:11px;color:var(--gray-l);text-align:center;margin-bottom:8px">Mostrando 6 de ' + rows.length.toLocaleString() + ' líneas</div>' : '') +
+    '<div class="progress-bar-wrap" id="importProgress" style="display:none"><div class="progress-bar" id="importBar"></div></div>' +
+    '<div id="importStatus" style="font-size:12px;color:var(--gray);text-align:center;min-height:18px"></div>' +
+    '<div class="imp-err" id="importErr"></div>';
+
+  var btn = document.getElementById('btnConfirmImport');
+  btn.style.display = 'inline-block';
+  btn.disabled = false;
+  btn.textContent = 'Importar ' + rows.length.toLocaleString() + ' líneas';
+}
+
+function importError(msg) {
+  var el = document.getElementById('importErr');
+  el.style.display = 'block';
+  el.innerHTML = msg;
+}
+
+async function confirmarImport() {
+  var rows = importPendiente;
+  if (!rows.length) return;
+  var btn = document.getElementById('btnConfirmImport');
+  btn.disabled = true;
+  btn.textContent = 'Procesando…';
+  document.getElementById('importProgress').style.display = 'block';
+  document.getElementById('importErr').style.display = 'none';
+
+  var fechas = rows.map(function (r) { return r.fecha; });
+  var fMin = fechas.reduce(function (a, b) { return a < b ? a : b; });
+  var fMax = fechas.reduce(function (a, b) { return a > b ? a : b; });
+
+  try {
+    document.getElementById('importStatus').textContent = 'Limpiando registros previos del rango…';
+    var rd = await db.from('ventas').delete().gte('fecha', fMin).lte('fecha', fMax);
+    if (rd.error) throw rd.error;
+
+    var BATCH = 200;
+    var hecho = 0, errores = 0, ultimoError = null;
+    for (var i = 0; i < rows.length; i += BATCH) {
+      var lote = rows.slice(i, i + BATCH);
+      var rv = await db.from('ventas').insert(lote);
+      if (rv.error) { errores += lote.length; ultimoError = rv.error; }
+      hecho += lote.length;
+      document.getElementById('importBar').style.width = Math.round(hecho / rows.length * 100) + '%';
+      document.getElementById('importStatus').textContent = 'Insertando ' + hecho.toLocaleString() + ' / ' + rows.length.toLocaleString() + '…';
+    }
+    document.getElementById('importProgress').style.display = 'none';
+    document.getElementById('importStatus').textContent = '';
+
+    if (errores) {
+      btn.disabled = false;
+      btn.textContent = 'Reintentar';
+      var detalle = ultimoError ? escHtml(ultimoError.message || JSON.stringify(ultimoError)) : '';
+      importError('⛔ ' + errores.toLocaleString() + ' líneas fallaron.<br>' + detalle +
+        '<br><br>Si el error menciona columnas o permisos, probablemente falta correr <b>sql/ventas_financiero_v1.sql</b> en el SQL Editor de Supabase.');
+      return;
+    }
+
+    cerrarImport();
+    toast(rows.length.toLocaleString() + ' líneas importadas (' + fMin + ' → ' + fMax + ')', 'ok');
+    await recargar();
+  } catch (err) {
+    document.getElementById('importProgress').style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = 'Reintentar';
+    importError('⛔ ' + escHtml(err.message || String(err)) +
+      '<br><br>Si el error menciona columnas o permisos, probablemente falta correr <b>sql/ventas_financiero_v1.sql</b> en el SQL Editor de Supabase.');
+  }
+}
+
+// ── Toast ───────────────────────────────────────────────────────
+var toastTimer = null;
+function toast(msg, tipo) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (tipo || '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.className = 'toast'; }, 3200);
+}
+
+// ── Logo nav ────────────────────────────────────────────────────
+function toggleLogoNav(e) {
+  e.stopPropagation();
+  var n = document.getElementById('logoNav'), c = document.getElementById('logoChev');
+  var o = n.classList.toggle('open');
+  c.classList.toggle('open', o);
+}
+document.addEventListener('click', function () {
+  var n = document.getElementById('logoNav'), c = document.getElementById('logoChev');
+  if (n) n.classList.remove('open');
+  if (c) c.classList.remove('open');
+});
+
+// ── INIT ────────────────────────────────────────────────────────
+async function recargar() {
+  try {
+    await cargarVentas();
+    mesSel = MESES.length ? MESES[MESES.length - 1] : 'todo';
+    poblarSelectores();
+    renderTodo();
+  } catch (err) {
+    console.error('ventas:', err);
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('resumenContent').style.display = 'none';
+    if (err && /permission|not found|schema/i.test(String(err.message || ''))) {
+      toast('Tabla ventas sin configurar — correr sql/ventas_financiero_v1.sql', 'err');
+    } else {
+      toast('Error al cargar ventas', 'err');
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', recargar);
+</script>
+
+</body>
+</html>

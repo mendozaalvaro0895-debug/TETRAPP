@@ -36,10 +36,12 @@ Los `.js` en shared/ eran huérfanos y se borraron (jul/2026).
 | `registro-tapas.html` | ✅ Activo | Formulario móvil para rol `operativo` (tapas@tetrapp.app): el operario elige su nombre y registra su comanda ya concluida (sin campo Estado, sin devolución de material); correlativo CMD-### lo asigna trigger DB; supervisor se lee en vivo de `personal` (rol='supervisor', area='tapas', activo=true) — nunca hardcodeado |
 | `dashboard.html` | ✅ Activo | KPIs ejecutivos globales |
 | `inventario.html` | ✅ Activo | Gestión de SKUs, existencias, importación Excel |
+| `ventas.html` | ✅ Activo | Módulo Ventas y Financiero (ago/2026): tabs Resumen (KPIs del mes en foco + gráfico mensual de barras CSS + familias + top clientes) · Productos (top por periodo, Δ vs mes anterior, búsqueda) · Clientes (concentración top 3, Δ) · botón Importar facturación (Excel/CSV del reporte "VENTAS DISTRIBUCION" cols A-R; reemplaza por rango de fechas para poder recargar meses sin duplicar). Lee/escribe tabla `ventas`. Fases futuras: costos, comisiones, proyecciones |
 | `produccion.html` | 🔒 Placeholder | "En desarrollo" — sin funcionalidad real |
 
 ### Módulos bloqueados (nav-locked vía CSS)
-- Ventas y Bodega: `<a class="nav-locked">` — bloqueados en toda la navegación global
+- Bodega: `<a class="nav-locked">` — bloqueado en toda la navegación global
+- Ventas se desbloqueó en ago/2026 (ventas.html) — el link vive en las 8 páginas con logo-nav
 
 ---
 
@@ -156,6 +158,7 @@ Apoyo externo: operador_codigo=null + area_origen (tapas/produccion/bodega/otra)
 | `entregas_serig` | Entregas/requis de serigrafía (migradas desde localStorage) |
 | `asistencia_diaria` | Asistencia por fecha/área/turno (presente/ausente/tarde/velada) — la usan serigrafia.html Personal y sus PDFs |
 | `comandas` + `comanda_tareas` | Producción diaria |
+| `ventas` | Detalle de facturación, una fila por línea de factura (serie, docu, fecha DATE, codigo_cliente, nit, cliente, familia, descripcion_familia, sku, descripcion, precio_unidad, total_quetzales, total_unidades, costo, utilidad). La escriben ventas.html (importador principal, reemplaza por rango de fechas) y el importador diario "Ventas · Facturación" de inventario.html (más viejo, no manda familia/codigo_cliente). ⚠️ Existía antes del módulo, creada manual — sql/ventas_financiero_v1.sql la normaliza (fecha→DATE, columnas nuevas, RLS master-only escritura) |
 | `clientes`, `cat_procesos`, `asistencia`, `configuracion` | Catálogos / preferencias UI |
 | `v_solicitudes`, `v_capacidad_hoy` | Vistas |
 
@@ -180,6 +183,9 @@ animPop y CSS huérfano (.rechazo-*, .rbadge, --serig-m, --gold).
    en Auth → Users) + políticas INSERT en comandas/comanda_tareas + trigger correlativo CMD-###
 3. `sql/registro_procesos_serig_v1.sql` — crea registro_flameado_serig + registro_empaque_serig
    con RLS (pendiente de confirmar; sin él los flujos Flameado/Empaque fallan con recuadro rojo)
+4. `sql/ventas_financiero_v1.sql` — prepara la tabla `ventas` para ventas.html: columnas
+   familia/descripcion_familia/codigo_cliente, fecha texto→DATE, índices, RLS (lectura con
+   perfil, escritura solo master). Sin él, el importador de ventas.html falla con aviso claro
 
 ### SQL ya corridos (referencia, jul/2026)
 - `sql/seguridad_v1.sql` — blindaje: perfiles + rol_actual()/es_master() + anon sin privilegios.

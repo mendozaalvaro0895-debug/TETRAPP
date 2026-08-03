@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS insumos_b7 (
 -- ── PASO 3: RLS ──────────────────────────────────────────────────
 ALTER TABLE insumos_b7 ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "b7_select" ON insumos_b7;
+DROP POLICY IF EXISTS "b7_insert" ON insumos_b7;
+DROP POLICY IF EXISTS "b7_update" ON insumos_b7;
 CREATE POLICY "b7_select" ON insumos_b7 FOR SELECT USING (true);
 CREATE POLICY "b7_insert" ON insumos_b7 FOR INSERT WITH CHECK (true);
 CREATE POLICY "b7_update" ON insumos_b7 FOR UPDATE USING (true);
