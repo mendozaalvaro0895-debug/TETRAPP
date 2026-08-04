@@ -167,6 +167,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .drop-t{font-size:14px;font-weight:700;margin-bottom:4px}
 .drop-s{font-size:12px;color:var(--gray)}
 
+/* ROTACIÓN */
+.rot-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+.rot-pos{background:var(--green-l);color:var(--green)}
+.rot-neg{background:var(--red-l);color:var(--red)}
+
 /* TOAST */
 .toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
 .toast.show{opacity:1;transform:translateY(0)}
@@ -233,6 +238,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <button class="tab active" id="tab-resumen" onclick="switchTab('resumen')">📊 Resumen</button>
     <button class="tab" id="tab-productos" onclick="switchTab('productos')">📦 Productos</button>
     <button class="tab" id="tab-clientes" onclick="switchTab('clientes')">🤝 Clientes</button>
+    <button class="tab" id="tab-rotacion" onclick="switchTab('rotacion')">🔁 Rotación</button>
     <div class="tabs-r">
       <div class="iva-toggle" id="ivaToggle" onclick="toggleIVA()" title="Los precios del reporte son sin IVA. Haz clic para ver con IVA (×1.12)">
         <span class="iva-lbl">sin IVA</span>
@@ -378,6 +384,68 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     </div>
   </div>
 
+  <!-- ══ VIEW ROTACIÓN ═════════════════════════════════════════ -->
+  <div id="view-rotacion" style="display:none">
+
+    <div class="imp-aviso" style="display:block;margin-bottom:16px">
+      ⚠️ <b>Comparación con matices.</b> Algunos códigos que entrega producción cambian antes de facturarse —
+      se transforman en otro producto terminado, o el mismo envase se factura bajo un código distinto según
+      lo pida el cliente (ej. el litro cuello 33 sale de producción como <b>10033</b>, pero también se factura
+      como <b>100332</b> — mismo producto, código diferente). Por eso esta vista compara <b>totales del mes</b>
+      (toda la producción vs toda la facturación), no SKU por SKU: evita descuadres por variantes de código,
+      pero la diferencia tampoco es 100% inventario físico — parte puede ser producto que cambió de código
+      antes de venderse. Identificar esas "recetas"/variantes de SKU queda como paso pendiente para afinar
+      esta comparación.
+    </div>
+
+    <div id="rotVacio" class="empty-mod" style="display:none">
+      <div class="empty-ico">🔁</div>
+      <div class="empty-t">Sin producción cargada todavía</div>
+      <div class="empty-s">Esta vista compara lo producido en Sopladoras contra lo facturado. Carga producción desde el módulo <b>🏭 Producción</b> para verla aquí.</div>
+      <a href="produccion.html" class="btn btn-ven" style="text-decoration:none;display:inline-block">🏭 Ir a Producción</a>
+    </div>
+
+    <div id="rotContent" style="display:none">
+      <div class="kpi-strip">
+        <div class="kpi">
+          <div class="kpi-l">Unidades producidas</div>
+          <div class="kpi-v" id="kpiRotProdU">—</div>
+          <div class="kpi-s">total del periodo cargado</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l">Unidades facturadas</div>
+          <div class="kpi-v" id="kpiRotFactU">—</div>
+          <div class="kpi-s">toda la facturación, esos meses</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l">Venta potencial</div>
+          <div class="kpi-v" id="kpiRotPotQ">—</div>
+          <div class="kpi-s">producción × precio ponderado</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-l">Facturado real</div>
+          <div class="kpi-v" id="kpiRotFactQ">—</div>
+          <div class="kpi-s" id="kpiRotFactQSub">—</div>
+        </div>
+      </div>
+
+      <div class="tbl-wrap">
+        <div class="tbl-head">
+          <div><div class="tbl-head-t">Rotación por mes</div><div class="tbl-head-s">Producido vs facturado, unidades y Q · eficiencia de máquina vive en el módulo Producción</div></div>
+        </div>
+        <div class="tbl-scroll">
+          <table class="tbl">
+            <thead><tr>
+              <th>Mes</th><th class="num">Und. producidas</th><th class="num">Und. facturadas</th><th class="num">Δ unidades</th>
+              <th class="num">Venta potencial</th><th class="num">Facturado real</th><th class="num">Δ financiera</th><th>Rotación</th>
+            </tr></thead>
+            <tbody id="rotBody"><tr class="empty-row"><td colspan="8">Cargando…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- MODAL IMPORTAR -->
@@ -503,11 +571,12 @@ function totalQ(filas) {
 
 // ── Tabs ────────────────────────────────────────────────────────
 function switchTab(tab) {
-  ['resumen', 'productos', 'clientes'].forEach(function (t) {
+  ['resumen', 'productos', 'clientes', 'rotacion'].forEach(function (t) {
     document.getElementById('view-' + t).style.display = t === tab ? 'block' : 'none';
     document.getElementById('tab-' + t).classList.toggle('active', t === tab);
   });
-  renderTodo();
+  if (tab === 'rotacion') renderRotacion();
+  else renderTodo();
 }
 
 // ── Selector de mes (compartido entre vistas) ───────────────────
@@ -994,6 +1063,125 @@ async function recargar() {
       toast('Error al cargar ventas', 'err');
     }
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+// ROTACIÓN — producido (Sopladoras) vs facturado, por mes.
+// Toda la facturación del mes, sin filtrar por SKU (ver aviso en la vista):
+// producción y ventas usan códigos que no siempre coinciden 1 a 1.
+// ══════════════════════════════════════════════════════════════
+var ROT_CARGADO = false;
+var PROD_ROT = [];   // {fecha, sku, cantidad} de produccion_diaria
+var PRECIO_ROT = {}; // sku -> {precio, fuente}
+
+async function cargarRotacion() {
+  if (ROT_CARGADO) return;
+  PROD_ROT = [];
+  var desde = 0, LOTE = 1000;
+  while (true) {
+    var r = await db.from('produccion_diaria').select('fecha,sku,cantidad').range(desde, desde + LOTE - 1);
+    if (r.error) { console.warn('produccion_diaria no disponible:', r.error.message); break; }
+    var d = r.data || [];
+    d.forEach(function (p) {
+      PROD_ROT.push({ fecha: p.fecha, sku: String(p.sku == null ? '' : p.sku).trim(), cantidad: parseFloat(p.cantidad) || 0 });
+    });
+    if (d.length < LOTE) break;
+    desde += LOTE;
+  }
+
+  // precio ponderado por SKU: histórico completo de VENTAS (ya cargado) + respaldo manual
+  var acumSku = {};
+  VENTAS.forEach(function (v) {
+    if (!v.sku) return;
+    if (!acumSku[v.sku]) acumSku[v.sku] = { q: 0, u: 0 };
+    acumSku[v.sku].q += v.total_quetzales;
+    acumSku[v.sku].u += v.total_unidades;
+  });
+  var manual = {};
+  try {
+    var rm = await db.from('inventario').select('sku,precio_ponderado_manual');
+    (rm.data || []).forEach(function (i) {
+      if (i.precio_ponderado_manual) manual[i.sku] = parseFloat(i.precio_ponderado_manual);
+    });
+  } catch (e) { /* precio manual es solo respaldo, no bloquea */ }
+
+  PRECIO_ROT = {};
+  var skus = {};
+  Object.keys(acumSku).forEach(function (s) { skus[s] = 1; });
+  PROD_ROT.forEach(function (p) { skus[p.sku] = 1; });
+  Object.keys(skus).forEach(function (s) {
+    var a = acumSku[s];
+    if (a && a.u > 0) { PRECIO_ROT[s] = { precio: a.q / a.u, fuente: 'auto' }; return; }
+    if (manual[s]) { PRECIO_ROT[s] = { precio: manual[s], fuente: 'manual' }; return; }
+    PRECIO_ROT[s] = { precio: 0, fuente: 'none' };
+  });
+
+  ROT_CARGADO = true;
+}
+
+async function renderRotacion() {
+  try {
+    await cargarRotacion();
+  } catch (err) {
+    toast('Error al cargar producción: ' + (err.message || err), 'err');
+  }
+
+  var vacio = document.getElementById('rotVacio');
+  var cont = document.getElementById('rotContent');
+  if (!PROD_ROT.length) { vacio.style.display = 'block'; cont.style.display = 'none'; return; }
+  vacio.style.display = 'none'; cont.style.display = 'block';
+
+  var prodMes = {}; // 'YYYY-MM' -> {u, q}
+  PROD_ROT.forEach(function (p) {
+    var m = String(p.fecha || '').slice(0, 7);
+    if (m.length !== 7) return;
+    if (!prodMes[m]) prodMes[m] = { u: 0, q: 0 };
+    prodMes[m].u += p.cantidad;
+    prodMes[m].q += p.cantidad * (PRECIO_ROT[p.sku] ? PRECIO_ROT[p.sku].precio : 0);
+  });
+
+  var factMes = {}; // toda la facturación del mes, ya está en VENTAS
+  VENTAS.forEach(function (v) {
+    if (!v.mes) return;
+    if (!factMes[v.mes]) factMes[v.mes] = { u: 0, q: 0 };
+    factMes[v.mes].u += v.total_unidades;
+    factMes[v.mes].q += v.total_quetzales;
+  });
+
+  var meses = Object.keys(prodMes).sort();
+  var html = '';
+  var totProdU = 0, totFactU = 0, totPotQ = 0, totFactQ = 0;
+  meses.forEach(function (m) {
+    var prod = prodMes[m], fact = factMes[m] || { u: 0, q: 0 };
+    totProdU += prod.u; totFactU += fact.u; totPotQ += prod.q; totFactQ += fact.q;
+    html += buildRotRow(m, prod, fact);
+  });
+  document.getElementById('rotBody').innerHTML = html || '<tr class="empty-row"><td colspan="8">Sin datos</td></tr>';
+
+  document.getElementById('kpiRotProdU').textContent = fmtU(totProdU);
+  document.getElementById('kpiRotFactU').textContent = fmtU(totFactU);
+  document.getElementById('kpiRotPotQ').textContent = fmtQ(totPotQ);
+  document.getElementById('kpiRotFactQ').textContent = fmtQ(totFactQ);
+  document.getElementById('kpiRotFactQSub').textContent = totPotQ > 0
+    ? (totFactQ / totPotQ * 100).toFixed(0) + '% de la venta potencial' : 'sin comparativo';
+}
+
+function buildRotRow(m, prod, fact) {
+  var duU = prod.u - fact.u;
+  var duQ = prod.q - fact.q;
+  var badge = duU >= 0
+    ? '<span class="rot-badge rot-pos">Positiva</span>'
+    : '<span class="rot-badge rot-neg">Negativa</span>';
+  return '<tr>' +
+    '<td>' + escHtml(mesLabel(m)) + '</td>' +
+    '<td class="num">' + fmtU(prod.u) + '</td>' +
+    '<td class="num">' + fmtU(fact.u) + '</td>' +
+    '<td class="num">' + (duU >= 0 ? '+' : '') + fmtU(duU) + '</td>' +
+    '<td class="num">' + fmtQ(prod.q) + '</td>' +
+    '<td class="num">' + fmtQ(fact.q) + '</td>' +
+    '<td class="num">' + (duQ >= 0 ? '+' : '') + fmtQ(duQ) + '</td>' +
+    '<td>' + badge + '</td>' +
+    '</tr>';
 }
 
 document.addEventListener('DOMContentLoaded', recargar);

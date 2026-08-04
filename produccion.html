@@ -100,6 +100,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .dia-cell{background:#F6FBF7}
 .noche-cell{background:#F4F5FA}
 .cell-0{color:var(--border)}
+.tbl td.band-a{background:#FAF6EC}
+
+/* MENSUAL */
+.mes-box{border:2px solid var(--prod-l);border-radius:12px;margin-bottom:20px;overflow:hidden;background:var(--card)}
+.mes-box-head{background:var(--prod-xl);padding:10px 16px;border-bottom:2px solid var(--prod-l)}
+.mes-box-title{font-family:var(--display);font-weight:700;font-size:15px;color:var(--prod-d)}
+.mes-box-sub{font-size:11px;color:var(--gray);margin-top:2px}
+
+.resumen-mes{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:22px 24px;margin-top:6px}
+.resumen-mes-title{font-family:var(--display);font-size:18px;font-weight:700;margin-bottom:16px}
+.resumen-sec{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.resumen-sec:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.resumen-sec-t{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--prod-d);margin-bottom:6px}
+.resumen-sec-body{font-size:13.5px;line-height:1.7;color:var(--ink)}
+.resumen-sec-body b{color:var(--prod-d)}
 
 /* PILLS Y BADGES */
 .maq-pill{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:24px;padding:0 7px;border-radius:6px;background:var(--prod);color:#fff;font-size:12px;font-weight:700;font-family:var(--mono)}
@@ -226,6 +241,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   <div class="tabs">
     <button class="tab active" id="tab-ingreso" onclick="switchTab('ingreso')">📥 Ingreso</button>
     <button class="tab" id="tab-semanal" onclick="switchTab('semanal')">📊 Reporte Semanal</button>
+    <button class="tab" id="tab-mensual" onclick="switchTab('mensual')">📅 Mensual</button>
   </div>
 
   <!-- ══════════ VIEW INGRESO ══════════ -->
@@ -361,6 +377,32 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     </div>
   </div>
 
+  <!-- ══════════ VIEW MENSUAL ══════════ -->
+  <div id="view-mensual" style="display:none">
+
+    <div class="ctrl-bar">
+      <span class="ctrl-lbl">Mes</span>
+      <input type="month" class="ctrl-in" id="mesSelInput" onchange="renderMensual()">
+      <div class="sem-nav">
+        <button class="sem-btn" onclick="moverMes(-1)" title="Mes anterior">‹</button>
+        <button class="sem-btn" onclick="moverMes(1)" title="Mes siguiente">›</button>
+      </div>
+      <span class="sem-rango" id="mesLabel">—</span>
+    </div>
+
+    <div id="mesVacio" class="empty-mod" style="display:none">
+      <div class="empty-ico">📅</div>
+      <div class="empty-t">Sin producción en este mes</div>
+      <div class="empty-s">No hay turnos cargados en este mes. Cambia de mes con el selector o busca el último mes con datos.</div>
+      <button class="btn btn-prod" onclick="irUltimoMesConDatos()">📅 Ir al último mes con datos</button>
+    </div>
+
+    <div id="mesContent" style="display:none">
+      <div id="mesSemanasWrap"></div>
+      <div id="mesResumen"></div>
+    </div>
+  </div>
+
 </div>
 
 <!-- MODAL PREVIEW -->
@@ -390,12 +432,14 @@ var INV_LISTA = [];  // para autocomplete
 var PRECIOS = {};    // sku -> {precio, fuente}
 var PROD_SEM = [];   // filas de produccion_diaria de la semana en foco
 var VENTAS_SEM = {}; // sku -> quetzales facturados en la semana
+var PROD_MES = [];   // filas de produccion_diaria del mes en foco (Mensual)
 var prevRows = [];   // filas pendientes de confirmar en el modal
 var manSeq = 0;
 
 var MAQUINAS = [1,2,3,4,5,6,7,8,9,10,11,12];
 var DIAS_C = ['LUN','MAR','MIÉ','JUE','VIE','SÁB'];
 var MESES_ABR = {ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,OCT:10,NOV:11,DIC:12};
+var MESES_L = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -470,11 +514,12 @@ document.addEventListener('click', function () {
 });
 
 function switchTab(tab) {
-  ['ingreso', 'semanal'].forEach(function (t) {
+  ['ingreso', 'semanal', 'mensual'].forEach(function (t) {
     document.getElementById('view-' + t).style.display = t === tab ? 'block' : 'none';
     document.getElementById('tab-' + t).classList.toggle('active', t === tab);
   });
   if (tab === 'semanal') renderSemanal();
+  if (tab === 'mensual') renderMensual();
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1127,18 +1172,11 @@ async function cargarVentasSemana(ini, fin) {
 
 function claveCelda(fecha, turno) { return fecha + '|' + turno; }
 
-function pintarTablaSemanal(ini) {
-  var head = '<th class="ctr">Máq</th><th>Código</th><th>Producto</th><th class="num">Meta 12h</th><th class="num">Turnos</th>';
-  for (var d = 0; d < 6; d++) {
-    head += '<th class="num dia-cell">' + DIAS_C[d] + ' D</th>';
-    head += '<th class="num noche-cell">' + DIAS_C[d] + ' N</th>';
-  }
-  head += '<th class="num">Total</th><th class="ctr">Efic.</th><th class="num">Precio</th><th class="num">Venta potencial</th>';
-  document.getElementById('semHead').innerHTML = head;
-
-  // agrupar por (maquina, sku)
+// Agrupa filas de produccion_diaria por (maquina, sku). Reutilizado por el
+// reporte Semanal, cada caja de semana en Mensual, y las estadísticas del mes.
+function agruparProduccion(prodRows) {
   var grupos = {};
-  PROD_SEM.forEach(function (p) {
+  prodRows.forEach(function (p) {
     var k = (p.maquina || 0) + '|' + p.sku;
     if (!grupos[k]) {
       grupos[k] = {
@@ -1151,35 +1189,51 @@ function pintarTablaSemanal(ini) {
     grupos[k].celdas[ck] = (grupos[k].celdas[ck] || 0) + numVal(p.cantidad);
     grupos[k].total += numVal(p.cantidad);
   });
-
-  var lista = Object.keys(grupos).map(function (k) { return grupos[k]; })
+  return Object.keys(grupos).map(function (k) { return grupos[k]; })
     .sort(function (a, b) {
       var ma = a.maquina || 99, mb = b.maquina || 99;
       if (ma !== mb) return ma - mb;
       return b.total - a.total;
     });
+}
+
+// Meta, turnos trabajados, eficiencia, precio y venta potencial de un grupo.
+function statsDeGrupo(g) {
+  var inv = INV[g.sku] || {};
+  var meta = numVal(inv.meta_12hrs);
+  var pr = precioDe(g.sku);
+  var turnos = 0;
+  Object.keys(g.celdas).forEach(function (k) { if (g.celdas[k] > 0) turnos++; });
+  var ef = (meta > 0 && turnos > 0) ? g.total / (meta * turnos) : null;
+  var pot = g.total * pr.precio;
+  return { meta: meta, pr: pr, turnos: turnos, ef: ef, pot: pot };
+}
+
+function pintarTablaSemanal(ini) {
+  var head = '<th class="ctr">Máq</th><th>Código</th><th>Producto</th><th class="num">Meta 12h</th><th class="num">Turnos</th>';
+  for (var d = 0; d < 6; d++) {
+    head += '<th class="num dia-cell">' + DIAS_C[d] + ' D</th>';
+    head += '<th class="num noche-cell">' + DIAS_C[d] + ' N</th>';
+  }
+  head += '<th class="num">Total</th><th class="ctr">Efic.</th><th class="num">Precio</th><th class="num">Venta potencial</th>';
+  document.getElementById('semHead').innerHTML = head;
+
+  var lista = agruparProduccion(PROD_SEM);
 
   var html = '', maqPrev = null;
   var totU = 0, totPot = 0, capac = 0, prodConMeta = 0, sinPrecio = 0, sinMeta = 0;
 
   lista.forEach(function (g) {
-    var inv = INV[g.sku] || {};
-    var meta = numVal(inv.meta_12hrs);
-    var pr = precioDe(g.sku);
+    var st = statsDeGrupo(g);
 
-    var turnos = 0;
-    Object.keys(g.celdas).forEach(function (k) { if (g.celdas[k] > 0) turnos++; });
+    totU += g.total; totPot += st.pot;
+    if (st.ef !== null) { capac += st.meta * st.turnos; prodConMeta += g.total; } else { sinMeta++; }
+    if (st.pr.fuente === 'none') sinPrecio++;
 
-    var ef = (meta > 0 && turnos > 0) ? g.total / (meta * turnos) : null;
-    var pot = g.total * pr.precio;
-
-    totU += g.total; totPot += pot;
-    if (ef !== null) { capac += meta * turnos; prodConMeta += g.total; } else { sinMeta++; }
-    if (pr.fuente === 'none') sinPrecio++;
-
-    var sep = (maqPrev !== null && g.maquina !== maqPrev) ? ' class="maq-sep"' : '';
+    var classes = [];
+    if (maqPrev !== null && g.maquina !== maqPrev) classes.push('maq-sep');
     maqPrev = g.maquina;
-    html += buildSemRow(g, ini, meta, turnos, ef, pr, pot, sep);
+    html += buildSemRow(g, ini, st.meta, st.turnos, st.ef, st.pr, st.pot, classes);
   });
 
   document.getElementById('semBody').innerHTML = html || '<tr class="empty-row"><td colspan="21">Sin datos</td></tr>';
@@ -1214,7 +1268,7 @@ function pintarTablaSemanal(ini) {
   } else { av.innerHTML = ''; }
 }
 
-function buildSemRow(g, ini, meta, turnos, ef, pr, pot, sep) {
+function buildSemRow(g, ini, meta, turnos, ef, pr, pot, rowClasses) {
   var celdas = '';
   for (var d = 0; d < 6; d++) {
     var f = addDias(ini, d);
@@ -1233,8 +1287,9 @@ function buildSemRow(g, ini, meta, turnos, ef, pr, pot, sep) {
   var maqTxt = g.maquina
     ? '<span class="maq-pill">' + g.maquina + '</span>'
     : '<span class="maq-pill sin" title="Sin máquina asignada">?</span>';
+  var clsAttr = (rowClasses && rowClasses.length) ? ' class="' + rowClasses.join(' ') + '"' : '';
 
-  return '<tr' + sep + '>' +
+  return '<tr' + clsAttr + '>' +
     '<td class="ctr">' + maqTxt + '</td>' +
     '<td style="font-family:var(--mono);font-weight:700">' + esc(g.sku) + '</td>' +
     '<td class="desc-cell">' + esc(g.descripcion) + '</td>' +
@@ -1262,10 +1317,185 @@ async function editarMeta(sku) {
     if (!INV[sku]) INV[sku] = { sku: sku };
     INV[sku].meta_12hrs = n;
     toast('Meta actualizada: ' + fmtU(n) + ' und/12h', 'ok');
-    renderSemanal();
+    if (document.getElementById('tab-mensual').classList.contains('active')) renderMensual();
+    else renderSemanal();
   } catch (err) {
     toast('No se pudo guardar la meta: ' + (err.message || err), 'err');
   }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   REPORTE MENSUAL — replica la vista "Mayo 2026" de la hoja de cálculo:
+   una caja por semana (misma tabla del Reporte Semanal) + un resumen de
+   eficiencia de planta al final. La comparación financiera (rotación,
+   venta potencial vs facturado real) vive en el módulo Ventas.
+   ══════════════════════════════════════════════════════════════ */
+function mesNombre(ym) {
+  var p = ym.split('-');
+  return MESES_L[parseInt(p[1], 10) - 1] + ' ' + p[0];
+}
+
+function moverMes(n) {
+  var input = document.getElementById('mesSelInput');
+  var ym = input.value || fechaHoy().slice(0, 7);
+  var d = new Date(parseInt(ym.slice(0, 4), 10), parseInt(ym.slice(5, 7), 10) - 1 + n, 1);
+  input.value = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+  renderMensual();
+}
+
+async function irUltimoMesConDatos() {
+  try {
+    var r = await db.from('produccion_diaria').select('fecha').order('fecha', { ascending: false }).limit(1);
+    if (r.error || !r.data || !r.data.length) { toast('No hay producción cargada todavía', 'err'); return; }
+    document.getElementById('mesSelInput').value = r.data[0].fecha.slice(0, 7);
+    renderMensual();
+  } catch (e) { toast('Error al buscar: ' + e.message, 'err'); }
+}
+
+async function renderMensual() {
+  var input = document.getElementById('mesSelInput');
+  if (!input.value) input.value = fechaHoy().slice(0, 7);
+  var ym = input.value;
+  document.getElementById('mesLabel').textContent = mesNombre(ym);
+
+  var desde = ym + '-01';
+  var ultimoDia = new Date(parseInt(ym.slice(0, 4), 10), parseInt(ym.slice(5, 7), 10), 0).getDate();
+  var hasta = ym + '-' + ('0' + ultimoDia).slice(-2);
+
+  try {
+    var r = await db.from('produccion_diaria')
+      .select('fecha,turno,maquina,sku,descripcion,cantidad')
+      .gte('fecha', desde).lte('fecha', hasta);
+    if (r.error) throw r.error;
+    PROD_MES = r.data || [];
+  } catch (err) {
+    toast(mensajeError(err), 'err');
+    PROD_MES = [];
+  }
+
+  var vacio = document.getElementById('mesVacio');
+  var cont = document.getElementById('mesContent');
+  if (!PROD_MES.length) { vacio.style.display = 'block'; cont.style.display = 'none'; return; }
+  vacio.style.display = 'none'; cont.style.display = 'block';
+
+  var porSemana = {};
+  PROD_MES.forEach(function (p) {
+    var lu = lunesDe(p.fecha);
+    if (!porSemana[lu]) porSemana[lu] = [];
+    porSemana[lu].push(p);
+  });
+  var semanas = Object.keys(porSemana).sort();
+
+  var html = '';
+  semanas.forEach(function (lu, idx) {
+    html += buildSemanaBoxHtml(lu, porSemana[lu], idx + 1);
+  });
+  document.getElementById('mesSemanasWrap').innerHTML = html;
+  document.getElementById('mesResumen').innerHTML = buildResumenMesHtml(mesNombre(ym));
+}
+
+function buildSemanaBoxHtml(ini, prodRowsSemana, weekIndex) {
+  var fin = addDias(ini, 5);
+  var lista = agruparProduccion(prodRowsSemana);
+  if (!lista.length) return '';
+
+  var head = '<th class="ctr">Máq</th><th>Código</th><th>Producto</th><th class="num">Meta 12h</th><th class="num">Turnos</th>';
+  for (var d = 0; d < 6; d++) {
+    head += '<th class="num dia-cell">' + DIAS_C[d] + ' D</th>';
+    head += '<th class="num noche-cell">' + DIAS_C[d] + ' N</th>';
+  }
+  head += '<th class="num">Total</th><th class="ctr">Efic.</th><th class="num">Precio</th><th class="num">Venta potencial</th>';
+
+  var body = '', maqPrev = null, band = false, totU = 0;
+  lista.forEach(function (g) {
+    var st = statsDeGrupo(g);
+    totU += g.total;
+    var classes = [];
+    if (maqPrev !== null && g.maquina !== maqPrev) { classes.push('maq-sep'); band = !band; }
+    if (band) classes.push('band-a');
+    maqPrev = g.maquina;
+    body += buildSemRow(g, ini, st.meta, st.turnos, st.ef, st.pr, st.pot, classes);
+  });
+
+  return '<div class="mes-box">' +
+    '<div class="mes-box-head">' +
+    '<div class="mes-box-title">Semana ' + weekIndex + '</div>' +
+    '<div class="mes-box-sub">Del ' + fechaCorta(ini) + ' al ' + fechaCorta(fin) + ' · ' + fmtU(totU) + ' unidades</div>' +
+    '</div>' +
+    '<div class="tbl-scroll"><table class="tbl"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>' +
+    '</div>';
+}
+
+function buildResumenSeccion(titulo, cuerpo) {
+  return '<div class="resumen-sec"><div class="resumen-sec-t">' + esc(titulo) + '</div>' +
+    '<div class="resumen-sec-body">' + cuerpo + '</div></div>';
+}
+
+function buildResumenMesHtml(mesLabel) {
+  var lista = agruparProduccion(PROD_MES);
+  var totU = 0, totPot = 0, capac = 0, prodConMeta = 0, sinMeta = 0, sinPrecio = 0;
+  var porMaquina = {}, porSku = {};
+
+  lista.forEach(function (g) {
+    var st = statsDeGrupo(g);
+    totU += g.total; totPot += st.pot;
+    porSku[g.sku] = (porSku[g.sku] || 0) + g.total;
+    if (st.ef !== null) {
+      capac += st.meta * st.turnos; prodConMeta += g.total;
+      var mk = g.maquina || 0;
+      if (!porMaquina[mk]) porMaquina[mk] = { capac: 0, prod: 0 };
+      porMaquina[mk].capac += st.meta * st.turnos;
+      porMaquina[mk].prod += g.total;
+    } else sinMeta++;
+    if (st.pr.fuente === 'none') sinPrecio++;
+  });
+
+  var efGlobal = capac > 0 ? prodConMeta / capac : null;
+
+  var maquinasEf = Object.keys(porMaquina).filter(function (m) { return m !== '0'; })
+    .map(function (m) { return { maquina: m, ef: porMaquina[m].prod / porMaquina[m].capac, prod: porMaquina[m].prod }; })
+    .sort(function (a, b) { return b.ef - a.ef; });
+
+  var skuOrden = Object.keys(porSku).map(function (s) { return { sku: s, u: porSku[s] }; })
+    .sort(function (a, b) { return b.u - a.u; });
+  var top = skuOrden.slice(0, 5);
+  var topU = top.reduce(function (a, s) { return a + s.u; }, 0);
+  var topPct = totU > 0 ? (topU / totU * 100) : 0;
+
+  var secEf = buildResumenSeccion('1) Eficiencia de planta',
+    'Se produjeron <b>' + fmtU(totU) + ' unidades</b> en ' + esc(mesLabel) +
+    (efGlobal !== null
+      ? ', con una eficiencia promedio de <b>' + (efGlobal * 100).toFixed(1) + '%</b> contra la meta de las combinaciones máquina/producto que tienen meta definida.'
+      : '. Ninguna combinación máquina/producto tiene meta definida todavía, así que no se puede calcular la eficiencia.') +
+    (sinMeta ? ' <b>' + sinMeta + '</b> combinación(es) quedaron fuera del cálculo por falta de meta.' : ''));
+
+  var secMaq = '';
+  if (maquinasEf.length > 1) {
+    var mejor = maquinasEf[0], peor = maquinasEf[maquinasEf.length - 1];
+    secMaq = buildResumenSeccion('2) Máquinas del mes',
+      'La máquina <b>' + esc(mejor.maquina) + '</b> fue la más eficiente (' + (mejor.ef * 100).toFixed(0) + '%, ' +
+      fmtU(mejor.prod) + ' und). La máquina <b>' + esc(peor.maquina) + '</b> cerró más baja (' + (peor.ef * 100).toFixed(0) +
+      '%, ' + fmtU(peor.prod) + ' und) — vale la pena revisar paros o asignación de moldes en esa línea.');
+  } else if (maquinasEf.length === 1) {
+    secMaq = buildResumenSeccion('2) Máquinas del mes',
+      'Solo la máquina <b>' + esc(maquinasEf[0].maquina) + '</b> tiene datos suficientes para calcular eficiencia este mes (' +
+      (maquinasEf[0].ef * 100).toFixed(0) + '%).');
+  }
+
+  var secConc = buildResumenSeccion('3) Concentración de producción',
+    'Los <b>' + top.length + ' productos</b> con más volumen (' + esc(top.map(function (s) { return s.sku; }).join(', ')) +
+    ') representan <b>' + topPct.toFixed(0) + '%</b> de las unidades del mes.');
+
+  var secVenta = buildResumenSeccion('4) Venta potencial del mes',
+    'A precio ponderado, lo producido este mes representa <b>' + fmtQ(totPot) + '</b> (sin IVA).' +
+    (sinPrecio ? ' <b>' + sinPrecio + '</b> producto(s) no tienen precio y no están incluidos en ese total.' : '') +
+    ' Para comparar contra lo realmente facturado y ver la rotación de inventario, revisa la pestaña ' +
+    '<b>🔁 Rotación</b> del módulo Ventas y Financiero.');
+
+  return '<div class="resumen-mes">' +
+    '<div class="resumen-mes-title">📋 Resumen de eficiencia — ' + esc(mesLabel) + '</div>' +
+    secEf + secMaq + secConc + secVenta +
+    '</div>';
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1274,6 +1504,7 @@ async function editarMeta(sku) {
 async function init() {
   document.getElementById('manFecha').value = fechaHoy();
   document.getElementById('semInicio').value = lunesDe(fechaHoy());
+  document.getElementById('mesSelInput').value = fechaHoy().slice(0, 7);
   addManRow(); addManRow(); addManRow();
 
   try {
