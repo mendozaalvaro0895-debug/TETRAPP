@@ -172,6 +172,31 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rot-pos{background:var(--green-l);color:var(--green)}
 .rot-neg{background:var(--red-l);color:var(--red)}
 
+/* EQUIVALENCIAS SKU */
+.equiv-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:18px}
+.equiv-header{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+.equiv-header:hover{background:var(--ven-xl)}
+.equiv-header-t{font-size:13px;font-weight:700}
+.equiv-header-s{font-size:11px;color:var(--gray-l)}
+.equiv-chevron{font-size:12px;color:var(--gray);transition:transform .2s;flex-shrink:0}
+.equiv-chevron.open{transform:rotate(180deg)}
+.equiv-body{display:none;padding:14px 16px}
+.equiv-body.open{display:block}
+.equiv-list{max-height:280px;overflow-y:auto;margin-bottom:14px;border:1px solid var(--border);border-radius:8px}
+.equiv-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bg);font-size:12px}
+.equiv-item:last-child{border-bottom:none}
+.equiv-sku{font-family:var(--mono);font-weight:700;color:var(--ven);font-size:11px;white-space:nowrap}
+.equiv-arrow{color:var(--gray-l);font-size:13px;flex-shrink:0}
+.equiv-nota{color:var(--gray);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.equiv-del{background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 6px;border-radius:5px;line-height:1;transition:color .15s;flex-shrink:0}
+.equiv-del:hover{color:var(--red)}
+.equiv-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:4px}
+.equiv-input{padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--mono);font-weight:600;width:130px;outline:none;transition:border-color .15s}
+.equiv-input:focus{border-color:var(--ven)}
+.equiv-input.wide{width:220px;font-family:var(--font);font-weight:400}
+.equiv-empty{color:var(--gray);font-size:12px;padding:18px;text-align:center}
+@media(max-width:600px){.equiv-form{flex-direction:column;align-items:stretch}.equiv-input,.equiv-input.wide{width:100%}}
+
 /* TOAST */
 .toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
 .toast.show{opacity:1;transform:translateY(0)}
@@ -394,8 +419,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       como <b>100332</b> — mismo producto, código diferente). Por eso esta vista compara <b>totales del mes</b>
       (toda la producción vs toda la facturación), no SKU por SKU: evita descuadres por variantes de código,
       pero la diferencia tampoco es 100% inventario físico — parte puede ser producto que cambió de código
-      antes de venderse. Identificar esas "recetas"/variantes de SKU queda como paso pendiente para afinar
-      esta comparación.
+      antes de venderse. Las variantes conocidas se documentan en el panel <b>Equivalencias de SKU</b> al final de esta vista.
     </div>
 
     <div id="rotVacio" class="empty-mod" style="display:none">
@@ -443,6 +467,30 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </table>
         </div>
       </div>
+
+      <!-- EQUIVALENCIAS SKU -->
+      <div class="equiv-panel" id="equivPanel">
+        <div class="equiv-header" onclick="toggleEquiv()">
+          <div>
+            <div class="equiv-header-t">Equivalencias de SKU</div>
+            <div class="equiv-header-s">Variantes de código: un SKU de producción que se factura bajo otro código</div>
+          </div>
+          <span class="equiv-chevron" id="equivChev">▾</span>
+        </div>
+        <div class="equiv-body" id="equivBody">
+          <div class="equiv-list" id="equivList"><div class="equiv-empty">Cargando…</div></div>
+          <div id="equivFormWrap" style="display:none">
+            <div class="equiv-form">
+              <input class="equiv-input" id="equivProd" placeholder="SKU producción" maxlength="30">
+              <span style="color:var(--gray-l);font-size:16px">→</span>
+              <input class="equiv-input" id="equivFact" placeholder="SKU facturación" maxlength="30">
+              <input class="equiv-input wide" id="equivNota" placeholder="Nota (opcional)" maxlength="120">
+              <button class="btn btn-ven" onclick="agregarEquivalencia()" style="padding:7px 14px;font-size:12px">Añadir</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1182,6 +1230,79 @@ function buildRotRow(m, prod, fact) {
     '<td class="num">' + (duQ >= 0 ? '+' : '') + fmtQ(duQ) + '</td>' +
     '<td>' + badge + '</td>' +
     '</tr>';
+}
+
+// ── Equivalencias SKU ────────────────────────────────────────────
+var EQUIV = [];
+var EQUIV_CARGADO = false;
+
+function toggleEquiv() {
+  var body = document.getElementById('equivBody');
+  var chev = document.getElementById('equivChev');
+  var open = body.classList.toggle('open');
+  chev.classList.toggle('open', open);
+  if (open && !EQUIV_CARGADO) cargarEquivalencias();
+}
+
+async function cargarEquivalencias() {
+  var r = await db.from('sku_equivalencias').select('id,sku_prod,sku_fact,nota').order('sku_prod');
+  if (r.error) {
+    document.getElementById('equivList').innerHTML = '<div class="equiv-empty">Error al cargar equivalencias</div>';
+    return;
+  }
+  EQUIV = r.data || [];
+  EQUIV_CARGADO = true;
+  renderEquivalencias();
+  if (TETRA.rol === 'master') {
+    document.getElementById('equivFormWrap').style.display = 'block';
+  }
+}
+
+function renderEquivalencias() {
+  var lista = document.getElementById('equivList');
+  if (!EQUIV.length) {
+    lista.innerHTML = '<div class="equiv-empty">Sin equivalencias registradas.' + (TETRA.rol === 'master' ? ' Añade la primera abajo.' : '') + '</div>';
+    return;
+  }
+  var html = '';
+  EQUIV.forEach(function (e) { html += buildEquivItem(e); });
+  lista.innerHTML = html;
+}
+
+function buildEquivItem(e) {
+  var delBtn = (TETRA.rol === 'master')
+    ? '<button class="equiv-del" onclick="eliminarEquivalencia(' + e.id + ')" title="Eliminar">✕</button>'
+    : '';
+  return '<div class="equiv-item">' +
+    '<span class="equiv-sku">' + escHtml(e.sku_prod) + '</span>' +
+    '<span class="equiv-arrow">→</span>' +
+    '<span class="equiv-sku">' + escHtml(e.sku_fact) + '</span>' +
+    '<span class="equiv-nota">' + (e.nota ? escHtml(e.nota) : '') + '</span>' +
+    delBtn +
+    '</div>';
+}
+
+async function agregarEquivalencia() {
+  var prod = document.getElementById('equivProd').value.trim();
+  var fact = document.getElementById('equivFact').value.trim();
+  var nota = document.getElementById('equivNota').value.trim();
+  if (!prod || !fact) { toast('Ingresa SKU de producción y SKU de facturación', 'err'); return; }
+  var r = await db.from('sku_equivalencias').insert({ sku_prod: prod, sku_fact: fact, nota: nota || null });
+  if (r.error) { toast('Error: ' + (r.error.message || r.error), 'err'); return; }
+  document.getElementById('equivProd').value = '';
+  document.getElementById('equivFact').value = '';
+  document.getElementById('equivNota').value = '';
+  EQUIV_CARGADO = false;
+  await cargarEquivalencias();
+  toast('Equivalencia añadida', 'ok');
+}
+
+async function eliminarEquivalencia(id) {
+  var r = await db.from('sku_equivalencias').delete().eq('id', id);
+  if (r.error) { toast('Error al eliminar', 'err'); return; }
+  EQUIV_CARGADO = false;
+  await cargarEquivalencias();
+  toast('Equivalencia eliminada', 'ok');
 }
 
 document.addEventListener('DOMContentLoaded', recargar);
