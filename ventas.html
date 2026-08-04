@@ -1292,7 +1292,7 @@ async function cargarRecetario() {
   RECET_SKUS = Object.keys(skuMap).sort().map(function(s) { return {sku_fact: s, desc: skuMap[s]}; });
 
   // 2. Inventario para autocomplete (inventario + SKUs facturables no presentes en inventario)
-  var ri = await db.from('inventario').select('sku,descripcion');
+  var ri = await db.from('inventario').select('sku,descripcion').order('sku').limit(5000);
   INV_REC = ri.error ? [] : (ri.data || []);
   var invIdx = {};
   INV_REC.forEach(function(i) { if (i.sku) invIdx[String(i.sku)] = 1; });
