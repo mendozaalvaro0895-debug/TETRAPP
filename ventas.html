@@ -190,12 +190,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .recet-ver-mas:hover{border-color:var(--ven);color:var(--ven)}
 /* cards */
 .rc{border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden}
-.rc-hdr{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none;background:var(--bg)}
+.rc-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none;background:var(--bg)}
 .rc-hdr:hover{background:var(--ven-xl)}
-.rc-sku{font-family:var(--mono);font-weight:700;color:var(--ven);font-size:12px;white-space:nowrap}
-.rc-desc{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--gray)}
+.rc-sku{font-family:var(--mono);font-weight:700;color:var(--ven);font-size:12px;white-space:nowrap;flex-shrink:0}
+.rc-desc{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--gray);flex:1;min-width:0}
 .rc-badge{background:var(--ven-l);color:var(--ven-dark);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0}
 .rc-badge.vacio{background:var(--bg2);color:var(--gray-l)}
+.rc-badge.dir{background:var(--green-l);color:var(--green)}
+.rc-btn-dir{background:none;border:1.5px solid var(--border);border-radius:6px;font-size:10px;font-weight:700;padding:2px 9px;cursor:pointer;color:var(--gray);white-space:nowrap;flex-shrink:0;line-height:1.6;transition:all .15s}
+.rc-btn-dir:hover{border-color:var(--green);color:var(--green);background:var(--green-l)}
+.rc-btn-dir.activo{background:var(--green-l);border-color:var(--green);color:var(--green)}
+.recet-dir-toggle{background:none;border:1.5px solid var(--border);border-radius:8px;font-size:11px;font-weight:600;padding:6px 10px;cursor:pointer;color:var(--gray);white-space:nowrap;transition:all .15s;flex-shrink:0}
+.recet-dir-toggle:hover{border-color:var(--ven);color:var(--ven)}
+.recet-dir-toggle.active{background:var(--ven-l);border-color:var(--ven);color:var(--ven-dark)}
 .rc-chev{font-size:11px;color:var(--gray);transition:transform .2s;flex-shrink:0}
 .rc-chev.open{transform:rotate(180deg)}
 .rc-cuerpo{display:none;padding:12px 14px;border-top:1px solid var(--border);background:var(--card)}
@@ -222,7 +229,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rc-opt:last-child{border-bottom:none}
 .rc-opt:hover{background:var(--ven-xl)}
 .rc-opt b{font-family:var(--mono);color:var(--ven)}
-@media(max-width:600px){.rc-hdr{grid-template-columns:auto 1fr auto auto}.rc-partes-hdr,.rc-parte,.rc-add{grid-template-columns:70px 1fr 1fr 26px}}
+@media(max-width:600px){.rc-sku{font-size:11px}.rc-btn-dir{display:none}.rc-partes-hdr,.rc-parte,.rc-add{grid-template-columns:70px 1fr 1fr 26px}}
 
 /* TOAST */
 .toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
@@ -503,6 +510,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="recet-barra">
             <input class="recet-search" id="recetSearch" placeholder="🔍 Buscar SKU o descripción..." oninput="filtrarRecetario(this.value)" autocomplete="off">
             <span class="recet-count" id="recetCount">—</span>
+            <button class="recet-dir-toggle" id="recetDirToggle" onclick="toggleDirectos()" style="display:none" title="Mostrar u ocultar SKUs marcados como directos">👁 Atendidos (0)</button>
           </div>
           <div id="recetLista"><div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">Abre el panel para cargar…</div></div>
         </div>
@@ -1257,7 +1265,8 @@ var RECETARIO_CARGADO = false;
 var RECET_FILTRO = '';
 var RECET_VISIBLE = 30;
 var INV_REC = [];          // [{sku, descripcion}] de inventario para autocomplete
-var RECET_SID_SKU = {};   // sid -> sku_fact
+var RECET_SID_SKU = {};        // sid -> sku_fact
+var RECET_MOSTRAR_DIRECTOS = false;
 
 var PROCESOS_FIJOS = ['Armado','Liner','Banda','Flameado','Impresión','Empaque','Serigrafía','Revisado','Limpiar pestaña','Apoyo'];
 
@@ -1287,7 +1296,7 @@ async function cargarRecetario() {
   INV_REC = ri.error ? [] : (ri.data || []);
 
   // 3. Recetas existentes
-  var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion');
+  var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion,es_directo');
   RECETAS_MAP = {};
   if (!rr.error) (rr.data || []).forEach(function(r) { RECETAS_MAP[r.sku_fact] = r; });
 
@@ -1311,7 +1320,19 @@ function filtrarRecetario(q) {
 
 function renderRecetario() {
   var q = RECET_FILTRO.toLowerCase();
+
+  // contar y mostrar/ocultar toggle de directos
+  var nDir = Object.values(RECETAS_MAP).filter(function(r) { return r.es_directo; }).length;
+  var toggle = document.getElementById('recetDirToggle');
+  if (toggle) {
+    toggle.style.display = nDir > 0 ? '' : 'none';
+    toggle.textContent = '👁 Atendidos (' + nDir + ')';
+    toggle.classList.toggle('active', RECET_MOSTRAR_DIRECTOS);
+  }
+
   var lista = RECET_SKUS.filter(function(s) {
+    var rec = RECETAS_MAP[s.sku_fact];
+    if (!RECET_MOSTRAR_DIRECTOS && rec && rec.es_directo) return false;
     return !q || s.sku_fact.toLowerCase().indexOf(q) !== -1 || (s.desc || '').toLowerCase().indexOf(q) !== -1;
   });
   lista.sort(function(a, b) {
@@ -1343,21 +1364,37 @@ function renderRecetario() {
   }
 }
 
+function toggleDirectos() {
+  RECET_MOSTRAR_DIRECTOS = !RECET_MOSTRAR_DIRECTOS;
+  RECET_VISIBLE = 30;
+  renderRecetario();
+}
+
 function buildRecetCard(sku, desc, receta, partes) {
   var sid = safeSku(sku);
+  var esDirecto = receta && receta.es_directo;
   var nP = partes.length;
-  var badgeTxt = nP ? nP + (nP === 1 ? ' parte' : ' partes') : 'Sin receta';
-  var badgeCls = nP ? 'rc-badge' : 'rc-badge vacio';
+  var badgeTxt = esDirecto ? 'Directo' : (nP ? nP + (nP === 1 ? ' parte' : ' partes') : 'Sin receta');
+  var badgeCls = esDirecto ? 'rc-badge dir' : (nP ? 'rc-badge' : 'rc-badge vacio');
   var cuerpo = buildRcCuerpo(sku, sid, desc, receta, partes);
   return '<div class="rc" id="rc-' + sid + '">' +
     '<div class="rc-hdr" onclick="toggleRcCard(\'' + sid + '\')">' +
       '<span class="rc-sku">' + escHtml(sku) + '</span>' +
       '<span class="rc-desc">' + escHtml(desc || '—') + '</span>' +
       '<span class="' + badgeCls + '">' + badgeTxt + '</span>' +
+      buildRcDirBtn(sid, esDirecto) +
       '<span class="rc-chev" id="rc-chev-' + sid + '">▾</span>' +
     '</div>' +
     '<div class="rc-cuerpo" id="rc-body-' + sid + '">' + cuerpo + '</div>' +
   '</div>';
+}
+
+function buildRcDirBtn(sid, esDirecto) {
+  if (TETRA.rol !== 'master') return '';
+  if (esDirecto) {
+    return '<button class="rc-btn-dir activo" title="Quitar marca — volver a pendiente" onclick="event.stopPropagation();marcarDirecto(\'' + sid + '\')">✓ Directo</button>';
+  }
+  return '<button class="rc-btn-dir" title="Marcar como SKU directo: se produce y se factura bajo el mismo código, sin proceso adicional" onclick="event.stopPropagation();marcarDirecto(\'' + sid + '\')">Marcar directo</button>';
 }
 
 function buildRcCuerpo(sku, sid, desc, receta, partes) {
@@ -1492,16 +1529,66 @@ function refreshRcCard(sku) {
   var partes = receta ? (PARTES_MAP[receta.id] || []) : [];
   var skuData = null;
   RECET_SKUS.forEach(function(s) { if (s.sku_fact === sku) skuData = s; });
-
+  var esDirecto = receta && receta.es_directo;
   var nP = partes.length;
+
+  // badge
   var badge = document.querySelector('#rc-' + sid + ' .rc-badge');
   if (badge) {
-    badge.textContent = nP ? nP + (nP === 1 ? ' parte' : ' partes') : 'Sin receta';
-    badge.className = nP ? 'rc-badge' : 'rc-badge vacio';
+    badge.textContent = esDirecto ? 'Directo' : (nP ? nP + (nP === 1 ? ' parte' : ' partes') : 'Sin receta');
+    badge.className = esDirecto ? 'rc-badge dir' : (nP ? 'rc-badge' : 'rc-badge vacio');
   }
+  // botón directo
+  var dirBtn = document.querySelector('#rc-' + sid + ' .rc-btn-dir');
+  if (dirBtn) {
+    dirBtn.textContent = esDirecto ? '✓ Directo' : 'Marcar directo';
+    dirBtn.className = esDirecto ? 'rc-btn-dir activo' : 'rc-btn-dir';
+  }
+  // cuerpo si está abierto
   var body = document.getElementById('rc-body-' + sid);
   if (body && body.classList.contains('open')) {
     body.innerHTML = buildRcCuerpo(sku, sid, skuData ? skuData.desc : '', receta, partes);
+  }
+}
+
+async function marcarDirecto(sid) {
+  var sku = RECET_SID_SKU[sid];
+  if (!sku) return;
+  var receta = RECETAS_MAP[sku];
+  var nuevoVal = !(receta && receta.es_directo);
+
+  if (receta) {
+    var ra = await db.from('sku_recetas').update({es_directo: nuevoVal}).eq('id', receta.id);
+    if (ra.error) { toast('Error', 'err'); return; }
+    RECETAS_MAP[sku].es_directo = nuevoVal;
+  } else {
+    var skuData = null;
+    RECET_SKUS.forEach(function(s) { if (s.sku_fact === sku) skuData = s; });
+    var rb = await db.from('sku_recetas')
+      .insert({sku_fact: sku, descripcion: skuData ? skuData.desc : null, es_directo: true})
+      .select().single();
+    if (rb.error) { toast('Error', 'err'); return; }
+    RECETAS_MAP[sku] = rb.data;
+    PARTES_MAP[rb.data.id] = [];
+  }
+
+  toast(nuevoVal ? 'Marcado como SKU directo' : 'Desmarcado', 'ok');
+
+  // si acabamos de marcar Y estamos ocultando directos → sacar de la vista
+  if (nuevoVal && !RECET_MOSTRAR_DIRECTOS) {
+    var card = document.getElementById('rc-' + sid);
+    if (card) card.remove();
+    var nDir = Object.values(RECETAS_MAP).filter(function(r) { return r.es_directo; }).length;
+    var tog = document.getElementById('recetDirToggle');
+    if (tog) { tog.style.display = ''; tog.textContent = '👁 Atendidos (' + nDir + ')'; }
+    var nVis = RECET_SKUS.filter(function(s) { return !RECETAS_MAP[s.sku_fact] || !RECETAS_MAP[s.sku_fact].es_directo; }).length;
+    document.getElementById('recetCount').textContent = nVis + ' SKUs de ventas';
+  } else {
+    refreshRcCard(sku);
+    // actualizar toggle si desmarcamos
+    var nDir2 = Object.values(RECETAS_MAP).filter(function(r) { return r.es_directo; }).length;
+    var tog2 = document.getElementById('recetDirToggle');
+    if (tog2) { tog2.style.display = nDir2 > 0 ? '' : 'none'; tog2.textContent = '👁 Atendidos (' + nDir2 + ')'; }
   }
 }
 
