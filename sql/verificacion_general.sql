@@ -1,70 +1,73 @@
 -- ════════════════════════════════════════════════════════════════
 -- TETRAPP — Verificación general de SQLs corridos
 -- Pega este bloque completo en Supabase Dashboard → SQL Editor → Run
--- Cada sección imprime un resultado; revísalos de arriba a abajo.
+--
+-- Es UNA sola consulta (UNION ALL) para que el editor muestre todas
+-- las filas de una vez — si se corre como varios `select` sueltos,
+-- Supabase solo enseña el resultado del último.
 -- No modifica nada, solo lee.
 -- ════════════════════════════════════════════════════════════════
 
--- ── A. produccion_v1.sql — ¿existe la tabla y tiene RLS? ──────────
-select 'A. produccion_diaria' as chequeo, tablename, rowsecurity
-from pg_tables where schemaname = 'public' and tablename = 'produccion_diaria';
+select 1 as orden, 'A. produccion_diaria existe + RLS' as chequeo,
+       tablename as detalle_1, rowsecurity::text as detalle_2, null as detalle_3
+from pg_tables where schemaname = 'public' and tablename = 'produccion_diaria'
 
--- ── B. produccion_v1.sql — las 4 políticas ────────────────────────
-select 'B. politicas produccion_diaria' as chequeo, policyname, cmd
+union all
+select 2, 'B. politica: ' || policyname, cmd, roles::text, null
 from pg_policies where schemaname = 'public' and tablename = 'produccion_diaria'
-order by policyname;
 
--- ── C. produccion_v1.sql — columnas nuevas en inventario ──────────
-select 'C. columnas inventario' as chequeo, column_name, data_type
+union all
+select 3, 'C. columna inventario: ' || column_name, data_type, null, null
 from information_schema.columns
 where table_schema = 'public' and table_name = 'inventario'
   and column_name in ('meta_12hrs','maquina_default','precio_ponderado_manual')
-order by column_name;
 
--- ── D. produccion_v1.sql — columna documento + índice único ───────
-select 'D. columna documento' as chequeo, column_name, data_type, column_default
+union all
+select 4, 'D. columna documento', data_type, column_default, null
 from information_schema.columns
-where table_schema = 'public' and table_name = 'produccion_diaria' and column_name = 'documento';
+where table_schema = 'public' and table_name = 'produccion_diaria' and column_name = 'documento'
 
-select 'D. indice unico' as chequeo, indexname
+union all
+select 5, 'D. indice unico con documento', indexname, null, null
 from pg_indexes
 where schemaname = 'public' and tablename = 'produccion_diaria'
-  and indexname = 'ux_prod_fecha_turno_maq_sku_doc';
+  and indexname = 'ux_prod_fecha_turno_maq_sku_doc'
 
--- ── E. produccion_seed_historico.sql — ¿cargó? ────────────────────
-select 'E. seed historico' as chequeo,
-       count(*) as lineas, count(distinct fecha) as dias,
-       min(fecha) as desde, max(fecha) as hasta,
-       to_char(sum(cantidad),'FM999,999,999') as unidades
-from public.produccion_diaria where documento = 'SHEETS';
+union all
+select 6, 'E. seed historico (SHEETS)',
+       count(*)::text || ' lineas, ' || count(distinct fecha)::text || ' dias',
+       min(fecha)::text || ' -> ' || max(fecha)::text,
+       to_char(sum(cantidad),'FM999,999,999') || ' unidades'
+from public.produccion_diaria where documento = 'SHEETS'
 
--- ── F. produccion_seed_historico.sql — catálogo poblado ───────────
-select 'F. catalogo poblado' as chequeo,
-       count(*) filter (where meta_12hrs is not null)              as con_meta,
-       count(*) filter (where maquina_default is not null)         as con_maquina,
-       count(*) filter (where precio_ponderado_manual is not null) as con_precio
-from public.inventario;
+union all
+select 7, 'F. catalogo poblado',
+       'con_meta=' || count(*) filter (where meta_12hrs is not null)::text,
+       'con_maquina=' || count(*) filter (where maquina_default is not null)::text,
+       'con_precio=' || count(*) filter (where precio_ponderado_manual is not null)::text
+from public.inventario
 
--- ── G. ventas_financiero_v1.sql — tabla y RLS ─────────────────────
-select 'G. ventas RLS' as chequeo, tablename, rowsecurity
-from pg_tables where schemaname = 'public' and tablename = 'ventas';
+union all
+select 8, 'G. ventas existe + RLS', tablename, rowsecurity::text, null
+from pg_tables where schemaname = 'public' and tablename = 'ventas'
 
-select 'G. politicas ventas' as chequeo, policyname, cmd
+union all
+select 9, 'G. politica ventas: ' || policyname, cmd, roles::text, null
 from pg_policies where schemaname = 'public' and tablename = 'ventas'
-order by policyname;
 
--- ── H. ventas_financiero_v1.sql — columnas y tipo de fecha ────────
-select 'H. columnas ventas' as chequeo, column_name, data_type
+union all
+select 10, 'H. columna ventas: ' || column_name, data_type, null, null
 from information_schema.columns
 where table_schema = 'public' and table_name = 'ventas'
   and column_name in ('fecha','familia','descripcion_familia','codigo_cliente')
-order by column_name;
 
--- ── I. ventas_financiero_v1.sql — ¿hay datos importados? ──────────
-select 'I. filas ventas' as chequeo,
-       count(*) as filas, min(fecha) as desde, max(fecha) as hasta
-from public.ventas;
+union all
+select 11, 'I. filas en ventas',
+       count(*)::text, min(fecha)::text, max(fecha)::text
+from public.ventas
 
--- ── J. rechazos_rls_fix.sql — RLS de rechazos (pendiente histórico) ─
-select 'J. rechazos RLS' as chequeo, tablename, rowsecurity
-from pg_tables where schemaname = 'public' and tablename = 'rechazos';
+union all
+select 12, 'J. rechazos existe + RLS', tablename, rowsecurity::text, null
+from pg_tables where schemaname = 'public' and tablename = 'rechazos'
+
+order by orden, chequeo;
