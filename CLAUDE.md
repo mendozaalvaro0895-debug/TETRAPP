@@ -20,10 +20,25 @@
 ---
 
 ## Arquitectura actual
-Cada HTML es AUTÓNOMO: cliente db propio, CSS en `<style>`, funciones y datos inline.
-`shared/styles.css` es el único archivo compartido — se carga en todos los HTML como
+Cada HTML es AUTÓNOMO: CSS en `<style>`, funciones y datos inline. El cliente `db` y los
+helpers de sesión/roles YA NO son inline — los provee `shared/auth.js` (ver Supabase arriba).
+`shared/styles.css` es el único archivo de estilos compartido — se carga en todos los HTML como
 `<link rel="stylesheet" href="shared/styles.css">` ANTES del `<style>` propio.
-Los `.js` en shared/ eran huérfanos y se borraron (jul/2026).
+Los `.js` sueltos en shared/ (aparte de auth.js) eran huérfanos y se borraron (jul/2026).
+
+### Funciones serverless (Vercel) — carpeta `api/`
+Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados). Config y
+límites en `vercel.json` (memory/maxDuration por función).
+- `api/whatsapp.js` — bot de registro por WhatsApp (Twilio → Claude interpreta → INSERT en
+  Supabase con **service_role**, salta RLS). Estado conversacional en tabla `bot_estado`
+  (1 fila por número). ⚠️ Escritura sensible: valida la firma `X-Twilio-Signature`
+  (HMAC-SHA1, fail-closed) — sin `TWILIO_AUTH_TOKEN` en env, rechaza TODO POST (403).
+  Env: ANTHROPIC_API_KEY, SUPA_URL, SUPA_SERVICE_KEY, TWILIO_AUTH_TOKEN (obligatorio),
+  TWILIO_WEBHOOK_URL (opcional, pin de URL), TETRA_WA_ALLOW (opcional, allowlist de números).
+- `api/parse-doc.js` — lee la foto de una requi con Claude Vision y devuelve JSON
+  {requi, fecha, productos[...]}. Lo llama serigrafia.html (Movimientos). Env: ANTHROPIC_API_KEY.
+  ⚠️ PENDIENTE DE SEGURIDAD: CORS `*` y sin auth → cualquiera puede gastar tokens de Claude
+  llamando al endpoint. Falta gatear con el JWT de sesión de Supabase (cambia endpoint + caller).
 
 ### Módulos y su estado
 | Archivo | Estado | Descripción |
@@ -159,6 +174,7 @@ Apoyo externo: operador_codigo=null + area_origen (tapas/produccion/bodega/otra)
 | `entregas_serig` | Entregas/requis de serigrafía (migradas desde localStorage) |
 | `asistencia_diaria` | Asistencia por fecha/área/turno (presente/ausente/tarde/velada) — la usan serigrafia.html Personal y sus PDFs |
 | `comandas` + `comanda_tareas` | Producción diaria |
+| `bot_estado` | Estado conversacional del bot de WhatsApp (1 fila por número: whatsapp_from UNIQUE, estado JSON, updated_at). La usa api/whatsapp.js |
 | `ventas` | Detalle de facturación, una fila por línea de factura (serie, docu, fecha DATE, codigo_cliente, nit, cliente, familia, descripcion_familia, sku, descripcion, precio_unidad, total_quetzales, total_unidades, costo, utilidad). La escriben ventas.html (importador principal, reemplaza por rango de fechas) y el importador diario "Ventas · Facturación" de inventario.html (más viejo, no manda familia/codigo_cliente). ⚠️ Existía antes del módulo, creada manual — sql/ventas_financiero_v1.sql la normaliza (fecha→DATE, columnas nuevas, RLS master-only escritura) |
 | `clientes`, `cat_procesos`, `asistencia`, `configuracion` | Catálogos / preferencias UI |
 | `v_solicitudes`, `v_capacidad_hoy` | Vistas |
@@ -177,6 +193,17 @@ Apoyo externo: operador_codigo=null + area_origen (tapas/produccion/bodega/otra)
 - #3 race conditions: `ajustarExistencia()` ya usa las RPCs atómicas
 Limpieza jul/2026 en tapas.html: eliminados view-dash/renderDash, modal paro máquina completo,
 animPop y CSS huérfano (.rechazo-*, .rbadge, --serig-m, --gold).
+
+Limpieza ago/2026 (auditoría de código muerto, verificado con grep 0-usos + node --check):
+- serigrafia.html: −267 líneas · 10 funciones sin uso (boardBuildCardCompact, buildPedidoOpts,
+  buildProcNode, buscarExistencia, envSetFiltro, movSSolInput, toggleLineaProc,
+  verDetalleKpiProceso, verDetalleKpiPendientes, verFoto) + CSS huérfano `.kpi.clickable`
+  (feature de KPI-detalle-popup que quedó desconectada, sin ningún elemento con la clase)
+- registro-serigrafia.html: buildOpCard (reemplazada por buildSeccionesGrid) y otraBolsaFlam
+  (su botón ahora llama volverSeleccionFlam)
+- index.html: escHtml local redundante (auth.js ya lo da global)
+- console.log de debug removidos (comandas.html ×4, tapas.html ×1)
+- borrado archivo basura en raíz (extracción temporal de un syntax-check)
 
 ### SQL pendiente de correr en Supabase (dashboard → SQL Editor)
 1. `sql/rechazos_rls_fix.sql` — activa RLS en la tabla rechazos
@@ -203,6 +230,21 @@ animPop y CSS huérfano (.rechazo-*, .rbadge, --serig-m, --gold).
   re-corre, hay que re-correr después los fix de políticas específicas (insert_operativo_serig etc.)
 - `sql/fix_rls_serig_v2.sql` — reparó registro_tiros_serig: política insert_operativo_serig,
   columna hora, CHECK momento con 'velada', y corrigió fechas UTC adelantadas un día
+
+### Seguridad — estado (auditoría ago/2026)
+Sólido:
+- Sin secretos hardcodeados: solo la publishable key (segura CON RLS activo). Las funciones
+  api/ usan `process.env.*`.
+- `vercel.json`: CSP estricto + HSTS + X-Frame-Options DENY + nosniff + Referrer-Policy +
+  Permissions-Policy (camera/mic/geo/payment en `()`). connect-src limita a self + Supabase.
+- Cliente `db` centralizado en auth.js; anon sin privilegios (seguridad_v1.sql).
+- api/whatsapp.js valida firma Twilio (fail-closed) — corregido ago/2026.
+
+Pendiente:
+- ⚠️ `api/parse-doc.js`: CORS `*` + sin auth → gasto de tokens de Claude por cualquiera.
+  Falta gatear con el JWT de sesión de Supabase.
+- `TWILIO_AUTH_TOKEN` debe existir en las env vars de Vercel o el bot de WhatsApp devuelve
+  403 a todo (es intencional: fail-closed).
 
 ### Roles de acceso (shared/auth.js)
 - `master` → todo · `visor` → solo lectura (banner Modo Visual)

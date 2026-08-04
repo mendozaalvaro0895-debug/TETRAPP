@@ -6,13 +6,23 @@
 //   ANTHROPIC_API_KEY   — clave Claude API (platform.anthropic.com)
 //   SUPA_URL            — https://rohdxjuuvpgrhevfsrye.supabase.co
 //   SUPA_SERVICE_KEY    — service_role key de Supabase (Supabase → Project Settings → API)
-//   TWILIO_SANDBOX_AUTH — token del sandbox Twilio (opcional; activa validación de firma)
+//   TWILIO_AUTH_TOKEN   — OBLIGATORIO. Auth token de Twilio (Console → Account Info).
+//                         Valida la firma X-Twilio-Signature; sin él se rechaza TODO
+//                         POST (fail-closed) para que nadie más pueda escribir en la
+//                         base ni gastar tokens de Claude llamando al endpoint.
+//                         (acepta el nombre viejo TWILIO_SANDBOX_AUTH como respaldo)
+//   TWILIO_WEBHOOK_URL  — opcional. URL exacta configurada en Twilio (ej.
+//                         https://tetrapp.vercel.app/api/whatsapp). Úsalo si la firma
+//                         falla por reconstrucción de URL detrás del proxy de Vercel.
+//   TETRA_WA_ALLOW      — opcional. Números autorizados separados por coma (defensa
+//                         extra; la firma ya garantiza que el POST viene de Twilio).
 //
 // FLUJO:
 //   Álvaro reenvía mensaje del grupo serigrafía al número sandbox de Twilio
 //   → Twilio hace POST aquí → Claude interpreta → INSERT en Supabase → respuesta TwiML
 // ════════════════════════════════════════════════════════════════
 
+const crypto = require('crypto');
 const Anthropic = require('@anthropic-ai/sdk');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -35,6 +45,21 @@ function parseFormBody(raw) {
   const out = {};
   for (const [k, v] of p) out[k] = v;
   return out;
+}
+
+// Valida la firma X-Twilio-Signature. Twilio firma con HMAC-SHA1 la URL
+// del webhook concatenada con sus parámetros POST ordenados por clave.
+// https://www.twilio.com/docs/usage/security#validating-requests
+function firmaTwilioValida(req, url, params, authToken) {
+  const firma = req.headers['x-twilio-signature'];
+  if (!firma) return false;
+  let data = url;
+  Object.keys(params).sort().forEach(function (k) { data += k + params[k]; });
+  const esperado = crypto.createHmac('sha1', authToken)
+    .update(Buffer.from(data, 'utf-8')).digest('base64');
+  const a = Buffer.from(firma);
+  const b = Buffer.from(esperado);
+  return a.length === b.length && crypto.timingSafeEqual(a, b); // tiempo constante
 }
 
 // Fecha/hora en Guatemala (UTC-6) — nunca toISOString directo en prod
@@ -224,10 +249,34 @@ module.exports = async function handler(req, res) {
     const from    = body.From  || '';
     const msgText = (body.Body  || '').trim();
 
+    // ── Seguridad: validar que el POST viene realmente de Twilio ──────
+    // Fail-closed: sin auth token o con firma inválida se rechaza (403),
+    // ANTES de llamar a Claude o escribir en Supabase (service_role salta RLS).
+    const authToken = process.env.TWILIO_AUTH_TOKEN || process.env.TWILIO_SANDBOX_AUTH;
+    if (!authToken) {
+      console.error('[TETRAPP-BOT] TWILIO_AUTH_TOKEN no configurado — rechazando (fail-closed)');
+      res.status(403).end('Forbidden');
+      return;
+    }
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    const host  = req.headers['x-forwarded-host'] || req.headers.host;
+    const url   = process.env.TWILIO_WEBHOOK_URL || (proto + '://' + host + req.url);
+    if (!firmaTwilioValida(req, url, body, authToken)) {
+      console.warn('[TETRAPP-BOT] firma Twilio inválida — rechazado. from:', from);
+      res.status(403).end('Forbidden');
+      return;
+    }
+
+    // Allowlist opcional de números (defensa extra sobre la firma)
+    const allow = (process.env.TETRA_WA_ALLOW || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    if (allow.length && !allow.some(function (n) { return from.indexOf(n) !== -1; })) {
+      console.warn('[TETRAPP-BOT] número no autorizado:', from);
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml('⛔ Número no autorizado para registrar producción.'));
+      return;
+    }
+
     console.log('[TETRAPP-BOT] from:', from, '| msg:', msgText.slice(0, 80));
-    console.log('[TETRAPP-BOT] env check — SUPA_URL:', !!process.env.SUPA_URL,
-      '| SUPA_SERVICE_KEY:', !!process.env.SUPA_SERVICE_KEY,
-      '| ANTHROPIC_API_KEY:', !!process.env.ANTHROPIC_API_KEY);
 
     if (!msgText) {
       res.setHeader('Content-Type', 'text/xml');

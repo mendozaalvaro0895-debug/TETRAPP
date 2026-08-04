@@ -293,7 +293,6 @@ async function getInventario() {
     const { data, error } = await db.from('inventario').select('sku, descripcion, existencia').eq('activo', true);
     if (error) throw error;
     inventarioCache = data || [];
-    console.log(`📦 Inventario cargado: ${inventarioCache.length} SKUs`);
     return inventarioCache;
   } catch(e) { console.error('Error inventario:', e); return []; }
 }
@@ -899,11 +898,9 @@ async function guardar() {
 // INICIALIZACIÓN
 // ============================================
 async function inicializar() {
-  console.log('🚀 Comandas iniciado');
   await cargarOperarios();
   await getInventario(); // Precargar inventario
-  console.log('✅ Inventario precargado');
-  
+
   const hoy = new Date().toISOString().split('T')[0];
   if (document.getElementById('filtroFecha')) document.getElementById('filtroFecha').value = hoy;
   if (document.getElementById('fFecha')) document.getElementById('fFecha').value = hoy;
@@ -916,7 +913,6 @@ async function inicializar() {
   const comandaId = urlParams.get('id');
   
   if (comandaId) {
-    console.log('📌 URL contiene ID de comanda:', comandaId);
     await cargarComandasPorFecha();
     await cargarYMostrarComandaPorId(comandaId);
   } else {

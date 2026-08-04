@@ -748,8 +748,6 @@ function buildOpCardGen(op, fn) {
     + '</div>';
 }
 
-function buildOpCard(op) { return buildOpCardGen(op, 'elegirOperario'); }
-
 function buildSeccionesGrid(lista, fn, rolClave) {
   var asignados = lista.filter(function(o){ return o.proceso_hab === rolClave; });
   asignados.sort(function(a,b){
@@ -1847,17 +1845,6 @@ async function guardarFlameado() {
     btn.disabled = false;
     btn.textContent = '💾 Guardar registro';
   }
-}
-
-// Conserva flameador, envase y línea (suelen repetirse bolsa tras
-// bolsa); solo renueva la hora y limpia la cantidad.
-function otraBolsaFlam() {
-  if (!flamOpActual) { volverSeleccionFlam(); return; }
-  set12h('fFlamHora', new Date().toTimeString().slice(0,5));
-  document.getElementById('fFlamCant').value = '';
-  cargarHoyFlam();
-  mostrarPantalla('scrFormFlam');
-  window.scrollTo(0, 0);
 }
 
 // ═══════════════════════════════════════════════════════════════
