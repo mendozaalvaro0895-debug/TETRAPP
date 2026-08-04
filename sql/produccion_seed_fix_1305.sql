@@ -1,0 +1,37 @@
+-- Reinsercion puntual del 13-may-2026, unica fecha que quedo fuera del seed
+-- (29 lineas, 213,749 unidades). Idempotente, no duplica lo que ya esta.
+insert into public.produccion_diaria (fecha, turno, maquina, sku, descripcion, cantidad, documento, origen) values
+  ('2026-05-13','dia',0,'10135','TAPA PASTILLERO 38 MM BLANCA',20845,'SHEETS','sheets'),
+  ('2026-05-13','dia',0,'10571','CONTRATAPA PRESS TOP 28/410 AMARILLO FLUOR INCOGUA',20000,'SHEETS','sheets'),
+  ('2026-05-13','dia',0,'10588','TAPA ELIPTICA LISA BLANCO/BLANCO SOLO ARMADA',16000,'SHEETS','sheets'),
+  ('2026-05-13','dia',0,'202010','PEINES SURTIDOS DE COLORES',5337,'SHEETS','sheets'),
+  ('2026-05-13','dia',1,'10004','ENVASE PIRAMIDAL CUADRADO COD. 207577',2880,'SHEETS','sheets'),
+  ('2026-05-13','dia',2,'10001','ENVASE JABONERO 48/150 NATURAL PVC INCOGUA',450,'SHEETS','sheets'),
+  ('2026-05-13','dia',2,'10384','ENVASE BABY SHAMPOO PVC 220 ML NATURAL PVC INCOGUA',325,'SHEETS','sheets'),
+  ('2026-05-13','dia',3,'10026','ENVASE MANZANITA 150 GR BLANCA',5500,'SHEETS','sheets'),
+  ('2026-05-13','dia',4,'10435','ENVASE LUNA 780 ML BLANCO SCENTIA',7800,'SHEETS','sheets'),
+  ('2026-05-13','dia',5,'10149','ENVASE BARRILITO BLANCO',5550,'SHEETS','sheets'),
+  ('2026-05-13','dia',6,'10025','ENVASE LITRO CUELLO 28 LITRO BLANCO POLIETILENO INCOGUA / SCENTIA',6700,'SHEETS','sheets'),
+  ('2026-05-13','dia',7,'214577','ENVASE ROLL ON BLANCO',9000,'SHEETS','sheets'),
+  ('2026-05-13','dia',8,'10033','ENVASE LITRO CUELLO 33 BLANCO POLIETILENO',6800,'SHEETS','sheets'),
+  ('2026-05-13','dia',9,'214641','ENVASE TARRO FORZA REDONDO 1000ML BLANCO POLIETILENO',3520,'SHEETS','sheets'),
+  ('2026-05-13','noche',0,'10224','BASE TAPA PRESS TOP 33/415 VERDE TRASLUCIDO SINERGIA',8000,'SHEETS','sheets'),
+  ('2026-05-13','noche',0,'10269','TAPA GENERICA 28/410 BLANCA H25 SIN LINER',5000,'SHEETS','sheets'),
+  ('2026-05-13','noche',0,'10571','CONTRATAPA PRESS TOP 28/410 AMARILLO FLUOR INCOGUA',20000,'SHEETS','sheets'),
+  ('2026-05-13','noche',0,'10573','TAPA PRESS TOP 28/410 VERDE TRASLUCIDO OSCURO/AMARILLO FLUOR SOLO ARMADO INCOGUA',1360,'SHEETS','sheets'),
+  ('2026-05-13','noche',0,'10588','TAPA ELIPTICA LISA BLANCO/BLANCO SOLO ARMADA',16000,'SHEETS','sheets'),
+  ('2026-05-13','noche',0,'202010','PEINES SURTIDOS DE COLORES',7392,'SHEETS','sheets'),
+  ('2026-05-13','noche',1,'10004','ENVASE PIRAMIDAL CUADRADO COD. 207577',3120,'SHEETS','sheets'),
+  ('2026-05-13','noche',2,'10001','ENVASE JABONERO 48/150 NATURAL PVC INCOGUA',3000,'SHEETS','sheets'),
+  ('2026-05-13','noche',3,'10026','ENVASE MANZANITA 150 GR BLANCA',5000,'SHEETS','sheets'),
+  ('2026-05-13','noche',4,'10435','ENVASE LUNA 780 ML BLANCO SCENTIA',3600,'SHEETS','sheets'),
+  ('2026-05-13','noche',5,'10149','ENVASE BARRILITO BLANCO',4050,'SHEETS','sheets'),
+  ('2026-05-13','noche',6,'10025','ENVASE LITRO CUELLO 28 LITRO BLANCO POLIETILENO INCOGUA / SCENTIA',6800,'SHEETS','sheets'),
+  ('2026-05-13','noche',7,'214577','ENVASE ROLL ON BLANCO',10000,'SHEETS','sheets'),
+  ('2026-05-13','noche',8,'10033','ENVASE LITRO CUELLO 33 BLANCO POLIETILENO',6200,'SHEETS','sheets'),
+  ('2026-05-13','noche',9,'214641','ENVASE TARRO FORZA REDONDO 1000ML BLANCO POLIETILENO',3520,'SHEETS','sheets')
+on conflict (fecha, turno, maquina, sku, documento) do update set
+  cantidad = excluded.cantidad, descripcion = excluded.descripcion;
+
+select count(*) as lineas, to_char(sum(cantidad),'FM999,999,999') as unidades
+from public.produccion_diaria where documento='SHEETS' and fecha='2026-05-13';
