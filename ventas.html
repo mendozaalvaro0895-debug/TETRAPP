@@ -1291,9 +1291,16 @@ async function cargarRecetario() {
   });
   RECET_SKUS = Object.keys(skuMap).sort().map(function(s) { return {sku_fact: s, desc: skuMap[s]}; });
 
-  // 2. Inventario para autocomplete
+  // 2. Inventario para autocomplete (inventario + SKUs facturables no presentes en inventario)
   var ri = await db.from('inventario').select('sku,descripcion');
   INV_REC = ri.error ? [] : (ri.data || []);
+  var invIdx = {};
+  INV_REC.forEach(function(i) { if (i.sku) invIdx[String(i.sku)] = 1; });
+  RECET_SKUS.forEach(function(s) {
+    if (s.sku_fact && !invIdx[s.sku_fact])
+      INV_REC.push({sku: s.sku_fact, descripcion: s.desc || ''});
+  });
+  INV_REC.sort(function(a,b){ return String(a.sku||'').localeCompare(String(b.sku||'')); });
 
   // 3. Recetas existentes
   var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion,es_directo');
