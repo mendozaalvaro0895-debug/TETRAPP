@@ -31,3 +31,4 @@ create policy delete_master on public.sku_equivalencias
   for delete to authenticated using (public.es_master());
 
 revoke all on public.sku_equivalencias from anon;
+grant select, insert, update, delete on public.sku_equivalencias to authenticated;
