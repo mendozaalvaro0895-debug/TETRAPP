@@ -1452,7 +1452,7 @@ function buildRcAddForm(sid) {
       '<div class="rc-drop" id="rcd-' + sid + '"></div>' +
     '</div>' +
     '<input class="rc-in nota" id="rcn-' + sid + '" placeholder="Nota (opcional)">' +
-    '<button class="btn btn-ven" style="padding:5px 10px;font-size:11px;white-space:nowrap" onclick="agregarParte(\'' + sid + '\')">+ Añadir</button>' +
+    '<button class="btn btn-ven" id="rcb-' + sid + '" style="padding:5px 10px;font-size:11px;white-space:nowrap" onclick="agregarParte(\'' + sid + '\')">+ Añadir</button>' +
   '</div>';
 }
 
@@ -1500,20 +1500,27 @@ async function agregarParte(sid) {
   var nota   = ((document.getElementById('rcn-' + sid) || {}).value || '').trim();
   if (!codigo) { toast('Ingresa un código o nombre de proceso', 'err'); return; }
 
+  var btn = document.getElementById('rcb-' + sid);
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+
   var recetaId = await ensureReceta(sku, sid);
-  if (!recetaId) return;
+  if (!recetaId) {
+    if (btn) { btn.disabled = false; btn.textContent = '+ Añadir'; }
+    return;
+  }
 
   var orden = (PARTES_MAP[recetaId] || []).length + 1;
   var rp = await db.from('sku_receta_partes')
     .insert({receta_id: recetaId, tipo: tipo, codigo: codigo, nota: nota || null, orden: orden})
     .select().single();
-  if (rp.error) { toast('Error: ' + rp.error.message, 'err'); return; }
+  if (btn) { btn.disabled = false; btn.textContent = '+ Añadir'; }
+  if (rp.error) { toast('Error al guardar: ' + rp.error.message, 'err'); return; }
 
   PARTES_MAP[recetaId].push(rp.data);
   refreshRcCard(sku);
   document.getElementById('rcc-' + sid).value = '';
   document.getElementById('rcn-' + sid).value = '';
-  toast('Parte añadida', 'ok');
+  toast('✓ Parte añadida', 'ok');
 }
 
 async function eliminarParte(parteId) {
