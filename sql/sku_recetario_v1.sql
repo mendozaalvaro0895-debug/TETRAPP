@@ -1,20 +1,19 @@
--- sku_recetario_v1.sql
--- Recetario de SKUs: un SKU facturable puede tener N partes (base, accesorio, proceso).
--- Reemplaza sku_equivalencias (tabla aún vacía).
+-- sku_recetario_v1.sql (v2 — incluye area, guardado, es_directo)
 -- Correr en Supabase Dashboard → SQL Editor.
+-- Reemplaza sku_equivalencias (vacía). Incluye todo: no necesitás correr archivos separados.
 
--- 1. Eliminar tabla anterior (vacía, sin datos que perder)
 drop table if exists public.sku_equivalencias;
 
--- 2. Cabecera: una fila por SKU facturable
 create table if not exists public.sku_recetas (
   id          serial primary key,
   sku_fact    text not null unique,
   descripcion text,
+  area        text check (area in ('tapas','serigrafia','produccion')),
+  es_directo  boolean default false,
+  guardado    boolean default false,
   creado_en   timestamptz default now()
 );
 
--- 3. Partes: N filas por receta (base, accesorio, proceso)
 create table if not exists public.sku_receta_partes (
   id          serial primary key,
   receta_id   int not null references public.sku_recetas(id) on delete cascade,
