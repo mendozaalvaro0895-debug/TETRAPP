@@ -172,30 +172,57 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rot-pos{background:var(--green-l);color:var(--green)}
 .rot-neg{background:var(--red-l);color:var(--red)}
 
-/* EQUIVALENCIAS SKU */
-.equiv-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:18px}
-.equiv-header{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
-.equiv-header:hover{background:var(--ven-xl)}
-.equiv-header-t{font-size:13px;font-weight:700}
-.equiv-header-s{font-size:11px;color:var(--gray-l)}
-.equiv-chevron{font-size:12px;color:var(--gray);transition:transform .2s;flex-shrink:0}
-.equiv-chevron.open{transform:rotate(180deg)}
-.equiv-body{display:none;padding:14px 16px}
-.equiv-body.open{display:block}
-.equiv-list{max-height:280px;overflow-y:auto;margin-bottom:14px;border:1px solid var(--border);border-radius:8px}
-.equiv-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bg);font-size:12px}
-.equiv-item:last-child{border-bottom:none}
-.equiv-sku{font-family:var(--mono);font-weight:700;color:var(--ven);font-size:11px;white-space:nowrap}
-.equiv-arrow{color:var(--gray-l);font-size:13px;flex-shrink:0}
-.equiv-nota{color:var(--gray);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
-.equiv-del{background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:14px;padding:2px 6px;border-radius:5px;line-height:1;transition:color .15s;flex-shrink:0}
-.equiv-del:hover{color:var(--red)}
-.equiv-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:4px}
-.equiv-input{padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--mono);font-weight:600;width:130px;outline:none;transition:border-color .15s}
-.equiv-input:focus{border-color:var(--ven)}
-.equiv-input.wide{width:220px;font-family:var(--font);font-weight:400}
-.equiv-empty{color:var(--gray);font-size:12px;padding:18px;text-align:center}
-@media(max-width:600px){.equiv-form{flex-direction:column;align-items:stretch}.equiv-input,.equiv-input.wide{width:100%}}
+/* RECETARIO DE SKUs */
+.recet-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:18px}
+.recet-phdr{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;cursor:pointer;user-select:none}
+.recet-phdr:hover{background:var(--ven-xl)}
+.recet-phdr-t{font-size:13px;font-weight:700}
+.recet-phdr-s{font-size:11px;color:var(--gray-l)}
+.recet-pchev{font-size:12px;color:var(--gray);transition:transform .2s;flex-shrink:0}
+.recet-pchev.open{transform:rotate(180deg)}
+.recet-pbody{display:none;padding:14px 16px;border-top:1px solid var(--border)}
+.recet-pbody.open{display:block}
+.recet-barra{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.recet-search{flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--font);outline:none;transition:border-color .15s}
+.recet-search:focus{border-color:var(--ven)}
+.recet-count{font-size:11px;color:var(--gray);white-space:nowrap;flex-shrink:0}
+.recet-ver-mas{display:block;width:100%;padding:9px;background:none;border:1.5px dashed var(--border);border-radius:8px;font-size:12px;font-weight:600;color:var(--gray);cursor:pointer;margin-top:4px;transition:border-color .15s,color .15s}
+.recet-ver-mas:hover{border-color:var(--ven);color:var(--ven)}
+/* cards */
+.rc{border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden}
+.rc-hdr{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none;background:var(--bg)}
+.rc-hdr:hover{background:var(--ven-xl)}
+.rc-sku{font-family:var(--mono);font-weight:700;color:var(--ven);font-size:12px;white-space:nowrap}
+.rc-desc{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--gray)}
+.rc-badge{background:var(--ven-l);color:var(--ven-dark);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.rc-badge.vacio{background:var(--bg2);color:var(--gray-l)}
+.rc-chev{font-size:11px;color:var(--gray);transition:transform .2s;flex-shrink:0}
+.rc-chev.open{transform:rotate(180deg)}
+.rc-cuerpo{display:none;padding:12px 14px;border-top:1px solid var(--border);background:var(--card)}
+.rc-cuerpo.open{display:block}
+.rc-desc-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.rc-lbl{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);white-space:nowrap;flex-shrink:0}
+.rc-desc-inp{flex:1;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);outline:none;transition:border-color .15s}
+.rc-desc-inp:focus{border-color:var(--ven)}
+.rc-partes-hdr{display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:6px;padding:4px 8px;font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);border-bottom:1px solid var(--bg2)}
+.rc-parte{display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--bg)}
+.rc-parte:last-of-type{border-bottom:none}
+.rc-add{display:grid;grid-template-columns:80px 1fr 1fr auto;gap:6px;align-items:center;padding:8px 8px 4px;border-top:1px solid var(--border);margin-top:4px}
+.rc-tipo{padding:5px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:var(--font);outline:none;background:var(--card);width:100%}
+.rc-tipo:focus{border-color:var(--ven)}
+.rc-in{padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:var(--mono);font-weight:600;outline:none;width:100%;box-sizing:border-box;transition:border-color .15s}
+.rc-in:focus{border-color:var(--ven)}
+.rc-in.nota{font-family:var(--font);font-weight:400}
+.rc-del{background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:13px;padding:3px 5px;border-radius:5px;line-height:1;transition:color .15s}
+.rc-del:hover{color:var(--red)}
+.rc-wrap{position:relative}
+.rc-drop{display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;background:var(--card);border:1.5px solid var(--ven);border-radius:8px;max-height:160px;overflow-y:auto;z-index:60;box-shadow:0 8px 22px rgba(0,0,0,.14)}
+.rc-drop.open{display:block}
+.rc-opt{padding:7px 10px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border)}
+.rc-opt:last-child{border-bottom:none}
+.rc-opt:hover{background:var(--ven-xl)}
+.rc-opt b{font-family:var(--mono);color:var(--ven)}
+@media(max-width:600px){.rc-hdr{grid-template-columns:auto 1fr auto auto}.rc-partes-hdr,.rc-parte,.rc-add{grid-template-columns:70px 1fr 1fr 26px}}
 
 /* TOAST */
 .toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none}
@@ -463,26 +490,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
       </div>
 
-      <!-- EQUIVALENCIAS SKU -->
-      <div class="equiv-panel" id="equivPanel">
-        <div class="equiv-header" onclick="toggleEquiv()">
+      <!-- RECETARIO DE SKUs -->
+      <div class="recet-panel" id="recetarioPanel">
+        <div class="recet-phdr" onclick="toggleRecetario()">
           <div>
-            <div class="equiv-header-t">Equivalencias de SKU</div>
-            <div class="equiv-header-s">Variantes de código: un SKU de producción que se factura bajo otro código</div>
+            <div class="recet-phdr-t">📋 Recetario de SKUs</div>
+            <div class="recet-phdr-s">Componentes y procesos de cada SKU facturable · base para trazabilidad completa</div>
           </div>
-          <span class="equiv-chevron" id="equivChev">▾</span>
+          <span class="recet-pchev" id="recetChev">▾</span>
         </div>
-        <div class="equiv-body" id="equivBody">
-          <div class="equiv-list" id="equivList"><div class="equiv-empty">Cargando…</div></div>
-          <div id="equivFormWrap" style="display:none">
-            <div class="equiv-form">
-              <input class="equiv-input" id="equivProd" placeholder="SKU producción" maxlength="30">
-              <span style="color:var(--gray-l);font-size:16px">→</span>
-              <input class="equiv-input" id="equivFact" placeholder="SKU facturación" maxlength="30">
-              <input class="equiv-input wide" id="equivNota" placeholder="Nota (opcional)" maxlength="120">
-              <button class="btn btn-ven" onclick="agregarEquivalencia()" style="padding:7px 14px;font-size:12px">Añadir</button>
-            </div>
+        <div class="recet-pbody" id="recetBody">
+          <div class="recet-barra">
+            <input class="recet-search" id="recetSearch" placeholder="🔍 Buscar SKU o descripción..." oninput="filtrarRecetario(this.value)" autocomplete="off">
+            <span class="recet-count" id="recetCount">—</span>
           </div>
+          <div id="recetLista"><div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">Abre el panel para cargar…</div></div>
         </div>
       </div>
 
@@ -1227,77 +1249,307 @@ function buildRotRow(m, prod, fact) {
     '</tr>';
 }
 
-// ── Equivalencias SKU ────────────────────────────────────────────
-var EQUIV = [];
-var EQUIV_CARGADO = false;
+// ── Recetario de SKUs ────────────────────────────────────────────
+var RECET_SKUS = [];       // [{sku_fact, desc}] únicos de VENTAS
+var RECETAS_MAP = {};      // sku_fact -> {id, descripcion}
+var PARTES_MAP = {};       // receta_id -> [{id, tipo, codigo, nota, orden}]
+var RECETARIO_CARGADO = false;
+var RECET_FILTRO = '';
+var RECET_VISIBLE = 30;
+var INV_REC = [];          // [{sku, descripcion}] de inventario para autocomplete
+var RECET_SID_SKU = {};   // sid -> sku_fact
 
-function toggleEquiv() {
-  var body = document.getElementById('equivBody');
-  var chev = document.getElementById('equivChev');
+var PROCESOS_FIJOS = ['Armado','Liner','Banda','Flameado','Impresión','Empaque','Serigrafía','Revisado','Limpiar pestaña','Apoyo'];
+
+function safeSku(sku) { return String(sku).replace(/[^a-zA-Z0-9]/g, '_'); }
+
+function toggleRecetario() {
+  var body = document.getElementById('recetBody');
+  var chev = document.getElementById('recetChev');
   var open = body.classList.toggle('open');
   chev.classList.toggle('open', open);
-  if (open && !EQUIV_CARGADO) cargarEquivalencias();
+  if (open && !RECETARIO_CARGADO) cargarRecetario();
 }
 
-async function cargarEquivalencias() {
-  var r = await db.from('sku_equivalencias').select('id,sku_prod,sku_fact,nota').order('sku_prod');
-  if (r.error) {
-    document.getElementById('equivList').innerHTML = '<div class="equiv-empty">Error al cargar equivalencias</div>';
-    return;
-  }
-  EQUIV = r.data || [];
-  EQUIV_CARGADO = true;
-  renderEquivalencias();
-  if (TETRA.rol === 'master') {
-    document.getElementById('equivFormWrap').style.display = 'block';
-  }
+async function cargarRecetario() {
+  document.getElementById('recetLista').innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">Cargando…</div>';
+
+  // 1. SKUs únicos de VENTAS (ya cargado en memoria)
+  var skuMap = {};
+  VENTAS.forEach(function(v) {
+    if (!v.sku) return;
+    if (!skuMap[v.sku] || (!skuMap[v.sku] && v.descripcion)) skuMap[v.sku] = v.descripcion || '';
+  });
+  RECET_SKUS = Object.keys(skuMap).sort().map(function(s) { return {sku_fact: s, desc: skuMap[s]}; });
+
+  // 2. Inventario para autocomplete
+  var ri = await db.from('inventario').select('sku,descripcion');
+  INV_REC = ri.error ? [] : (ri.data || []);
+
+  // 3. Recetas existentes
+  var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion');
+  RECETAS_MAP = {};
+  if (!rr.error) (rr.data || []).forEach(function(r) { RECETAS_MAP[r.sku_fact] = r; });
+
+  // 4. Partes de todas las recetas
+  var rp = await db.from('sku_receta_partes').select('id,receta_id,tipo,codigo,nota,orden').order('receta_id').order('orden');
+  PARTES_MAP = {};
+  if (!rp.error) (rp.data || []).forEach(function(p) {
+    if (!PARTES_MAP[p.receta_id]) PARTES_MAP[p.receta_id] = [];
+    PARTES_MAP[p.receta_id].push(p);
+  });
+
+  RECETARIO_CARGADO = true;
+  renderRecetario();
 }
 
-function renderEquivalencias() {
-  var lista = document.getElementById('equivList');
-  if (!EQUIV.length) {
-    lista.innerHTML = '<div class="equiv-empty">Sin equivalencias registradas.' + (TETRA.rol === 'master' ? ' Añade la primera abajo.' : '') + '</div>';
-    return;
-  }
+function filtrarRecetario(q) {
+  RECET_FILTRO = q;
+  RECET_VISIBLE = 30;
+  renderRecetario();
+}
+
+function renderRecetario() {
+  var q = RECET_FILTRO.toLowerCase();
+  var lista = RECET_SKUS.filter(function(s) {
+    return !q || s.sku_fact.toLowerCase().indexOf(q) !== -1 || (s.desc || '').toLowerCase().indexOf(q) !== -1;
+  });
+  lista.sort(function(a, b) {
+    var aR = !!RECETAS_MAP[a.sku_fact], bR = !!RECETAS_MAP[b.sku_fact];
+    if (aR !== bR) return aR ? -1 : 1;
+    return a.sku_fact < b.sku_fact ? -1 : 1;
+  });
+
+  var shown = lista.slice(0, RECET_VISIBLE);
+  RECET_SID_SKU = {};
   var html = '';
-  EQUIV.forEach(function (e) { html += buildEquivItem(e); });
-  lista.innerHTML = html;
+  shown.forEach(function(s) {
+    var sid = safeSku(s.sku_fact);
+    RECET_SID_SKU[sid] = s.sku_fact;
+    var receta = RECETAS_MAP[s.sku_fact] || null;
+    var partes = receta ? (PARTES_MAP[receta.id] || []) : [];
+    html += buildRecetCard(s.sku_fact, s.desc, receta, partes);
+  });
+
+  document.getElementById('recetCount').textContent = lista.length + ' SKUs' + (q ? ' (filtrado)' : ' de ventas');
+  document.getElementById('recetLista').innerHTML = html || '<div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">Sin resultados</div>';
+
+  if (lista.length > RECET_VISIBLE) {
+    var btn = document.createElement('button');
+    btn.className = 'recet-ver-mas';
+    btn.textContent = 'Ver ' + Math.min(30, lista.length - RECET_VISIBLE) + ' más (' + (lista.length - RECET_VISIBLE) + ' pendientes)';
+    btn.onclick = function() { RECET_VISIBLE += 30; renderRecetario(); };
+    document.getElementById('recetLista').appendChild(btn);
+  }
 }
 
-function buildEquivItem(e) {
-  var delBtn = (TETRA.rol === 'master')
-    ? '<button class="equiv-del" onclick="eliminarEquivalencia(' + e.id + ')" title="Eliminar">✕</button>'
+function buildRecetCard(sku, desc, receta, partes) {
+  var sid = safeSku(sku);
+  var nP = partes.length;
+  var badgeTxt = nP ? nP + (nP === 1 ? ' parte' : ' partes') : 'Sin receta';
+  var badgeCls = nP ? 'rc-badge' : 'rc-badge vacio';
+  var cuerpo = buildRcCuerpo(sku, sid, desc, receta, partes);
+  return '<div class="rc" id="rc-' + sid + '">' +
+    '<div class="rc-hdr" onclick="toggleRcCard(\'' + sid + '\')">' +
+      '<span class="rc-sku">' + escHtml(sku) + '</span>' +
+      '<span class="rc-desc">' + escHtml(desc || '—') + '</span>' +
+      '<span class="' + badgeCls + '">' + badgeTxt + '</span>' +
+      '<span class="rc-chev" id="rc-chev-' + sid + '">▾</span>' +
+    '</div>' +
+    '<div class="rc-cuerpo" id="rc-body-' + sid + '">' + cuerpo + '</div>' +
+  '</div>';
+}
+
+function buildRcCuerpo(sku, sid, desc, receta, partes) {
+  var descVal = receta ? (receta.descripcion || desc || '') : (desc || '');
+  var esMaster = TETRA.rol === 'master';
+  var partesHdr = partes.length
+    ? '<div class="rc-partes-hdr"><span>Tipo</span><span>Código / Proceso</span><span>Nota</span><span></span></div>'
     : '';
-  return '<div class="equiv-item">' +
-    '<span class="equiv-sku">' + escHtml(e.sku_prod) + '</span>' +
-    '<span class="equiv-arrow">→</span>' +
-    '<span class="equiv-sku">' + escHtml(e.sku_fact) + '</span>' +
-    '<span class="equiv-nota">' + (e.nota ? escHtml(e.nota) : '') + '</span>' +
-    delBtn +
-    '</div>';
+  var partesHtml = '';
+  partes.forEach(function(p) { partesHtml += buildRcParteRow(p, esMaster); });
+  return buildRcDescRow(sid, descVal, esMaster) + partesHdr + partesHtml + (esMaster ? buildRcAddForm(sid) : '');
 }
 
-async function agregarEquivalencia() {
-  var prod = document.getElementById('equivProd').value.trim();
-  var fact = document.getElementById('equivFact').value.trim();
-  var nota = document.getElementById('equivNota').value.trim();
-  if (!prod || !fact) { toast('Ingresa SKU de producción y SKU de facturación', 'err'); return; }
-  var r = await db.from('sku_equivalencias').insert({ sku_prod: prod, sku_fact: fact, nota: nota || null });
-  if (r.error) { toast('Error: ' + (r.error.message || r.error), 'err'); return; }
-  document.getElementById('equivProd').value = '';
-  document.getElementById('equivFact').value = '';
-  document.getElementById('equivNota').value = '';
-  EQUIV_CARGADO = false;
-  await cargarEquivalencias();
-  toast('Equivalencia añadida', 'ok');
+function buildRcDescRow(sid, val, esMaster) {
+  var btn = esMaster
+    ? '<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;flex-shrink:0" onclick="guardarDesc(\'' + sid + '\')">✓ Guardar</button>'
+    : '';
+  return '<div class="rc-desc-row">' +
+    '<span class="rc-lbl">Descripción</span>' +
+    '<input class="rc-desc-inp" id="rc-desc-' + sid + '" value="' + escHtml(val) + '" placeholder="Descripción del producto terminado"' + (esMaster ? '' : ' disabled') + '>' +
+    btn +
+  '</div>';
 }
 
-async function eliminarEquivalencia(id) {
-  var r = await db.from('sku_equivalencias').delete().eq('id', id);
-  if (r.error) { toast('Error al eliminar', 'err'); return; }
-  EQUIV_CARGADO = false;
-  await cargarEquivalencias();
-  toast('Equivalencia eliminada', 'ok');
+function buildRcParteRow(p, esMaster) {
+  var tipoLabel = {base: 'Base', accesorio: 'Accesorio', proceso: 'Proceso'}[p.tipo] || p.tipo;
+  var del = esMaster
+    ? '<button class="rc-del" onclick="eliminarParte(' + p.id + ')" title="Eliminar">✕</button>'
+    : '<span></span>';
+  return '<div class="rc-parte">' +
+    '<span style="font-size:11px;font-weight:700;color:var(--gray-l)">' + escHtml(tipoLabel) + '</span>' +
+    '<span style="font-family:var(--mono);font-size:11px;font-weight:700">' + escHtml(p.codigo) + '</span>' +
+    '<span style="font-size:11px;color:var(--gray)">' + escHtml(p.nota || '—') + '</span>' +
+    del +
+  '</div>';
+}
+
+function buildRcAddForm(sid) {
+  return '<div class="rc-add">' +
+    '<select class="rc-tipo" id="rct-' + sid + '">' +
+      '<option value="base">Base</option>' +
+      '<option value="accesorio">Accesorio</option>' +
+      '<option value="proceso">Proceso</option>' +
+    '</select>' +
+    '<div class="rc-wrap">' +
+      '<input class="rc-in" id="rcc-' + sid + '" placeholder="Código o proceso…" autocomplete="off" ' +
+        'oninput="rcAcBuscar(\'' + sid + '\')" onblur="setTimeout(function(){rcAcCerrar(\'' + sid + '\')},180)">' +
+      '<div class="rc-drop" id="rcd-' + sid + '"></div>' +
+    '</div>' +
+    '<input class="rc-in nota" id="rcn-' + sid + '" placeholder="Nota (opcional)">' +
+    '<button class="btn btn-ven" style="padding:5px 10px;font-size:11px;white-space:nowrap" onclick="agregarParte(\'' + sid + '\')">+ Añadir</button>' +
+  '</div>';
+}
+
+function toggleRcCard(sid) {
+  var body = document.getElementById('rc-body-' + sid);
+  var chev = document.getElementById('rc-chev-' + sid);
+  if (!body) return;
+  var open = body.classList.toggle('open');
+  if (chev) chev.classList.toggle('open', open);
+}
+
+async function guardarDesc(sid) {
+  var sku = RECET_SID_SKU[sid];
+  if (!sku) return;
+  var val = (document.getElementById('rc-desc-' + sid).value || '').trim();
+  var receta = RECETAS_MAP[sku];
+  if (receta) {
+    var ra = await db.from('sku_recetas').update({descripcion: val}).eq('id', receta.id);
+    if (ra.error) { toast('Error al guardar', 'err'); return; }
+    RECETAS_MAP[sku].descripcion = val;
+  } else {
+    var rb = await db.from('sku_recetas').insert({sku_fact: sku, descripcion: val || null}).select().single();
+    if (rb.error) { toast('Error al guardar', 'err'); return; }
+    RECETAS_MAP[sku] = rb.data;
+    PARTES_MAP[rb.data.id] = [];
+  }
+  toast('Descripción guardada', 'ok');
+}
+
+async function ensureReceta(sku, sid) {
+  if (RECETAS_MAP[sku]) return RECETAS_MAP[sku].id;
+  var desc = ((document.getElementById('rc-desc-' + sid) || {}).value || '').trim();
+  var rc = await db.from('sku_recetas').insert({sku_fact: sku, descripcion: desc || null}).select().single();
+  if (rc.error) { toast('Error: ' + rc.error.message, 'err'); return null; }
+  RECETAS_MAP[sku] = rc.data;
+  PARTES_MAP[rc.data.id] = [];
+  return rc.data.id;
+}
+
+async function agregarParte(sid) {
+  var sku = RECET_SID_SKU[sid];
+  if (!sku) return;
+  var tipo   = (document.getElementById('rct-' + sid) || {}).value || 'base';
+  var codigo = ((document.getElementById('rcc-' + sid) || {}).value || '').trim();
+  var nota   = ((document.getElementById('rcn-' + sid) || {}).value || '').trim();
+  if (!codigo) { toast('Ingresa un código o nombre de proceso', 'err'); return; }
+
+  var recetaId = await ensureReceta(sku, sid);
+  if (!recetaId) return;
+
+  var orden = (PARTES_MAP[recetaId] || []).length + 1;
+  var rp = await db.from('sku_receta_partes')
+    .insert({receta_id: recetaId, tipo: tipo, codigo: codigo, nota: nota || null, orden: orden})
+    .select().single();
+  if (rp.error) { toast('Error: ' + rp.error.message, 'err'); return; }
+
+  PARTES_MAP[recetaId].push(rp.data);
+  refreshRcCard(sku);
+  document.getElementById('rcc-' + sid).value = '';
+  document.getElementById('rcn-' + sid).value = '';
+  toast('Parte añadida', 'ok');
+}
+
+async function eliminarParte(parteId) {
+  var recetaId = null;
+  Object.keys(PARTES_MAP).forEach(function(rid) {
+    (PARTES_MAP[rid] || []).forEach(function(p) { if (p.id === parteId) recetaId = parseInt(rid, 10); });
+  });
+  var rd = await db.from('sku_receta_partes').delete().eq('id', parteId);
+  if (rd.error) { toast('Error al eliminar', 'err'); return; }
+  if (recetaId != null) PARTES_MAP[recetaId] = (PARTES_MAP[recetaId] || []).filter(function(p) { return p.id !== parteId; });
+  var sku = null;
+  Object.keys(RECETAS_MAP).forEach(function(s) { if (RECETAS_MAP[s].id === recetaId) sku = s; });
+  if (sku) refreshRcCard(sku);
+  toast('Parte eliminada', 'ok');
+}
+
+function refreshRcCard(sku) {
+  var sid = safeSku(sku);
+  var receta = RECETAS_MAP[sku] || null;
+  var partes = receta ? (PARTES_MAP[receta.id] || []) : [];
+  var skuData = null;
+  RECET_SKUS.forEach(function(s) { if (s.sku_fact === sku) skuData = s; });
+
+  var nP = partes.length;
+  var badge = document.querySelector('#rc-' + sid + ' .rc-badge');
+  if (badge) {
+    badge.textContent = nP ? nP + (nP === 1 ? ' parte' : ' partes') : 'Sin receta';
+    badge.className = nP ? 'rc-badge' : 'rc-badge vacio';
+  }
+  var body = document.getElementById('rc-body-' + sid);
+  if (body && body.classList.contains('open')) {
+    body.innerHTML = buildRcCuerpo(sku, sid, skuData ? skuData.desc : '', receta, partes);
+  }
+}
+
+// Autocomplete campo Código
+function rcAcBuscar(sid) {
+  var q = ((document.getElementById('rcc-' + sid) || {}).value || '').trim().toLowerCase();
+  var drop = document.getElementById('rcd-' + sid);
+  if (!drop) return;
+  if (q.length < 2) { drop.classList.remove('open'); return; }
+  var tipo = (document.getElementById('rct-' + sid) || {}).value || 'base';
+  var res = [];
+  if (tipo === 'proceso') {
+    res = PROCESOS_FIJOS
+      .filter(function(p) { return p.toLowerCase().indexOf(q) !== -1; })
+      .map(function(p) { return {sku: '', descripcion: p}; })
+      .slice(0, 10);
+  } else {
+    res = INV_REC.filter(function(i) {
+      return String(i.sku || '').toLowerCase().indexOf(q) === 0 ||
+             String(i.descripcion || '').toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 15);
+  }
+  if (!res.length) { drop.classList.remove('open'); return; }
+  var html = '';
+  res.forEach(function(i) { html += buildRcOpt(i, sid); });
+  drop.innerHTML = html;
+  drop.classList.add('open');
+}
+
+function buildRcOpt(item, sid) {
+  var display = item.sku
+    ? '<b>' + escHtml(String(item.sku)) + '</b> · ' + escHtml((item.descripcion || '').slice(0, 42))
+    : escHtml(item.descripcion);
+  return '<div class="rc-opt" data-sid="' + sid + '" data-val="' + escHtml(item.sku || item.descripcion) + '" onmousedown="rcAcElegirEv(this)">' + display + '</div>';
+}
+
+function rcAcElegirEv(el) {
+  var sid = el.dataset.sid, val = el.dataset.val;
+  var inp = document.getElementById('rcc-' + sid);
+  if (inp) inp.value = val;
+  rcAcCerrar(sid);
+  var nota = document.getElementById('rcn-' + sid);
+  if (nota) nota.focus();
+}
+
+function rcAcCerrar(sid) {
+  var d = document.getElementById('rcd-' + sid);
+  if (d) d.classList.remove('open');
 }
 
 document.addEventListener('DOMContentLoaded', recargar);
