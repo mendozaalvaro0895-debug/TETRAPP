@@ -438,7 +438,7 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
 .ag-cell.finde{background:#475569 !important;color:#fff !important;opacity:1}
 .ag-cell.finde.dom-trabajado{background:#22c55e !important;color:#fff !important;opacity:1}
 .ag-row-full .ag-td-name{color:#14532d;font-weight:700}
-.ag-row-inactivo .ag-td-name{opacity:.55}
+.ag-row-inactivo .ag-td-name{color:#9ca3af;background:var(--bg)}
 .ag-row-inactivo .ag-cell{opacity:.55}
 .ag-section-hdr td{background:var(--bg2);padding:3px 10px;font-size:9px;font-weight:800;color:var(--gray-l);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border)}
 .ag-th-anterior{background:#FFFBEB;color:#92400E}
@@ -2016,7 +2016,11 @@ function posKeyDefault(p) {
 function getMatriz() {
   var m = {};
   var lista = (personalData && personalData.serig ? personalData.serig : [])
-    .filter(function(p) { return p.activo && !ausentesDia[p.codigo]; });
+    .filter(function(p) {
+      if (!p.activo || ausentesDia[p.codigo]) return false;
+      var fi = p.fecha_inicio || (p.created_at ? p.created_at.slice(0,10) : null);
+      return !fi || posFecha >= fi;
+    });
   lista.forEach(function(p) {
     var pos = Object.prototype.hasOwnProperty.call(posDiaCache, p.codigo)
       ? posDiaCache[p.codigo]   // snapshot del día ('' = pool explícito ese día)
@@ -2052,7 +2056,11 @@ function renderMatriz() {
   var m = getMatriz();
   var asignados = {};
   Object.keys(m).forEach(function(k) { (m[k] || []).forEach(function(c) { asignados[c] = true; }); });
-  var lista = (personalData && personalData.serig ? personalData.serig : []).filter(function(p) { return p.activo; });
+  var lista = (personalData && personalData.serig ? personalData.serig : []).filter(function(p) {
+    if (!p.activo) return false;
+    var fi = p.fecha_inicio || (p.created_at ? p.created_at.slice(0,10) : null);
+    return !fi || posFecha >= fi;
+  });
 
   var poolChips = lista.filter(function(p) { return !asignados[p.codigo] && !ausentesDia[p.codigo]; })
                        .map(function(p) { return matrizChip(p.codigo); }).join('');
@@ -4008,10 +4016,12 @@ async function renderAsistGrid() {
     lista.forEach(function(p) {
       var daysByP = byPD[p.codigo] || {};
       var fechaInicio = p.fecha_inicio || (p.created_at ? p.created_at.slice(0,10) : null);
+      var fechaBaja = !p.activo ? (p.fecha_baja || null) : null;
       var isFullGreen = true;
       diasActual.forEach(function(f) { // racha del mes ACTUAL — la cola del mes anterior no cuenta
         if (f > hoy) return;
         if (fechaInicio && f < fechaInicio) return; // antes de ingreso — no cuenta para racha
+        if (fechaBaja && f > fechaBaja) return; // tras baja — no cuenta para racha
         var dow = new Date(f + 'T12:00:00').getDay();
         if (dow === 0) return;
         if (daysByP[f] === 'pendiente') return;
@@ -4032,8 +4042,9 @@ async function renderAsistGrid() {
         var dow = new Date(f + 'T12:00:00').getDay();
         var esFinde = dow === 0;
         var divCls = f === ultimoDiaAnterior ? ' ag-divider-cell' : '';
-        if (esFuturo || esAntesIngreso) {
-          var titAnt = esAntesIngreso ? 'Antes de ingreso (' + fechaInicio + ')' : '';
+        var esPostBaja = fechaBaja && f > fechaBaja;
+        if (esFuturo || esAntesIngreso || esPostBaja) {
+          var titAnt = esAntesIngreso ? 'Antes de ingreso (' + fechaInicio + ')' : (esPostBaja ? 'Tras baja (' + fechaBaja + ')' : '');
           html += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + (f === posFecha ? ' ag-col-sel' : '') + divCls + '" title="' + titAnt + '"></td>';
         } else {
           var esPendiente = f === hoy && !daysByP[f];
