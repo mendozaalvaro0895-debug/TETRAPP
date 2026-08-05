@@ -1593,7 +1593,18 @@ async function ensureReceta(sku, sid) {
   if (RECETAS_MAP[sku]) return RECETAS_MAP[sku].id;
   var desc = ((document.getElementById('rc-desc-' + sid) || {}).value || '').trim();
   var rc = await db.from('sku_recetas').insert({sku_fact: sku, descripcion: desc || null}).select().single();
-  if (rc.error) { toast('Error: ' + rc.error.message, 'err'); return null; }
+  if (rc.error) {
+    // fila ya existe (23505 = unique_violation) — buscarla en lugar de fallar
+    if (rc.error.code === '23505') {
+      var fe = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado').eq('sku_fact', sku).single();
+      if (fe.error || !fe.data) { toast('Error al acceder a la receta', 'err'); return null; }
+      RECETAS_MAP[sku] = fe.data;
+      if (!PARTES_MAP[fe.data.id]) PARTES_MAP[fe.data.id] = [];
+      return fe.data.id;
+    }
+    toast('Error: ' + rc.error.message, 'err');
+    return null;
+  }
   RECETAS_MAP[sku] = rc.data;
   PARTES_MAP[rc.data.id] = [];
   return rc.data.id;
