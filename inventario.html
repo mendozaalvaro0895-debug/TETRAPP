@@ -372,10 +372,19 @@ async function cargarTodo() {
       desde += BATCH;
     }
     todosLosItems = todos;
-    var rb7 = await db.from('insumos_b7')
-      .select('sku,descripcion,existencia,activo,stock_minimo')
-      .order('sku', { ascending: true });
-    todosLosInsumosB7 = rb7.error ? [] : (rb7.data || []);
+    var todosB7 = [];
+    var desdeB7 = 0;
+    while (true) {
+      var rb7 = await db.from('insumos_b7')
+        .select('sku,descripcion,existencia,activo,stock_minimo')
+        .order('sku', { ascending: true })
+        .range(desdeB7, desdeB7 + BATCH - 1);
+      if (rb7.error) break;
+      todosB7 = todosB7.concat(rb7.data || []);
+      if (!rb7.data || rb7.data.length < BATCH) break;
+      desdeB7 += BATCH;
+    }
+    todosLosInsumosB7 = todosB7;
     actualizarStats();
     aplicarFiltro();
   } catch(e) {
@@ -1174,7 +1183,7 @@ async function confirmarImportB7() {
       var payloadN = loteN.map(function(p) {
         return { sku: p.sku, descripcion: p.descripcion, existencia: p.existencia, activo: true };
       });
-      var rN = await db.from('insumos_b7').insert(payloadN);
+      var rN = await db.from('insumos_b7').upsert(payloadN, { onConflict: 'sku' });
       if (rN.error) { errores += loteN.length; }
       hecho += loteN.length;
       setProgress(hecho);
