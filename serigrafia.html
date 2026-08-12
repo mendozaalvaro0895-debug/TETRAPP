@@ -698,21 +698,15 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
         <div class="inicio-dos-col">
           <div class="inicio-col-izq">
             <div class="mtx-wrap">
-              <div class="mtx-hdr" style="justify-content:space-between">
-                <div>
-                  <span class="mtx-hdr-title">👥 Personal y Roles</span>
-                  <span class="mtx-hdr-sub" id="matrizSub">Arrastra cada operador a su rol y línea</span>
-                </div>
-                <button class="btn btn-s btn-xs" id="btnGuardarMatriz" onclick="guardarMatrizDia()" title="Guardar posiciones del día">💾 Guardar</button>
+              <div class="mtx-hdr">
+                <span class="mtx-hdr-title">👥 Personal y Roles</span>
+                <span class="mtx-hdr-sub" id="matrizSub">Arrastra cada operador a su rol y línea</span>
               </div>
               <div id="matrizPersonal"></div>
             </div>
             <div id="prodMensual"></div>
           </div>
           <div class="inicio-col-der">
-            <div style="display:flex;justify-content:flex-end;padding:2px 4px 4px">
-              <button id="btnAsistLock" class="btn btn-xs btn-g" onclick="toggleAsistLock()" title="Haz clic para editar la tabla de asistencia">🔒 Bloqueada</button>
-            </div>
             <div id="asistGrid"></div>
           </div>
         </div>
@@ -2291,16 +2285,20 @@ function toggleAsistLock() {
   }
 }
 
-async function guardarMatrizDia() {
-  var btn = document.getElementById('btnGuardarMatriz');
+async function guardarAmbas() {
+  var btn = document.getElementById('btnGuardarAmbas');
   if (btn) { btn.textContent = '⏳ Guardando…'; btn.disabled = true; }
   await freezeDiaCompleto();
   if (btn) {
     btn.textContent = '✅ Guardado';
     btn.disabled = false;
-    setTimeout(function() { btn.textContent = '💾 Guardar'; }, 2000);
+    setTimeout(function() {
+      var b2 = document.getElementById('btnGuardarAmbas');
+      if (b2) b2.textContent = '💾 Guardar';
+    }, 2000);
   }
 }
+function guardarMatrizDia() { return guardarAmbas(); }
 
 function renderDiaBar() {
   var lbl  = document.getElementById('diaBarLbl');
@@ -4065,13 +4063,19 @@ async function renderAsistGrid() {
   var tableRows = buildRows(plazaFija, null);
   if (prestados.length) tableRows += buildRows(prestados, '🔄 Prestados');
 
+  var _lockTxt = asistLocked ? '🔒 Bloqueada' : '🔓 Editable';
+  var _lockClr = asistLocked ? '' : ';color:var(--serig-m);border-color:var(--serig-m)';
   var _agHtml =
     '<div class="asist-grid-wrap">' +
       '<div class="asist-grid-hdr">' +
         '<span style="font-size:12px;font-weight:800;color:var(--ink)">📋 Asistencia Mensual</span>' +
         '<div style="display:flex;align-items:center;gap:8px">' +
           '<span style="font-size:11px;font-weight:600;color:var(--text);text-transform:capitalize;min-width:130px;text-align:center">' + mesNombre + '</span>' +
-          '<button class="btn btn-g btn-xs" onclick="exportarAsistGridPDF()" style="margin-left:8px">⬇ PDF</button>' +
+          '<div style="display:flex;flex-direction:column;gap:4px;align-items:stretch">' +
+            '<button id="btnAsistLock" class="btn btn-xs btn-g" onclick="toggleAsistLock()" title="Haz clic para editar la tabla de asistencia" style="white-space:nowrap' + _lockClr + '">' + _lockTxt + '</button>' +
+            '<button id="btnGuardarAmbas" class="btn btn-s btn-xs" onclick="guardarAmbas()" title="Guardar roles del día y asistencia" style="background:var(--serig-m);color:#fff;border-color:var(--serig-m);white-space:nowrap">💾 Guardar</button>' +
+          '</div>' +
+          '<button class="btn btn-g btn-xs" onclick="exportarAsistGridPDF()" style="margin-left:2px;white-space:nowrap">⬇ PDF</button>' +
         '</div>' +
       '</div>' +
       '<div class="asist-grid-scroll">' +
@@ -4176,7 +4180,7 @@ async function toggleAsistCell(codigo, fecha) {
 }
 
 
-function exportarAsistGridPDF() {
+async function exportarAsistGridPDF() {
   if (!asistGridCache) { showToast('Sin datos cargados', '#92400e'); return; }
   var byPD   = asistGridCache.byPersonDay;
   var mesStr = asistGridCache._mes;
@@ -4197,6 +4201,46 @@ function exportarAsistGridPDF() {
   var esAnteriorSet = {};
   diasAnterior.forEach(function(f){ esAnteriorSet[f] = true; });
   var dias = diasAnterior.concat(diasActual);
+
+  // Cargar roles del mes completo desde matriz_dia_serig
+  var matrizByOpDia = {};
+  try {
+    var rMat = await db.from(MATRIZ_DIA_TABLE)
+      .select('fecha,operador_codigo,mtx_pos')
+      .eq('area', 'serig')
+      .gte('fecha', mesStr + '-01')
+      .lte('fecha', mesStr + '-' + String(ultimoDia).padStart(2, '0'));
+    (rMat.data || []).forEach(function(row) {
+      if (!matrizByOpDia[row.operador_codigo]) matrizByOpDia[row.operador_codigo] = {};
+      matrizByOpDia[row.operador_codigo][row.fecha] = row.mtx_pos;
+    });
+  } catch(e) { /* si la tabla no existe, la sección de roles queda vacía */ }
+
+  function abrevRol(pos) {
+    if (pos === null || pos === undefined) return '';
+    if (pos === 'supervisor') return 'SUP';
+    if (pos === 'auxiliar')   return 'AUX';
+    if (pos === 'empaque')    return 'EMP';
+    if (pos === '')           return 'POOL';
+    var p = pos.split('-');
+    if (p.length === 2) {
+      var r = p[0] === 'flameador' ? 'F' : p[0] === 'imprime' ? 'I' : p[0] === 'recibe' ? 'R' : p[0].charAt(0).toUpperCase();
+      return r + p[1];
+    }
+    return pos.slice(0, 4).toUpperCase();
+  }
+  function colorRol(pos) {
+    if (pos === null || pos === undefined) return '#f8fafc';
+    if (pos === 'supervisor') return '#2563eb';
+    if (pos === 'auxiliar')   return '#6b7280';
+    if (pos === 'empaque')    return '#0d9488';
+    if (pos === '')           return '#e2e8f0';
+    var r = pos.split('-')[0];
+    if (r === 'flameador') return '#d97706';
+    if (r === 'imprime')   return '#7c3aed';
+    if (r === 'recibe')    return '#16a34a';
+    return '#64748b';
+  }
 
   var personas = (personalData && personalData.serig ? personalData.serig : []).filter(function(p){ return p.activo; });
   var plazaFija = personas.filter(function(p){ return (p.proceso_hab||'') !== 'Prestado'; });
@@ -4261,6 +4305,32 @@ function exportarAsistGridPDF() {
 
   var tableRows = buildPersonaRows(plazaFija, null);
   if (prestados.length) tableRows += buildPersonaRows(prestados, 'Prestados');
+
+  // ── Tabla de roles diarios ─────────────────────────────────────
+  function buildRolesRows(lista, secLabel) {
+    var html = '';
+    if (secLabel) html += '<tr><td colspan="' + (diasActual.length+1) + '" style="background:#f1f5f9;font-size:7px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;padding:3px 6px;border:1px solid #cbd5e1">' + secLabel + '</td></tr>';
+    lista.forEach(function(p) {
+      var diasOp = matrizByOpDia[p.codigo] || {};
+      html += '<tr>';
+      html += '<td style="font-size:8px;font-weight:600;padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + '</td>';
+      diasActual.forEach(function(f) {
+        var dow = new Date(f + 'T12:00:00').getDay();
+        var esFin = dow === 0;
+        var pos = Object.prototype.hasOwnProperty.call(diasOp, f) ? diasOp[f] : null;
+        var bg  = esFin ? '#475569' : (pos !== null ? colorRol(pos) : '#f8fafc');
+        var lbl = esFin ? '' : abrevRol(pos);
+        var clr = (esFin || (pos !== null && pos !== '')) ? '#fff' : '#94a3b8';
+        html += '<td style="background:' + bg + ';color:' + clr + ';font-size:6.5px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
+      });
+      html += '</tr>';
+    });
+    return html;
+  }
+
+  var hayRoles = Object.keys(matrizByOpDia).length > 0;
+  var rolesRows = buildRolesRows(plazaFija, null);
+  if (prestados.length) rolesRows += buildRolesRows(prestados, 'Prestados');
 
   // ── Calcular resumen por categoría ────────────────────────────
   var resAusentes  = [];
@@ -4363,6 +4433,30 @@ function exportarAsistGridPDF() {
       '<span><span class="leg-dot" style="background:#ede9fe;border:1px solid #c4b5fd"></span>V = Velada</span>' +
       '<span><span class="leg-dot" style="background:#dcfce7;border:1px solid #86efac"></span>Fila verde = asistencia completa</span>' +
     '</div>' +
+    (hayRoles
+      ? '<div style="margin-top:18px;page-break-before:always">' +
+          '<div style="font-size:10px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">Roles del Día · ' + mesNombre + '</div>' +
+          '<div style="font-size:7px;color:#64748b;margin-bottom:6px">F# = Flameador línea · I# = Impresora línea · R# = Receptor línea · SUP = Supervisor · AUX = Auxiliar · EMP = Empaque · POOL = Sin rol asignado</div>' +
+          '<table><thead><tr>' +
+            '<th style="background:#f8fafc;font-size:8px;font-weight:700;text-align:left;padding:3px 6px;border:1px solid #cbd5e1;min-width:110px">Operador</th>' +
+            diasActual.map(function(f) {
+              var dow = new Date(f + 'T12:00:00').getDay();
+              var dn  = parseInt(f.slice(8));
+              var bg  = dow === 0 ? '#64748b' : '#f8fafc';
+              var clr = dow === 0 ? '#fff' : '#64748b';
+              return '<th style="background:' + bg + ';color:' + clr + ';width:18px;min-width:18px;font-size:7px;font-weight:700;text-align:center;padding:3px 0;border:1px solid #cbd5e1">' + dn + '</th>';
+            }).join('') +
+          '</tr></thead><tbody>' + rolesRows + '</tbody></table>' +
+          '<div style="margin-top:6px;display:flex;gap:12px;font-size:7px;color:#475569;flex-wrap:wrap">' +
+            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#d97706;border-radius:2px"></span>F# = Flameador</span>' +
+            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#7c3aed;border-radius:2px"></span>I# = Impresora</span>' +
+            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#16a34a;border-radius:2px"></span>R# = Receptor</span>' +
+            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:2px"></span>SUP</span>' +
+            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#0d9488;border-radius:2px"></span>EMP</span>' +
+            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#6b7280;border-radius:2px"></span>AUX</span>' +
+          '</div>' +
+        '</div>'
+      : '') +
     resumenHtml +
     '<script>window.onload=function(){window.print();}<\/script>' +
     '</body></html>';
