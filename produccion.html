@@ -273,11 +273,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="drop-s">Ej: PRODUCCION 01JUN DIA-.pdf · también acepta .htm</div>
         </div>
         <div class="drop-sep">o</div>
-        <div class="drop-zone-img" id="dropImg" onclick="document.getElementById('imgInput').click()">
-          <div class="drop-zone-img-ico">📷</div>
+        <div class="drop-zone-img" id="dropImg">
+          <div class="drop-zone-img-ico">📋</div>
           <div>
-            <div class="drop-zone-img-txt">Subir screenshot del documento</div>
-            <div class="drop-zone-img-sub">PNG · JPG · WEBP — la IA lee los códigos y cantidades</div>
+            <div class="drop-zone-img-txt">Pegar screenshot — Ctrl+V</div>
+            <div class="drop-zone-img-sub">Toma el screenshot y pégalo en cualquier parte de esta página</div>
           </div>
         </div>
       </div>
@@ -445,7 +445,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 </div>
 
 <input type="file" id="pdfInput" accept=".pdf,.htm,.html" style="display:none" onchange="onPdfChange(event)">
-<input type="file" id="imgInput" accept="image/*" style="display:none" onchange="onImgChange(event)">
 <div class="toast" id="toast"></div>
 
 <script>
@@ -782,13 +781,10 @@ async function onPdfChange(e) {
   e.target.value = '';
 }
 
-async function onImgChange(e) {
-  var file = e.target.files[0];
-  if (!file) return;
-  e.target.value = '';
+async function procesarImgFile(file) {
   var btn = document.getElementById('dropImg');
   if (btn) btn.classList.add('cargando');
-  toast('📷 Analizando imagen con IA…');
+  toast('📋 Analizando screenshot con IA…');
   try {
     var base64 = await new Promise(function (res, rej) {
       var r = new FileReader();
@@ -807,7 +803,7 @@ async function onImgChange(e) {
     }
     var data = await resp.json();
     if (!data.productos || !data.productos.length) {
-      toast('La IA no encontró productos. Intenta con una imagen más nítida.', 'err'); return;
+      toast('La IA no encontró productos en el screenshot. Intenta con una imagen más nítida.', 'err'); return;
     }
     var filas = data.productos
       .map(function (p) { return { sku: String(p.sku || '').trim(), descripcion: p.desc || '', cantidad: numVal(p.cant) }; })
@@ -816,13 +812,25 @@ async function onImgChange(e) {
     var turno = descLow.indexOf('noche') >= 0 ? 'noche' : 'dia';
     var meta = { fecha: data.fecha || fechaHoy(), turno: turno, documento: data.requi || 'IMG-SCAN', fechaDeclarada: !!data.fecha };
     if (data.warnings && data.warnings.length) toast('⚠️ ' + data.warnings.join(' · '), 'err');
-    abrirPreview(filas, meta, file.name);
+    abrirPreview(filas, meta, file.name || 'screenshot');
   } catch (err) {
-    toast('Error al analizar la imagen: ' + err.message, 'err');
+    toast('Error al analizar el screenshot: ' + err.message, 'err');
   } finally {
     if (btn) btn.classList.remove('cargando');
   }
 }
+
+document.addEventListener('paste', function (e) {
+  if (document.getElementById('view-ingreso').style.display === 'none') return;
+  var items = (e.clipboardData || {}).items || [];
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') !== -1) {
+      e.preventDefault();
+      procesarImgFile(items[i].getAsFile());
+      break;
+    }
+  }
+});
 
 /* ══════════════════════════════════════════════════════════════
    MODAL DE PREVIEW
