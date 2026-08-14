@@ -479,6 +479,7 @@ var MAQ_TIPO_FULL = {1:'Sopladora simple',2:'Sopladora simple',3:'Sopladora simp
 var DIAS_C = ['LUN','MAR','MIÉ','JUE','VIE','SÁB'];
 var MESES_ABR = {ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,OCT:10,NOV:11,DIC:12};
 var MESES_L = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+var MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -507,7 +508,11 @@ function lunesDe(iso) {
 }
 function fechaCorta(iso) {
   var d = dObj(iso);
-  return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
+  return ('0' + d.getDate()).slice(-2) + ' ' + MESES_C[d.getMonth()];
+}
+function fechaLarga(iso) {
+  var d = dObj(iso);
+  return ('0' + d.getDate()).slice(-2) + ' ' + MESES_C[d.getMonth()] + ' ' + d.getFullYear();
 }
 function mesesAtras(n) {
   var d = new Date(); d.setMonth(d.getMonth() - n);
@@ -1191,7 +1196,7 @@ function buildUltRow(t) {
   var pills = maqs.map(function (m) { return '<span class="maq-pill">' + m + '</span>'; }).join(' ');
   var sinTxt = t.sin ? '<span class="maq-pill sin">' + t.sin + '</span>' : '<span style="color:var(--gray-l)">—</span>';
   return '<tr>' +
-    '<td style="font-family:var(--mono)">' + esc(t.fecha) + '</td>' +
+    '<td style="font-family:var(--mono)">' + fechaLarga(t.fecha) + '</td>' +
     '<td>' + (t.turno === 'dia' ? '☀️ Día' : '🌙 Noche') + '</td>' +
     '<td class="ctr" style="white-space:normal;max-width:220px">' + (pills || '—') + '</td>' +
     '<td class="num">' + Object.keys(t.skus).length + '</td>' +
