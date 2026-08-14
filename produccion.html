@@ -1208,6 +1208,7 @@ function buildUltRow(t) {
     '<td style="white-space:nowrap;display:flex;gap:6px">' +
       '<button class="btn btn-ghost btn-sm" onclick="verSemanaDe(\'' + t.fecha + '\')">Ver semana</button>' +
       '<button class="btn btn-ghost btn-sm" onclick="abrirModalMaq(\'' + t.fecha + '\',\'' + t.turno + '\')">✏️ Máquinas</button>' +
+      '<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red)" onclick="eliminarTurno(\'' + t.fecha + '\',\'' + t.turno + '\')">🗑️</button>' +
     '</td>' +
     '</tr>';
 }
@@ -1285,6 +1286,21 @@ async function guardarMaquinas() {
 
 function cerrarModalMaq() {
   document.getElementById('modalMaq').classList.remove('open');
+}
+
+async function eliminarTurno(fecha, turno) {
+  var label = fecha + ' · ' + (turno === 'dia' ? '☀️ Día' : '🌙 Noche');
+  if (!confirm('¿Eliminar TODOS los datos del turno ' + label + '?\nEsta acción no se puede deshacer.')) return;
+  try {
+    var r = await db.from('produccion_diaria').delete().eq('fecha', fecha).eq('turno', turno);
+    if (r.error) throw r.error;
+    toast('🗑️ Turno ' + label + ' eliminado');
+    await cargarUltimos();
+    if (document.getElementById('tab-semanal').classList.contains('active')) renderSemanal();
+    if (document.getElementById('tab-mensual').classList.contains('active')) renderMensual();
+  } catch (err) {
+    toast(mensajeError(err), 'err');
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
