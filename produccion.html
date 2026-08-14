@@ -444,6 +444,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 </div>
 
+<!-- MODAL MÁQUINAS -->
+<div class="overlay" id="modalMaq" onclick="if(event.target.id==='modalMaq')cerrarModalMaq()">
+  <div class="modal" style="max-width:700px">
+    <div class="mh">
+      <div class="mh-t" id="maqTit">✏️ Asignar Máquinas</div>
+      <button class="mh-x" onclick="cerrarModalMaq()">×</button>
+    </div>
+    <div class="mb" id="maqBody"></div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="cerrarModalMaq()">Cancelar</button>
+      <button class="btn btn-prod" onclick="guardarMaquinas()">💾 Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <input type="file" id="pdfInput" accept=".pdf,.htm,.html" style="display:none" onchange="onPdfChange(event)">
 <div class="toast" id="toast"></div>
 
@@ -1190,13 +1205,86 @@ function buildUltRow(t) {
     '<td class="ctr">' + sinTxt + '</td>' +
     '<td style="font-family:var(--mono);font-size:11px;white-space:normal;max-width:180px">' +
       esc(Object.keys(t.docs).sort().join(', ')) + '</td>' +
-    '<td><button class="btn btn-ghost btn-sm" onclick="verSemanaDe(\'' + t.fecha + '\')">Ver semana</button></td>' +
+    '<td style="white-space:nowrap;display:flex;gap:6px">' +
+      '<button class="btn btn-ghost btn-sm" onclick="verSemanaDe(\'' + t.fecha + '\')">Ver semana</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="abrirModalMaq(\'' + t.fecha + '\',\'' + t.turno + '\')">✏️ Máquinas</button>' +
+    '</td>' +
     '</tr>';
 }
 
 function verSemanaDe(fecha) {
   document.getElementById('semInicio').value = lunesDe(fecha);
   switchTab('semanal');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODAL ASIGNAR MÁQUINAS
+   ══════════════════════════════════════════════════════════════ */
+var maqRows = [];
+
+async function abrirModalMaq(fecha, turno) {
+  document.getElementById('maqTit').textContent =
+    '✏️ Máquinas · ' + fecha + ' · ' + (turno === 'dia' ? '☀️ Día' : '🌙 Noche');
+  document.getElementById('maqBody').innerHTML = '<div style="padding:24px;text-align:center;color:var(--gray)">Cargando…</div>';
+  document.getElementById('modalMaq').classList.add('open');
+
+  var r = await db.from('produccion_diaria')
+    .select('id,sku,descripcion,cantidad,maquina')
+    .eq('fecha', fecha).eq('turno', turno)
+    .order('maquina').order('sku');
+  if (r.error) { toast(mensajeError(r.error), 'err'); return; }
+  maqRows = r.data || [];
+  renderModalMaq();
+}
+
+function renderModalMaq() {
+  var baseOpts = '<option value="0">— Sin asignar</option>';
+  for (var m = 1; m <= 10; m++) {
+    baseOpts += '<option value="' + m + '">' + m + ' · ' + (MAQ_TIPO[m] || '') + '</option>';
+  }
+  var html = '<table class="tbl" style="width:100%"><thead><tr>' +
+    '<th>Código</th><th>Producto</th><th class="num">Cantidad</th><th class="ctr" style="min-width:160px">Máquina</th>' +
+    '</tr></thead><tbody>';
+  maqRows.forEach(function (row, i) {
+    var desc = row.descripcion || (INV[row.sku] && INV[row.sku].descripcion) || '—';
+    var opts = baseOpts.replace('value="' + (row.maquina || 0) + '"',
+      'value="' + (row.maquina || 0) + '" selected');
+    html += '<tr>' +
+      '<td style="font-family:var(--mono);font-weight:700">' + esc(row.sku) + '</td>' +
+      '<td style="font-size:11px;white-space:normal;max-width:220px;text-align:left">' + esc(desc) + '</td>' +
+      '<td class="num">' + fmtU(row.cantidad) + '</td>' +
+      '<td class="ctr"><select class="ctrl-in" id="maqSel' + i + '" style="padding:5px 8px;font-size:12px;width:100%">' +
+        opts + '</select></td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('maqBody').innerHTML = html;
+}
+
+async function guardarMaquinas() {
+  var cambios = [];
+  maqRows.forEach(function (row, i) {
+    var nueva = parseInt(document.getElementById('maqSel' + i).value, 10) || 0;
+    if (nueva !== (row.maquina || 0)) cambios.push({ id: row.id, maquina: nueva });
+  });
+  if (!cambios.length) { toast('No hay cambios que guardar'); return; }
+  try {
+    for (var i = 0; i < cambios.length; i++) {
+      var r = await db.from('produccion_diaria').update({ maquina: cambios[i].maquina }).eq('id', cambios[i].id);
+      if (r.error) throw r.error;
+    }
+    toast('✅ ' + cambios.length + ' fila(s) actualizadas');
+    cerrarModalMaq();
+    await cargarUltimos();
+    if (document.getElementById('tab-semanal').classList.contains('active')) renderSemanal();
+    if (document.getElementById('tab-mensual').classList.contains('active')) renderMensual();
+  } catch (err) {
+    toast(mensajeError(err), 'err');
+  }
+}
+
+function cerrarModalMaq() {
+  document.getElementById('modalMaq').classList.remove('open');
 }
 
 /* ══════════════════════════════════════════════════════════════
