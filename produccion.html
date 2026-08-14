@@ -1227,7 +1227,7 @@ function pintarTablaSemanal(ini) {
   var head = '<th class="ctr">Máq</th><th>Código</th><th>Producto</th><th class="num">Meta 12h</th><th class="num col-sep">Turnos</th>';
   for (var d = 0; d < 6; d++) {
     head += '<th class="num dia-cell">' + DIAS_C[d] + ' D</th>';
-    head += '<th class="num noche-cell">' + DIAS_C[d] + ' N</th>';
+    head += '<th class="num noche-cell' + (d === 5 ? ' col-sep' : '') + '">' + DIAS_C[d] + ' N</th>';
   }
   head += '<th class="num">Total</th><th class="ctr">Efic.</th><th class="num">Precio</th><th class="num">Venta potencial</th>';
   document.getElementById('semHead').innerHTML = head;
@@ -1288,8 +1288,9 @@ function buildSemRow(g, ini, meta, turnos, ef, pr, pot, rowClasses) {
     var f = addDias(ini, d);
     var vd = g.celdas[claveCelda(f, 'dia')] || 0;
     var vn = g.celdas[claveCelda(f, 'noche')] || 0;
+    var sepN = d === 5 ? ' col-sep' : '';
     celdas += '<td class="num dia-cell' + (vd ? '' : ' cell-0') + '">' + (vd ? fmtU(vd) : '·') + '</td>';
-    celdas += '<td class="num noche-cell' + (vn ? '' : ' cell-0') + '">' + (vn ? fmtU(vn) : '·') + '</td>';
+    celdas += '<td class="num noche-cell' + sepN + (vn ? '' : ' cell-0') + '">' + (vn ? fmtU(vn) : '·') + '</td>';
   }
   var efCls = 'ef-na', efTxt = '—';
   if (ef !== null) {
@@ -1417,7 +1418,7 @@ function buildSemanaBoxHtml(ini, prodRowsSemana, weekIndex) {
   var head = '<th class="ctr">Máq</th><th>Código</th><th>Producto</th><th class="num">Meta 12h</th><th class="num col-sep">Turnos</th>';
   for (var d = 0; d < 6; d++) {
     head += '<th class="num dia-cell">' + DIAS_C[d] + ' D</th>';
-    head += '<th class="num noche-cell">' + DIAS_C[d] + ' N</th>';
+    head += '<th class="num noche-cell' + (d === 5 ? ' col-sep' : '') + '">' + DIAS_C[d] + ' N</th>';
   }
   head += '<th class="num">Total</th><th class="ctr">Efic.</th><th class="num">Precio</th><th class="num">Venta potencial</th>';
 
