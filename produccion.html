@@ -124,6 +124,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .maq-pill{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:36px;padding:4px 8px;border-radius:6px;background:var(--prod);color:#fff;font-size:12px;font-weight:700;font-family:var(--mono);line-height:1.2;gap:1px}
 .maq-pill.sin{background:var(--red)}
 .maq-tipo-lbl{font-size:7px;font-weight:700;font-family:var(--font);letter-spacing:.2px;text-transform:uppercase;opacity:.9;white-space:nowrap}
+.tbl th.col-sep,.tbl td.col-sep{border-right:3px solid var(--prod);box-shadow:3px 0 8px -2px rgba(0,0,0,.10)}
 .ef-pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;font-family:var(--mono)}
 .ef-alta{background:#DCFCE7;color:#15803D}
 .ef-media{background:#FEF3C7;color:#B45309}
@@ -1223,7 +1224,7 @@ function statsDeGrupo(g) {
 }
 
 function pintarTablaSemanal(ini) {
-  var head = '<th class="ctr">Máq</th><th>Código</th><th>Producto</th><th class="num">Meta 12h</th><th class="num">Turnos</th>';
+  var head = '<th class="ctr">Máq</th><th>Código</th><th>Producto</th><th class="num">Meta 12h</th><th class="num col-sep">Turnos</th>';
   for (var d = 0; d < 6; d++) {
     head += '<th class="num dia-cell">' + DIAS_C[d] + ' D</th>';
     head += '<th class="num noche-cell">' + DIAS_C[d] + ' N</th>';
@@ -1308,7 +1309,7 @@ function buildSemRow(g, ini, meta, turnos, ef, pr, pot, rowClasses) {
     '<td style="font-family:var(--mono);font-weight:700">' + esc(g.sku) + '</td>' +
     '<td class="desc-cell">' + esc(g.descripcion) + '</td>' +
     '<td class="num"><span class="' + metaCls + '" onclick="editarMeta(\'' + esc(g.sku) + '\')">' + metaTxt + '</span></td>' +
-    '<td class="num">' + turnos + '</td>' +
+    '<td class="num col-sep">' + turnos + '</td>' +
     celdas +
     '<td class="num" style="font-weight:700">' + fmtU(g.total) + '</td>' +
     '<td class="ctr"><span class="ef-pill ' + efCls + '">' + efTxt + '</span></td>' +
@@ -1413,7 +1414,7 @@ function buildSemanaBoxHtml(ini, prodRowsSemana, weekIndex) {
   var lista = agruparProduccion(prodRowsSemana);
   if (!lista.length) return '';
 
-  var head = '<th class="ctr">Máq</th><th>Código</th><th>Producto</th><th class="num">Meta 12h</th><th class="num">Turnos</th>';
+  var head = '<th class="ctr">Máq</th><th>Código</th><th>Producto</th><th class="num">Meta 12h</th><th class="num col-sep">Turnos</th>';
   for (var d = 0; d < 6; d++) {
     head += '<th class="num dia-cell">' + DIAS_C[d] + ' D</th>';
     head += '<th class="num noche-cell">' + DIAS_C[d] + ' N</th>';
