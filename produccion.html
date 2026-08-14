@@ -121,8 +121,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .resumen-sec-body b{color:var(--prod-d)}
 
 /* PILLS Y BADGES */
-.maq-pill{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:24px;padding:0 7px;border-radius:6px;background:var(--prod);color:#fff;font-size:12px;font-weight:700;font-family:var(--mono)}
+.maq-pill{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:36px;padding:4px 8px;border-radius:6px;background:var(--prod);color:#fff;font-size:12px;font-weight:700;font-family:var(--mono);line-height:1.2;gap:1px}
 .maq-pill.sin{background:var(--red)}
+.maq-tipo-lbl{font-size:7px;font-weight:700;font-family:var(--font);letter-spacing:.2px;text-transform:uppercase;opacity:.9;white-space:nowrap}
 .ef-pill{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;font-family:var(--mono)}
 .ef-alta{background:#DCFCE7;color:#15803D}
 .ef-media{background:#FEF3C7;color:#B45309}
@@ -441,6 +442,12 @@ var prevRows = [];   // filas pendientes de confirmar en el modal
 var manSeq = 0;
 
 var MAQUINAS = [1,2,3,4,5,6,7,8,9,10,11,12];
+var MAQ_TIPO = {1:'S.Simple',2:'S.Simple',3:'S.Simple',4:'S.Simple',5:'S.Simple',
+  6:'S.Doble',7:'I.Sopla',8:'S.Doble',9:'S.Doble',10:'I.Sopla'};
+var MAQ_TIPO_FULL = {1:'Sopladora simple',2:'Sopladora simple',3:'Sopladora simple',
+  4:'Sopladora simple',5:'Sopladora simple',6:'Sopladora Doble Estación',
+  7:'Inyecto Sopladora',8:'Sopladora Doble Estación',9:'Sopladora Doble Estación',
+  10:'Inyecto Sopladora'};
 var DIAS_C = ['LUN','MAR','MIÉ','JUE','VIE','SÁB'];
 var MESES_ABR = {ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,OCT:10,NOV:11,DIC:12};
 var MESES_L = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -1181,7 +1188,9 @@ function claveCelda(fecha, turno) { return fecha + '|' + turno; }
 function agruparProduccion(prodRows) {
   var grupos = {};
   prodRows.forEach(function (p) {
-    var k = (p.maquina || 0) + '|' + p.sku;
+    var mq = p.maquina || 0;
+    if (mq < 1 || mq > 10) return; // solo envases máq 1-10
+    var k = mq + '|' + p.sku;
     if (!grupos[k]) {
       grupos[k] = {
         maquina: p.maquina || 0, sku: p.sku,
@@ -1289,7 +1298,8 @@ function buildSemRow(g, ini, meta, turnos, ef, pr, pot, rowClasses) {
   var metaTxt = meta > 0 ? fmtU(meta) : 'definir';
   var metaCls = meta > 0 ? 'meta-edit' : 'meta-edit vacia';
   var maqTxt = g.maquina
-    ? '<span class="maq-pill">' + g.maquina + '</span>'
+    ? '<span class="maq-pill" title="' + esc(MAQ_TIPO_FULL[g.maquina] || 'Máq ' + g.maquina) + '">' +
+      g.maquina + '<span class="maq-tipo-lbl">' + (MAQ_TIPO[g.maquina] || '') + '</span></span>'
     : '<span class="maq-pill sin" title="Sin máquina asignada">?</span>';
   var clsAttr = (rowClasses && rowClasses.length) ? ' class="' + rowClasses.join(' ') + '"' : '';
 
