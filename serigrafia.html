@@ -1894,6 +1894,7 @@ var posColDispo    = null;       // null = aún no se sabe; false si la tabla ma
 var posAvisoMostrado = false;    // para avisar una sola vez si no se pueden guardar posiciones
 var asistLocked    = true;       // tabla de asistencia bloqueada por defecto (evita clicasos)
 var MATRIZ_DIA_TABLE = 'matriz_dia_serig'; // posición de matriz por día — SEPARADA de asistencia
+var prodMesNav     = null;       // null = mes actual; 'YYYY-MM' = mes seleccionado en el gráfico
 var ausentesHoy    = {};         // { codigo: true } — se carga al init y al marcar asistencia
 var asistHoyCache  = {};         // { codigo: estado } — refleja la fecha del widget
 var asistHoyRolCache = {};       // { codigo: rol }   — rol guardado para la fecha del widget
@@ -3434,21 +3435,35 @@ function _prodColor(val) {
   return 'rgb(' + r + ',' + g + ',' + b + ')';
 }
 
+function navegarProdMes(delta) {
+  var hoy  = fechaHoy();
+  var base = prodMesNav || hoy.slice(0,7);
+  var anio = parseInt(base.slice(0,4)), mesN = parseInt(base.slice(5,7));
+  var d    = new Date(anio, mesN - 1 + delta, 1);
+  var nuevo = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  if (nuevo > hoy.slice(0,7)) return;
+  prodMesNav = (nuevo === hoy.slice(0,7)) ? null : nuevo;
+  renderProdMensual();
+}
+
 function renderProdMensual() {
   var cont = document.getElementById('prodMensual');
   if (!cont) return;
 
-  var hoy      = new Date();
-  var anio     = hoy.getFullYear();
-  var mes      = hoy.getMonth();
-  var diasMes  = new Date(anio, mes + 1, 0).getDate();
-  var mesStr   = hoy.toLocaleString('es-GT', { month: 'long', year: 'numeric' });
   var todayStr = fechaHoy();
-  var finStr   = new Date(anio, mes, diasMes).toISOString().slice(0,10);
+  var selMes   = prodMesNav || todayStr.slice(0,7);
+  var anio     = parseInt(selMes.slice(0,4));
+  var mes      = parseInt(selMes.slice(5,7)) - 1; // 0-based
+  var diasMes  = new Date(anio, mes + 1, 0).getDate();
+  var mesStr   = new Date(anio, mes, 1).toLocaleString('es-GT', { month: 'long', year: 'numeric' });
+  var esMesActual = selMes === todayStr.slice(0,7);
 
-  // Rango: desde inicio del mes anterior
-  var startD   = new Date(anio, mes - 1, 1);
-  var startStr = startD.toISOString().slice(0,10);
+  // Rango: 5 días del mes anterior + mes completo + 5 días del mes siguiente
+  var startD  = new Date(anio, mes, 1 - 5);  // 5 días antes del día 1
+  var startStr = startD.getFullYear() + '-' + String(startD.getMonth()+1).padStart(2,'0') + '-' + String(startD.getDate()).padStart(2,'0');
+  var endD    = new Date(anio, mes, diasMes + 5); // 5 días después del último día
+  var endStr0 = endD.getFullYear() + '-' + String(endD.getMonth()+1).padStart(2,'0') + '-' + String(endD.getDate()).padStart(2,'0');
+  var endStr  = endStr0 > todayStr ? todayStr : endStr0;
 
   // Acumular por fecha YYYY-MM-DD
   var porFecha = {};
@@ -3457,23 +3472,28 @@ function renderProdMensual() {
     var f = new Date(s.created_at || s.fecha_lim || '');
     if (isNaN(f) || f < startD) return;
     var fStr = f.toISOString().slice(0,10);
+    if (fStr > endStr) return;
     porFecha[fStr] = (porFecha[fStr] || 0) + (s.cant || 0);
   });
   (getEntregasManuales() || []).forEach(function(m) {
     if (!m.fecha) return;
     var f = new Date(m.fecha + 'T12:00:00');
-    if (isNaN(f) || f < startD) return;
+    if (isNaN(f) || f < startD || m.fecha > endStr) return;
     porFecha[m.fecha] = (porFecha[m.fecha] || 0) + (m.cant || 0);
   });
 
-  // Array de días
+  // Array de días (startStr → endStr)
   var dias = [];
   var dIt = new Date(startStr + 'T12:00:00');
-  var finD = new Date(finStr + 'T12:00:00');
-  while (dIt <= finD) { dias.push(dIt.toISOString().slice(0,10)); dIt.setDate(dIt.getDate()+1); }
+  var finDRange = new Date(endStr + 'T12:00:00');
+  while (dIt <= finDRange) {
+    var df = dIt.getFullYear() + '-' + String(dIt.getMonth()+1).padStart(2,'0') + '-' + String(dIt.getDate()).padStart(2,'0');
+    dias.push(df);
+    dIt.setDate(dIt.getDate()+1);
+  }
 
-  // KPIs solo mes actual
-  var mesActStr = anio + '-' + String(mes+1).padStart(2,'0');
+  // KPIs solo mes seleccionado
+  var mesActStr = selMes;
   var totalMes = 0, diasConProd = 0;
   dias.forEach(function(f) {
     if (f.slice(0,7) === mesActStr && porFecha[f]) { totalMes += porFecha[f]; diasConProd++; }
@@ -3525,10 +3545,15 @@ function renderProdMensual() {
     '</div>';
   });
 
+  var _btnNavStyle = 'background:none;border:1px solid var(--border);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px;color:var(--ink);line-height:1';
   cont.innerHTML = '<div class="prod-mens-wrap">' +
     '<div class="prod-mens-hdr">' +
       '<span style="font-size:12px;font-weight:800">📦 Producción mensual</span>' +
-      '<span style="font-size:11px;color:var(--gray-l);text-transform:capitalize">' + mesStr + '</span>' +
+      '<div style="display:flex;align-items:center;gap:6px">' +
+        '<button onclick="navegarProdMes(-1)" style="' + _btnNavStyle + '" title="Mes anterior">◀</button>' +
+        '<span style="font-size:11px;font-weight:700;color:var(--ink);text-transform:capitalize;min-width:120px;text-align:center">' + mesStr + '</span>' +
+        '<button onclick="navegarProdMes(1)" ' + (esMesActual ? 'disabled ' : '') + 'style="' + _btnNavStyle + (esMesActual ? ';opacity:.3;cursor:default' : '') + '" title="Mes siguiente">▶</button>' +
+      '</div>' +
     '</div>' +
     '<div class="prod-mens-chart" id="prodChartScroll" style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px">' +
       '<div style="display:flex;align-items:flex-end;gap:3px;min-height:210px;width:max-content;min-width:100%">' + cols + '</div>' +
