@@ -4492,8 +4492,10 @@ async function exportarAsistGridPDF() {
 }
 
 function mesSol(s) {
-  var ef = s.periodo_efectivo || '';
-  return ef ? ef.slice(0, 7) : (s.created_at || '').slice(0, 7);
+  // periodo_efectivo manda cuando fue asignado explícitamente (traslado de mes)
+  if (s.periodo_efectivo) return String(s.periodo_efectivo).slice(0, 7);
+  // Usa la misma lógica que el board: días 28-31 pertenecen al período siguiente
+  return periodoDe(s.created_at).key;
 }
 
 function abrirModalImprimirBoard() {
