@@ -4527,18 +4527,25 @@ function abrirModalImprimirBoard() {
     '<div style="background:var(--card);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.3);padding:22px 24px;width:100%;max-width:360px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
         '<span style="font-size:14px;font-weight:800;color:var(--ink)">🖨 Imprimir Board</span>' +
-        '<button onclick="document.getElementById(\'modalImprimirBoard\').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0">✕</button>' +
+        '<button id="btnCerrarModalImp" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0">✕</button>' +
       '</div>' +
       '<label style="font-size:11px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Filtrar por mes</label>' +
       '<select id="selMesImprimir" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--ink);font-size:13px;margin-bottom:18px">' +
         optsHtml +
       '</select>' +
       '<div style="display:flex;gap:10px;justify-content:flex-end">' +
-        '<button onclick="document.getElementById(\'modalImprimirBoard\').remove()" style="padding:8px 16px;border:1.5px solid var(--border);background:none;border-radius:8px;cursor:pointer;font-size:12px;color:var(--ink)">Cancelar</button>' +
-        '<button onclick="var m=document.getElementById(\'selMesImprimir\').value;document.getElementById(\'modalImprimirBoard\').remove();exportarBoardPDF(m)" style="padding:8px 18px;background:var(--serig-m);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700">Imprimir</button>' +
+        '<button id="btnCancelarModalImp" style="padding:8px 16px;border:1.5px solid var(--border);background:none;border-radius:8px;cursor:pointer;font-size:12px;color:var(--ink)">Cancelar</button>' +
+        '<button id="btnConfirmarImp" style="padding:8px 18px;background:var(--serig-m);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700">Imprimir</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(modal);
+  document.getElementById('btnCerrarModalImp').addEventListener('click', function() { modal.remove(); });
+  document.getElementById('btnCancelarModalImp').addEventListener('click', function() { modal.remove(); });
+  document.getElementById('btnConfirmarImp').addEventListener('click', function() {
+    var m = document.getElementById('selMesImprimir').value;
+    modal.remove();
+    exportarBoardPDF(m || null);
+  });
 }
 
 function exportarBoardPDF(filtroMes) {
