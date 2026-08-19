@@ -3004,11 +3004,10 @@ function boardBuildSinBlock(items) {
     }
   });
   function getTier(item) {
-    var ent = entregadoMap[item.solId] || 0;
-    var tot = item.cant || 0;
-    if (ent > 0 && ent >= tot) return 2; // verde
-    if (ent > 0) return 1;               // amarillo (parcial)
-    return 0;                            // rojo (sin entregas)
+    // Tier por estado: lista=verde, parcial=amarillo, resto=rojo
+    if (item.estado === 'lista')   return 2;
+    if (item.estado === 'parcial') return 1;
+    return 0;
   }
 
   var fichas = grupoKeys.map(function(gk) {
@@ -4577,13 +4576,12 @@ function exportarBoardPDF(filtroMes) {
   LINEAS_PRODUCCION.forEach(function(ln){ enCurso[ln.id] = []; });
 
   solicitudes.forEach(function(s) {
-    // Filtrar por período efectivo (julio trasladado a agosto = periodo_efectivo '2026-08')
     if (filtroMes && mesSol(s) !== filtroMes) return;
+    // Lista → siempre completado (sin importar si tiene línea asignada o no)
+    if (s.estado === 'lista') { completados.push(s); return; }
     var lineaAsignada = lineaAsignadaDe(s);
-    if (s.estado === 'lista' && lineaAsignada) { completados.push(s); return; }
-    var esActiva   = ['nueva','programada','proceso','parcial'].indexOf(s.estado) >= 0;
-    var esListaSin = s.estado === 'lista' && !lineaAsignada;
-    if (!esActiva && !esListaSin) return;
+    // Estados activos: nueva, proceso, parcial (programada eliminada — se ignora)
+    if (['nueva','proceso','parcial'].indexOf(s.estado) < 0) return;
     if (!lineaAsignada) { sinAsignar.push(s); }
     else if (enCurso[lineaAsignada]) { enCurso[lineaAsignada].push(s); }
     else { sinAsignar.push(s); }
@@ -4591,12 +4589,10 @@ function exportarBoardPDF(filtroMes) {
 
   completados.sort(function(a,b){ return (b.created_at||'')<(a.created_at||'') ? -1 : 1; });
 
-  // Tier de entrega real por pedido — misma lógica que el board en pantalla (0=rojo,1=amarillo,2=verde)
+  // Tier por estado (igual que el board): lista=verde, parcial=amarillo, resto=rojo
   function getTier(s) {
-    var ent = entregadoMap[s.id] || 0;
-    var tot = s.cant || 0;
-    if (ent > 0 && ent >= tot) return 2;
-    if (ent > 0) return 1;
+    if (s.estado === 'lista')   return 2;
+    if (s.estado === 'parcial') return 1;
     return 0;
   }
   var TIER_INFO = [
@@ -4615,9 +4611,9 @@ function exportarBoardPDF(filtroMes) {
 
   function estadoBadge(s, ent, total) {
     var e = s.estado || 'nueva';
-    var m = { lista:'LISTA', proceso:'EN PROCESO', parcial:'PARCIAL', programada:'PROGRAMADA', nueva:'NUEVA' };
-    var c = { lista:'#166534', proceso:'#1e40af', parcial:'#92400e', programada:'#92400e', nueva:'#374151' };
-    var b = { lista:'#dcfce7', proceso:'#dbeafe', parcial:'#fef3c7', programada:'#fef3c7', nueva:'#f3f4f6' };
+    var m = { lista:'LISTA', proceso:'EN PROCESO', parcial:'PARCIAL', nueva:'NUEVA' };
+    var c = { lista:'#166534', proceso:'#1e40af', parcial:'#92400e', nueva:'#374151' };
+    var b = { lista:'#dcfce7', proceso:'#dbeafe', parcial:'#fef3c7', nueva:'#f3f4f6' };
     return '<span style="background:'+(b[e]||'#f3f4f6')+';color:'+(c[e]||'#374151')+';border-radius:3px;padding:1px 6px;font-size:8px;font-weight:800">'+(m[e]||e.toUpperCase())+'</span>';
   }
 
