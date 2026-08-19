@@ -3017,10 +3017,11 @@ function boardBuildSinBlock(items) {
         var cli    = grupo.cli;
         var per    = grupo.per;
         var gItems = grupo.items.slice();
-        // Ordenar: primero por tier (rojo→amarillo→verde), luego por orden manual guardado
+        // Ordenar: primero por tier (rojo=0 → amarillo=1 → verde=2), luego por orden manual
         var cliOrden = allCardOrden[cli] || [];
         gItems.sort(function(a, b) {
-          var ta = getTier(a); var tb = getTier(b);
+          var ta = a.estado === 'lista' ? 2 : a.estado === 'parcial' ? 1 : 0;
+          var tb = b.estado === 'lista' ? 2 : b.estado === 'parcial' ? 1 : 0;
           if (ta !== tb) return ta - tb;
           var ia = cliOrden.indexOf(a.solId); var ib = cliOrden.indexOf(b.solId);
           ia = ia === -1 ? 9999 : ia; ib = ib === -1 ? 9999 : ib;
@@ -3248,8 +3249,11 @@ function renderBoard() {
     if (!lanes[k]) k = 0;
     lanes[k].push(item);
   });
-  // Ordenar Sin asignar: por cliente A→Z, luego por ingreso más antiguo primero (FIFO)
+  // Ordenar Sin asignar: tier (rojo→verde), luego cliente A→Z, luego FIFO
   lanes[0].sort(function(a, b) {
+    var ta = a.estado === 'lista' ? 2 : a.estado === 'parcial' ? 1 : 0;
+    var tb = b.estado === 'lista' ? 2 : b.estado === 'parcial' ? 1 : 0;
+    if (ta !== tb) return ta - tb;
     var ca = (a.cliente || '').toLowerCase();
     var cb = (b.cliente || '').toLowerCase();
     if (ca < cb) return -1;
