@@ -2416,9 +2416,9 @@ function boardBuildCard(item) {
     }
   });
   var progColor = item.prog >= 80 ? 'var(--green)' : item.prog >= 40 ? 'var(--amber)' : 'var(--serig-m)';
-  var badgeBg   = item.estado === 'proceso'    ? 'var(--serig-l)' : item.estado === 'parcial' ? '#fef9c3' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
-  var badgeClr  = item.estado === 'proceso'    ? 'var(--serig-m)' : item.estado === 'parcial' ? '#92400e' : item.estado === 'programada' ? '#92400e' : '#64748b';
-  var badgeTxt  = item.estado === 'proceso'    ? 'EN PROCESO'     : item.estado === 'parcial' ? 'PARCIAL' : item.estado === 'programada' ? 'PROG'    : 'NUEVA';
+  var badgeBg   = item.estado === 'lista'    ? '#dcfce7'        : item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'parcial' ? '#fef9c3' : '#f1f5f9';
+  var badgeClr  = item.estado === 'lista'    ? '#15803d'        : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'parcial' ? '#92400e' : '#64748b';
+  var badgeTxt  = item.estado === 'lista'    ? 'COMPLETADO'     : item.estado === 'proceso' ? 'EN PROCESO'     : item.estado === 'parcial' ? 'PARCIAL' : 'NUEVA';
   var badge = '<span style="background:' + badgeBg + ';color:' + badgeClr + ';border-radius:4px;padding:1px 5px;font-size:8px;font-weight:800">' + badgeTxt + '</span>';
   var skuTxt  = item.sku  ? '<span style="color:var(--gray-l);font-family:var(--mono);font-size:10px">' + item.sku + '</span> · ' : '';
   var descTxt = skuTxt + '<span style="font-weight:700;color:var(--ink)">' + (item.desc || '—') + '</span>';
@@ -2472,7 +2472,9 @@ function boardBuildCard(item) {
   var esNueva  = perC.key === periodoActualKey();
   var badgeAgo = perC.key === '0000-00' ? ''
     : '<span class="badge-ago' + (esNueva ? '' : ' badge-ago-old') + '" title="Período ' + perC.largo + '">' + perC.corto + '</span>';
-  return '<div class="board-card' + (esNueva ? ' nueva-orden' : '') + '" draggable="true"' +
+  var esLista = item.estado === 'lista';
+  var cardStyle = esLista ? ' style="border-left:3px solid #22c55e;background:rgba(34,197,94,.06)"' : '';
+  return '<div class="board-card' + (esNueva ? ' nueva-orden' : '') + '"' + cardStyle + ' draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
     ' onclick="mostrarDetalle(\'' + item.solId + '\')">' +
