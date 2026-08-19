@@ -626,7 +626,7 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
     <div class="tab" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
     <div class="tab" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
     <div class="tabs-r">
-      <button class="btn btn-g btn-sm" onclick="exportarBoardPDF()" title="Imprimir estado del board">🖨 Imprimir</button>
+      <button class="btn btn-g btn-sm" onclick="abrirModalImprimirBoard()" title="Imprimir estado del board">🖨 Imprimir</button>
       <button class="btn btn-s btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>
     </div>
   </div>
@@ -4491,7 +4491,52 @@ async function exportarAsistGridPDF() {
   else showToast('Activa las ventanas emergentes para exportar', '#92400e');
 }
 
-function exportarBoardPDF() {
+function abrirModalImprimirBoard() {
+  if (!solicitudes || !solicitudes.length) { showToast('Sin datos cargados', '#92400e'); return; }
+
+  // Recopilar meses disponibles de las solicitudes sin asignar
+  var mesesSet = {};
+  solicitudes.forEach(function(s) {
+    var f = (s.created_at || '').slice(0, 7);
+    if (f) mesesSet[f] = true;
+  });
+  var meses = Object.keys(mesesSet).sort().reverse();
+
+  var hoyMes = fechaHoy().slice(0, 7);
+  var optsHtml = '<option value="">Todos los meses</option>';
+  meses.forEach(function(m) {
+    var label = new Date(m + '-15').toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+    label = label.charAt(0).toUpperCase() + label.slice(1);
+    var sel = m === hoyMes ? ' selected' : '';
+    optsHtml += '<option value="' + m + '"' + sel + '>' + label + '</option>';
+  });
+
+  var existente = document.getElementById('modalImprimirBoard');
+  if (existente) existente.remove();
+
+  var modal = document.createElement('div');
+  modal.id = 'modalImprimirBoard';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:10500;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+  modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+  modal.innerHTML =
+    '<div style="background:var(--card);border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.3);padding:22px 24px;width:100%;max-width:360px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+        '<span style="font-size:14px;font-weight:800;color:var(--ink)">🖨 Imprimir Board</span>' +
+        '<button onclick="document.getElementById(\'modalImprimirBoard\').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0">✕</button>' +
+      '</div>' +
+      '<label style="font-size:11px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Filtrar por mes</label>' +
+      '<select id="selMesImprimir" style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--ink);font-size:13px;margin-bottom:18px">' +
+        optsHtml +
+      '</select>' +
+      '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+        '<button onclick="document.getElementById(\'modalImprimirBoard\').remove()" style="padding:8px 16px;border:1.5px solid var(--border);background:none;border-radius:8px;cursor:pointer;font-size:12px;color:var(--ink)">Cancelar</button>' +
+        '<button onclick="var m=document.getElementById(\'selMesImprimir\').value;document.getElementById(\'modalImprimirBoard\').remove();exportarBoardPDF(m)" style="padding:8px 18px;background:var(--serig-m);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700">Imprimir</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(modal);
+}
+
+function exportarBoardPDF(filtroMes) {
   if (!solicitudes || !solicitudes.length) { showToast('Sin datos cargados', '#92400e'); return; }
 
   var manuales = getEntregasManuales() || [];
@@ -4511,12 +4556,13 @@ function exportarBoardPDF() {
     return conLinea ? conLinea.linea_id : null;
   }
 
-  // Clasificar solicitudes
+  // Clasificar solicitudes (con filtro de mes opcional)
   var sinAsignar = [], completados = [];
   var enCurso = {}; // linea_id → []
   LINEAS_PRODUCCION.forEach(function(ln){ enCurso[ln.id] = []; });
 
   solicitudes.forEach(function(s) {
+    if (filtroMes && (s.created_at || '').slice(0, 7) !== filtroMes) return;
     var lineaAsignada = lineaAsignadaDe(s);
     if (s.estado === 'lista' && lineaAsignada) { completados.push(s); return; }
     var esActiva   = ['nueva','programada','proceso','parcial'].indexOf(s.estado) >= 0;
@@ -4731,7 +4777,7 @@ function exportarBoardPDF() {
     '@media print{.no-print{display:none}}' +
     '</style></head><body>' +
     '<h1>Tetraplastic · Serigrafía — Estado de Producción</h1>' +
-    '<div style="font-size:9px;color:#6b7280">Generado: ' + fecha + '</div>' +
+    '<div style="font-size:9px;color:#6b7280">Generado: ' + fecha + (filtroMes ? ' · Mes: ' + new Date(filtroMes + '-15').toLocaleDateString('es-GT', {month:'long', year:'numeric'}).replace(/^\w/, function(c){return c.toUpperCase();}) : ' · Todos los meses') + '</div>' +
     '<div class="resumen">' +
       '<div><strong>' + totalPedidos + '</strong>Pedidos activos</div>' +
       '<div><strong>' + enCursoTotal + '</strong>En curso (líneas)</div>' +
