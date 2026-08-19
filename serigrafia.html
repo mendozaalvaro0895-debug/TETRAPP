@@ -2509,10 +2509,10 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
       requis.push({ cant: m.cant, fecha: m.fecha, requi: m.requi });
     }
   });
-  var badgeBg  = item.estado === 'lista' ? '#dcfce7' : item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'parcial' ? '#fef9c3' : item.estado === 'programada' ? '#fef3c7' : '#f1f5f9';
-  var badgeClr = item.estado === 'lista' ? '#15803d' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'parcial' ? '#92400e' : item.estado === 'programada' ? '#92400e' : '#64748b';
-  var badgeBdr = item.estado === 'lista' ? '#86efac' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'parcial' ? '#fde68a' : item.estado === 'programada' ? '#fde68a' : '#cbd5e1';
-  var badgeTxt = item.estado === 'lista' ? 'LISTA' : item.estado === 'proceso' ? 'EN PROC.' : item.estado === 'parcial' ? 'PARCIAL' : item.estado === 'programada' ? 'PROGRAMADA' : 'NUEVA';
+  var badgeBg  = item.estado === 'lista' ? '#dcfce7' : item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'parcial' ? '#fef9c3' : '#f1f5f9';
+  var badgeClr = item.estado === 'lista' ? '#15803d' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'parcial' ? '#92400e' : '#64748b';
+  var badgeBdr = item.estado === 'lista' ? '#86efac' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'parcial' ? '#fde68a' : '#cbd5e1';
+  var badgeTxt = item.estado === 'lista' ? 'COMPLETADO' : item.estado === 'proceso' ? 'EN PROC.' : item.estado === 'parcial' ? 'PARCIAL' : 'NUEVA';
   var dragArg    = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var total      = item.cant || 0;
   // estado 'lista' = siempre verde aunque las entregas no lleguen al 100%
@@ -2644,7 +2644,10 @@ async function guardarProgreso(solId, prog) {
   prog = Math.max(0, Math.min(100, prog || 0));
   var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!s) return;
-  var nuevoEstado = prog >= 100 ? 'lista' : prog > 0 ? 'proceso' : s.estado;
+  // No degradar un cierre manual ni una entrega parcial ya registrada
+  var nuevoEstado = prog >= 100 ? 'lista'
+                  : (s.estado === 'lista' || s.estado === 'parcial') ? s.estado
+                  : prog > 0 ? 'proceso' : s.estado;
   try {
     var r = await db.from('solicitudes').update({ progreso_pct: prog, estado: nuevoEstado }).eq('id', s.dbId);
     if (r.error) throw r.error;
@@ -2807,9 +2810,12 @@ async function toggleProcesoPedido(solId, procIdx) {
   var doneCount = (nuevoProc.match(/2/g) || []).length;
   var anyMarked = /[12]/.test(nuevoProc);
   var prog = Math.round(doneCount / PROCESOS_SEQ.length * 100);
-  var nuevoEstado = doneCount === PROCESOS_SEQ.length ? 'lista'
+  // No pisar un cierre manual ('lista') ni una entrega parcial ya registrada
+  var nuevoEstado = s.estado === 'lista' ? 'lista'
+                  : doneCount === PROCESOS_SEQ.length ? 'lista'
+                  : s.estado === 'parcial' ? 'parcial'
                   : anyMarked ? 'proceso'
-                  : (s.estado === 'lista' || s.estado === 'entregada' ? s.estado : 'nueva');
+                  : 'nueva';
 
   var nuevasNotas = encodeMeta(0, s.tiros || 1, 0, s.notas || '', nuevoProc, s.tiro_actual || 1);
   try {
@@ -3195,7 +3201,7 @@ function renderBoard() {
   if (!contSin || !contLines) return;
   var items = [];
   solicitudes.forEach(function(s) {
-    var esActiva   = ['nueva','programada','proceso','parcial'].indexOf(s.estado) >= 0;
+    var esActiva   = ['nueva','proceso','parcial'].indexOf(s.estado) >= 0;
     var esListaSin = s.estado === 'lista' && !s.linea_id;
     if (!esActiva && !esListaSin) return;
     var sTiros = s.tiros || Math.max.apply(null, (s.lineas.length ? s.lineas.map(function(l){ return l.tiros || 1; }) : [1]));
@@ -3305,6 +3311,51 @@ function boardDragStart(e, lineaDbId, solId) {
   if (card) setTimeout(function(){ card.classList.add('dragging'); }, 0);
 }
 
+// ══════════════════════════════════════════════════════════════
+// ESTADOS OFICIALES: nueva · proceso · parcial · lista
+// 'lista' = ENTREGADO (cierra la ficha). No existen 'programada' ni 'entregada'.
+// ══════════════════════════════════════════════════════════════
+var ESTADOS_SERIG = ['nueva', 'proceso', 'parcial', 'lista'];
+
+// Unidades entregadas acumuladas de una solicitud (entregas manuales)
+function entregadoDeSolicitud(solId) {
+  var total = 0;
+  (getEntregasManuales() || []).forEach(function(m) {
+    if (m.lineas && m.lineas.length) {
+      m.lineas.forEach(function(l) { if (l.solId === solId) total += (l.cant || 0); });
+    } else if (m.solId === solId) {
+      total += (m.cant || 0);
+    }
+  });
+  return total;
+}
+
+// Escribe el estado en AMBOS niveles: solicitudes + solicitud_lineas.
+// La tarjeta lee 'l.estado || s.estado' — si la línea queda desincronizada,
+// el cambio se guarda pero NO se ve. Devuelve null si OK, o el error.
+async function syncEstado(s, nuevoEstado) {
+  if (!s) return { message: 'solicitud no encontrada' };
+  var r1 = await db.from('solicitudes').update({ estado: nuevoEstado }).eq('id', s.dbId);
+  if (r1.error) return r1.error;
+  var ids = (s.lineas || []).map(function(l) { return l.id; }).filter(Boolean);
+  if (ids.length) {
+    var r2 = await db.from('solicitud_lineas').update({ estado: nuevoEstado }).in('id', ids);
+    if (r2.error) return r2.error;
+  }
+  s.estado = nuevoEstado;
+  (s.lineas || []).forEach(function(l) { l.estado = nuevoEstado; });
+  return null;
+}
+
+// Estado que le corresponde a una ficha devuelta a Sin Asignar, según entregas
+function estadoPorEntregas(s) {
+  var ent = entregadoDeSolicitud(s.id);
+  var tot = s.cant || 0;
+  if (ent <= 0)            return 'nueva';
+  if (tot > 0 && ent >= tot) return 'lista';
+  return 'parcial';
+}
+
 async function boardDrop(e, targetLaneId) {
   e.preventDefault();
   var lane = document.getElementById('bl-' + targetLaneId);
@@ -3323,44 +3374,24 @@ async function boardDrop(e, targetLaneId) {
     var r = await db.from('solicitud_lineas').update({ linea_id: newLinea }).eq('id', boardDragId);
     if (r.error) throw r.error;
 
-    // Al asignar a una línea, iniciar automáticamente (estado -> proceso)
     var iniciada = false;
     var estadoMsg = '';
     var s = solicitudes.find(function(x) { return x.id === solId; });
     if (newLinea) {
-      if (s && (s.estado === 'nueva' || s.estado === 'programada')) {
-        var ru = await db.from('solicitudes').update({ estado: 'proceso' }).eq('id', s.dbId);
-        if (ru.error) throw ru.error;
+      // Entra a línea → arranca en proceso (salvo que ya esté cerrada como lista)
+      if (s && s.estado !== 'lista' && s.estado !== 'proceso') {
+        var errIni = await syncEstado(s, 'proceso');
+        if (errIni) throw errIni;
         iniciada = true;
       }
     } else {
-      // Al devolver a Sin Asignar: ajustar estado según entregas acumuladas
-      if (s && ['nueva','proceso','parcial'].indexOf(s.estado) >= 0) {
-        var manuales = getEntregasManuales() || [];
-        var entregadoS = 0;
-        manuales.forEach(function(m) {
-          if (m.lineas && m.lineas.length) {
-            m.lineas.forEach(function(l) { if (l.solId === solId) entregadoS += (l.cant || 0); });
-          } else if (m.solId === solId) {
-            entregadoS += (m.cant || 0);
-          }
-        });
-        var totalS = s.cant || 0;
-        var nuevoEstado = (entregadoS > 0 && entregadoS < totalS) ? 'parcial'
-                        : (entregadoS === 0) ? 'nueva'
-                        : s.estado; // entregado >= total → usuario decide (no auto-cambiar)
+      // Vuelve a Sin Asignar → el estado lo dictan las entregas acumuladas
+      if (s && s.estado !== 'lista') {
+        var nuevoEstado = estadoPorEntregas(s);
         if (nuevoEstado !== s.estado) {
-          var ru2 = await db.from('solicitudes').update({ estado: nuevoEstado }).eq('id', s.dbId);
-          if (ru2.error) {
-            // Si falla por constraint (parcial no en DB), mover igual pero avisar
-            if (ru2.error.code === '23514') {
-              showToast('⚠️ Falta correr SQL: añadir "parcial" al constraint de solicitudes', '#92400e');
-            } else {
-              throw ru2.error;
-            }
-          } else {
-            estadoMsg = ' · ' + nuevoEstado.toUpperCase();
-          }
+          var errEst = await syncEstado(s, nuevoEstado);
+          if (errEst) throw errEst;
+          estadoMsg = ' · ' + nuevoEstado.toUpperCase();
         }
       }
     }
@@ -3403,11 +3434,11 @@ function renderInicio() {
   solicitudes.forEach(function(s) {
     if (s.lineas.length === 0) {
       var e0 = s.estado;
-      if (e0 === 'nueva' || e0 === 'programada' || e0 === 'proceso' || e0 === 'parcial') pendientesCount++;
+      if (e0 === 'nueva' || e0 === 'proceso' || e0 === 'parcial') pendientesCount++;
     } else {
       s.lineas.forEach(function(l) {
         var e0 = l.estado || s.estado;
-        if (e0 === 'nueva' || e0 === 'programada' || e0 === 'proceso' || e0 === 'parcial') pendientesCount++;
+        if (e0 === 'nueva' || e0 === 'proceso' || e0 === 'parcial') pendientesCount++;
       });
     }
   });
@@ -3417,7 +3448,7 @@ function renderInicio() {
 
   var entMap = _buildEntregadoMap();
   var parciales = solicitudes.filter(function(s) {
-    return ['nueva','programada','proceso','parcial'].indexOf(s.estado) >= 0
+    return ['nueva','proceso','parcial'].indexOf(s.estado) >= 0
       && ((entMap[s.id] || 0) > 0 && (entMap[s.id] || 0) < (s.cant || 1) || s.estado === 'parcial');
   });
 
@@ -5298,14 +5329,14 @@ function entregadoSolInput(val, i) {
   eEntregadoSolIds[i] = null;
   var v = val.trim().toLowerCase();
   var candidatos = solicitudes.filter(function(s) {
-    return s.estado === 'proceso' || s.estado === 'parcial' || s.estado === 'programada' || s.estado === 'nueva' || s.estado === 'lista' || s.estado === 'entregada';
+    return ESTADOS_SERIG.indexOf(s.estado) >= 0;
   });
   var matches = v.length === 0 ? candidatos.slice(0, 12) : candidatos.filter(function(s) {
     return (s.id_display || '').toLowerCase().includes(v) || (s.cliente || '').toLowerCase().includes(v) || (s.desc || '').toLowerCase().includes(v);
   }).slice(0, 12);
   if (!matches.length) { drop.classList.remove('open'); return; }
   drop.innerHTML = matches.map(function(s) {
-    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'parcial' ? '🟡' : s.estado === 'programada' ? '🟡' : s.estado === 'nueva' ? '⚪' : s.estado === 'lista' ? '✅' : '📦';
+    var ico = s.estado === 'proceso' ? '🟢' : s.estado === 'parcial' ? '🟡' : s.estado === 'lista' ? '✅' : '⚪';
     var lbl = escHtml((s.id_display || '') + ' · ' + (s.cliente || ''));
     var sub = escHtml((s.desc || '').slice(0, 40));
     var sid = s.id.replace(/'/g, "\\'");
@@ -5415,7 +5446,7 @@ async function autoCompletarSiCorresponde(lineasGuardadas) {
   for (var i = 0; i < solIds.length; i++) {
     var solId = solIds[i];
     var s = solicitudes.find(function(x) { return x.id === solId; });
-    if (!s || ['nueva','programada','proceso','parcial'].indexOf(s.estado) < 0) continue;
+    if (!s || ['nueva','proceso','parcial'].indexOf(s.estado) < 0) continue;
     var entregado = 0;
     (getEntregasManuales() || []).forEach(function(m) {
       if (m.lineas && m.lineas.length) {
@@ -5506,7 +5537,7 @@ async function renderConsolidadoEnvases() {
   var el = document.getElementById('alertasSlotR');
   if (!el) return;
 
-  var ESTADOS_VIVOS = ['nueva','programada','proceso','parcial'];
+  var ESTADOS_VIVOS = ['nueva','proceso','parcial'];
   var perHoy = periodoActualKey();
 
   var mapa = {};
@@ -5559,7 +5590,7 @@ async function renderConsolidadoEnvases() {
     var desc     = (inv && inv.descripcion) || e.desc || '—';
     var pedList  = Object.keys(e.pedidos).map(function(k){ return e.pedidos[k]; })
       .sort(function(a,b){
-        var ord = {'nueva':0,'programada':1,'proceso':2,'parcial':3};
+        var ord = {'nueva':0,'proceso':1,'parcial':2};
         return (ord[a.estado]||9) - (ord[b.estado]||9) || a.codigo.localeCompare(b.codigo);
       });
     return { kb: kb, desc: desc, pedidos: pedList, npedidos: pedList.length,
@@ -5680,8 +5711,8 @@ function envTogglePedDrop(e, kb) {
   }
   f.dataset.kb = kb;
   var peds = _envPedData[kb] || [];
-  var EST = { nueva:'#f1f5f9|#64748b', programada:'#fef3c7|#92400e',
-              proceso:'var(--serig-l)|var(--serig-m)', parcial:'#fef9c3|#92400e' };
+  var EST = { nueva:'#f1f5f9|#64748b', proceso:'var(--serig-l)|var(--serig-m)',
+              parcial:'#fef9c3|#92400e', lista:'#dcfce7|#15803d' };
   var rows = peds.map(function(p) {
     var clr = (EST[p.estado] || '#f1f5f9|#64748b').split('|');
     var bg = clr[0], fg = clr[1];
@@ -5720,7 +5751,7 @@ function envPedDetalle(solId) {
 
 function envPDF() {
   var perHoy = periodoActualKey();
-  var ESTADOS_VIVOS = ['nueva','programada','proceso','parcial'];
+  var ESTADOS_VIVOS = ['nueva','proceso','parcial'];
   var mapa = {};
   solicitudes.forEach(function(s) {
     if (ESTADOS_VIVOS.indexOf(s.estado) < 0) return;
@@ -5967,7 +5998,7 @@ async function generarCodigo(area) {
 
 async function refreshKPIs() {
   var activas   = solicitudes.filter(function(s) { return s.estado === 'proceso'; }).length;
-  var pendientes = solicitudes.filter(function(s) { return s.estado === 'nueva' || s.estado === 'programada'; }).length;
+  var pendientes = solicitudes.filter(function(s) { return s.estado === 'nueva'; }).length;
 
   var el;
   el = document.getElementById('ks-proc'); if (el) el.textContent = activas;
@@ -6070,10 +6101,11 @@ async function mostrarDetalle(id) {
   var tirosSol = s.tiros || 1;
   var horas    = calcularHoras(s.cant, 1, allProcs, tirosSol);
 
+  // 'lista' = entregado / completado → es el estado final, no hay paso siguiente
   var btnEstado = '';
-  if (s.estado === 'nueva')    btnEstado = '<button class="btn btn-s btn-xs" onclick="cambiarEstado(\'' + s.id + '\',\'proceso\')">▶ Iniciar</button>';
-  if (s.estado === 'proceso')  btnEstado = '<button class="btn btn-g btn-xs" onclick="cambiarEstado(\'' + s.id + '\',\'lista\')">✓ Lista</button>';
-  if (s.estado === 'lista')    btnEstado = '<button class="btn btn-g btn-xs" onclick="cambiarEstado(\'' + s.id + '\',\'entregada\')">📦 Entregar</button>';
+  if (s.estado === 'nueva')   btnEstado = '<button class="btn btn-s btn-xs" onclick="cambiarEstado(\'' + s.id + '\',\'proceso\')">▶ Iniciar</button>';
+  if (s.estado === 'proceso' || s.estado === 'parcial')
+                              btnEstado = '<button class="btn btn-g btn-xs" onclick="cambiarEstado(\'' + s.id + '\',\'lista\')">✓ Completar</button>';
 
   var fugaColor = fugas.fugaTotal > 0 ? 'var(--red)' : 'var(--green)';
 
@@ -6288,12 +6320,12 @@ function abrirEstadoSin(event, solId, lineaDbId) {
   var old = document.getElementById('estado-sin-pop');
   if (old) { var wasMe = old._key === (lineaDbId || solId); old.remove(); if (wasMe) return; }
 
+  // Los 4 estados oficiales. 'lista' = entregado / completado.
   var opciones = [
-    { val: 'nueva',      label: 'Nueva',      bg: '#f1f5f9', clr: '#64748b' },
-    { val: 'programada', label: 'Programada', bg: '#fef3c7', clr: '#92400e' },
-    { val: 'proceso',    label: 'En proceso', bg: 'var(--serig-l)', clr: 'var(--serig-m)' },
-    { val: 'parcial',    label: 'Parcial', bg: '#fef9c3', clr: '#92400e' },
-    { val: 'lista',      label: 'Lista ✓',    bg: '#dcfce7', clr: '#15803d' }
+    { val: 'nueva',   label: 'Nueva',        bg: '#f1f5f9',       clr: '#64748b' },
+    { val: 'proceso', label: 'En proceso',   bg: 'var(--serig-l)', clr: 'var(--serig-m)' },
+    { val: 'parcial', label: 'Parcial',      bg: '#fef9c3',       clr: '#92400e' },
+    { val: 'lista',   label: 'Completado ✓', bg: '#dcfce7',       clr: '#15803d' }
   ];
 
   var pop = document.createElement('div');
@@ -6334,33 +6366,37 @@ function abrirEstadoSin(event, solId, lineaDbId) {
   }, 0);
 }
 
+// Cambiar estado desde la píldora de una línea: sincroniza solicitud + líneas
+// para que 'l.estado || s.estado' no muestre un valor viejo.
 async function cambiarEstadoLinea(lineaDbId, solId, nuevoEstado) {
-  try {
-    var r = await db.from('solicitud_lineas').update({ estado: nuevoEstado }).eq('id', lineaDbId);
-    if (r.error) throw r.error;
-    // Actualizar en memoria
-    var s = solicitudes.find(function(x) { return x.id === solId; });
-    if (s) {
-      var l = s.lineas.find(function(x) { return x.id === lineaDbId; });
-      if (l) l.estado = nuevoEstado;
-    }
-    renderBoard();
-    showToast('✅ Línea marcada como ' + nuevoEstado);
-  } catch(e) { showToast('❌ Error al cambiar estado', '#B83232'); }
+  var s = solicitudes.find(function(x) { return x.id === solId; });
+  var err = await syncEstado(s, nuevoEstado);
+  if (err) {
+    console.error('cambiarEstadoLinea:', err);
+    showToast('❌ No se guardó: ' + (err.message || 'error'), '#B83232');
+    return;
+  }
+  if (nuevoEstado === 'lista') s.prog = 100;
+  renderBoard();
+  refreshKPIs();
+  showToast('✅ ' + (s.id_display || '') + ' → ' + nuevoEstado.toUpperCase());
 }
 
 async function cambiarEstado(id, nuevoEstado, silent) {
   var s = solicitudes.find(function(x) { return x.id === id; });
   if (!s) return;
-  try {
-    await db.from('solicitudes').update({ estado: nuevoEstado }).eq('id', s.dbId);
-    s.estado = nuevoEstado;
-    if (nuevoEstado === 'lista' || nuevoEstado === 'entregada') s.prog = 100;
-    renderBoard();
-    if (!silent) mostrarDetalle(id);
-    var msg = {lista:'marcada como lista', entregada:'entregada', proceso:'en proceso'};
-    showToast('✅ Solicitud ' + (msg[nuevoEstado] || nuevoEstado));
-  } catch(e) { showToast('❌ Error al cambiar estado', '#B83232'); }
+  var err = await syncEstado(s, nuevoEstado);
+  if (err) {
+    console.error('cambiarEstado:', err);
+    showToast('❌ No se guardó: ' + (err.message || 'error'), '#B83232');
+    return;
+  }
+  if (nuevoEstado === 'lista') s.prog = 100;
+  renderBoard();
+  refreshKPIs();
+  if (!silent) mostrarDetalle(id);
+  var msg = { lista: 'entregada / completada', proceso: 'en proceso', parcial: 'entrega parcial', nueva: 'nueva' };
+  showToast('✅ Solicitud ' + (msg[nuevoEstado] || nuevoEstado));
 }
 
 async function actualizarProg(id) {
@@ -6814,7 +6850,7 @@ function seleccionarLineaSkuBase(idx, sku) {
   var existencia = item ? (item.existencia || 0) : 0;
 
   // Sumar lo ya comprometido en solicitudes activas (no entregadas ni lista)
-  var estadosActivos = ['nueva', 'programada', 'proceso', 'parcial'];
+  var estadosActivos = ['nueva', 'proceso', 'parcial'];
   var comprometido = 0;
   solicitudes.forEach(function(sol) {
     if (estadosActivos.indexOf(sol.estado) < 0) return;
