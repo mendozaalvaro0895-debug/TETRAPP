@@ -3325,12 +3325,35 @@ async function boardDrop(e, targetLaneId) {
 
     // Al asignar a una línea, iniciar automáticamente (estado -> proceso)
     var iniciada = false;
+    var estadoMsg = '';
+    var s = solicitudes.find(function(x) { return x.id === solId; });
     if (newLinea) {
-      var s = solicitudes.find(function(x) { return x.id === solId; });
       if (s && (s.estado === 'nueva' || s.estado === 'programada')) {
         var ru = await db.from('solicitudes').update({ estado: 'proceso' }).eq('id', s.dbId);
         if (ru.error) throw ru.error;
         iniciada = true;
+      }
+    } else {
+      // Al devolver a Sin Asignar: ajustar estado según entregas acumuladas
+      if (s && ['nueva','proceso','parcial'].indexOf(s.estado) >= 0) {
+        var manuales = getEntregasManuales() || [];
+        var entregadoS = 0;
+        manuales.forEach(function(m) {
+          if (m.lineas && m.lineas.length) {
+            m.lineas.forEach(function(l) { if (l.solId === solId) entregadoS += (l.cant || 0); });
+          } else if (m.solId === solId) {
+            entregadoS += (m.cant || 0);
+          }
+        });
+        var totalS = s.cant || 0;
+        var nuevoEstado = (entregadoS > 0 && entregadoS < totalS) ? 'parcial'
+                        : (entregadoS === 0) ? 'nueva'
+                        : s.estado; // entregado >= total → usuario decide (no auto-cambiar)
+        if (nuevoEstado !== s.estado) {
+          var ru2 = await db.from('solicitudes').update({ estado: nuevoEstado }).eq('id', s.dbId);
+          if (ru2.error) throw ru2.error;
+          estadoMsg = ' · ' + nuevoEstado.toUpperCase();
+        }
       }
     }
 
@@ -3339,7 +3362,7 @@ async function boardDrop(e, targetLaneId) {
     await cargarSolicitudes();
     showToast(newLinea
       ? '✅ Asignado a Línea ' + newLinea + (iniciada ? ' · iniciado ▶' : '')
-      : '✅ Movido a Sin asignar');
+      : '✅ Movido a Sin asignar' + estadoMsg);
   } catch(err) {
     console.error('boardDrop:', err);
     showToast('Error al asignar: ' + err.message, '#B83232');
