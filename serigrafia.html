@@ -3347,6 +3347,25 @@ async function syncEstado(s, nuevoEstado) {
   return null;
 }
 
+// Estado efectivo de una solicitud.
+// El board renderiza una tarjeta por LÍNEA usando 'l.estado || s.estado' — la línea
+// manda. Las vistas que muestran UNA fila por solicitud (PDF) deben resolver igual,
+// o los conteos no cuadran. Con varias líneas gana la MENOS avanzada: un pedido con
+// alguna línea pendiente no puede reportarse como completo.
+function estadoEfectivoSol(s) {
+  var lineas = (s && s.lineas) || [];
+  var base = (s && s.estado) || 'nueva';
+  if (!lineas.length) return base;
+  var RANK = { nueva: 0, proceso: 0, parcial: 1, lista: 2 };
+  var peor = null, peorR = 99;
+  lineas.forEach(function(l) {
+    var e = l.estado || base;
+    var r = RANK[e] === undefined ? 0 : RANK[e];
+    if (r < peorR) { peorR = r; peor = e; }
+  });
+  return peor || base;
+}
+
 // Estado que le corresponde a una ficha devuelta a Sin Asignar, según entregas
 function estadoPorEntregas(s) {
   var ent = entregadoDeSolicitud(s.id);
@@ -4641,7 +4660,7 @@ function exportarBoardPDF(filtroMes) {
     if (filtroMes && mesSol(s) !== filtroMes) return;
     var lineaAsignada = lineaAsignadaDe(s);
     // Lista: siempre en Sin Asignar (verde/completado) — no se mueve a sección aparte
-    var esActiva = ['nueva','proceso','parcial','lista'].indexOf(s.estado) >= 0;
+    var esActiva = ESTADOS_SERIG.indexOf(estadoEfectivoSol(s)) >= 0;
     if (!esActiva) return;
     if (!lineaAsignada) { sinAsignar.push(s); }
     else if (enCurso[lineaAsignada]) { enCurso[lineaAsignada].push(s); }
@@ -4650,10 +4669,12 @@ function exportarBoardPDF(filtroMes) {
 
   completados.sort(function(a,b){ return (b.created_at||'')<(a.created_at||'') ? -1 : 1; });
 
-  // Tier por estado (igual que el board): lista=verde, parcial=amarillo, resto=rojo
+  // Tier por estado EFECTIVO (resuelve nivel línea, igual que el board):
+  // lista=verde, parcial=amarillo, resto=rojo
   function getTier(s) {
-    if (s.estado === 'lista')   return 2;
-    if (s.estado === 'parcial') return 1;
+    var e = estadoEfectivoSol(s);
+    if (e === 'lista')   return 2;
+    if (e === 'parcial') return 1;
     return 0;
   }
   var TIER_INFO = [
@@ -4671,8 +4692,8 @@ function exportarBoardPDF(filtroMes) {
   var totalPedidos = enCursoTotal + sinAsignar.length + completados.length;
 
   function estadoBadge(s, ent, total) {
-    var e = s.estado || 'nueva';
-    var m = { lista:'LISTA', proceso:'EN PROCESO', parcial:'PARCIAL', nueva:'NUEVA' };
+    var e = estadoEfectivoSol(s);
+    var m = { lista:'COMPLETADO', proceso:'EN PROCESO', parcial:'PARCIAL', nueva:'NUEVA' };
     var c = { lista:'#166534', proceso:'#1e40af', parcial:'#92400e', nueva:'#374151' };
     var b = { lista:'#dcfce7', proceso:'#dbeafe', parcial:'#fef3c7', nueva:'#f3f4f6' };
     return '<span style="background:'+(b[e]||'#f3f4f6')+';color:'+(c[e]||'#374151')+';border-radius:3px;padding:1px 6px;font-size:8px;font-weight:800">'+(m[e]||e.toUpperCase())+'</span>';
