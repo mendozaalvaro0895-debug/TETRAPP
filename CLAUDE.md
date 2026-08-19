@@ -21,263 +21,154 @@
 
 ## Arquitectura actual
 Cada HTML es AUTÓNOMO: CSS en `<style>`, funciones y datos inline. El cliente `db` y los
-helpers de sesión/roles YA NO son inline — los provee `shared/auth.js` (ver Supabase arriba).
-`shared/styles.css` es el único archivo de estilos compartido — se carga en todos los HTML como
+helpers de sesión/roles los provee `shared/auth.js`. `shared/styles.css` es el único archivo
+de estilos compartido — se carga en todos los HTML como
 `<link rel="stylesheet" href="shared/styles.css">` ANTES del `<style>` propio.
-Los `.js` sueltos en shared/ (aparte de auth.js) eran huérfanos y se borraron (jul/2026).
 
 ### Funciones serverless (Vercel) — carpeta `api/`
-Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados). Config y
-límites en `vercel.json` (memory/maxDuration por función).
-- `api/whatsapp.js` — bot de registro por WhatsApp (Twilio → Claude interpreta → INSERT en
-  Supabase con **service_role**, salta RLS). Estado conversacional en tabla `bot_estado`
-  (1 fila por número). ⚠️ Escritura sensible: valida la firma `X-Twilio-Signature`
-  (HMAC-SHA1, fail-closed) — sin `TWILIO_AUTH_TOKEN` en env, rechaza TODO POST (403).
-  Env: ANTHROPIC_API_KEY, SUPA_URL, SUPA_SERVICE_KEY, TWILIO_AUTH_TOKEN (obligatorio),
-  TWILIO_WEBHOOK_URL (opcional, pin de URL), TETRA_WA_ALLOW (opcional, allowlist de números).
-- `api/parse-doc.js` — lee la foto de una requi con Claude Vision y devuelve JSON
-  {requi, fecha, productos[...]}. Lo llama serigrafia.html (Movimientos). Env: ANTHROPIC_API_KEY.
-  ⚠️ PENDIENTE DE SEGURIDAD: CORS `*` y sin auth → cualquiera puede gastar tokens de Claude
-  llamando al endpoint. Falta gatear con el JWT de sesión de Supabase (cambia endpoint + caller).
+Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados).
+- `api/whatsapp.js` — bot WhatsApp (Twilio → Claude → INSERT con **service_role**, salta RLS).
+  ⚠️ Valida firma `X-Twilio-Signature` (HMAC-SHA1, fail-closed) — sin `TWILIO_AUTH_TOKEN` rechaza TODO POST.
+  Env: ANTHROPIC_API_KEY, SUPA_URL, SUPA_SERVICE_KEY, TWILIO_AUTH_TOKEN (obligatorio), TWILIO_WEBHOOK_URL, TETRA_WA_ALLOW.
+- `api/parse-doc.js` — parsea foto de requi con Claude Vision → JSON {requi, fecha, productos[]}.
+  ⚠️ PENDIENTE: CORS `*` + sin auth → gasto de tokens de Claude. Falta gatear con JWT de sesión.
 
-### Módulos y su estado
-| Archivo | Estado | Descripción |
-|---|---|---|
-| `index.html` | ✅ Activo | Fachada principal — 6 cards de módulo |
-| `tapas.html` | ✅ Activo | Módulo completo Tapas (hub + pedidos + movimientos + personal) |
-| `serigrafia.html` | ✅ Activo | Módulo admin Serigrafía: Inicio (board de solicitudes) + Movimientos + Productividad (lecturas de contador por línea, con diagnóstico si la fecha elegida está vacía) + Personal (asistencia con grid mensual, veladas, PDF) + link a Dashboard |
-| `registro-serigrafia.html` | ✅ Activo | Formulario móvil rol `operativo_serig` (serigrafia@tetrapp.app). Pantalla 0 = selección de tarea: 🔥 Flameado (una bolsa por registro: hora, envase autocomplete, cantidad, Para línea 1-4; "otra bolsa" conserva flameador/envase/línea) · 🖨 Impresión (lectura de contador por línea/momento inicio-mediodía-fin-velada, foto opcional, paros del turno) · 📦 Empaque (operador o "apoyo de otra área" con area_origen, SKU + cantidad, fecha/hora automáticas). Errores de guardado se muestran en recuadro rojo persistente |
-| `comandas.html` | ✅ Activo | Registro de producción diaria por operario (vista admin) |
-| `registro-tapas.html` | ✅ Activo | Formulario móvil para rol `operativo` (tapas@tetrapp.app): el operario elige su nombre y registra su comanda ya concluida (sin campo Estado, sin devolución de material); correlativo CMD-### lo asigna trigger DB; supervisor se lee en vivo de `personal` (rol='supervisor', area='tapas', activo=true) — nunca hardcodeado |
-| `dashboard.html` | ✅ Activo | KPIs ejecutivos globales |
-| `inventario.html` | ✅ Activo | Gestión de SKUs, existencias, importación Excel |
-| `ventas.html` | ✅ Activo | Módulo Ventas y Financiero (ago/2026): tabs Resumen (KPIs del mes en foco + gráfico mensual de barras CSS + familias + top clientes) · Productos (top por periodo, Δ vs mes anterior, búsqueda) · Clientes (concentración top 3, Δ) · Rotación (produccion_diaria vs `ventas` por mes: unidades producidas vs TODA la facturación del mes sin filtrar por SKU, venta potencial —precio ponderado histórico× producción— vs facturado real, badge Positiva/Negativa; trae aviso permanente explicando que no filtra por SKU porque hay códigos que cambian antes de facturarse, ej. 10033 se factura también como 100332 según lo pida el cliente — pendiente identificar esas "recetas"/variantes para afinar la comparación SKU a SKU) · botón Importar facturación (Excel/CSV del reporte "VENTAS DISTRIBUCION" cols A-R; reemplaza por rango de fechas para poder recargar meses sin duplicar) · toggle sin IVA/con IVA (×1.12, el reporte de facturación viene sin IVA). Lee/escribe tabla `ventas`, lee `produccion_diaria` e `inventario` (solo lectura) para Rotación. Fases futuras: costos, comisiones, proyecciones, mapeo de variantes de SKU |
-| `produccion.html` | ✅ Activo | Módulo Producción · Sopladoras (ago/2026): tab Ingreso (sube el PDF de requi que emite el sistema local — se parsea con pdf.js, deduce fecha/turno del nombre y del texto, pre-asigna máquina por `inventario.maquina_default` y la recuerda al guardar · también ingreso manual fila por fila con autocomplete de SKU) · tab Reporte Semanal (pivote máquina×SKU con 12 columnas Lun-Sáb día/noche, eficiencia = total ÷ (meta_12hrs × turnos), precio ponderado automático desde `ventas` y venta potencial vs facturado real) · tab Mensual (replica la hoja "Mayo 2026" de Álvaro: una caja por semana con la misma tabla del Reporte Semanal, separador grueso entre semanas, sombreado alterno por bloque de máquina `.band-a`, + panel de Resumen de eficiencia auto-generado — eficiencia global, mejor/peor máquina, concentración de producción, venta potencial. Sin cifras de facturación real: esa comparación vive en ventas.html). Replica la hoja de cálculo `Plantilla_Produccion` de Álvaro |
+### Módulos activos
+| Archivo | Descripción |
+|---|---|
+| `index.html` | Fachada principal — 6 cards de módulo |
+| `tapas.html` | Módulo completo Tapas: hub + pedidos + movimientos (salidas/ingresos/rechazos) + personal |
+| `serigrafia.html` | Módulo admin Serigrafía: Inicio (board) + Movimientos + Productividad + Personal |
+| `registro-serigrafia.html` | Formulario móvil rol `operativo_serig`: Flameado / Impresión / Empaque |
+| `comandas.html` | Registro de producción diaria por operario (vista admin) |
+| `registro-tapas.html` | Formulario móvil rol `operativo`: comanda concluida, correlativo CMD-### vía trigger DB |
+| `dashboard.html` | KPIs ejecutivos globales |
+| `inventario.html` | Gestión de SKUs, existencias, importación Excel |
+| `ventas.html` | Ventas y Financiero: Resumen · Productos · Clientes · Rotación · Importar facturación (Excel/CSV cols A-R) · toggle IVA |
+| `produccion.html` | Sopladoras: Ingreso PDF/manual (pdf.js) · Reporte Semanal (pivote máquina×SKU) · Mensual |
 
-### Módulos bloqueados (nav-locked vía CSS)
-- Bodega: `<a class="nav-locked">` — bloqueado en toda la navegación global
-- Ventas se desbloqueó en ago/2026 (ventas.html) — el link vive en las 8 páginas con logo-nav
+Bodega bloqueado via `<a class="nav-locked">` en toda la navegación.
 
 ---
 
-## Design System v1.0 — shared/styles.css
-
-### Paleta CSS (variables en :root)
-- Teal (marca):   `--teal #1A6B5B`, `--teal-l #2A8B75`, `--teal-xl #E8F5F2`, `--teal-dark #134F43`
-- Amber:          `--amber #D97706`
-- Red:            `--red #EF4444`, `--red-l` (light)
-- Green:          `--green #16A34A`
-- Producción:     `--prod #B07D2A`, `--prod-xl #FFFBEB`
-- Ventas:         `--ventas #1D4ED8`, `--ventas-xl #EFF6FF`
-- Bodega:         `--bodega #0E7490`, `--bodega-xl #ECFEFF`
-- UI:             `--ink #0C0C0B`, `--bg #F7F6F2`, `--bg2 #F0EDEA`, `--card #FFFFFF`
-- Tipografía:     `--display` (Playfair Display), `--sans` (DM Sans), `--mono` (DM Mono)
-
-### Componentes y patrones establecidos
-1. **Topbar**: fondo `#0C0C0B`, borde inferior teal, logo con dropdown de navegación global
-2. **Logo-nav**: items activos con `nav-active`, bloqueados con `nav-locked` (🔒 via CSS `::after`)
-3. **Sidenav**: iconos emoji, `.sn-btn` / `.sn-btn.active`
-4. **Tabs**: `.tab` / `.tab.active` + `.tabs-r` (botones de acción a la derecha)
-5. **Vistas**: `.view` con `display:flex/none` controlado por `switchTab()`
-6. **KPI strip**: `.kpi-strip` horizontal con `.kpi` / `.kpi-l` / `.kpi-v` / `.kpi-s`
-7. **Modales**: `.overlay` > `.modal` > `.mh` / `.mb` / `.mf` con animación `ds-slideUp`
-8. **Segmented control**: `.seg-btn` / `.seg-active` — toggle dentro de una misma vista
-9. **WIP view**: `.wip-view` con `.wip-icon` (animación `ds-float`), `.wip-title`, `.wip-chips`
-10. **Sub-cards (hub)**: `.sub-card` con hover translate + shadow, `.sub-card-icon`, `.sub-stat`
-11. **Autocomplete SKU**: `.sku-wrap` > `.sku-drop` con `.sku-opt` onmousedown
-12. **Micro-animaciones**: `ds-dropDown` (nav), `ds-slideUp` (modales), `ds-float` (WIP),
-    `btn:active { transform: scale(0.97) }`, progress `transition: width .75s`
-13. **Responsive**: ≤1024px (2-col kpi), ≤768px (topbar wrap + modales full-width), ≤480px (1-col)
+## Design System v1.0
+Ver paleta CSS, componentes y patrones completos: `.claude/docs/design-system.md`
+Regla: cargar `shared/styles.css` ANTES del `<style>` propio en todo HTML.
 
 ---
 
-## tapas.html — Arquitectura de vistas (la más compleja)
+## tapas.html — Arquitectura de vistas
 
 ```
 switchTab(tab) controla qué view se muestra.
 'rechazos' es ALIAS → switchTab('movimientos') + setMovVista('rechazos')
 
-view-inicio     (HUB — default al cargar)
-  4 KPIs globales + 5 sub-cards:
-  Pedidos → switchTab('tapas')
-  Procesos → switchTab('movimientos')
-  Personal → switchTab('personal')
-  Rechazos → switchTab('rechazos')  [alias]
-  Dashboard → dashboard.html
-
-view-tapas      (Solicitudes — split pane: lista + detalle)
-view-movimientos (Módulo UNIFICADO con segmented control de 3)
+view-inicio      HUB default: 4 KPIs + 5 sub-cards (Pedidos/Procesos/Personal/Rechazos/Dashboard)
+view-tapas       Solicitudes — split pane: lista + detalle
+view-movimientos Segmented control de 3:
   [📤 Salidas de Bodega] [📦 Ingresos PT] [⛔ Rechazos]
   Comparten: movDesde/movHasta, movBuscar, kpi-strip (mkpi-v1..v4), movTabla
   setMovVista('salida'|'ingreso'|'rechazos') actualiza todo
   movRegistrar() delega a abrirModalMov() o abrirModalRechazo()
-view-personal   (grid de operadores)
-(view-dash y el modal de paro de máquina se eliminaron jul/2026 — eran código muerto)
+view-personal    Grid de operadores
 ```
-
-### Botones de acción rápida (tabs-r en tapas.html)
-- `+ Nueva Solicitud` → `abrirForm()`
-- `📋 Comandas` → link a comandas.html
-- `⬆⬇ Movimiento ▾` → dropdown con: 📤 Salida / 📦 Ingreso PT / ⛔ Registrar Rechazo
-
----
 
 ## serigrafia.html — Arquitectura de vistas
 
 ```
 Tabs: Inicio · Movimientos · Productividad · Personal · Dashboard (link)
-view-inicio        (board de solicitudes por línea, entregados, orden sin asignar)
-view-movimientos   (salidas/ingresos serig + resumen por ficha)
-view-productividad (lecturas de registro_tiros_serig por fecha; si la fecha
-                    está vacía, buildUltimasLecturasHint() muestra las últimas
-                    10 lecturas de la tabla sin filtro, clicables para saltar
-                    a su fecha — distingue "base vacía" de "fecha equivocada")
-view-personal      (grid personal + asistencia diaria/mensual, veladas, PDF)
+view-productividad: si la fecha está vacía, buildUltimasLecturasHint() muestra las últimas
+  10 lecturas clicables para saltar a su fecha — distingue "base vacía" de "fecha equivocada"
 ```
 
-## registro-serigrafia.html — Flujos (rol operativo_serig)
+### Estados de ficha — SOLO 4 (`ESTADOS_SERIG`)
+`nueva` ⚪ → `proceso` 🔵 → `parcial` 🟡 → `lista` 🟢
+**`lista` = ENTREGADO / COMPLETADO** — estado final, pinta la ficha de verde con badge
+COMPLETADO. NO existen `programada` ni `entregada` (eliminados 2026-08-19; constraints
+en `sql/solicitudes_parcial_constraint.sql`).
 
-```
-scrTarea (pantalla 0, default) → 3 tarjetas: flameado / impresion / empaque
-Impresión: scrSel → scrForm (contador, momentos, paros, foto) → scrOk (gráfico)
-Flameado:  scrSelFlam → scrFormFlam → scrOkFlam   (tabla registro_flameado_serig)
-Empaque:   scrSelEmp (+tarjeta "Apoyo de otra área" → ovApoyo) → scrFormEmp
-           → scrOkEmp                              (tabla registro_empaque_serig)
-mostrarPantalla() alterna sobre el array PANTALLAS.
-buildOpCardGen(op, fn) genera las tarjetas de operario para los 3 flujos.
-skuDescDe(inputId) extrae {sku, descripcion} de un input con acGen.
-Apoyo externo: operador_codigo=null + area_origen (tapas/produccion/bodega/otra)
-— NO se agrega a la tabla personal.
-```
+⚠️ El estado vive en DOS tablas y la tarjeta lee `l.estado || s.estado` — la LÍNEA gana.
+Escribir solo en `solicitudes` guarda el cambio pero **no se ve**. Usar siempre
+`syncEstado(s, estado)`, que actualiza `solicitudes` + todas sus `solicitud_lineas`.
+
+Transiciones automáticas en `boardDrop()`:
+- Entra a línea de producción → `proceso`
+- Vuelve a Sin Asignar → `estadoPorEntregas(s)`: 0 entregas=`nueva` · parcial=`parcial` · completa=`lista`
+- Una ficha ya en `lista` nunca se degrada al moverla
+
+**Entregas**: la única fuente son las requis manuales vinculadas a la ficha
+(`getEntregasManuales()`). El estado NO cuenta como entrega — sumarlo duplicaba unidades.
+
+Tier de color: `lista`=2 verde · `parcial`=1 amarillo · resto=0 rojo.
+Orden dentro de cada desplegable: rojo → amarillo → verde.
+
+## registro-serigrafia.html — Flujos
+Ver flujos completos y componentes en `.claude/docs/design-system.md` § Flujos.
+Pantallas: `scrTarea(0)` → Impresión / Flameado / Empaque → `scrOk*`.
+`mostrarPantalla()` · `buildOpCardGen()` · apoyo externo: `operador_codigo=null + area_origen`.
 
 ---
 
 ## Tablas Supabase (schema v2.0)
+Ver descripciones completas: `.claude/docs/schema-tablas.md`
 
-| Tabla | Descripción |
-|---|---|
-| `solicitudes` | Órdenes (código T-001/S-001 via trigger DB) |
-| `solicitud_lineas` | Líneas de producto (operadores_ids TEXT[]) |
-| `solicitud_operadores` | Asignación de operadores |
-| `solicitud_historial` | Historial de cambios de estado |
-| `personal` | Operarios/supervisores (codigo UNIQUE, proceso_hab, color_hex, rol: 'operador'\|'supervisor') — fuente única de verdad; registro-tapas.html lee el supervisor activo de aquí, no lo hardcodea |
-| `inventario` | 2358 SKUs activos (sku, descripcion, existencia, facturable, activo). +3 columnas de producción (sql/produccion_v1.sql): `meta_12hrs` (capacidad por turno de 12h, base de la eficiencia), `maquina_default` (máquina habitual del SKU, la escribe produccion.html al guardar un turno), `precio_ponderado_manual` (respaldo solo para SKUs que se producen pero nunca se facturan, ej. 214774/214776) |
-| `produccion_diaria` | Producción de sopladoras: una fila por (fecha, turno 'dia'\|'noche', maquina, sku, **documento**) + descripcion, cantidad, origen 'pdf'\|'manual'\|'sheets'. ⚠️ `documento` (correlativo de la requi, ej. PRI2-421) entra en la llave única porque **un turno puede tener varias requis distintas** (ingresos anticipados + la principal) con cantidades que se SUMAN — verificado en 13-may-2026: PRI2-412, 418 y 421 traen cantidades diferentes del mismo turno. Recargar una requi reemplaza solo sus líneas. El ingreso manual usa documento='MANUAL'. maquina=0 = sin asignar / producto que no es de sopladora (sql/produccion_v1.sql) |
-| `movimientos_materiales` | Trazabilidad (tipo: 'salida_bodega' \| 'entrada_pt') |
-| `rechazos` | ✅ Existe (la creó movimientos_serigrafia_v1.sql) — RLS pendiente: correr sql/rechazos_rls_fix.sql |
-| `perfiles` | Roles de acceso: master / visor / operativo / operativo_serig |
-| `paros_maquina` | Registro de paros (legado tapas) |
-| `registro_tiros_serig` | Lecturas de contador por línea/fecha/momento (inicio/mediodia/fin/velada) + hora + foto_url — la llena Impresión en registro-serigrafia.html; la lee Productividad en serigrafia.html. RLS reparada con sql/fix_rls_serig_v2.sql (corrido jul/2026) |
-| `paros_serig` | Paros por línea/fecha con motivo (incl. EMPAQUE con envase+cantidad) — registrados desde el formulario del operador |
-| `registro_flameado_serig` | Una fila por bolsa flameada: hora, flameador, sku/descripcion, cantidad, para_linea 1-4 (sql/registro_procesos_serig_v1.sql) |
-| `registro_empaque_serig` | Empaques: operador_codigo (null = apoyo externo), area_origen, sku/descripcion, cantidad (sql/registro_procesos_serig_v1.sql) |
-| `entregas_serig` | Entregas/requis de serigrafía (migradas desde localStorage) |
-| `asistencia_diaria` | Asistencia por fecha/área/turno (presente/ausente/tarde/velada) — la usan serigrafia.html Personal y sus PDFs |
-| `comandas` + `comanda_tareas` | Producción diaria |
-| `bot_estado` | Estado conversacional del bot de WhatsApp (1 fila por número: whatsapp_from UNIQUE, estado JSON, updated_at). La usa api/whatsapp.js |
-| `ventas` | Detalle de facturación, una fila por línea de factura (serie, docu, fecha DATE, codigo_cliente, nit, cliente, familia, descripcion_familia, sku, descripcion, precio_unidad, total_quetzales, total_unidades, costo, utilidad). La escriben ventas.html (importador principal, reemplaza por rango de fechas) y el importador diario "Ventas · Facturación" de inventario.html (más viejo, no manda familia/codigo_cliente). ⚠️ Existía antes del módulo, creada manual — sql/ventas_financiero_v1.sql la normaliza (fecha→DATE, columnas nuevas, RLS master-only escritura) |
-| `clientes`, `cat_procesos`, `asistencia`, `configuracion` | Catálogos / preferencias UI |
-| `v_solicitudes`, `v_capacidad_hoy` | Vistas |
+Notas críticas:
+- `produccion_diaria`: llave única incluye `documento` — un turno puede tener varias requis con cantidades que se SUMAN
+- `inventario`: +3 cols producción: `meta_12hrs`, `maquina_default`, `precio_ponderado_manual`
+- `personal`: fuente única de supervisores — registro-tapas.html NO los hardcodea
+- `ventas`: fecha→DATE, RLS master-only escritura; importador reemplaza por rango de fechas (sin duplicar)
+- `bot_estado`: 1 fila por número (`whatsapp_from` UNIQUE)
+- `rechazos`: existe, RLS pendiente (sql/rechazos_rls_fix.sql)
 
-### RPCs atómicas disponibles en Supabase
+### RPCs atómicas
 - `descontar_inventario(p_sku, p_cantidad)` — usar en lugar de select+update manual
 - `aumentar_inventario(p_sku, p_cantidad)` — ídem
 
 ---
 
-## Bugs y pendientes
+## SQL pendiente de correr en Supabase (dashboard → SQL Editor)
+1. `sql/rechazos_rls_fix.sql` — activa RLS en tabla rechazos
+2. `sql/operativo_tapas_v1.sql` — rol `operativo` + usuario tapas@tetrapp.app + políticas INSERT + trigger CMD-###
+3. `sql/registro_procesos_serig_v1.sql` — crea registro_flameado_serig + registro_empaque_serig con RLS
+4. `sql/ventas_financiero_v1.sql` — prepara tabla `ventas`: familia/codigo_cliente, fecha→DATE, RLS master
+5. `sql/produccion_v1.sql` — crea `produccion_diaria` + cols meta_12hrs/maquina_default/precio_ponderado_manual
+6. `sql/produccion_seed_historico.sql` — histórico Sheets (831 líneas, 5-may→6-jun, documento='SHEETS').
+   Correr DESPUÉS del 5. ⚠️ Si luego subes PDF de un turno ya sembrado, borra primero sus líneas con documento='SHEETS'
 
-### Bugs históricos #1/#2/#3 — RESUELTOS (verificado jul/2026)
-- #1 nombres de campo: corregido; incluía `rechSkuInput()` usando `inventario` en vez de `inventarioCache`
-- #2 paginación: `cargarInventario()` ya pagina con `.range()` en lotes de 1000
-- #3 race conditions: `ajustarExistencia()` ya usa las RPCs atómicas
-Limpieza jul/2026 en tapas.html: eliminados view-dash/renderDash, modal paro máquina completo,
-animPop y CSS huérfano (.rechazo-*, .rbadge, --serig-m, --gold).
+### SQL ya corridos (solo si necesitas re-correr)
+- `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
+- `sql/fix_rls_serig_v2.sql` — reparó registro_tiros_serig RLS + columna hora + CHECK velada
+- `sql/solicitudes_parcial_constraint.sql` (19-ago-2026) — CHECK de estado en `solicitudes`
+  y `solicitud_lineas` limitado a los 4 oficiales; habilita `parcial`, elimina `programada`/`entregada`
 
-Limpieza ago/2026 (auditoría de código muerto, verificado con grep 0-usos + node --check):
-- serigrafia.html: −267 líneas · 10 funciones sin uso (boardBuildCardCompact, buildPedidoOpts,
-  buildProcNode, buscarExistencia, envSetFiltro, movSSolInput, toggleLineaProc,
-  verDetalleKpiProceso, verDetalleKpiPendientes, verFoto) + CSS huérfano `.kpi.clickable`
-  (feature de KPI-detalle-popup que quedó desconectada, sin ningún elemento con la clase)
-- registro-serigrafia.html: buildOpCard (reemplazada por buildSeccionesGrid) y otraBolsaFlam
-  (su botón ahora llama volverSeleccionFlam)
-- index.html: escHtml local redundante (auth.js ya lo da global)
-- console.log de debug removidos (comandas.html ×4, tapas.html ×1)
-- borrado archivo basura en raíz (extracción temporal de un syntax-check)
+---
 
-### SQL pendiente de correr en Supabase (dashboard → SQL Editor)
-1. `sql/rechazos_rls_fix.sql` — activa RLS en la tabla rechazos
-2. `sql/operativo_tapas_v1.sql` — rol `operativo` + usuario tapas@tetrapp.app (crearlo antes
-   en Auth → Users) + políticas INSERT en comandas/comanda_tareas + trigger correlativo CMD-###
-3. `sql/registro_procesos_serig_v1.sql` — crea registro_flameado_serig + registro_empaque_serig
-   con RLS (pendiente de confirmar; sin él los flujos Flameado/Empaque fallan con recuadro rojo)
-4. `sql/ventas_financiero_v1.sql` — prepara la tabla `ventas` para ventas.html: columnas
-   familia/descripcion_familia/codigo_cliente, fecha texto→DATE, índices, RLS (lectura con
-   perfil, escritura solo master). Sin él, el importador de ventas.html falla con aviso claro
-5. `sql/produccion_v1.sql` — crea `produccion_diaria` + agrega meta_12hrs / maquina_default /
-   precio_ponderado_manual a `inventario`, con RLS. Sin él produccion.html avisa en rojo
-   ("falta correr sql/produccion_v1.sql") y no puede guardar turnos
-6. `sql/produccion_seed_historico.sql` — carga la historia que ya existía en el Google Sheets
-   de Álvaro (Plantilla_Produccion_Mayo_V3_Fechas): 831 líneas del 5-may al 6-jun 2026
-   (53 turnos, 4.9M und) con documento='SHEETS', + meta_12hrs de 84 SKUs, precio de respaldo
-   de 77 y maquina_default de 73 deducida del histórico. Correr DESPUÉS del punto 5.
-   ⚠️ Si luego subes el PDF de un turno ya sembrado, sus líneas entran con su propio
-   correlativo y se SUMARÍAN; borra antes las de ese turno con documento='SHEETS'
+## Seguridad — estado
+Sólido: sin secretos hardcodeados; CSP + HSTS + X-Frame-Options en vercel.json; auth.js centralizado; anon sin privilegios; api/whatsapp.js valida firma Twilio (fail-closed).
+⚠️ Pendiente: `api/parse-doc.js` CORS `*` sin auth → tokens expuestos. `TWILIO_AUTH_TOKEN` debe existir en Vercel env vars.
 
-### SQL ya corridos (referencia, jul/2026)
-- `sql/seguridad_v1.sql` — blindaje: perfiles + rol_actual()/es_master() + anon sin privilegios.
-  ⚠️ Su sección C BORRA TODAS las políticas del schema y recrea solo las genéricas: si se
-  re-corre, hay que re-correr después los fix de políticas específicas (insert_operativo_serig etc.)
-- `sql/fix_rls_serig_v2.sql` — reparó registro_tiros_serig: política insert_operativo_serig,
-  columna hora, CHECK momento con 'velada', y corrigió fechas UTC adelantadas un día
-
-### Seguridad — estado (auditoría ago/2026)
-Sólido:
-- Sin secretos hardcodeados: solo la publishable key (segura CON RLS activo). Las funciones
-  api/ usan `process.env.*`.
-- `vercel.json`: CSP estricto + HSTS + X-Frame-Options DENY + nosniff + Referrer-Policy +
-  Permissions-Policy (camera/mic/geo/payment en `()`). connect-src limita a self + Supabase.
-- Cliente `db` centralizado en auth.js; anon sin privilegios (seguridad_v1.sql).
-- api/whatsapp.js valida firma Twilio (fail-closed) — corregido ago/2026.
-
-Pendiente:
-- ⚠️ `api/parse-doc.js`: CORS `*` + sin auth → gasto de tokens de Claude por cualquiera.
-  Falta gatear con el JWT de sesión de Supabase.
-- `TWILIO_AUTH_TOKEN` debe existir en las env vars de Vercel o el bot de WhatsApp devuelve
-  403 a todo (es intencional: fail-closed).
-
-### Roles de acceso (shared/auth.js)
+## Roles de acceso (shared/auth.js)
 - `master` → todo · `visor` → solo lectura (banner Modo Visual)
-- `operativo` → enjaulado en registro-tapas.html; RLS solo le permite INSERT en comandas/comanda_tareas
-- `operativo_serig` → enjaulado en registro-serigrafia.html; INSERT en registro_tiros_serig,
-  paros_serig, registro_flameado_serig, registro_empaque_serig
+- `operativo` → enjaulado en registro-tapas.html; INSERT solo en comandas/comanda_tareas
+- `operativo_serig` → enjaulado en registro-serigrafia.html; INSERT en registro_tiros_serig, paros_serig, registro_flameado_serig, registro_empaque_serig
 - La jaula vive en TETRA_PAGINAS_OPERATIVO (auth.js): rol → página permitida
 - Sesiones expiran a 60 min de inactividad, EXCEPTO roles operativos (pantallas de planta)
 
-### Metas de productividad — CUATRO tablas, sincronizadas jul/2026
-Valores oficiales (und/hora), idénticos en las 4 copias:
-- Armado, Liner, Banda (manual): **1500**
-- Encajado: **3000**
-- Flameado, Impresión: **1500**
-- Armado, Liner (máquina — Press Top 28/33): **2500**
-- Otras tareas (Revisado, Limpiar pestaña, Apoyo Serigrafía, Apoyo Producción, Otra tarea,
-  y cualquier proceso sin meta explícita): **1200**
+---
 
-Dónde viven las 4 copias (misma lógica, 4 archivos porque cada HTML es autónomo — ver
-Arquitectura actual):
-1. `CAPACIDADES` en registro-tapas.html — und/hora por tarea individual (rol operativo)
-2. `CAPACIDADES` en comandas.html — misma tabla, vista admin (su PROCS_LIST no incluye las
-   4 tareas nuevas, solo necesita el default `manual`/`otro` en 1200)
-3. `METAS` + `META_DEFAULT` en tapas.html — estima tiempo de entrega de solicitudes/pedidos
-   (metaParaProcesos). Tiene claves muertas sin tocar (armado_pushpull=700, separar cavidad,
-   limpiar grasa, armadora tapa 28, liner tapa 33) — inalcanzables desde el chip-selector de
-   ALL_PROCS_TAPAS, se dejaron igual por ser reglas de negocio históricas no mencionadas.
-4. `METAS` + `META_DEFAULT` en dashboard.html — calcula la eficiencia real mostrada en KPIs
-   ejecutivos (metaProc), lee `comanda_tareas.proceso` tal cual se guardó desde 1/2.
+## Metas de productividad — CUATRO tablas, sincronizadas jul/2026
+Valores oficiales (und/hora):
+- Armado, Liner, Banda (manual): **1500** · Encajado: **3000**
+- Flameado, Impresión: **1500** · Armado, Liner (máquina — Press Top 28/33): **2500**
+- Resto (Revisado, Limpiar pestaña, Apoyo Serig, Apoyo Prod, Otra tarea, sin meta): **1200**
 
-⚠️ Si se agrega una tarea nueva a futuro, hay que agregarla en las 4 tablas (o al menos
-confirmar que cae bien en el default de 1200) — no hay fuente única, es duplicación
-intencional por la arquitectura autónoma de cada HTML.
+Las 4 copias (misma lógica, autónomas por arquitectura):
+1. `CAPACIDADES` en registro-tapas.html — rol operativo
+2. `CAPACIDADES` en comandas.html — vista admin
+3. `METAS` + `META_DEFAULT` en tapas.html — estima tiempo de entrega de solicitudes
+4. `METAS` + `META_DEFAULT` en dashboard.html — calcula eficiencia real en KPIs ejecutivos
+
+⚠️ Al agregar una tarea nueva: actualizarla en las 4 tablas (o confirmar que cae en default 1200).
 
 ---
 
@@ -289,18 +180,11 @@ intencional por la arquitectura autónoma de cada HTML.
 5. **Git siempre a ambas ramas**: `git push origin master && git push origin master:main`
 6. **Verificar referencias eliminadas**: tras borrar IDs o funciones, grep para confirmar que no quedan usos huérfanos.
 7. **var sobre const/let** en funciones globales de tapas.html (evitar errores de redeclaración entre módulos cargados múltiples veces).
-8. **Fecha "hoy" SIEMPRE con `fechaHoy()`** (fecha local, existe en serigrafia.html y
-   registro-serigrafia.html) — NUNCA `new Date().toISOString().slice(0,10)`: devuelve la fecha
-   UTC y Guatemala es UTC-6, después de las 18:00 marca el día siguiente (bug que dejó
-   Productividad "vacía" en jul/2026). `toISOString()` solo es válido sobre fechas ancladas a
-   mediodía (`new Date(str + 'T12:00:00')`) o para timestamps completos (updated_at).
+8. **Fecha "hoy" SIEMPRE con `fechaHoy()`** — NUNCA `new Date().toISOString().slice(0,10)`: devuelve fecha UTC y Guatemala es UTC-6, después de las 18:00 marca el día siguiente. `toISOString()` solo válido sobre fechas ancladas a mediodía o para timestamps completos.
 
 ---
 
-## Personal (referencia — datos reales viven en la tabla `personal`)
-- Tapas: T0 Heidy (supervisora en tabla `personal`, aún sin actualizar), T1-T9 operadores
-  - ⚠️ Supervisora actual real: **Yenifer** — la tabla `personal` sigue sin actualizar (pendiente,
-    lo hará Álvaro). registro-tapas.html YA lee el supervisor en vivo de esta tabla
-    (rol='supervisor', activo=true), así que en cuanto se actualice el registro de Heidy→Yenifer
-    el formulario lo reflejará automáticamente, sin tocar código.
-- Serigrafía: S0 Luis Cordova (supervisor), S1-S7 operadores
+## Personal
+⚠️ Supervisora actual real tapas: **Yenifer** (tabla `personal` aún dice Heidy — pendiente Álvaro).
+registro-tapas.html lee supervisor en vivo → se corregirá solo al actualizar el registro.
+Serigrafía: S0 Luis Cordova (supervisor), S1-S7 operadores.
