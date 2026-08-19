@@ -725,7 +725,7 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
         <div class="sec-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
           <div>
             <div class="sec-title">Entregados</div>
-            <div class="sec-sub">Solicitudes entregadas del sistema + registros manuales · <span id="lastUpdate">—</span></div>
+            <div class="sec-sub">Entregas registradas por requi vinculada a cada ficha · <span id="lastUpdate">—</span></div>
           </div>
           <button class="btn btn-s" style="background:var(--serig-m);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="abrirFormEntregado()">+ Registrar entregado</button>
         </div>
@@ -3532,16 +3532,10 @@ function renderProdMensual() {
   var endStr0 = endD.getFullYear() + '-' + String(endD.getMonth()+1).padStart(2,'0') + '-' + String(endD.getDate()).padStart(2,'0');
   var endStr  = endStr0 > todayStr ? todayStr : endStr0;
 
-  // Acumular por fecha YYYY-MM-DD
+  // Acumular por fecha YYYY-MM-DD.
+  // Única fuente: entregas manuales (requis vinculadas). El estado de la
+  // solicitud no representa una entrega y sumarlo duplicaría unidades.
   var porFecha = {};
-  solicitudes.forEach(function(s) {
-    if (s.estado !== 'entregada') return;
-    var f = new Date(s.created_at || s.fecha_lim || '');
-    if (isNaN(f) || f < startD) return;
-    var fStr = f.toISOString().slice(0,10);
-    if (fStr > endStr) return;
-    porFecha[fStr] = (porFecha[fStr] || 0) + (s.cant || 0);
-  });
   (getEntregasManuales() || []).forEach(function(m) {
     if (!m.fecha) return;
     var f = new Date(m.fecha + 'T12:00:00');
@@ -5824,25 +5818,17 @@ function renderProduccionActual() {
     var elMov = document.getElementById('produccionActualMov');
     if (!elIn && !elMov) return;
 
-    var entregadasSistema = solicitudes.filter(function(s){ return s.estado === 'entregada'; });
+    // Única fuente de entregas: las requis registradas manualmente y vinculadas
+    // a cada ficha. El estado de la solicitud NO cuenta como entrega.
     var manuales = getEntregasManuales();
 
-    if (elIn) elIn.innerHTML = buildProduccionHtml(entregadasSistema, manuales);
+    if (elIn) elIn.innerHTML = buildProduccionHtml(manuales);
 
     if (elMov) {
       var desde  = (document.getElementById('movDesde')  || {}).value || '';
       var hasta  = (document.getElementById('movHasta')  || {}).value || '';
       var buscar = ((document.getElementById('movBuscar') || {}).value || '').toLowerCase();
 
-      var entFiltradas = entregadasSistema.filter(function(s) {
-        var f = (s.created_at || '').slice(0,10);
-        if (desde && f < desde) return false;
-        if (hasta && f > hasta) return false;
-        if (!buscar) return true;
-        return (s.cliente||'').toLowerCase().indexOf(buscar) >= 0
-          || (s.desc||'').toLowerCase().indexOf(buscar) >= 0
-          || (s.sku||'').toLowerCase().indexOf(buscar) >= 0;
-      });
       var manFiltradas = manuales.filter(function(m) {
         var f = m.fecha || '';
         if (desde && f < desde) return false;
@@ -5856,35 +5842,17 @@ function renderProduccionActual() {
                  || (l.sku||'').toLowerCase().indexOf(buscar) >= 0;
              });
       });
-      elMov.innerHTML = buildProduccionHtml(entFiltradas, manFiltradas);
+      elMov.innerHTML = buildProduccionHtml(manFiltradas);
     }
   } catch(e) {
     console.error('renderProduccionActual:', e);
   }
 }
 
-function buildProduccionHtml(entregadasSistema, manuales) {
-    if (entregadasSistema.length === 0 && manuales.length === 0) {
+function buildProduccionHtml(manuales) {
+    if (manuales.length === 0) {
       return '<div class="prod-empty">No hay entregados registrados aún</div>';
     }
-
-    // Filas del sistema
-    var rowsSistema = entregadasSistema.map(function(s) {
-      var requiSal = salidaRequiMap[s.id] ? salidaRequiMap[s.id].join(', ') : '—';
-      return '<tr onclick="mostrarDetalle(\'' + s.id + '\')" style="cursor:pointer">' +
-        '<td><span style="font-family:var(--mono);font-weight:700;color:var(--serig-m)">' + escHtml(s.id_display || s.id.slice(0,8)) + '</span></td>' +
-        '<td style="font-weight:600">' + escHtml(s.cliente || '—') + '</td>' +
-        '<td></td>' +
-        '<td style="color:var(--gray-l);font-size:11px">' + escHtml(s.desc || s.sku || '—') + '</td>' +
-        '<td style="font-family:var(--mono);font-weight:600">' + (s.cant||0).toLocaleString() + '</td>' +
-        '<td style="font-size:11px;color:var(--gray)">' + (s.created || '—') + '</td>' +
-        '<td><span style="font-size:9px;background:#E0E7FF;color:#3730a3;border-radius:4px;padding:2px 6px;font-weight:700">SISTEMA</span></td>' +
-        '<td>' + (requiSal !== '—'
-          ? '<span onclick="event.stopPropagation();irAResumenFicha(\'' + s.id + '\')" style="cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--serig-m);text-decoration:underline dotted">' + escHtml(requiSal) + '</span>'
-          : '<span style="font-size:11px;color:var(--gray-l)">—</span>') + '</td>' +
-        '<td></td>' +
-      '</tr>';
-    }).join('');
 
     // Filas manuales — UNA fila por producto, agrupadas por requi con color alternado
     var rowsManuales = manuales.map(function(m, grpIdx) {
@@ -5939,7 +5907,7 @@ function buildProduccionHtml(entregadasSistema, manuales) {
         '<th>No. Requi</th><th>Cliente</th><th>Pedido</th><th>Producto</th>' +
         '<th>Unidades</th><th>Fecha</th><th>Origen</th><th>Requi Salida Bodega</th><th></th>' +
       '</tr></thead>' +
-      '<tbody>' + rowsManuales + rowsSistema + '</tbody>' +
+      '<tbody>' + rowsManuales + '</tbody>' +
       '</table>';
 }
 
@@ -9369,7 +9337,7 @@ function movSHdrSolInput(val) {
   movSSolId = null;
   var cli = (document.getElementById('movSClienteSel') || {}).value || '';
   var v = (val || '').trim().toLowerCase();
-  var candidatos = solicitudes.filter(function(s) { return s.estado !== 'entregada'; });
+  var candidatos = solicitudes.slice();
   if (cli) candidatos = candidatos.filter(function(s) { return (s.cliente || '') === cli; });
   var matches = v.length === 0
     ? candidatos.slice(0, 12)
@@ -9516,7 +9484,7 @@ function esSolInput(val) {
   _editSalidaSolId = null;
   var v = val.trim().toLowerCase();
   var matches = v.length === 0
-    ? solicitudes.filter(function(s) { return s.estado !== 'entregada'; }).slice(0, 12)
+    ? solicitudes.slice(0, 12)
     : solicitudes.filter(function(s) {
         return (s.id_display || '').toLowerCase().indexOf(v) >= 0
             || (s.cliente || '').toLowerCase().indexOf(v) >= 0;
