@@ -4491,13 +4491,18 @@ async function exportarAsistGridPDF() {
   else showToast('Activa las ventanas emergentes para exportar', '#92400e');
 }
 
+function mesSol(s) {
+  var ef = s.periodo_efectivo || '';
+  return ef ? ef.slice(0, 7) : (s.created_at || '').slice(0, 7);
+}
+
 function abrirModalImprimirBoard() {
   if (!solicitudes || !solicitudes.length) { showToast('Sin datos cargados', '#92400e'); return; }
 
-  // Recopilar meses disponibles de las solicitudes sin asignar
+  // Recopilar meses disponibles usando periodo_efectivo cuando existe
   var mesesSet = {};
   solicitudes.forEach(function(s) {
-    var f = (s.created_at || '').slice(0, 7);
+    var f = mesSol(s);
     if (f) mesesSet[f] = true;
   });
   var meses = Object.keys(mesesSet).sort().reverse();
@@ -4562,13 +4567,10 @@ function exportarBoardPDF(filtroMes) {
   LINEAS_PRODUCCION.forEach(function(ln){ enCurso[ln.id] = []; });
 
   solicitudes.forEach(function(s) {
+    // Filtrar por período efectivo (julio trasladado a agosto = periodo_efectivo '2026-08')
+    if (filtroMes && mesSol(s) !== filtroMes) return;
     var lineaAsignada = lineaAsignadaDe(s);
-    if (s.estado === 'lista' && lineaAsignada) {
-      // Completados: aplicar filtro de mes si se eligió uno
-      if (!filtroMes || (s.created_at || '').slice(0, 7) === filtroMes) completados.push(s);
-      return;
-    }
-    // Sin Asignar y En Curso: siempre se muestran (son trabajo activo)
+    if (s.estado === 'lista' && lineaAsignada) { completados.push(s); return; }
     var esActiva   = ['nueva','programada','proceso','parcial'].indexOf(s.estado) >= 0;
     var esListaSin = s.estado === 'lista' && !lineaAsignada;
     if (!esActiva && !esListaSin) return;
