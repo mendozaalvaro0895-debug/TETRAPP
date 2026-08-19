@@ -4642,10 +4642,10 @@ function exportarBoardPDF(filtroMes) {
     var MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-    // Agrupar por mes (YYYY-MM de fecha_lim) → cliente
+    // Agrupar por período efectivo (igual que el board) → cliente
     var mesMap = {}, mesKeys = [];
     items.forEach(function(s) {
-      var mesKey = (s.fecha_lim && s.fecha_lim.length >= 7) ? s.fecha_lim.slice(0,7) : '9999-99';
+      var mesKey = mesSol(s) || '9999-99';
       if (!mesMap[mesKey]) { mesMap[mesKey] = {}; mesKeys.push(mesKey); }
       var cli = s.cliente || '(Sin cliente)';
       if (!mesMap[mesKey][cli]) mesMap[mesKey][cli] = [];
