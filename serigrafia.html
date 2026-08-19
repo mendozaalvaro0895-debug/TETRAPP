@@ -2515,9 +2515,9 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
   var badgeTxt = item.estado === 'lista' ? 'LISTA' : item.estado === 'proceso' ? 'EN PROC.' : item.estado === 'parcial' ? 'PARCIAL' : item.estado === 'programada' ? 'PROGRAMADA' : 'NUEVA';
   var dragArg    = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
   var total      = item.cant || 0;
-  var isComplete = entregado > 0 && entregado >= total;
-  var isPartial  = entregado > 0 && entregado < total;
-  // isEmpty = entregado === 0
+  // estado 'lista' = siempre verde aunque las entregas no lleguen al 100%
+  var isComplete = item.estado === 'lista' || (entregado > 0 && entregado >= total);
+  var isPartial  = !isComplete && entregado > 0;
   var cardBg   = isComplete ? '#dcfce7' : isPartial ? '#fef9c3' : '#fee2e2';
   var cardBdr  = isComplete ? '#86efac' : isPartial ? '#fde68a' : '#fca5a5';
   var descClr  = isComplete ? 'var(--gray)' : '#111';
