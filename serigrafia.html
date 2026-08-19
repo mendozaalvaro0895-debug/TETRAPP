@@ -4562,9 +4562,13 @@ function exportarBoardPDF(filtroMes) {
   LINEAS_PRODUCCION.forEach(function(ln){ enCurso[ln.id] = []; });
 
   solicitudes.forEach(function(s) {
-    if (filtroMes && (s.created_at || '').slice(0, 7) !== filtroMes) return;
     var lineaAsignada = lineaAsignadaDe(s);
-    if (s.estado === 'lista' && lineaAsignada) { completados.push(s); return; }
+    if (s.estado === 'lista' && lineaAsignada) {
+      // Completados: aplicar filtro de mes si se eligió uno
+      if (!filtroMes || (s.created_at || '').slice(0, 7) === filtroMes) completados.push(s);
+      return;
+    }
+    // Sin Asignar y En Curso: siempre se muestran (son trabajo activo)
     var esActiva   = ['nueva','programada','proceso','parcial'].indexOf(s.estado) >= 0;
     var esListaSin = s.estado === 'lista' && !lineaAsignada;
     if (!esActiva && !esListaSin) return;
