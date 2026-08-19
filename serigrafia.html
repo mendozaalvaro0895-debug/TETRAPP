@@ -3351,8 +3351,16 @@ async function boardDrop(e, targetLaneId) {
                         : s.estado; // entregado >= total → usuario decide (no auto-cambiar)
         if (nuevoEstado !== s.estado) {
           var ru2 = await db.from('solicitudes').update({ estado: nuevoEstado }).eq('id', s.dbId);
-          if (ru2.error) throw ru2.error;
-          estadoMsg = ' · ' + nuevoEstado.toUpperCase();
+          if (ru2.error) {
+            // Si falla por constraint (parcial no en DB), mover igual pero avisar
+            if (ru2.error.code === '23514') {
+              showToast('⚠️ Falta correr SQL: añadir "parcial" al constraint de solicitudes', '#92400e');
+            } else {
+              throw ru2.error;
+            }
+          } else {
+            estadoMsg = ' · ' + nuevoEstado.toUpperCase();
+          }
         }
       }
     }
