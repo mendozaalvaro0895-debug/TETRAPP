@@ -661,6 +661,7 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
               <span>⚠️</span>
               <span class="b7-alert-ttl">Bajo stock — Insumos Serigrafía</span>
               <span class="b7-alert-cnt" id="b7AlertCnt">0</span>
+              <span id="b7AlertFecha" style="font-size:9px;opacity:.65;white-space:nowrap;font-weight:500;margin-left:2px"></span>
               <button class="b7-alert-btn" onclick="event.stopPropagation();descargarAlertasB7()" title="Descargar PDF">⬇ PDF</button>
               <span class="b7-alert-chev">▾</span>
             </div>
@@ -6586,11 +6587,24 @@ var b7AlertasData = [];
 async function cargarAlertasB7() {
   try {
     var r = await db.from('insumos_b7')
-      .select('sku,descripcion,existencia,stock_minimo')
+      .select('sku,descripcion,existencia,stock_minimo,updated_at')
       .eq('activo', true)
       .not('stock_minimo', 'is', null)
       .order('existencia', { ascending: true });
     if (r.error || !r.data) return;
+
+    // Fecha de última actualización: MAX(updated_at) de TODAS las filas traídas
+    var maxTs = null;
+    r.data.forEach(function(i) { if (i.updated_at && (!maxTs || i.updated_at > maxTs)) maxTs = i.updated_at; });
+    var fechaEl = document.getElementById('b7AlertFecha');
+    if (fechaEl && maxTs) {
+      var d = new Date(maxTs);
+      var dd = String(d.getDate()).padStart(2,'0');
+      var mm = String(d.getMonth()+1).padStart(2,'0');
+      var yyyy = d.getFullYear();
+      fechaEl.textContent = 'Inv. B7 · ' + dd + '/' + mm + '/' + yyyy;
+    }
+
     var alertas = r.data.filter(function(i) { return (i.existencia || 0) <= (i.stock_minimo || 0); });
     var wrap = document.getElementById('b7AlertWrap');
     if (!wrap || !alertas.length) return;
