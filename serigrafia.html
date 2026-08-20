@@ -5657,10 +5657,13 @@ async function renderConsolidadoEnvases() {
   var ESTADOS_VIVOS = ['nueva','proceso','parcial'];
   var perHoy = periodoActualKey();
 
+  var mesHdr = new Date(fechaHoy() + 'T12:00:00').toLocaleString('es-GT', { month:'long', year:'numeric' });
+
   var mapa = {};
   solicitudes.forEach(function(s) {
     if (ESTADOS_VIVOS.indexOf(s.estado) < 0) return;
     var esAgo = periodoDe(s.created_at).key === perHoy;
+    if (!esAgo) return; // solo fichas del mes en curso
     (s.lineas || []).forEach(function(l) {
       if ((l.estado || s.estado) === 'lista') return;
       var kb = (l.sku_base || '').trim();
@@ -5670,21 +5673,21 @@ async function renderConsolidadoEnvases() {
       if (!entry.pedidos[s.id]) {
         entry.pedidos[s.id] = { id: s.id, codigo: s.id_display || s.id.slice(0,8),
                                  cliente: s.cliente || '—', estado: l.estado || s.estado, cant: 0,
-                                 esAgo: esAgo, skus: [] };
+                                 esAgo: true, skus: [] };
       }
       entry.pedidos[s.id].cant += (l.cant || 0);
       if (l.sku && !entry.pedidos[s.id].skus.some(function(x){ return x.sku === l.sku; })) {
         entry.pedidos[s.id].skus.push({ sku: l.sku, desc: l.desc || l.descripcion || '' });
       }
-      if (esAgo) entry.ago  += (l.cant || 0);
-      else       entry.back += (l.cant || 0);
+      entry.ago += (l.cant || 0);
     });
   });
 
-  // Huecos: líneas sin sku_base (excluye 'lista')
+  // Huecos: líneas sin sku_base (solo fichas del mes en curso)
   var huecos = [];
   solicitudes.forEach(function(s) {
     if (ESTADOS_VIVOS.indexOf(s.estado) < 0) return;
+    if (periodoDe(s.created_at).key !== perHoy) return;
     (s.lineas || []).forEach(function(l) {
       if ((l.estado || s.estado) === 'lista') return;
       if (!(l.sku_base || '').trim()) {
@@ -5763,8 +5766,8 @@ async function renderConsolidadoEnvases() {
     '<div class="env-wrap">' +
       '<div class="env-hdr" onclick="toggleEnvConsolidado(event)">' +
         '<span style="font-size:17px">📦</span>' +
-        '<span class="env-hdr-title">Requerimiento de Envases Base</span>' +
-        '<span class="env-hdr-sub">Todos los pedidos pendientes · vs B2</span>' +
+        '<span class="env-hdr-title">Bajo Stock — Envases Base para Serigrafía</span>' +
+        '<span class="env-hdr-sub">Fichas activas ' + mesHdr + ' · vs B2</span>' +
         '<button onclick="event.stopPropagation();envPDF()" style="margin-left:auto;font-size:11px;font-weight:700;background:#92400e;color:#fff;border:none;border-radius:7px;padding:4px 12px;cursor:pointer;white-space:nowrap">⬇ PDF</button>' +
         '<span class="env-hdr-chev">▾</span>' +
       '</div>' +
@@ -5909,7 +5912,7 @@ function envPDF() {
   var totalFalt = rows.reduce(function(s,r){return s+r.faltante;},0);
 
   var w = window.open('','_blank','width=860,height=700');
-  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Requerimiento Envases Base</title>' +
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bajo Stock Envases Base — Serigrafía</title>' +
     '<style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}' +
     'h1{font-size:16px;color:#92400e;margin:0 0 4px}' +
     'p{margin:0 0 16px;font-size:11px;color:#6b7280}' +
@@ -5921,7 +5924,7 @@ function envPDF() {
     'tfoot td{font-weight:800;border-top:2px solid #92400e;background:#fffbeb}' +
     '.alerta{color:#b91c1c;font-weight:800}' +
     '@media print{body{padding:8px}}</style></head><body>' +
-    '<h1>📦 Requerimiento de Envases Base — Serigrafía</h1>' +
+    '<h1>📦 Bajo Stock — Envases Base para Serigrafía</h1>' +
     '<p>Todos los pedidos pendientes · Generado: ' + ahora + ' · Tetraplastic</p>' +
     '<table><thead><tr>' +
     '<th>SKU</th><th>Descripción</th><th class="r">Este mes</th>' +
