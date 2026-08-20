@@ -4800,6 +4800,26 @@ function exportarBoardPDF(filtroMes) {
   var verdeN  = sinAsignar.filter(function(s){ return getTier(s) === 2; }).length;
   var totalPedidos = enCursoTotal + sinAsignar.length + completados.length;
 
+  // ── Snapshot de cierre para meses pasados ──────────────────────────
+  // Cuando se selecciona un mes ya cerrado, las fichas pendientes fueron
+  // trasladadas a periodo_efectivo del mes siguiente → mesSol() ya no
+  // las incluye en el filtro. El snapshot en periodoCierresCache contiene
+  // los totales exactos al momento del cierre y es la fuente correcta.
+  var esPassado = filtroMes && filtroMes < periodoActualKey();
+  var cierreKeys = esPassado
+    ? Object.keys(periodoCierresCache).filter(function(k){ return k.slice(k.indexOf('§')+1) === filtroMes; })
+    : [];
+  var usaCierres = cierreKeys.length > 0;
+  if (usaCierres) {
+    var _cr = cierreKeys.map(function(k){ return periodoCierresCache[k]; });
+    rojoN      = _cr.reduce(function(s,c){ return s+(c.n_pendientes||0); }, 0);
+    ambN       = _cr.reduce(function(s,c){ return s+(c.n_parciales||0); }, 0);
+    verdeN     = _cr.reduce(function(s,c){ return s+(c.n_listos||0); }, 0);
+    totalPedidos = _cr.reduce(function(s,c){ return s+(c.n_total||0); }, 0) + enCursoTotal;
+    var sinNSnapshot   = _cr.reduce(function(s,c){ return s+(c.n_total||0); }, 0);
+    var sinUndSnapshot = _cr.reduce(function(s,c){ return s+(c.und_total||0); }, 0);
+  }
+
   function estadoBadge(s, ent, total) {
     var e = estadoEfectivoSol(s);
     var m = { lista:'COMPLETADO', proceso:'EN PROCESO', parcial:'PARCIAL', nueva:'NUEVA' };
@@ -4822,6 +4842,36 @@ function exportarBoardPDF(filtroMes) {
       '<td style="text-align:right;font-weight:700;font-size:10px">' + entTxt + ' und</td>' +
       '<td style="text-align:center"><span style="background:'+tier.bg+';color:'+tier.clr+';border-radius:3px;padding:1px 6px;font-size:8px;font-weight:800">'+tier.lbl+'</span></td>' +
       '</tr>';
+  }
+
+  function buildSinAsignarHtmlFromCierres(keys) {
+    if (!keys.length) return '<p style="color:#9ca3af;font-size:10px;font-style:italic">Sin pedidos</p>';
+    var cierres = keys.map(function(k){ return periodoCierresCache[k]; }).filter(Boolean);
+    cierres.sort(function(a,b){ return (a.cliente||'').toLowerCase()<(b.cliente||'').toLowerCase()?-1:1; });
+    return cierres.map(function(c) {
+      var nRojo  = c.n_pendientes||0;
+      var nAmb   = c.n_parciales||0;
+      var nVerde = c.n_listos||0;
+      var undTotal = c.und_total||0;
+      var undVerde = c.und_verde||0;
+      var undAmb   = c.und_ambar||0;
+      var undRojo  = c.und_rojo||0;
+      var pct = c.pct_entregado!=null ? Math.round(c.pct_entregado) : (undTotal>0?Math.round(undVerde/undTotal*100):0);
+      var undLinea = '<div style="font-size:10px;font-weight:500;color:#6b7280;margin:-4px 0 6px;display:flex;flex-wrap:wrap;align-items:center;gap:8px">' +
+        '<span style="color:#111;font-weight:700">' + undTotal.toLocaleString() + ' und</span>' +
+        (undVerde?'<span style="color:#15803d">✅ '+undVerde.toLocaleString()+' und</span>':'') +
+        (undAmb  ?'<span style="color:#92400e">🟡 '+undAmb.toLocaleString()  +' und</span>':'') +
+        (undRojo ?'<span style="color:#991b1b">🔴 '+undRojo.toLocaleString() +' und</span>':'') +
+        '<span style="margin-left:2px;font-weight:700;color:'+(pct>=100?'#15803d':pct>0?'#92400e':'#9ca3af')+'">'+pct+'% entregado</span>' +
+        '</div>';
+      return '<div class="seccion">' +
+        '<h3>' + escHtml(c.cliente||'—') + ' <span class="badge-count">'+(c.n_total||0)+' pedidos' +
+          (nRojo ?' · 🔴 '+nRojo:'')+(nAmb?' · 🟡 '+nAmb:'')+(nVerde?' · 🟢 '+nVerde:'') +
+        '</span></h3>' +
+        undLinea +
+        '<p style="font-size:9px;color:#6b7280;font-style:italic;margin:4px 0">Datos del snapshot de cierre — al momento de trasladar al siguiente período</p>' +
+        '</div>';
+    }).join('');
   }
 
   function buildSinAsignarHtml(items) {
@@ -4958,7 +5008,8 @@ function exportarBoardPDF(filtroMes) {
       '</div>';
   }).join('');
 
-  var sinTotal = sinAsignar.reduce(function(s,i){return s+(i.cant||0);},0);
+  var sinTotal = usaCierres ? sinUndSnapshot : sinAsignar.reduce(function(s,i){return s+(i.cant||0);},0);
+  var sinNDisp = usaCierres ? sinNSnapshot  : sinAsignar.length;
   var compTotal = completados.reduce(function(s,i){return s+(i.cant||0);},0);
 
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Board Serigrafía</title><style>' +
@@ -4984,15 +5035,15 @@ function exportarBoardPDF(filtroMes) {
     '<div class="resumen">' +
       '<div><strong>' + totalPedidos + '</strong>Pedidos activos</div>' +
       '<div><strong>' + enCursoTotal + '</strong>En curso (líneas)</div>' +
-      '<div><strong>' + sinAsignar.length + '</strong>Sin asignar</div>' +
+      '<div><strong>' + sinNDisp + '</strong>Sin asignar</div>' +
       '<div><strong style="color:#991b1b">' + rojoN  + '</strong>🔴 Rojo</div>' +
       '<div><strong style="color:#92400e">' + ambN   + '</strong>🟡 Amarillo</div>' +
       '<div><strong style="color:#166534">' + verdeN + '</strong>🟢 Verde</div>' +
       '<div><strong>' + completados.length + '</strong>Completados</div>' +
     '</div>' +
 
-    '<h2>📥 Sin Asignar (' + sinAsignar.length + ' pedidos · ' + sinTotal.toLocaleString() + ' und · 🔴 ' + rojoN + ' · 🟡 ' + ambN + ' · 🟢 ' + verdeN + ')</h2>' +
-    buildSinAsignarHtml(sinAsignar) +
+    '<h2>📥 Sin Asignar (' + sinNDisp + ' pedidos · ' + sinTotal.toLocaleString() + ' und · 🔴 ' + rojoN + ' · 🟡 ' + ambN + ' · 🟢 ' + verdeN + ')</h2>' +
+    (usaCierres ? buildSinAsignarHtmlFromCierres(cierreKeys) : buildSinAsignarHtml(sinAsignar)) +
 
     '<h2>⚙️ En Curso</h2>' +
     enCursoHtml +
