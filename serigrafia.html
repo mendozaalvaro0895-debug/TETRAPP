@@ -241,6 +241,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .env-wrap.collapsed .env-hdr-sub{display:none}
 .env-hdr-chev{font-size:11px;color:#92400e;opacity:.6;transition:transform .2s;flex-shrink:0}
 .env-wrap.collapsed .env-hdr-chev{transform:rotate(-90deg)}
+.env-wrap.critico-hay{border-color:#FECACA}
+.env-wrap.critico-hay .env-hdr{background:#FEF2F2;border-bottom-color:#FECACA}
+.env-wrap.critico-hay .env-hdr-title{color:#B83232}
+.env-wrap.critico-hay .env-hdr-sub{color:#991b1b}
+.env-wrap.critico-hay .env-hdr-chev{color:#B83232}
+.env-hdr-fecha{font-size:9px;color:#92400e;opacity:.65;white-space:nowrap;font-weight:500;flex-shrink:0}
+.env-wrap.critico-hay .env-hdr-fecha{color:#B83232}
 .env-segs{display:flex;gap:4px;margin-left:auto}
 .env-seg{font-size:11px;font-weight:700;padding:3px 12px;border-radius:6px;border:1.5px solid #d97706;color:#92400e;background:#fff;cursor:pointer;transition:all .15s}
 .env-seg.active{background:#d97706;color:#fff;border-color:#d97706}
@@ -1764,7 +1771,7 @@ async function cargarInventario() {
     var desde = 0;
     var BATCH = 1000;
     while (true) {
-      var r = await db.from('inventario').select('sku,descripcion,existencia,tiros_hora')
+      var r = await db.from('inventario').select('sku,descripcion,existencia,tiros_hora,bodega,updated_at')
         .eq('activo', true).range(desde, desde + BATCH - 1);
       if (r.error) throw r.error;
       todos = todos.concat(r.data || []);
@@ -5733,6 +5740,19 @@ async function renderConsolidadoEnvases() {
   var nOk           = rows.filter(function(r){ return r.faltante === 0 && r.stock !== null; }).length;
   var totAgo        = rows.reduce(function(s,r){ return s + r.ago; }, 0);
   var totNeto       = rows.reduce(function(s,r){ return s + r.neto; }, 0);
+  var hayCritico    = rows.some(function(r){ return r.stock === 0 && r.faltante > 0; });
+
+  // Fecha última actualización inventario B2
+  var maxInvB2 = null;
+  inventarioCache.forEach(function(i) {
+    if (i.bodega && i.bodega !== 'B2') return;
+    if (i.updated_at && (!maxInvB2 || i.updated_at > maxInvB2)) maxInvB2 = i.updated_at;
+  });
+  var invFechaB2 = '';
+  if (maxInvB2) {
+    var _d = new Date(maxInvB2);
+    invFechaB2 = 'Inv. B2 · ' + String(_d.getDate()).padStart(2,'0') + '/' + String(_d.getMonth()+1).padStart(2,'0') + '/' + _d.getFullYear();
+  }
 
   function fmtN(n){ return n == null ? '—' : n.toLocaleString(); }
   function estadoBadge(r) {
@@ -5763,11 +5783,12 @@ async function renderConsolidadoEnvases() {
     '</div>';
 
   var html =
-    '<div class="env-wrap">' +
+    '<div class="env-wrap' + (hayCritico ? ' critico-hay' : '') + '">' +
       '<div class="env-hdr" onclick="toggleEnvConsolidado(event)">' +
         '<span style="font-size:17px">📦</span>' +
         '<span class="env-hdr-title">Bajo Stock — Envases Base para Serigrafía</span>' +
         '<span class="env-hdr-sub">Fichas activas ' + mesHdr + ' · vs B2</span>' +
+        (invFechaB2 ? '<span class="env-hdr-fecha">' + invFechaB2 + '</span>' : '') +
         '<button onclick="event.stopPropagation();envPDF()" style="margin-left:auto;font-size:11px;font-weight:700;background:#92400e;color:#fff;border:none;border-radius:7px;padding:4px 12px;cursor:pointer;white-space:nowrap">⬇ PDF</button>' +
         '<span class="env-hdr-chev">▾</span>' +
       '</div>' +
