@@ -1894,7 +1894,8 @@ var posColDispo    = null;       // null = aún no se sabe; false si la tabla ma
 var posAvisoMostrado = false;    // para avisar una sola vez si no se pueden guardar posiciones
 var asistLocked    = true;       // tabla de asistencia bloqueada por defecto (evita clicasos)
 var MATRIZ_DIA_TABLE = 'matriz_dia_serig'; // posición de matriz por día — SEPARADA de asistencia
-var prodMesNav     = null;       // null = mes actual; 'YYYY-MM' = mes seleccionado en el gráfico
+var prodMesNav        = null;  // null = mes actual; 'YYYY-MM' = mes seleccionado en el gráfico
+var prodCompararActivo = false; // mostrar gráfica del mes anterior alineada debajo
 var ausentesHoy    = {};         // { codigo: true } — se carga al init y al marcar asistencia
 var asistHoyCache  = {};         // { codigo: estado } — refleja la fecha del widget
 var asistHoyRolCache = {};       // { codigo: rol }   — rol guardado para la fecha del widget
@@ -3532,6 +3533,11 @@ function navegarProdMes(delta) {
   renderProdMensual();
 }
 
+function toggleProdComparar() {
+  prodCompararActivo = !prodCompararActivo;
+  renderProdMensual();
+}
+
 function renderProdMensual() {
   var cont = document.getElementById('prodMensual');
   if (!cont) return;
@@ -3626,18 +3632,107 @@ function renderProdMensual() {
   });
 
   var _btnNavStyle = 'background:none;border:1px solid var(--border);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px;color:var(--ink);line-height:1';
+  var _btnCmpStyle = 'border:1px solid ' + (prodCompararActivo ? 'var(--serig-m)' : 'var(--border)') + ';border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:' + (prodCompararActivo ? '700' : '400') + ';color:' + (prodCompararActivo ? 'var(--serig-m)' : 'var(--ink)') + ';background:' + (prodCompararActivo ? 'var(--serig-l)' : 'none') + ';line-height:1;white-space:nowrap';
+
+  var chartHtml = '';
+  if (prodCompararActivo) {
+    // ── Mes anterior ──────────────────────────────────
+    var prevDt   = new Date(anio, mes - 1, 1);
+    var prevA    = prevDt.getFullYear(), prevM2 = prevDt.getMonth();
+    var diasPrev = new Date(prevA, prevM2 + 1, 0).getDate();
+    var prevYM   = prevA + '-' + String(prevM2 + 1).padStart(2, '0');
+    var prevLabel = prevDt.toLocaleString('es-GT', { month:'long', year:'numeric' });
+
+    var porFechaPrev = {};
+    (getEntregasManuales() || []).forEach(function(m) {
+      if (!m.fecha || m.fecha.slice(0,7) !== prevYM) return;
+      porFechaPrev[m.fecha] = (porFechaPrev[m.fecha] || 0) + (m.cant || 0);
+    });
+
+    // Escala compartida: max de ambos meses
+    var maxDias2 = Math.max(diasMes, diasPrev);
+    var maxValC  = 1;
+    for (var dd = 1; dd <= maxDias2; dd++) {
+      var faC = selMes + '-' + String(dd).padStart(2,'0');
+      var fpC = prevYM  + '-' + String(dd).padStart(2,'0');
+      if (porFecha[faC])     maxValC = Math.max(maxValC, porFecha[faC]);
+      if (porFechaPrev[fpC]) maxValC = Math.max(maxValC, porFechaPrev[fpC]);
+    }
+
+    // KPIs mes anterior
+    var totalPrev = 0, diasConPrev = 0;
+    for (var dd = 1; dd <= diasPrev; dd++) {
+      var fp2 = prevYM + '-' + String(dd).padStart(2,'0');
+      if (porFechaPrev[fp2]) { totalPrev += porFechaPrev[fp2]; diasConPrev++; }
+    }
+    var promPrev = diasConPrev ? Math.round(totalPrev / diasConPrev) : 0;
+
+    // Helper: barra individual por día-número
+    var _cmpBar = function(ym, dd2, val, gray) {
+      var dateStr = ym + '-' + String(dd2).padStart(2,'0');
+      var dow  = new Date(dateStr + 'T12:00:00').getDay();
+      var isDom = dow === 0;
+      var px   = val ? Math.max(Math.round((val / maxValC) * 160), 5) : 2;
+      var bg   = gray ? (val ? '#94a3b8' : 'var(--border)') : (val > 0 ? _prodColor(val) : 'var(--border)');
+      var lbl  = (dd2 % 5 === 0 || dd2 === 1) ? dd2 : '';
+      return '<div style="flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end' + (isDom ? ';background:rgba(0,0,0,.04);border-radius:3px' : '') + '">' +
+        '<div style="width:100%;height:' + px + 'px;background:' + bg + ';border-radius:3px 3px 0 0;opacity:' + (isDom ? '.5' : gray ? '.85' : '1') + '"></div>' +
+        '<div style="height:22px;flex-shrink:0;display:flex;align-items:flex-start;justify-content:center;padding-top:2px">' +
+          '<span style="font-size:8px;color:var(--gray-l)">' + lbl + '</span>' +
+        '</div>' +
+      '</div>';
+    };
+
+    var _rowLabel = function(lbl, tot, prom, clr) {
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px 3px">' +
+        '<span style="font-size:10px;font-weight:700;color:' + clr + ';text-transform:capitalize">' + lbl + '</span>' +
+        '<div style="display:flex;gap:14px">' +
+          '<span style="font-size:10px;font-weight:700;color:' + clr + '">' + tot.toLocaleString() + ' und</span>' +
+          '<span style="font-size:10px;color:var(--gray-l)">' + prom.toLocaleString() + ' und/día</span>' +
+        '</div>' +
+      '</div>';
+    };
+
+    // Barras mes anterior
+    var barsPrev = '';
+    for (var dd = 1; dd <= diasPrev; dd++) {
+      barsPrev += _cmpBar(prevYM, dd, porFechaPrev[prevYM + '-' + String(dd).padStart(2,'0')] || 0, true);
+    }
+    // Barras mes actual (escala compartida, sin días extra)
+    var barsAct = '';
+    for (var dd = 1; dd <= diasMes; dd++) {
+      var faAct = selMes + '-' + String(dd).padStart(2,'0');
+      barsAct += _cmpBar(selMes, dd, faAct <= todayStr ? (porFecha[faAct] || 0) : 0, false);
+    }
+
+    chartHtml =
+      _rowLabel(prevLabel, totalPrev, promPrev, '#64748b') +
+      '<div id="prodChartScrollPrev" style="overflow-x:auto;scrollbar-width:thin;padding:0 14px 4px">' +
+        '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:max-content">' + barsPrev + '</div>' +
+      '</div>' +
+      '<div style="margin:2px 14px 4px;border-top:2px solid var(--border)"></div>' +
+      _rowLabel(mesStr, totalMes, promDia, 'var(--serig-m)') +
+      '<div id="prodChartScrollAct" style="overflow-x:auto;scrollbar-width:thin;padding:0 14px 4px">' +
+        '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:max-content">' + barsAct + '</div>' +
+      '</div>';
+  } else {
+    chartHtml =
+      '<div class="prod-mens-chart" id="prodChartScroll" style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px;max-width:715px">' +
+        '<div style="display:flex;align-items:flex-end;gap:3px;min-height:210px;width:max-content">' + cols + '</div>' +
+      '</div>';
+  }
+
   cont.innerHTML = '<div class="prod-mens-wrap">' +
     '<div class="prod-mens-hdr">' +
       '<span style="font-size:12px;font-weight:800">📦 Producción mensual</span>' +
       '<div style="display:flex;align-items:center;gap:6px">' +
+        '<button onclick="toggleProdComparar()" style="' + _btnCmpStyle + '" title="Comparar con mes anterior">📊 Comparar</button>' +
         '<button onclick="navegarProdMes(-1)" style="' + _btnNavStyle + '" title="Mes anterior">◀</button>' +
         '<span style="font-size:11px;font-weight:700;color:var(--ink);text-transform:capitalize;min-width:120px;text-align:center">' + mesStr + '</span>' +
         '<button onclick="navegarProdMes(1)" ' + (esMesActual ? 'disabled ' : '') + 'style="' + _btnNavStyle + (esMesActual ? ';opacity:.3;cursor:default' : '') + '" title="Mes siguiente">▶</button>' +
       '</div>' +
     '</div>' +
-    '<div class="prod-mens-chart" id="prodChartScroll" style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px">' +
-      '<div style="display:flex;align-items:flex-end;gap:3px;min-height:210px;width:max-content;min-width:100%">' + cols + '</div>' +
-    '</div>' +
+    chartHtml +
     '<div class="prod-mens-total">' +
       '<div class="prod-stat"><span class="prod-stat-val">' + totalMes.toLocaleString() + '</span><span class="prod-stat-lbl">und totales</span></div>' +
       '<div class="prod-stat"><span class="prod-stat-val">' + promDia.toLocaleString() + '</span><span class="prod-stat-lbl">und / día activo</span></div>' +
@@ -3646,14 +3741,18 @@ function renderProdMensual() {
     '</div>';
 
   setTimeout(function() {
+    // Vista normal: centrar en la barra de hoy / seleccionada
     var sc = document.getElementById('prodChartScroll');
-    if (!sc) return;
-    var tgtEl = document.getElementById('prodSelBar') || document.getElementById('prodTodayBar');
-    if (tgtEl) {
-      sc.scrollLeft = Math.max(0, tgtEl.offsetLeft - sc.clientWidth + tgtEl.offsetWidth + 24);
-    } else {
-      sc.scrollLeft = sc.scrollWidth;
+    if (sc) {
+      var tgtEl = document.getElementById('prodSelBar') || document.getElementById('prodTodayBar');
+      if (tgtEl) sc.scrollLeft = Math.max(0, tgtEl.offsetLeft - sc.clientWidth + tgtEl.offsetWidth + 24);
+      else        sc.scrollLeft = sc.scrollWidth;
     }
+    // Vista comparación: scroll al final (día más reciente)
+    var scPrev = document.getElementById('prodChartScrollPrev');
+    var scAct  = document.getElementById('prodChartScrollAct');
+    if (scPrev) scPrev.scrollLeft = scPrev.scrollWidth;
+    if (scAct)  scAct.scrollLeft  = scAct.scrollWidth;
   }, 50);
 
   // Popup de detalle por día (se crea una sola vez en body)
