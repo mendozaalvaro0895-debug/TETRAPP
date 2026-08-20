@@ -3615,18 +3615,17 @@ function renderProdMensual() {
     if (esSel)      bStyle += ';outline:2px solid var(--serig-m);outline-offset:1px;border-radius:3px 3px 0 0';
     else if (esHoy) bStyle += ';outline:1px dashed var(--serig-m);outline-offset:1px;border-radius:3px 3px 0 0';
     var tip    = !esFuturo && val ? ' title="' + f + ': ' + val.toLocaleString() + ' und"' : '';
-    var lbl    = (numDia % 5 === 0 || numDia === 1 || esHoy || esSel) ? numDia : '';
     var clickProd = (!esFuturo && val) ? ' onclick="verDetalleProdDia(\'' + f + '\',event)"' : '';
     var barId  = esSel ? ' id="prodSelBar"' : (esHoy ? ' id="prodTodayBar"' : '');
-    // Domingo: fondo sombreado + etiqueta "Dom" siempre visible
     var colStyle = 'flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end' +
       (!esFuturo && val ? ';cursor:pointer' : '') +
       (esDom ? ';background:rgba(0,0,0,.04);border-radius:3px' : '');
+    var lblClr = esDom ? 'var(--amber)' : 'var(--gray-l)';
     cols += '<div' + barId + clickProd + ' style="' + colStyle + '"' + tip + '>' +
       '<div class="prod-bar" style="width:100%;height:' + px + 'px;background:' + barColor + bStyle + '"></div>' +
-      '<div style="height:24px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;margin-top:2px;overflow:hidden;' + (esFuturo?'opacity:.3':'') + '">' +
-        '<div style="font-size:8px;line-height:1.2;color:' + (esDom ? 'var(--amber)' : 'var(--gray-l)') + '">' + lbl + '</div>' +
-        '<div style="font-size:7px;line-height:1.2;font-weight:' + (esDom ? '800' : '400') + ';color:' + (esDom ? 'var(--amber)' : 'var(--gray-l)') + '">' + (esDom || esSel || esHoy ? abbr : '') + '</div>' +
+      '<div style="height:26px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;margin-top:2px;overflow:hidden;' + (esFuturo?'opacity:.3':'') + '">' +
+        '<div style="font-size:7px;line-height:1.25;color:' + lblClr + '">' + numDia + '</div>' +
+        '<div style="font-size:6px;line-height:1.25;font-weight:' + (esDom ? '800' : '400') + ';color:' + lblClr + '">' + abbr + '</div>' +
       '</div>' +
     '</div>';
   });
@@ -3668,17 +3667,20 @@ function renderProdMensual() {
     var promPrev = diasConPrev ? Math.round(totalPrev / diasConPrev) : 0;
 
     // Helper: barra individual por día-número
+    var _ABREV2 = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
     var _cmpBar = function(ym, dd2, val, gray) {
       var dateStr = ym + '-' + String(dd2).padStart(2,'0');
-      var dow  = new Date(dateStr + 'T12:00:00').getDay();
+      var dow   = new Date(dateStr + 'T12:00:00').getDay();
       var isDom = dow === 0;
-      var px   = val ? Math.max(Math.round((val / maxValC) * 160), 5) : 2;
-      var bg   = gray ? (val ? '#94a3b8' : 'var(--border)') : (val > 0 ? _prodColor(val) : 'var(--border)');
-      var lbl  = (dd2 % 5 === 0 || dd2 === 1) ? dd2 : '';
+      var abbr2 = _ABREV2[dow];
+      var px    = val ? Math.max(Math.round((val / maxValC) * 160), 5) : 2;
+      var bg    = gray ? (val ? '#94a3b8' : 'var(--border)') : (val > 0 ? _prodColor(val) : 'var(--border)');
+      var clr2  = isDom ? 'var(--amber)' : (gray ? '#94a3b8' : 'var(--gray-l)');
       return '<div style="flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end' + (isDom ? ';background:rgba(0,0,0,.04);border-radius:3px' : '') + '">' +
         '<div style="width:100%;height:' + px + 'px;background:' + bg + ';border-radius:3px 3px 0 0;opacity:' + (isDom ? '.5' : gray ? '.85' : '1') + '"></div>' +
-        '<div style="height:22px;flex-shrink:0;display:flex;align-items:flex-start;justify-content:center;padding-top:2px">' +
-          '<span style="font-size:8px;color:var(--gray-l)">' + lbl + '</span>' +
+        '<div style="height:26px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:2px">' +
+          '<div style="font-size:7px;line-height:1.25;color:' + clr2 + '">' + dd2 + '</div>' +
+          '<div style="font-size:6px;line-height:1.25;font-weight:' + (isDom?'800':'400') + ';color:' + clr2 + '">' + abbr2 + '</div>' +
         '</div>' +
       '</div>';
     };
