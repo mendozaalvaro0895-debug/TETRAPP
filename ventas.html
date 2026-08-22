@@ -52,6 +52,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .tab.active{color:var(--ven)}
 .tab.active::after{background:var(--ven)}
 .tabs-r{margin-left:auto;display:flex;gap:8px;align-items:center;padding-bottom:6px}
+.ult-fact-nota{font-size:11px;color:var(--gray);white-space:nowrap}
 
 /* BOTONES */
 .btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;border:none;transition:all .15s}
@@ -158,6 +159,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .imp-table td{padding:6px 10px;border-bottom:1px solid var(--bg)}
 .imp-table tr:last-child td{border-bottom:none}
 .imp-aviso{font-size:11px;background:var(--amber-l);border:1px solid #FDE68A;color:#92400E;border-radius:7px;padding:7px 12px;margin-bottom:12px;line-height:1.5}
+.imp-aviso.ok{background:var(--green-l);border-color:var(--green);color:var(--green)}
 .imp-err{font-size:12px;background:var(--red-l);border:1.5px solid var(--red);color:var(--red);border-radius:8px;padding:10px 14px;margin-top:10px;line-height:1.5;display:none}
 .progress-bar-wrap{background:var(--bg);border-radius:6px;height:8px;overflow:hidden;margin:8px 0}
 .progress-bar{height:8px;background:var(--ven);border-radius:6px;transition:width .3s;width:0%}
@@ -324,6 +326,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <span class="iva-lbl iva-active">con IVA</span>
         <span class="iva-knob" id="ivaKnob"></span>
       </div>
+      <span class="ult-fact-nota" id="ultActFecha"></span>
       <button class="btn btn-ven" id="btnImportar" onclick="abrirImport()">📥 Importar facturación</button>
     </div>
   </div>
@@ -597,6 +600,10 @@ function fmtU(n) {
 }
 function fmtPct(n) {
   return (Math.round(n * 10) / 10).toFixed(1) + '%';
+}
+function fmtFechaISO(iso) {
+  var p = String(iso || '').slice(0, 10).split('-');
+  return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : '';
 }
 function mesLabel(key) {
   if (key === 'todo') return 'Todo el periodo';
@@ -1078,6 +1085,9 @@ async function confirmarImport() {
   document.getElementById('importProgress').style.display = 'block';
   document.getElementById('importErr').style.display = 'none';
 
+  var skusAntes = {};
+  VENTAS.forEach(function (v) { if (v.sku) skusAntes[v.sku] = 1; });
+
   var fechas = rows.map(function (r) { return r.fecha; });
   var fMin = fechas.reduce(function (a, b) { return a < b ? a : b; });
   var fMax = fechas.reduce(function (a, b) { return a > b ? a : b; });
@@ -1109,9 +1119,21 @@ async function confirmarImport() {
       return;
     }
 
-    cerrarImport();
-    toast(rows.length.toLocaleString() + ' líneas importadas (' + fMin + ' → ' + fMax + ')', 'ok');
+    var nuevosMap = {};
+    rows.forEach(function (r) {
+      if (r.sku && !skusAntes[r.sku] && !nuevosMap[r.sku]) nuevosMap[r.sku] = r.descripcion || '';
+    });
+    var nuevos = Object.keys(nuevosMap).sort().map(function (s) { return {sku: s, desc: nuevosMap[s]}; });
+
     await recargar();
+    refrescarRecetarioSkus();
+
+    if (nuevos.length) {
+      mostrarResumenImport(rows.length, fMin, fMax, nuevos);
+    } else {
+      cerrarImport();
+      toast(rows.length.toLocaleString() + ' líneas importadas (' + fMin + ' → ' + fMax + ')', 'ok');
+    }
   } catch (err) {
     document.getElementById('importProgress').style.display = 'none';
     btn.disabled = false;
@@ -1119,6 +1141,35 @@ async function confirmarImport() {
     importError('⛔ ' + escHtml(err.message || String(err)) +
       '<br><br>Si el error menciona columnas o permisos, probablemente falta correr <b>sql/ventas_financiero_v1.sql</b> en el SQL Editor de Supabase.');
   }
+}
+
+// Productos facturados por primera vez en esta importación — se quedan en el
+// modal para que el usuario los vea antes de saltar al Recetario a completarlos.
+function buildImportNuevoRow(n) {
+  return '<tr><td class="sku-cell">' + escHtml(n.sku) + '</td><td>' + escHtml(n.desc || '—') + '</td></tr>';
+}
+
+function mostrarResumenImport(nLineas, fMin, fMax, nuevos) {
+  var filasHtml = nuevos.map(buildImportNuevoRow).join('');
+  var pl = nuevos.length === 1 ? '' : 's';
+  document.getElementById('importBody').innerHTML =
+    '<div class="imp-aviso ok">✓ ' + nLineas.toLocaleString() + ' líneas importadas (' + fMin + ' → ' + fMax + ').</div>' +
+    '<div class="imp-aviso">🆕 <b>' + nuevos.length + ' producto' + pl + ' nuevo' + pl + '</b> facturado' + pl + ' por primera vez — se agregaron al <b>Recetario de SKUs</b> (tab Rotación → Pendientes) para completar su composición.</div>' +
+    '<div class="imp-table-wrap"><table class="imp-table"><thead><tr><th>SKU</th><th>Producto</th></tr></thead><tbody>' + filasHtml + '</tbody></table></div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px">' +
+      '<button class="btn btn-ven" onclick="irARecetarioDesdeImport()">📋 Ir al Recetario</button>' +
+      '<button class="btn btn-ghost" onclick="cerrarImport()">Cerrar</button>' +
+    '</div>';
+  document.getElementById('btnConfirmImport').style.display = 'none';
+}
+
+function irARecetarioDesdeImport() {
+  cerrarImport();
+  switchTab('rotacion');
+  var body = document.getElementById('recetBody');
+  if (body && !body.classList.contains('open')) toggleRecetario();
+  var panel = document.getElementById('recetarioPanel');
+  if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── Toast ───────────────────────────────────────────────────────
@@ -1151,6 +1202,9 @@ async function recargar() {
     mesSel = MESES.length ? MESES[MESES.length - 1] : 'todo';
     poblarSelectores();
     renderTodo();
+    var maxFecha = VENTAS.length ? VENTAS[VENTAS.length - 1].fecha : null;
+    var notaFecha = document.getElementById('ultActFecha');
+    if (notaFecha) notaFecha.textContent = maxFecha ? 'Última actualización: ' + fmtFechaISO(maxFecha) : '';
   } catch (err) {
     console.error('ventas:', err);
     document.getElementById('emptyState').style.display = 'block';
@@ -1305,10 +1359,9 @@ function toggleRecetario() {
   if (open && !RECETARIO_CARGADO) cargarRecetario();
 }
 
-async function cargarRecetario() {
-  document.getElementById('recetLista').innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">Cargando…</div>';
-
-  // 1. SKUs únicos de VENTAS (ya cargado en memoria)
+// SKUs únicos de VENTAS (en memoria) + fusión con inventario para autocomplete.
+// Se usa en la carga inicial y para refrescar tras una importación sin volver a golpear la DB.
+function construirRecetSkus() {
   var skuMap = {};
   VENTAS.forEach(function(v) {
     if (!v.sku) return;
@@ -1316,16 +1369,34 @@ async function cargarRecetario() {
   });
   RECET_SKUS = Object.keys(skuMap).sort().map(function(s) { return {sku_fact: s, desc: skuMap[s]}; });
 
-  // 2. Inventario para autocomplete (inventario + SKUs facturables no presentes en inventario)
-  var ri = await db.from('inventario').select('sku,descripcion').order('sku').limit(5000);
-  INV_REC = ri.error ? [] : (ri.data || []);
   var invIdx = {};
   INV_REC.forEach(function(i) { if (i.sku) invIdx[String(i.sku)] = 1; });
   RECET_SKUS.forEach(function(s) {
-    if (s.sku_fact && !invIdx[s.sku_fact])
+    if (s.sku_fact && !invIdx[s.sku_fact]) {
       INV_REC.push({sku: s.sku_fact, descripcion: s.desc || ''});
+      invIdx[s.sku_fact] = 1;
+    }
   });
   INV_REC.sort(function(a,b){ return String(a.sku||'').localeCompare(String(b.sku||'')); });
+}
+
+// Refresca el listado del Recetario tras importar facturación nueva, sin recargar
+// inventario/recetas desde la DB (esos no cambian por una importación de ventas).
+function refrescarRecetarioSkus() {
+  if (!RECETARIO_CARGADO) return;
+  construirRecetSkus();
+  renderRecetario();
+}
+
+async function cargarRecetario() {
+  document.getElementById('recetLista').innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">Cargando…</div>';
+
+  // 1. Inventario para autocomplete (inventario + SKUs facturables no presentes en inventario)
+  var ri = await db.from('inventario').select('sku,descripcion').order('sku').limit(5000);
+  INV_REC = ri.error ? [] : (ri.data || []);
+
+  // 2. SKUs únicos de VENTAS (ya cargado en memoria) fusionados en INV_REC
+  construirRecetSkus();
 
   // 3. Recetas existentes
   var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado');
