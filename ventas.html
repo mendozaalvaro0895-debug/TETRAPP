@@ -759,7 +759,8 @@ function renderResumen() {
 function buildMesBar(key, q, maxQ) {
   var h = maxQ > 0 ? Math.max(2, Math.round(q / maxQ * 100)) : 2;
   var sel = key === mesSel ? ' sel' : '';
-  var miles = q >= 1000000 ? (q / 1000000).toFixed(2) + 'M' : Math.round(q / 1000) + 'k';
+  var qShow = qVal(q);
+  var miles = qShow >= 1000000 ? (qShow / 1000000).toFixed(2) + 'M' : Math.round(qShow / 1000) + 'k';
   return '<div class="cbar-wrap' + sel + '" onclick="setMes(\'' + key + '\')" title="' + mesLabel(key) + ': ' + fmtQ(q) + '">' +
     '<div class="cbar-val">' + miles + '</div>' +
     '<div class="cbar" style="height:' + h + '%"></div>' +
