@@ -469,6 +469,12 @@ var PROD_MES = [];   // filas de produccion_diaria del mes en foco (Mensual)
 var prevRows = [];   // filas pendientes de confirmar en el modal
 var manSeq = 0;
 
+// Familias que no cuentan para ninguna métrica del sistema (igual que ventas.html)
+var FAMILIAS_EXCLUIDAS = ['OTROS', 'INSUMOS', 'MATERIA'];
+function familiaExcluida(descFamilia) {
+  return FAMILIAS_EXCLUIDAS.indexOf(String(descFamilia || '').trim().toUpperCase()) !== -1;
+}
+
 var MAQUINAS = [1,2,3,4,5,6,7,8,9,10,11,12];
 var MAQ_TIPO = {1:'S.Simple',2:'S.Simple',3:'S.Simple',4:'S.Simple',5:'S.Simple',
   6:'S.Doble',7:'I.Sopla',8:'S.Doble',9:'S.Doble',10:'I.Sopla'};
@@ -598,13 +604,13 @@ async function cargarPrecios() {
   var desde = 0, lote = 1000;
   while (true) {
     var r = await db.from('ventas')
-      .select('sku,fecha,total_quetzales,total_unidades')
+      .select('sku,fecha,total_quetzales,total_unidades,descripcion_familia')
       .range(desde, desde + lote - 1);
     if (r.error) { console.warn('ventas no disponible:', r.error.message); break; }
     var d = r.data || [];
     d.forEach(function (v) {
       var s = String(v.sku == null ? '' : v.sku).trim();
-      if (!s) return;
+      if (!s || familiaExcluida(v.descripcion_familia)) return;
       var u = numVal(v.total_unidades), q = numVal(v.total_quetzales);
       if (!acumTodo[s]) acumTodo[s] = { q: 0, u: 0 };
       acumTodo[s].q += q; acumTodo[s].u += u;
@@ -1345,9 +1351,10 @@ async function renderSemanal() {
 async function cargarVentasSemana(ini, fin) {
   VENTAS_SEM = {};
   try {
-    var r = await db.from('ventas').select('sku,total_quetzales').gte('fecha', ini).lte('fecha', fin);
+    var r = await db.from('ventas').select('sku,total_quetzales,descripcion_familia').gte('fecha', ini).lte('fecha', fin);
     if (r.error) return;
     (r.data || []).forEach(function (v) {
+      if (familiaExcluida(v.descripcion_familia)) return;
       var s = String(v.sku == null ? '' : v.sku).trim();
       VENTAS_SEM[s] = (VENTAS_SEM[s] || 0) + numVal(v.total_quetzales);
     });
