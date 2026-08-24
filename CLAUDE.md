@@ -134,6 +134,8 @@ Notas críticas:
 5. `sql/produccion_v1.sql` — crea `produccion_diaria` + cols meta_12hrs/maquina_default/precio_ponderado_manual
 6. `sql/produccion_seed_historico.sql` — histórico Sheets (831 líneas, 5-may→6-jun, documento='SHEETS').
    Correr DESPUÉS del 5. ⚠️ Si luego subes PDF de un turno ya sembrado, borra primero sus líneas con documento='SHEETS'
+7. `sql/sku_recetario_fotos_v1.sql` — columna `foto_url` en `sku_recetas` + RLS del bucket Storage `envases`.
+   ⚠️ El bucket `envases` (public) hay que crearlo a mano en Dashboard → Storage antes de correr el script
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)

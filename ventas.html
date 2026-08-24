@@ -205,6 +205,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rc-badge{background:var(--ven-l);color:var(--ven-dark);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0}
 .rc-badge.vacio{background:var(--bg2);color:var(--gray-l)}
 .rc-badge.dir{background:var(--green-l);color:var(--green)}
+.rc-badge.foto-pend{background:var(--amber-l);color:#92400E}
 .rc-chev{font-size:11px;color:var(--gray);transition:transform .2s;flex-shrink:0}
 .rc-chev.open{transform:rotate(180deg)}
 .rc-cuerpo{display:none;border-top:1px solid var(--border);background:var(--card);border-radius:0 0 9px 9px}
@@ -245,6 +246,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rc-opt:last-child{border-bottom:none}
 .rc-opt:hover{background:var(--ven-xl)}
 .rc-opt b{font-family:var(--mono);color:var(--ven);font-size:12px}
+/* foto del envase */
+.rc-foto-wrap{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--bg2)}
+.rc-foto-img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;flex-shrink:0}
+.rc-foto-vacia{width:64px;height:64px;border-radius:8px;border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--gray-l);text-align:center;flex-shrink:0}
+.rc-foto-acciones{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rc-foto-btn{padding:6px 14px;border:1.5px solid var(--border);border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;color:var(--ink);transition:all .15s}
+.rc-foto-btn:hover{border-color:var(--ven);color:var(--ven)}
+.rc-foto-status{font-size:11px;color:var(--gray)}
 /* pie de card (guardar / deshacer) */
 .rc-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg);border-radius:0 0 9px 9px}
 .rc-save-btn{padding:6px 18px;background:var(--ven);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);transition:opacity .15s}
@@ -1414,7 +1423,7 @@ async function cargarRecetario() {
   construirRecetSkus();
 
   // 3. Recetas existentes
-  var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado');
+  var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado,foto_url');
   RECETAS_MAP = {};
   if (!rr.error) (rr.data || []).forEach(function(r) { RECETAS_MAP[r.sku_fact] = r; });
 
@@ -1510,26 +1519,29 @@ function buildRecetCardGuardado(sku, desc, receta, partes) {
   var areaLabels = {tapas:'Tapas', serigrafia:'Serigrafía', produccion:'Producción'};
   var nP = partes.length;
   var esDir = receta && receta.es_directo;
+  var esMaster = TETRA.rol === 'master';
   var badgeTxt = esDir ? 'Directo' : (nP + (nP === 1 ? ' parte' : ' partes'));
   var badgeCls = esDir ? 'rc-badge dir' : 'rc-badge';
   var areaBadge = area ? '<span class="rc-area-badge ' + area + '">' + escHtml(areaLabels[area] || area) + '</span>' : '';
-  var undoBtn = TETRA.rol === 'master'
+  var fotoBadge = (receta && receta.foto_url) ? '' : '<span class="rc-badge foto-pend">📷 PENDIENTE DE FOTOS</span>';
+  var undoBtn = esMaster
     ? '<button class="rc-undo-btn" onclick="event.stopPropagation();deshacerReceta(\'' + sid + '\')">↩ Deshacer</button>'
     : '';
-  var cuerpoHtml = '';
+  var cuerpoHtml = buildRcFotoBlock(sku, sid, receta, esMaster);
   if (partes.length) {
-    cuerpoHtml = '<div class="rc-partes-hdr"><span>Tipo</span><span>Código / Proceso</span><span>Nota</span><span></span></div>';
+    cuerpoHtml += '<div class="rc-partes-hdr"><span>Tipo</span><span>Código / Proceso</span><span>Nota</span><span></span></div>';
     partes.forEach(function(p) { cuerpoHtml += buildRcParteRow(p, false); });
   } else if (esDir) {
-    cuerpoHtml = '<div style="padding:10px 14px;font-size:11px;color:var(--green);font-weight:600">✓ Directo desde Producción</div>';
+    cuerpoHtml += '<div style="padding:10px 14px;font-size:11px;color:var(--green);font-weight:600">✓ Directo desde Producción</div>';
   } else {
-    cuerpoHtml = '<div style="padding:10px 14px;font-size:11px;color:var(--gray)">Sin partes registradas</div>';
+    cuerpoHtml += '<div style="padding:10px 14px;font-size:11px;color:var(--gray)">Sin partes registradas</div>';
   }
   return '<div class="rc" id="rc-' + sid + '">' +
     '<div class="rc-hdr" onclick="toggleRcCard(\'' + sid + '\')">' +
       '<span class="rc-sku">' + escHtml(sku) + '</span>' +
       '<span class="rc-desc">' + escHtml(desc || '—') + '</span>' +
       areaBadge +
+      fotoBadge +
       '<span class="' + badgeCls + '">' + badgeTxt + '</span>' +
       undoBtn +
       '<span class="rc-chev" id="rc-chev-' + sid + '">▾</span>' +
@@ -1599,6 +1611,58 @@ function buildRcParteRow(p, esMaster) {
     '<span style="font-size:11px;color:var(--gray)">' + escHtml(p.nota || '—') + '</span>' +
     del +
   '</div>';
+}
+
+// ── Foto del envase (Guardados) ─────────────────────────────────
+function buildRcFotoBlock(sku, sid, receta, esMaster) {
+  var url = receta && receta.foto_url ? receta.foto_url : null;
+  var img = url
+    ? '<img class="rc-foto-img" src="' + escHtml(url) + '" alt="Foto ' + escHtml(sku) + '" onclick="window.open(\'' + escHtml(url) + '\',\'_blank\')">'
+    : '<div class="rc-foto-vacia">Sin foto</div>';
+  var accion = esMaster
+    ? '<label class="rc-foto-btn" for="rcfoto-' + sid + '">' + (url ? '🔄 Cambiar foto' : '📷 Subir foto') + '</label>' +
+      '<input type="file" accept="image/*" id="rcfoto-' + sid + '" style="display:none" onchange="subirFotoEnvase(\'' + sid + '\', this)">'
+    : '';
+  return '<div class="rc-foto-wrap">' + img +
+    '<div class="rc-foto-acciones">' + accion + '<span class="rc-foto-status" id="rcfoto-status-' + sid + '"></span></div>' +
+  '</div>';
+}
+
+async function subirFotoEnvase(sid, inputEl) {
+  var sku = RECET_SID_SKU[sid];
+  var receta = sku ? RECETAS_MAP[sku] : null;
+  var file = inputEl.files && inputEl.files[0];
+  if (!sku || !receta || !file) return;
+  if (!/^image\//.test(file.type)) { toast('El archivo debe ser una imagen', 'err'); inputEl.value = ''; return; }
+  if (file.size > 6 * 1024 * 1024) { toast('Imagen muy pesada (máx 6MB)', 'err'); inputEl.value = ''; return; }
+
+  var status = document.getElementById('rcfoto-status-' + sid);
+  if (status) status.textContent = 'Subiendo…';
+
+  var ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  var path = sku + '.' + ext;
+
+  var up = await db.storage.from('envases').upload(path, file, { upsert: true, contentType: file.type });
+  if (up.error) {
+    if (status) status.textContent = '';
+    toast('Error al subir la foto: ' + up.error.message, 'err');
+    inputEl.value = '';
+    return;
+  }
+
+  var pub = db.storage.from('envases').getPublicUrl(path);
+  var url = pub.data.publicUrl + '?v=' + Date.now();
+  var upd = await db.from('sku_recetas').update({ foto_url: url }).eq('id', receta.id);
+  if (upd.error) {
+    if (status) status.textContent = '';
+    toast('Error al guardar la foto: ' + upd.error.message, 'err');
+    inputEl.value = '';
+    return;
+  }
+
+  RECETAS_MAP[sku].foto_url = url;
+  toast('✓ Foto guardada', 'ok');
+  renderRecetario();
 }
 
 function buildRcAddForm(sid) {
@@ -1682,7 +1746,7 @@ async function ensureReceta(sku, sid) {
   if (rc.error) {
     // fila ya existe (23505 = unique_violation) — buscarla en lugar de fallar
     if (rc.error.code === '23505') {
-      var fe = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado').eq('sku_fact', sku).single();
+      var fe = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado,foto_url').eq('sku_fact', sku).single();
       if (fe.error || !fe.data) { toast('Error al acceder a la receta', 'err'); return null; }
       RECETAS_MAP[sku] = fe.data;
       if (!PARTES_MAP[fe.data.id]) PARTES_MAP[fe.data.id] = [];
