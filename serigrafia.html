@@ -5776,9 +5776,17 @@ async function renderConsolidadoEnvases() {
              salido: salido, neto: neto, stock: stock, faltante: faltante };
   });
 
-  // Siempre TODO — ordenar: mayor faltante primero, luego mayor neto
+  // Orden: 🔴 sin stock → 🟡 parcial → ✅ alcanza → ❓ sin SKU
+  function _envTier(r) {
+    if (r.stock === 0 && r.faltante > 0) return 0;
+    if (r.faltante > 0)                  return 1;
+    if (r.stock !== null)                return 2;
+    return 3;
+  }
   rows.sort(function(a,b){
-    if (b.faltante !== a.faltante) return b.faltante - a.faltante;
+    var ta = _envTier(a), tb = _envTier(b);
+    if (ta !== tb) return ta - tb;
+    if (ta < 2) return b.faltante - a.faltante;
     return b.neto - a.neto;
   });
 
