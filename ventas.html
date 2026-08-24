@@ -587,10 +587,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 // VENTAS Y FINANCIERO — SUPA_URL, SUPA_KEY, db y escHtml vienen de shared/auth.js
 // ════════════════════════════════════════════════════════════════
 
-var VENTAS = [];          // todas las filas de la tabla ventas
+var VENTAS = [];          // todas las filas de la tabla ventas QUE CUENTAN (ver FAMILIAS_EXCLUIDAS)
 var MESES = [];           // claves 'YYYY-MM' con datos, ordenadas asc
 var mesSel = 'todo';      // mes en foco ('YYYY-MM' o 'todo')
 var importPendiente = []; // filas parseadas del archivo, listas para insertar
+
+// Familias que NO aplican para la meta mensual ni ninguna métrica del sistema
+// (se siguen guardando en la tabla ventas, solo se excluyen de VENTAS en memoria)
+var FAMILIAS_EXCLUIDAS = ['OTROS', 'INSUMOS', 'MATERIA'];
+function familiaExcluida(descFamilia) {
+  return FAMILIAS_EXCLUIDAS.indexOf(String(descFamilia || '').trim().toUpperCase()) !== -1;
+}
 
 var MESES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 var conIVA = false;
@@ -651,6 +658,7 @@ async function cargarVentas() {
     var lote = r.data || [];
     for (var i = 0; i < lote.length; i++) {
       var v = lote[i];
+      if (familiaExcluida(v.descripcion_familia)) continue;
       v.mes = String(v.fecha || '').slice(0, 7);
       v.total_quetzales = parseFloat(v.total_quetzales) || 0;
       v.total_unidades = parseFloat(v.total_unidades) || 0;
@@ -1145,6 +1153,7 @@ async function confirmarImport() {
 
     var nuevosMap = {};
     rows.forEach(function (r) {
+      if (familiaExcluida(r.descripcion_familia)) return;
       if (r.sku && !skusAntes[r.sku] && !nuevosMap[r.sku]) nuevosMap[r.sku] = r.descripcion || '';
     });
     var nuevos = Object.keys(nuevosMap).sort().map(function (s) { return {sku: s, desc: nuevosMap[s]}; });
