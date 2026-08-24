@@ -401,6 +401,32 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
       </div>
 
+      <!-- Recetario de SKUs — instancia única, compartida con la tab Rotación (ver moveRecetarioPanel) -->
+      <div id="recetarioSlotResumen">
+        <div class="recet-panel" id="recetarioPanel">
+          <div class="recet-phdr" onclick="toggleRecetario()">
+            <div>
+              <div class="recet-phdr-t">📋 Recetario de SKUs</div>
+              <div class="recet-phdr-s">Componentes y procesos de cada SKU facturable · base para trazabilidad completa</div>
+            </div>
+            <span class="recet-pchev" id="recetChev">▾</span>
+          </div>
+          <div class="recet-pbody" id="recetBody">
+            <div class="recet-tabs">
+              <button class="recet-tab act" id="recetTabPend" onclick="switchRecetTab('pendientes')">Pendientes (—)</button>
+              <button class="recet-tab" id="recetTabGuard" onclick="switchRecetTab('guardados')">Guardados (—)</button>
+            </div>
+            <div class="recet-inner">
+              <div class="recet-barra">
+                <input class="recet-search" id="recetSearch" placeholder="🔍 Buscar SKU o descripción..." oninput="filtrarRecetario(this.value)" autocomplete="off">
+                <span class="recet-count" id="recetCount">—</span>
+              </div>
+              <div id="recetLista"><div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">Abre el panel para cargar…</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -520,29 +546,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
       </div>
 
-      <!-- RECETARIO DE SKUs -->
-      <div class="recet-panel" id="recetarioPanel">
-        <div class="recet-phdr" onclick="toggleRecetario()">
-          <div>
-            <div class="recet-phdr-t">📋 Recetario de SKUs</div>
-            <div class="recet-phdr-s">Componentes y procesos de cada SKU facturable · base para trazabilidad completa</div>
-          </div>
-          <span class="recet-pchev" id="recetChev">▾</span>
-        </div>
-        <div class="recet-pbody" id="recetBody">
-          <div class="recet-tabs">
-            <button class="recet-tab act" id="recetTabPend" onclick="switchRecetTab('pendientes')">Pendientes (—)</button>
-            <button class="recet-tab" id="recetTabGuard" onclick="switchRecetTab('guardados')">Guardados (—)</button>
-          </div>
-          <div class="recet-inner">
-            <div class="recet-barra">
-              <input class="recet-search" id="recetSearch" placeholder="🔍 Buscar SKU o descripción..." oninput="filtrarRecetario(this.value)" autocomplete="off">
-              <span class="recet-count" id="recetCount">—</span>
-            </div>
-            <div id="recetLista"><div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">Abre el panel para cargar…</div></div>
-          </div>
-        </div>
-      </div>
+      <!-- Recetario de SKUs vive en Resumen; se reubica aquí al entrar a esta tab -->
+      <div id="recetarioSlotRotacion"></div>
 
     </div>
   </div>
@@ -680,8 +685,17 @@ function switchTab(tab) {
     document.getElementById('view-' + t).style.display = t === tab ? 'block' : 'none';
     document.getElementById('tab-' + t).classList.toggle('active', t === tab);
   });
+  if (tab === 'resumen' || tab === 'rotacion') moveRecetarioPanel(tab);
   if (tab === 'rotacion') renderRotacion();
   else renderTodo();
+}
+
+// El Recetario de SKUs es una única instancia (mismo estado/DOM) que se reubica
+// entre Resumen y Rotación según la tab activa — evita duplicar IDs y lógica.
+function moveRecetarioPanel(tab) {
+  var panel = document.getElementById('recetarioPanel');
+  var slot = document.getElementById(tab === 'rotacion' ? 'recetarioSlotRotacion' : 'recetarioSlotResumen');
+  if (panel && slot && panel.parentElement !== slot) slot.appendChild(panel);
 }
 
 // ── Selector de mes (compartido entre vistas) ───────────────────
@@ -1155,7 +1169,7 @@ function mostrarResumenImport(nLineas, fMin, fMax, nuevos) {
   var pl = nuevos.length === 1 ? '' : 's';
   document.getElementById('importBody').innerHTML =
     '<div class="imp-aviso ok">✓ ' + nLineas.toLocaleString() + ' líneas importadas (' + fMin + ' → ' + fMax + ').</div>' +
-    '<div class="imp-aviso">🆕 <b>' + nuevos.length + ' producto' + pl + ' nuevo' + pl + '</b> facturado' + pl + ' por primera vez — se agregaron al <b>Recetario de SKUs</b> (tab Rotación → Pendientes) para completar su composición.</div>' +
+    '<div class="imp-aviso">🆕 <b>' + nuevos.length + ' producto' + pl + ' nuevo' + pl + '</b> facturado' + pl + ' por primera vez — se agregaron al <b>Recetario de SKUs</b> (pestaña Pendientes) para completar su composición.</div>' +
     '<div class="imp-table-wrap"><table class="imp-table"><thead><tr><th>SKU</th><th>Producto</th></tr></thead><tbody>' + filasHtml + '</tbody></table></div>' +
     '<div style="display:flex;gap:8px;margin-top:14px">' +
       '<button class="btn btn-ven" onclick="irARecetarioDesdeImport()">📋 Ir al Recetario</button>' +
@@ -1166,7 +1180,7 @@ function mostrarResumenImport(nLineas, fMin, fMax, nuevos) {
 
 function irARecetarioDesdeImport() {
   cerrarImport();
-  switchTab('rotacion');
+  switchTab('resumen');
   var body = document.getElementById('recetBody');
   if (body && !body.classList.contains('open')) toggleRecetario();
   var panel = document.getElementById('recetarioPanel');
