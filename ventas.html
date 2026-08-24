@@ -493,9 +493,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <table class="tbl">
           <thead><tr>
             <th>#</th><th>Cliente</th>
-            <th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th><th class="num">Facturas</th><th class="num">Δ vs mes ant.</th>
+            <th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th><th class="num">Facturas</th>
+            <th class="num">Última compra</th><th class="num">Cant.</th><th class="num">Δ vs mes ant.</th>
           </tr></thead>
-          <tbody id="cliBody"><tr class="empty-row"><td colspan="7">Cargando…</td></tr></tbody>
+          <tbody id="cliBody"><tr class="empty-row"><td colspan="9">Cargando…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -675,10 +676,17 @@ function agrupar(filas, keyFn) {
   var map = {};
   filas.forEach(function (v) {
     var k = keyFn(v);
-    if (!map[k]) map[k] = { q: 0, u: 0, facturas: {}, muestra: v };
+    if (!map[k]) map[k] = { q: 0, u: 0, facturas: {}, muestra: v, ultimaFecha: null, ultimaU: 0 };
     map[k].q += v.total_quetzales;
     map[k].u += v.total_unidades;
     map[k].facturas[v.serie + '-' + v.docu] = 1;
+    // VENTAS viene ordenado por fecha asc, pero comparamos igual por si el grupo llega desordenado
+    if (!map[k].ultimaFecha || v.fecha > map[k].ultimaFecha) {
+      map[k].ultimaFecha = v.fecha;
+      map[k].ultimaU = v.total_unidades;
+    } else if (v.fecha === map[k].ultimaFecha) {
+      map[k].ultimaU += v.total_unidades;
+    }
   });
   return map;
 }
@@ -898,6 +906,8 @@ function buildCliRow(idx, nombre, dat, total, qAntMap) {
     '<td class="num pct-cell">' + fmtPct(pct) + '</td>' +
     '<td class="num">' + fmtU(dat.u) + '</td>' +
     '<td class="num">' + Object.keys(dat.facturas).length + '</td>' +
+    '<td class="num">' + (dat.ultimaFecha ? fmtFechaISO(dat.ultimaFecha) : '—') + '</td>' +
+    '<td class="num">' + (dat.ultimaFecha ? fmtU(dat.ultimaU) : '—') + '</td>' +
     '<td class="num">' + (qAntMap === null ? '<span class="pct-cell">—</span>' : deltaHtml(dat.q, delta)) + '</td>' +
     '</tr>';
 }
@@ -928,7 +938,7 @@ function renderClientes() {
   var html = '';
   noms.forEach(function (n, i) { html += buildCliRow(i + 1, n, porCli[n], total, qAntMap); });
   document.getElementById('cliBody').innerHTML = html ||
-    '<tr class="empty-row"><td colspan="7">Sin clientes en este periodo</td></tr>';
+    '<tr class="empty-row"><td colspan="9">Sin clientes en este periodo</td></tr>';
 }
 
 // ════════════════════════════════════════════════════════════════
