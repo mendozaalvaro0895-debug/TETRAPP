@@ -6672,6 +6672,7 @@ async function cargarAlertasB7() {
     var r = await db.from('insumos_b7')
       .select('sku,descripcion,existencia,stock_minimo,updated_at')
       .eq('activo', true)
+      .eq('area', 'serig')
       .not('stock_minimo', 'is', null)
       .order('existencia', { ascending: true });
     if (r.error || !r.data) return;
