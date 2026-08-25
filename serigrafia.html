@@ -669,10 +669,32 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
               <span class="b7-alert-ttl">Bajo stock — Insumos Serigrafía</span>
               <span class="b7-alert-cnt" id="b7AlertCnt">0</span>
               <span id="b7AlertFecha" style="font-size:9px;opacity:.65;white-space:nowrap;font-weight:500;margin-left:2px"></span>
+              <button class="b7-alert-btn" onclick="event.stopPropagation();abrirAddInsumoB7()" title="Añadir insumo al catálogo serigrafía">+ Añadir</button>
               <button class="b7-alert-btn" onclick="event.stopPropagation();descargarAlertasB7()" title="Descargar PDF">⬇ PDF</button>
               <span class="b7-alert-chev">▾</span>
             </div>
             <div class="b7-alert-list" id="b7AlertList"></div>
+            <!-- Panel añadir nuevo insumo (autocomplete) -->
+            <div id="b7AddPanel" style="display:none;padding:8px 12px 12px;border-top:1px solid var(--border)">
+              <div style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:6px">Buscar en Bodega 7</div>
+              <div style="position:relative">
+                <input id="b7AddInput" type="text" placeholder="SKU o descripción…" oninput="filtrarAddInsumoB7(this.value)"
+                  style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--ink);outline:none;box-sizing:border-box">
+                <div id="b7AddDrop" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--border);border-radius:0 0 6px 6px;max-height:180px;overflow-y:auto;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
+              </div>
+              <div id="b7AddSel" style="display:none;margin-top:8px;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+                <div id="b7AddSelLabel" style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:6px"></div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <label style="font-size:11px;color:var(--gray)">Stock mínimo:</label>
+                  <input id="b7AddMin" type="number" min="0" step="1" value="2"
+                    style="width:70px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;background:var(--bg);color:var(--ink)">
+                  <button onclick="confirmarAddInsumoB7()"
+                    style="padding:5px 14px;background:var(--serig-m);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer">✓ Agregar</button>
+                  <button onclick="cancelarAddInsumoB7()"
+                    style="padding:5px 10px;background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:5px;font-size:11px;cursor:pointer">Cancelar</button>
+                </div>
+              </div>
+            </div>
           </div>
           <!-- Slot para futuras alertas -->
           <div class="alertas-slot-r" id="alertasSlotR"></div>
@@ -6769,6 +6791,9 @@ function cerrarForm() {
 }
 
 var b7AlertasData = [];
+var b7TodosData   = [];
+var b7NoSerigData = [];
+var b7AddSkuSel   = null;
 
 async function cargarAlertasB7() {
   try {
@@ -6777,42 +6802,168 @@ async function cargarAlertasB7() {
       .eq('activo', true)
       .eq('area', 'serig')
       .not('stock_minimo', 'is', null)
-      .order('existencia', { ascending: true });
+      .order('descripcion', { ascending: true });
     if (r.error || !r.data) return;
 
-    // Fecha de última actualización: MAX(updated_at) de TODAS las filas traídas
+    // Fecha de última actualización
     var maxTs = null;
     r.data.forEach(function(i) { if (i.updated_at && (!maxTs || i.updated_at > maxTs)) maxTs = i.updated_at; });
     var fechaEl = document.getElementById('b7AlertFecha');
     if (fechaEl && maxTs) {
       var d = new Date(maxTs);
-      var dd = String(d.getDate()).padStart(2,'0');
-      var mm = String(d.getMonth()+1).padStart(2,'0');
-      var yyyy = d.getFullYear();
-      fechaEl.textContent = 'Inv. B7 · ' + dd + '/' + mm + '/' + yyyy;
+      fechaEl.textContent = 'Inv. B7 · ' + String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
     }
 
-    var alertas = r.data.filter(function(i) { return (i.existencia || 0) <= (i.stock_minimo || 0); });
-    var wrap = document.getElementById('b7AlertWrap');
-    if (!wrap || !alertas.length) return;
+    b7TodosData   = r.data;
+    var alertas   = r.data.filter(function(i) { return (i.existencia || 0) <= (i.stock_minimo || 0); });
     b7AlertasData = alertas;
-    var hayCero = alertas.some(function(i) { return (i.existencia || 0) === 0; });
+
+    var wrap = document.getElementById('b7AlertWrap');
+    if (!wrap) return;
     wrap.style.display = 'block';
+    var hayCero = alertas.some(function(i) { return (i.existencia || 0) === 0; });
     wrap.classList.toggle('critico-hay', hayCero);
     if (localStorage.getItem('b7_alert_collapsed') === '1') wrap.classList.add('collapsed');
     document.getElementById('b7AlertCnt').textContent = alertas.length;
-    document.getElementById('b7AlertList').innerHTML = alertas.map(function(i) {
-      var exist = i.existencia || 0;
-      var cero  = exist === 0;
-      var existFmt = exist % 1 === 0 ? exist.toLocaleString() : exist.toFixed(2);
-      var minFmt   = (i.stock_minimo || 0) % 1 === 0 ? (i.stock_minimo||0).toLocaleString() : (i.stock_minimo||0).toFixed(2);
-      return '<div class="b7-alert-row' + (cero ? ' cero' : '') + '">' +
-        '<span class="b7-alert-sku">' + escHtml(i.sku) + '</span>' +
-        '<span class="b7-alert-desc">' + escHtml(i.descripcion || '') + '</span>' +
-        '<span class="b7-alert-nums">' + existFmt + ' / mín. ' + minFmt + '</span>' +
-      '</div>';
-    }).join('');
+
+    // Ordenar lista completa: sin stock → bajo mínimo → ok
+    var todos = r.data.slice().sort(function(a, b) {
+      function tier(i) {
+        var e = i.existencia || 0, m = i.stock_minimo || 0;
+        if (e === 0) return 0;
+        if (e <= m)  return 1;
+        return 2;
+      }
+      var ta = tier(a), tb = tier(b);
+      if (ta !== tb) return ta - tb;
+      return (a.descripcion || '').localeCompare(b.descripcion || '');
+    });
+
+    document.getElementById('b7AlertList').innerHTML =
+      '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:2px">' +
+      '<thead><tr style="background:var(--bg2)">' +
+        '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);font-size:9px;font-weight:700;color:var(--gray)">SKU</th>' +
+        '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);font-size:9px;font-weight:700;color:var(--gray)">Descripción</th>' +
+        '<th style="padding:4px 8px;text-align:right;border-bottom:1px solid var(--border);font-size:9px;font-weight:700;color:var(--gray)">Existencia</th>' +
+        '<th style="padding:4px 8px;text-align:right;border-bottom:1px solid var(--border);font-size:9px;font-weight:700;color:var(--gray)">Mínimo</th>' +
+        '<th style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:9px"></th>' +
+      '</tr></thead><tbody>' +
+      todos.map(function(i) {
+        var exist = i.existencia || 0;
+        var min   = i.stock_minimo || 0;
+        var cero  = exist === 0;
+        var bajo  = !cero && exist <= min;
+        var existFmt = exist % 1 === 0 ? exist.toLocaleString() : exist.toFixed(2);
+        var minFmt   = min % 1 === 0   ? min.toLocaleString()   : min.toFixed(2);
+        var badge, rowStyle;
+        if (cero) {
+          badge = '<span style="background:#FEF2F2;color:#B83232;border-radius:4px;padding:1px 7px;font-size:9px;font-weight:800;white-space:nowrap">🔴 Sin stock</span>';
+          rowStyle = 'background:#FEF2F24A';
+        } else if (bajo) {
+          badge = '<span style="background:#FEF3C7;color:#92400e;border-radius:4px;padding:1px 7px;font-size:9px;font-weight:800;white-space:nowrap">🟡 Bajo</span>';
+          rowStyle = 'background:#FEF3C74A';
+        } else {
+          badge = '<span style="background:#D1FAE5;color:#065f46;border-radius:4px;padding:1px 7px;font-size:9px;font-weight:800;white-space:nowrap">🟢 Ok</span>';
+          rowStyle = '';
+        }
+        return '<tr style="' + rowStyle + '">' +
+          '<td style="padding:4px 8px;font-family:var(--mono);font-size:10px;color:#6d28d9;white-space:nowrap;border-bottom:1px solid var(--border)">' + escHtml(i.sku) + '</td>' +
+          '<td style="padding:4px 8px;font-size:11px;border-bottom:1px solid var(--border)">' + escHtml(i.descripcion || '') + '</td>' +
+          '<td style="padding:4px 8px;text-align:right;font-weight:700;font-size:11px;color:' + (cero?'#B83232':bajo?'#92400e':'var(--ink)') + ';border-bottom:1px solid var(--border)">' + existFmt + '</td>' +
+          '<td style="padding:4px 8px;text-align:right;font-size:10px;color:var(--gray);border-bottom:1px solid var(--border)">' + minFmt + '</td>' +
+          '<td style="padding:4px 8px;border-bottom:1px solid var(--border)">' + badge + '</td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table>';
   } catch(e) { /* silencioso */ }
+}
+
+async function abrirAddInsumoB7() {
+  var panel = document.getElementById('b7AddPanel');
+  if (!panel) return;
+  var abierto = panel.style.display !== 'none';
+  if (abierto) { cancelarAddInsumoB7(); return; }
+  // Asegurar que el bloque esté expandido
+  var wrap = document.getElementById('b7AlertWrap');
+  if (wrap && wrap.classList.contains('collapsed')) toggleB7Alert();
+  panel.style.display = 'block';
+  document.getElementById('b7AddInput').value = '';
+  document.getElementById('b7AddDrop').style.display = 'none';
+  document.getElementById('b7AddSel').style.display = 'none';
+  b7AddSkuSel = null;
+  // Cargar insumos de B7 que NO son serig
+  if (!b7NoSerigData.length) {
+    var r = await db.from('insumos_b7')
+      .select('sku,descripcion,existencia,stock_minimo')
+      .eq('activo', true)
+      .neq('area', 'serig')
+      .order('descripcion', { ascending: true })
+      .limit(500);
+    b7NoSerigData = r.data || [];
+  }
+  document.getElementById('b7AddInput').focus();
+}
+
+function filtrarAddInsumoB7(q) {
+  var drop = document.getElementById('b7AddDrop');
+  if (!drop) return;
+  document.getElementById('b7AddSel').style.display = 'none';
+  b7AddSkuSel = null;
+  if (!q || q.length < 2) { drop.style.display = 'none'; return; }
+  var ql = q.toLowerCase();
+  var matches = b7NoSerigData.filter(function(i) {
+    return (i.sku || '').toLowerCase().indexOf(ql) >= 0 ||
+           (i.descripcion || '').toLowerCase().indexOf(ql) >= 0;
+  }).slice(0, 15);
+  if (!matches.length) {
+    drop.style.display = 'block';
+    drop.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--gray);font-style:italic">Sin resultados</div>';
+    return;
+  }
+  drop.style.display = 'block';
+  drop.innerHTML = matches.map(function(i) {
+    var exist = (i.existencia || 0);
+    var existStr = exist % 1 === 0 ? exist.toLocaleString() : exist.toFixed(2);
+    return '<div onclick="seleccionarAddInsumoB7(\'' + escHtml(i.sku) + '\',\'' + escHtml((i.descripcion||'').replace(/'/g,"&#39;")) + '\',' + exist + ')" ' +
+      'style="padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px" ' +
+      'onmouseover="this.style.background=\'var(--bg2)\'" onmouseout="this.style.background=\'\'">' +
+      '<span><span style="font-family:var(--mono);font-size:10px;color:#6d28d9;margin-right:8px">' + escHtml(i.sku) + '</span>' +
+      '<span style="font-size:11px">' + escHtml(i.descripcion || '') + '</span></span>' +
+      '<span style="font-size:10px;color:var(--gray);white-space:nowrap">exist. ' + existStr + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function seleccionarAddInsumoB7(sku, desc, exist) {
+  b7AddSkuSel = sku;
+  document.getElementById('b7AddDrop').style.display = 'none';
+  document.getElementById('b7AddInput').value = sku + ' — ' + desc;
+  var sel = document.getElementById('b7AddSel');
+  document.getElementById('b7AddSelLabel').textContent = sku + ' · ' + desc + ' (existencia actual: ' + exist + ')';
+  var minSugerido = (b7NoSerigData.find(function(i){ return i.sku === sku; }) || {}).stock_minimo || 2;
+  document.getElementById('b7AddMin').value = minSugerido;
+  sel.style.display = 'block';
+}
+
+async function confirmarAddInsumoB7() {
+  if (!b7AddSkuSel) return;
+  var min = parseFloat(document.getElementById('b7AddMin').value) || 0;
+  try {
+    var r = await db.from('insumos_b7').update({ area: 'serig', stock_minimo: min, activo: true }).eq('sku', b7AddSkuSel);
+    if (r.error) throw r.error;
+    b7NoSerigData = b7NoSerigData.filter(function(i){ return i.sku !== b7AddSkuSel; });
+    cancelarAddInsumoB7();
+    await cargarAlertasB7();
+    showToast('✅ ' + b7AddSkuSel + ' agregado al catálogo de serigrafía');
+  } catch(e) { showToast('❌ Error al agregar insumo', '#B83232'); }
+}
+
+function cancelarAddInsumoB7() {
+  var panel = document.getElementById('b7AddPanel');
+  if (panel) panel.style.display = 'none';
+  document.getElementById('b7AddDrop').style.display = 'none';
+  document.getElementById('b7AddSel').style.display = 'none';
+  b7AddSkuSel = null;
 }
 
 function toggleB7Alert() {
