@@ -6871,7 +6871,7 @@ async function cargarAlertasB7() {
           '<td style="padding:4px 8px;font-family:var(--mono);font-size:10px;color:#6d28d9;white-space:nowrap;border-bottom:1px solid var(--border)">' + escHtml(i.sku) + '</td>' +
           '<td style="padding:4px 8px;font-size:11px;border-bottom:1px solid var(--border)">' + escHtml(i.descripcion || '') + '</td>' +
           '<td style="padding:4px 8px;text-align:right;font-weight:700;font-size:11px;color:' + (cero?'#B83232':bajo?'#92400e':'var(--ink)') + ';border-bottom:1px solid var(--border)">' + existFmt + '</td>' +
-          '<td style="padding:4px 8px;text-align:right;font-size:10px;color:var(--gray);border-bottom:1px solid var(--border)">' + minFmt + '</td>' +
+          '<td id="b7min_' + escHtml(i.sku) + '" style="padding:4px 8px;text-align:right;font-size:10px;color:var(--gray);border-bottom:1px solid var(--border);cursor:pointer" title="Clic para editar mínimo" onclick="activarEditMinB7(\'' + escHtml(i.sku) + '\',' + min + ')">' + minFmt + ' ✏</td>' +
           '<td style="padding:4px 8px;border-bottom:1px solid var(--border)">' + badge + '</td>' +
         '</tr>';
       }).join('') +
@@ -6974,6 +6974,41 @@ function cancelarAddInsumoB7() {
   if (sel) sel.style.display = 'none';
   b7AddSkuSel = null;
 }
+function activarEditMinB7(sku, minActual) {
+  var td = document.getElementById('b7min_' + sku);
+  if (!td) return;
+  td.onclick = null;
+  td.style.cursor = 'default';
+  td.innerHTML =
+    '<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">' +
+      '<input id="b7minInput_' + escHtml(sku) + '" type="number" min="0" step="1" value="' + minActual + '" ' +
+        'style="width:60px;padding:2px 5px;border:1px solid var(--serig-m);border-radius:4px;font-size:11px;text-align:right;background:var(--bg);color:var(--ink)" ' +
+        'onkeydown="if(event.key===\'Enter\')guardarMinB7(\'' + escHtml(sku) + '\');if(event.key===\'Escape\')cargarAlertasB7()">' +
+      '<button onclick="guardarMinB7(\'' + escHtml(sku) + '\')" title="Guardar" ' +
+        'style="padding:2px 6px;background:var(--serig-m);color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-weight:700">✓</button>' +
+      '<button onclick="cargarAlertasB7()" title="Cancelar" ' +
+        'style="padding:2px 6px;background:var(--bg2);color:var(--gray);border:1px solid var(--border);border-radius:4px;font-size:11px;cursor:pointer">✕</button>' +
+    '</div>';
+  var inp = document.getElementById('b7minInput_' + sku);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+async function guardarMinB7(sku) {
+  var inp = document.getElementById('b7minInput_' + sku);
+  if (!inp) return;
+  var nuevoMin = parseFloat(inp.value);
+  if (isNaN(nuevoMin) || nuevoMin < 0) { showToast('Valor inválido', '#B83232'); return; }
+  try {
+    var r = await db.from('insumos_b7').update({ stock_minimo: nuevoMin }).eq('sku', sku);
+    if (r.error) throw r.error;
+    // Actualizar cache local para que la recarga sea inmediata
+    var item = b7TodosData.find(function(i){ return i.sku === sku; });
+    if (item) item.stock_minimo = nuevoMin;
+    await cargarAlertasB7();
+    showToast('✅ Mínimo de ' + sku + ' actualizado a ' + nuevoMin);
+  } catch(e) { showToast('❌ Error al guardar', '#B83232'); }
+}
+
 // Cerrar dropdown B7 al hacer clic fuera
 document.addEventListener('click', function(e) {
   var input = document.getElementById('b7AddInput');
