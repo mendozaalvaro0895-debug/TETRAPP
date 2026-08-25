@@ -729,6 +729,16 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
         <!-- Sin asignar (full width, debajo de líneas) -->
         <div id="boardSin" style="margin-bottom:18px"></div>
 
+        <!-- Archivo (soft-deleted) -->
+        <div style="margin-bottom:18px">
+          <div onclick="abrirArchivo()" style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;user-select:none">
+            <span id="archivoChev" style="font-size:11px;color:var(--gray)">▶</span>
+            <span style="font-size:13px;font-weight:700;color:var(--gray)">📦 Archivo</span>
+            <span style="font-size:11px;color:var(--gray-l)">Solicitudes archivadas — clic para ver y restaurar</span>
+          </div>
+          <div id="archivoBody" style="display:none;padding:12px 4px 4px"></div>
+        </div>
+
         <!-- Entregados -->
         <div class="sec-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
           <div>
@@ -1685,6 +1695,8 @@ function decodeMeta(notas) {
 
 // ── Estado global ────────────────────────────────────────────
 var solicitudes = [];
+var solicitudesArchivadas = [];
+var archivoCargado = false;
 var selId = null;
 var lineas = [];
 var inventarioCache = [];
@@ -1805,6 +1817,7 @@ async function cargarSolicitudes() {
       .from('solicitudes')
       .select('*, solicitud_lineas(*)')
       .eq('area','serig')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     if (r.error) throw r.error;
 
@@ -6587,18 +6600,108 @@ async function actualizarProg(id) {
 }
 
 async function confirmarBorrar(id) {
-  if (!confirm('¿Eliminar esta solicitud? Esta acción no se puede deshacer.')) return;
+  if (!confirm('¿Archivar esta solicitud? Podrás restaurarla desde el Archivo en el board.')) return;
   var s = solicitudes.find(function(x) { return x.id === id; });
   if (s && s.dbId) {
     try {
-      await db.from('solicitud_lineas').delete().eq('solicitud_id', s.dbId);
-      await db.from('solicitudes').delete().eq('id', s.dbId);
+      var ahora = new Date().toISOString();
+      await db.from('solicitudes').update({ deleted_at: ahora }).eq('id', s.dbId);
+      await db.from('solicitud_lineas').update({ deleted_at: ahora }).eq('solicitud_id', s.dbId);
       solicitudes = solicitudes.filter(function(x) { return x.id !== id; });
+      archivoCargado = false; // forzar recarga del archivo en próxima apertura
       cerrarDetalleModal();
       renderBoard();
-      showToast('🗑 Solicitud eliminada');
-    } catch(e) { showToast('❌ Error al eliminar', '#B83232'); }
+      showToast('📦 Solicitud archivada — visible en Archivo del board');
+    } catch(e) { showToast('❌ Error al archivar', '#B83232'); }
   }
+}
+
+async function abrirArchivo() {
+  var el = document.getElementById('archivoBody');
+  var ico = document.getElementById('archivoChev');
+  if (!el) return;
+  var abierto = el.style.display !== 'none';
+  if (abierto) {
+    el.style.display = 'none';
+    if (ico) ico.textContent = '▶';
+    return;
+  }
+  el.style.display = 'block';
+  if (ico) ico.textContent = '▼';
+  if (archivoCargado) return;
+  el.innerHTML = '<p style="color:var(--gray);font-size:12px;padding:8px 0">Cargando...</p>';
+  try {
+    var r = await db.from('solicitudes')
+      .select('*, solicitud_lineas(*)')
+      .eq('area', 'serig')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false })
+      .limit(100);
+    if (r.error) throw r.error;
+    solicitudesArchivadas = (r.data || []).map(function(s) {
+      var ld = s.solicitud_lineas || [];
+      var descPrimera = ld[0] ? (ld[0].descripcion || '—') : '—';
+      var descExtra   = ld.length > 1 ? ' (+' + (ld.length - 1) + ')' : '';
+      return {
+        id: s.id, dbId: s.id,
+        id_display: s.codigo,
+        cliente: s.cliente_nombre || '—',
+        desc: ld.length <= 1 ? descPrimera : descPrimera + descExtra,
+        cant: ld.reduce(function(sum,l){ return sum+(l.cantidad||0); }, 0),
+        estado: s.estado,
+        deleted_at: s.deleted_at,
+        created_at: s.created_at
+      };
+    });
+    archivoCargado = true;
+    renderArchivoBody(el);
+  } catch(e) {
+    el.innerHTML = '<p style="color:var(--red);font-size:12px">Error al cargar archivo</p>';
+  }
+}
+
+function renderArchivoBody(el) {
+  if (!el) el = document.getElementById('archivoBody');
+  if (!el) return;
+  if (!solicitudesArchivadas.length) {
+    el.innerHTML = '<p style="color:var(--gray);font-size:12px;padding:8px 0;font-style:italic">No hay solicitudes archivadas</p>';
+    return;
+  }
+  var filas = solicitudesArchivadas.map(function(s) {
+    var d = new Date(s.deleted_at);
+    var fechaArch = String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+    return '<tr>' +
+      '<td style="font-family:var(--mono);font-size:10px;font-weight:700;color:#6d28d9;white-space:nowrap">' + escHtml(s.id_display||s.id.slice(0,8)) + '</td>' +
+      '<td style="font-size:11px;font-weight:700">' + escHtml(s.cliente) + '</td>' +
+      '<td style="font-size:10px;color:#374151">' + escHtml(s.desc) + '</td>' +
+      '<td style="text-align:right;font-size:10px">' + (s.cant||0).toLocaleString() + ' und</td>' +
+      '<td style="font-size:10px;color:#6b7280;white-space:nowrap">' + fechaArch + '</td>' +
+      '<td><button onclick="restaurarSolicitud(\'' + s.id + '\')" style="font-size:10px;padding:3px 10px;background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:4px;cursor:pointer;font-weight:700">↩ Restaurar</button></td>' +
+    '</tr>';
+  }).join('');
+  el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
+    '<thead><tr style="background:#f8fafc">' +
+      '<th style="padding:5px 8px;text-align:left;border:1px solid #e2e8f0;font-size:9px">Código</th>' +
+      '<th style="padding:5px 8px;text-align:left;border:1px solid #e2e8f0;font-size:9px">Cliente</th>' +
+      '<th style="padding:5px 8px;text-align:left;border:1px solid #e2e8f0;font-size:9px">Descripción</th>' +
+      '<th style="padding:5px 8px;text-align:right;border:1px solid #e2e8f0;font-size:9px">Cant.</th>' +
+      '<th style="padding:5px 8px;text-align:left;border:1px solid #e2e8f0;font-size:9px">Archivada</th>' +
+      '<th style="padding:5px 8px;border:1px solid #e2e8f0;font-size:9px"></th>' +
+    '</tr></thead>' +
+    '<tbody>' + filas + '</tbody></table>';
+}
+
+async function restaurarSolicitud(id) {
+  var s = solicitudesArchivadas.find(function(x){ return x.id === id; });
+  if (!s) return;
+  try {
+    await db.from('solicitudes').update({ deleted_at: null }).eq('id', s.dbId);
+    await db.from('solicitud_lineas').update({ deleted_at: null }).eq('solicitud_id', s.dbId);
+    solicitudesArchivadas = solicitudesArchivadas.filter(function(x){ return x.id !== id; });
+    renderArchivoBody(null);
+    await cargarSolicitudes();
+    showToast('✅ Solicitud restaurada al board');
+  } catch(e) { showToast('❌ Error al restaurar', '#B83232'); }
 }
 
 // ════════════════════════════════════════════════════════════
