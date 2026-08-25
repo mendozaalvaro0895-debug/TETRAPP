@@ -677,11 +677,12 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
             <!-- Panel añadir nuevo insumo (autocomplete) -->
             <div id="b7AddPanel" style="display:none;padding:8px 12px 12px;border-top:1px solid var(--border)">
               <div style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:6px">Buscar en Bodega 7</div>
-              <div style="position:relative">
+              <div>
                 <input id="b7AddInput" type="text" placeholder="SKU o descripción…" oninput="filtrarAddInsumoB7(this.value)"
                   style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--ink);outline:none;box-sizing:border-box">
-                <div id="b7AddDrop" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--border);border-radius:0 0 6px 6px;max-height:180px;overflow-y:auto;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
               </div>
+              <!-- Dropdown global — fixed para escapar del overflow:hidden del wrapper -->
+              <div id="b7AddDrop" style="display:none;position:fixed;background:var(--bg);border:1px solid var(--border);border-radius:6px;max-height:220px;overflow-y:auto;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.18)"></div>
               <div id="b7AddSel" style="display:none;margin-top:8px;padding:8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
                 <div id="b7AddSelLabel" style="font-size:11px;font-weight:700;color:var(--ink);margin-bottom:6px"></div>
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -6905,11 +6906,17 @@ async function abrirAddInsumoB7() {
 }
 
 function filtrarAddInsumoB7(q) {
-  var drop = document.getElementById('b7AddDrop');
-  if (!drop) return;
+  var drop  = document.getElementById('b7AddDrop');
+  var input = document.getElementById('b7AddInput');
+  if (!drop || !input) return;
   document.getElementById('b7AddSel').style.display = 'none';
   b7AddSkuSel = null;
   if (!q || q.length < 2) { drop.style.display = 'none'; return; }
+  // Posicionar dropdown bajo el input (fixed, escapa overflow:hidden)
+  var rect = input.getBoundingClientRect();
+  drop.style.top   = (rect.bottom + 2) + 'px';
+  drop.style.left  = rect.left + 'px';
+  drop.style.width = rect.width + 'px';
   var ql = q.toLowerCase();
   var matches = b7NoSerigData.filter(function(i) {
     return (i.sku || '').toLowerCase().indexOf(ql) >= 0 ||
@@ -6917,7 +6924,7 @@ function filtrarAddInsumoB7(q) {
   }).slice(0, 15);
   if (!matches.length) {
     drop.style.display = 'block';
-    drop.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--gray);font-style:italic">Sin resultados</div>';
+    drop.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--gray);font-style:italic">Sin resultados en B7</div>';
     return;
   }
   drop.style.display = 'block';
@@ -6961,10 +6968,21 @@ async function confirmarAddInsumoB7() {
 function cancelarAddInsumoB7() {
   var panel = document.getElementById('b7AddPanel');
   if (panel) panel.style.display = 'none';
-  document.getElementById('b7AddDrop').style.display = 'none';
-  document.getElementById('b7AddSel').style.display = 'none';
+  var drop = document.getElementById('b7AddDrop');
+  if (drop) drop.style.display = 'none';
+  var sel = document.getElementById('b7AddSel');
+  if (sel) sel.style.display = 'none';
   b7AddSkuSel = null;
 }
+// Cerrar dropdown B7 al hacer clic fuera
+document.addEventListener('click', function(e) {
+  var input = document.getElementById('b7AddInput');
+  var drop  = document.getElementById('b7AddDrop');
+  if (!drop || drop.style.display === 'none') return;
+  if (input && input.contains(e.target)) return;
+  if (drop.contains(e.target)) return;
+  drop.style.display = 'none';
+});
 
 function toggleB7Alert() {
   var wrap = document.getElementById('b7AlertWrap');
