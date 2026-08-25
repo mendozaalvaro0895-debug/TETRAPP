@@ -1940,6 +1940,7 @@ var asistLocked    = true;       // tabla de asistencia bloqueada por defecto (e
 var MATRIZ_DIA_TABLE = 'matriz_dia_serig'; // posición de matriz por día — SEPARADA de asistencia
 var prodMesNav        = null;  // null = mes actual; 'YYYY-MM' = mes seleccionado en el gráfico
 var prodCompararActivo = false; // mostrar gráfica del mes anterior alineada debajo
+var prodVistaLinea    = false;  // true = línea acumulada; false = barras diarias
 var ausentesHoy    = {};         // { codigo: true } — se carga al init y al marcar asistencia
 var asistHoyCache  = {};         // { codigo: estado } — refleja la fecha del widget
 var asistHoyRolCache = {};       // { codigo: rol }   — rol guardado para la fecha del widget
@@ -3582,6 +3583,125 @@ function toggleProdComparar() {
   renderProdMensual();
 }
 
+function toggleProdVistaLinea() {
+  prodVistaLinea = !prodVistaLinea;
+  renderProdMensual();
+}
+
+function _buildLineaAcumSvg(opts) {
+  var SVG_W = 700, SVG_H = 210;
+  var PAD_L = 58, PAD_R = 12, PAD_T = 22, PAD_B = 34;
+  var PW = SVG_W - PAD_L - PAD_R;
+  var PH = SVG_H - PAD_T - PAD_B;
+
+  var N  = opts.dias;
+  var NP = opts.diasPrev || 0;
+  var maxN = NP ? Math.max(N, NP) : N;
+
+  var cumAct = [], runA = 0;
+  for (var da = 1; da <= N; da++) {
+    var keyA = opts.ym + '-' + String(da).padStart(2, '0');
+    if (keyA <= opts.todayStr) runA += (opts.porFecha[keyA] || 0);
+    cumAct.push(runA);
+  }
+
+  var cumPrev = [];
+  if (opts.prevYm) {
+    var runP = 0;
+    for (var dp = 1; dp <= NP; dp++) {
+      runP += (opts.porFechaPrev[opts.prevYm + '-' + String(dp).padStart(2, '0')] || 0);
+      cumPrev.push(runP);
+    }
+  }
+
+  var maxCum = Math.max(
+    cumAct.length ? cumAct[cumAct.length - 1] : 0,
+    cumPrev.length ? cumPrev[cumPrev.length - 1] : 0,
+    1
+  );
+
+  var xFn = function(d) {
+    if (maxN <= 1) return PAD_L + PW / 2;
+    return PAD_L + ((d - 1) / (maxN - 1)) * PW;
+  };
+  var yFn = function(v) {
+    return PAD_T + PH - (v / maxCum) * PH;
+  };
+
+  var todayDay = opts.ym === opts.todayStr.slice(0, 7) ? parseInt(opts.todayStr.slice(8)) : N;
+  var sliceLen = Math.min(todayDay, N);
+
+  var svg = '<svg viewBox="0 0 ' + SVG_W + ' ' + SVG_H + '" width="100%" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible">';
+
+  // Líneas de cuadrícula horizontales
+  [0, 0.25, 0.5, 0.75, 1].forEach(function(t) {
+    var gy = yFn(t * maxCum);
+    var gv = Math.round(t * maxCum);
+    var gl = gv >= 10000 ? Math.round(gv / 1000) + 'k' : gv >= 1000 ? (gv / 1000).toFixed(1) + 'k' : gv;
+    svg += '<line x1="' + PAD_L + '" y1="' + gy.toFixed(1) + '" x2="' + (PAD_L + PW) + '" y2="' + gy.toFixed(1) + '" stroke="var(--border)" stroke-width="' + (t === 0 ? '1.5' : '0.6') + '"' + (t > 0 ? ' stroke-dasharray="3,4"' : '') + '/>';
+    svg += '<text x="' + (PAD_L - 6) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end" font-size="8" fill="var(--gray-l)">' + gl + '</text>';
+  });
+
+  // Etiquetas eje X (cada 5 días)
+  for (var dlbl = 1; dlbl <= maxN; dlbl++) {
+    if (dlbl === 1 || dlbl % 5 === 0 || dlbl === maxN) {
+      var lx = xFn(dlbl);
+      var baseY = PAD_T + PH;
+      svg += '<line x1="' + lx.toFixed(1) + '" y1="' + baseY + '" x2="' + lx.toFixed(1) + '" y2="' + (baseY + 4) + '" stroke="var(--border)" stroke-width="1"/>';
+      svg += '<text x="' + lx.toFixed(1) + '" y="' + (baseY + 14) + '" text-anchor="middle" font-size="8" fill="var(--gray-l)">' + dlbl + '</text>';
+    }
+  }
+
+  // Leyenda (modo comparar)
+  if (opts.prevYm && opts.prevLabel) {
+    var cumPrevTotal = cumPrev.length ? cumPrev[cumPrev.length - 1] : 0;
+    var cumActTotal  = sliceLen > 0 ? cumAct[sliceLen - 1] : 0;
+    svg += '<line x1="' + PAD_L + '" y1="10" x2="' + (PAD_L + 18) + '" y2="10" stroke="#94a3b8" stroke-width="2" stroke-dasharray="5,3"/>';
+    svg += '<text x="' + (PAD_L + 24) + '" y="14" font-size="9" fill="#94a3b8">' + opts.prevLabel + ' — ' + cumPrevTotal.toLocaleString() + ' und</text>';
+    svg += '<line x1="' + (PAD_L + 230) + '" y1="10" x2="' + (PAD_L + 248) + '" y2="10" stroke="var(--serig-m)" stroke-width="2.5"/>';
+    svg += '<text x="' + (PAD_L + 254) + '" y="14" font-size="9" fill="var(--serig-m)">' + opts.mesLabel + ' — ' + cumActTotal.toLocaleString() + ' und</text>';
+  }
+
+  // Línea mes anterior (gris punteada)
+  if (cumPrev.length) {
+    var ptsPrev = cumPrev.map(function(v, i) { return xFn(i + 1).toFixed(1) + ',' + yFn(v).toFixed(1); }).join(' ');
+    svg += '<polyline points="' + ptsPrev + '" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5,3" opacity="0.85"/>';
+    cumPrev.forEach(function(v, i) {
+      var d2 = i + 1;
+      var dv = (opts.porFechaPrev[opts.prevYm + '-' + String(d2).padStart(2, '0')] || 0);
+      if (dv > 0 || d2 === NP) {
+        svg += '<circle cx="' + xFn(d2).toFixed(1) + '" cy="' + yFn(v).toFixed(1) + '" r="2.5" fill="#94a3b8" stroke="var(--card)" stroke-width="1"><title>Día ' + d2 + ' (' + (opts.prevLabel || '') + '): +' + dv.toLocaleString() + ' | Acum: ' + v.toLocaleString() + '</title></circle>';
+      }
+    });
+  }
+
+  // Área y línea mes actual
+  if (sliceLen > 0) {
+    var cumSlice = cumAct.slice(0, sliceLen);
+    var x1act = xFn(1), xLastAct = xFn(sliceLen), baseYp = PAD_T + PH;
+    var areaD = 'M' + x1act.toFixed(1) + ',' + baseYp.toFixed(1);
+    cumSlice.forEach(function(v, i) { areaD += ' L' + xFn(i + 1).toFixed(1) + ',' + yFn(v).toFixed(1); });
+    areaD += ' L' + xLastAct.toFixed(1) + ',' + baseYp.toFixed(1) + ' Z';
+    svg += '<path d="' + areaD + '" fill="var(--serig-m)" opacity="0.07"/>';
+
+    var ptsAct = cumSlice.map(function(v, i) { return xFn(i + 1).toFixed(1) + ',' + yFn(v).toFixed(1); }).join(' ');
+    svg += '<polyline points="' + ptsAct + '" fill="none" stroke="var(--serig-m)" stroke-width="2.5" stroke-linejoin="round"/>';
+
+    cumSlice.forEach(function(v, i) {
+      var d3 = i + 1;
+      var key3 = opts.ym + '-' + String(d3).padStart(2, '0');
+      var dv3 = (opts.porFecha[key3] || 0);
+      if (dv3 > 0 || d3 === sliceLen) {
+        var r3 = d3 === sliceLen ? '4' : '3';
+        svg += '<circle cx="' + xFn(d3).toFixed(1) + '" cy="' + yFn(v).toFixed(1) + '" r="' + r3 + '" fill="var(--serig-m)" stroke="var(--card)" stroke-width="1.5"><title>Día ' + d3 + ': +' + dv3.toLocaleString() + ' und | Acum: ' + v.toLocaleString() + '</title></circle>';
+      }
+    });
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
 function renderProdMensual() {
   var cont = document.getElementById('prodMensual');
   if (!cont) return;
@@ -3676,6 +3796,7 @@ function renderProdMensual() {
 
   var _btnNavStyle = 'background:none;border:1px solid var(--border);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:13px;color:var(--ink);line-height:1';
   var _btnCmpStyle = 'border:1px solid ' + (prodCompararActivo ? 'var(--serig-m)' : 'var(--border)') + ';border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:' + (prodCompararActivo ? '700' : '400') + ';color:' + (prodCompararActivo ? 'var(--serig-m)' : 'var(--ink)') + ';background:' + (prodCompararActivo ? 'var(--serig-l)' : 'none') + ';line-height:1;white-space:nowrap';
+  var _btnAcumStyle = 'border:1px solid ' + (prodVistaLinea ? 'var(--serig-m)' : 'var(--border)') + ';border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:' + (prodVistaLinea ? '700' : '400') + ';color:' + (prodVistaLinea ? 'var(--serig-m)' : 'var(--ink)') + ';background:' + (prodVistaLinea ? 'var(--serig-l)' : 'none') + ';line-height:1;white-space:nowrap';
 
   var chartHtml = '';
   if (prodCompararActivo) {
@@ -3751,27 +3872,44 @@ function renderProdMensual() {
       barsAct += _cmpBar(selMes, dd, faAct <= todayStr ? (porFecha[faAct] || 0) : 0, false);
     }
 
-    chartHtml =
-      _rowLabel(prevLabel, totalPrev, promPrev, '#64748b') +
-      '<div id="prodChartScrollPrev" style="overflow-x:auto;scrollbar-width:thin;padding:0 14px 4px">' +
-        '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:max-content">' + barsPrev + '</div>' +
-      '</div>' +
-      '<div style="margin:2px 14px 4px;border-top:2px solid var(--border)"></div>' +
-      _rowLabel(mesStr, totalMes, promDia, 'var(--serig-m)') +
-      '<div id="prodChartScrollAct" style="overflow-x:auto;scrollbar-width:thin;padding:0 14px 4px">' +
-        '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:max-content">' + barsAct + '</div>' +
-      '</div>';
+    if (prodVistaLinea) {
+      chartHtml = '<div style="padding:8px 14px">' + _buildLineaAcumSvg({
+        ym: selMes, dias: diasMes, porFecha: porFecha, todayStr: todayStr,
+        mesLabel: mesStr,
+        prevYm: prevYM, diasPrev: diasPrev, porFechaPrev: porFechaPrev,
+        prevLabel: prevLabel
+      }) + '</div>';
+    } else {
+      chartHtml =
+        _rowLabel(prevLabel, totalPrev, promPrev, '#64748b') +
+        '<div id="prodChartScrollPrev" style="overflow-x:auto;scrollbar-width:thin;padding:0 14px 4px">' +
+          '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:max-content">' + barsPrev + '</div>' +
+        '</div>' +
+        '<div style="margin:2px 14px 4px;border-top:2px solid var(--border)"></div>' +
+        _rowLabel(mesStr, totalMes, promDia, 'var(--serig-m)') +
+        '<div id="prodChartScrollAct" style="overflow-x:auto;scrollbar-width:thin;padding:0 14px 4px">' +
+          '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:max-content">' + barsAct + '</div>' +
+        '</div>';
+    }
   } else {
-    chartHtml =
-      '<div class="prod-mens-chart" id="prodChartScroll" style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px;max-width:715px">' +
-        '<div style="display:flex;align-items:flex-end;gap:3px;min-height:210px;width:max-content">' + cols + '</div>' +
-      '</div>';
+    if (prodVistaLinea) {
+      chartHtml = '<div style="padding:8px 14px">' + _buildLineaAcumSvg({
+        ym: selMes, dias: diasMes, porFecha: porFecha, todayStr: todayStr,
+        mesLabel: mesStr
+      }) + '</div>';
+    } else {
+      chartHtml =
+        '<div class="prod-mens-chart" id="prodChartScroll" style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px;max-width:715px">' +
+          '<div style="display:flex;align-items:flex-end;gap:3px;min-height:210px;width:max-content">' + cols + '</div>' +
+        '</div>';
+    }
   }
 
   cont.innerHTML = '<div class="prod-mens-wrap">' +
     '<div class="prod-mens-hdr">' +
       '<span style="font-size:12px;font-weight:800">📦 Producción mensual</span>' +
       '<div style="display:flex;align-items:center;gap:6px">' +
+        '<button onclick="toggleProdVistaLinea()" style="' + _btnAcumStyle + '" title="Acumulado día a día">📈 Acumulado</button>' +
         '<button onclick="toggleProdComparar()" style="' + _btnCmpStyle + '" title="Comparar con mes anterior">📊 Comparar</button>' +
         '<button onclick="navegarProdMes(-1)" style="' + _btnNavStyle + '" title="Mes anterior">◀</button>' +
         '<span style="font-size:11px;font-weight:700;color:var(--ink);text-transform:capitalize;min-width:120px;text-align:center">' + mesStr + '</span>' +
