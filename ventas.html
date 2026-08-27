@@ -254,6 +254,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rc-foto-btn{padding:6px 14px;border:1.5px solid var(--border);border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;color:var(--ink);transition:all .15s}
 .rc-foto-btn:hover{border-color:var(--ven);color:var(--ven)}
 .rc-foto-status{font-size:11px;color:var(--gray)}
+/* especificaciones técnicas */
+.rce-wrap{padding:10px 14px;border-top:1px solid var(--bg2)}
+.rce-hdr-title{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);margin-bottom:8px}
+.rce-row{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;margin-bottom:6px}
+.rce-lbl{font-size:11px;font-weight:700;color:var(--gray-l)}
+.rce-in{padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:var(--font);outline:none;width:100%;box-sizing:border-box;transition:border-color .15s}
+.rce-in:focus{border-color:var(--ven)}
+.rce-meta{font-size:10px;color:var(--gray-l);margin:4px 0 8px}
+.rce-foot{display:flex;align-items:center;gap:10px}
+@media(max-width:600px){.rce-row{grid-template-columns:90px 1fr}}
 /* pie de card (guardar / deshacer) */
 .rc-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg);border-radius:0 0 9px 9px}
 .rc-save-btn{padding:6px 18px;background:var(--ven);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);transition:opacity .15s}
@@ -1379,8 +1389,18 @@ var RECET_VISIBLE = 30;
 var RECET_TAB = 'pendientes';
 var INV_REC = [];          // [{sku, descripcion}] de inventario + ventas para autocomplete
 var RECET_SID_SKU = {};    // sid -> sku_fact
+var ESPECS_MAP = {};       // sku -> {campo -> {valor, nota, actualizado_por, actualizado_en}}
 
 var PROCESOS_FIJOS = ['Armado','Liner','Banda','Flameado','Impresión','Empaque','Serigrafía','Revisado','Limpiar pestaña','Apoyo'];
+var AREA_LABELS = {tapas:'Tapas', serigrafia:'Serigrafía', produccion:'Producción'};
+
+// Ficha técnica por área — Fase 2 del Recetario unificado. Agregar un campo acá
+// no requiere migración: sku_especificaciones guarda cualquier texto en `campo`.
+var CAMPOS_POR_AREA = {
+  tapas: ['Familia', 'Accesorios', 'Procesos'],
+  serigrafia: ['Tiros', 'Colores', 'Fórmula de tinta', 'Procesos', 'Empaque'],
+  produccion: ['Materia prima', 'Colorante', 'Mezcla', 'Peso', 'Detalles técnicos']
+};
 
 function safeSku(sku) { return String(sku).replace(/[^a-zA-Z0-9]/g, '_'); }
 
@@ -1466,9 +1486,21 @@ async function cargarRecetario() {
     });
   }
 
-  // Si falló la carga de recetas/partes, no marcamos como "cargado": al volver a
-  // abrir el panel (sin recargar la página) reintenta en vez de mostrarlo vacío para siempre.
-  RECETARIO_CARGADO = !rr.error && !rp.error;
+  // 5. Especificaciones técnicas (Fase 2 — peso, material, tiros, etc. por área)
+  var re = await db.from('sku_especificaciones').select('sku,area,campo,valor,nota,actualizado_por,actualizado_en');
+  ESPECS_MAP = {};
+  if (re.error) {
+    toast('⛔ No se pudieron cargar las especificaciones técnicas: ' + re.error.message + ' — probablemente falta correr sql/sku_especificaciones_v1.sql en Supabase', 'err');
+  } else {
+    (re.data || []).forEach(function(e) {
+      if (!ESPECS_MAP[e.sku]) ESPECS_MAP[e.sku] = {};
+      ESPECS_MAP[e.sku][e.campo] = e;
+    });
+  }
+
+  // Si falló alguna carga, no marcamos como "cargado": al volver a abrir el
+  // panel (sin recargar la página) reintenta en vez de mostrarlo vacío para siempre.
+  RECETARIO_CARGADO = !rr.error && !rp.error && !re.error;
   renderRecetario();
 }
 
@@ -1549,13 +1581,12 @@ function buildRecetCard(sku, desc, receta, partes) {
 function buildRecetCardGuardado(sku, desc, receta, partes) {
   var sid = safeSku(sku);
   var area = receta ? (receta.area || '') : '';
-  var areaLabels = {tapas:'Tapas', serigrafia:'Serigrafía', produccion:'Producción'};
   var nP = partes.length;
   var esDir = receta && receta.es_directo;
   var esMaster = TETRA.rol === 'master';
   var badgeTxt = esDir ? 'Directo' : (nP + (nP === 1 ? ' parte' : ' partes'));
   var badgeCls = esDir ? 'rc-badge dir' : 'rc-badge';
-  var areaBadge = area ? '<span class="rc-area-badge ' + area + '">' + escHtml(areaLabels[area] || area) + '</span>' : '';
+  var areaBadge = area ? '<span class="rc-area-badge ' + area + '">' + escHtml(AREA_LABELS[area] || area) + '</span>' : '';
   var fotoBadge = (receta && receta.foto_url) ? '' : '<span class="rc-badge foto-pend">📷 PENDIENTE DE FOTOS</span>';
   var undoBtn = esMaster
     ? '<button class="rc-undo-btn" onclick="event.stopPropagation();deshacerReceta(\'' + sid + '\')">↩ Deshacer</button>'
@@ -1569,6 +1600,7 @@ function buildRecetCardGuardado(sku, desc, receta, partes) {
   } else {
     cuerpoHtml += '<div style="padding:10px 14px;font-size:11px;color:var(--gray)">Sin partes registradas</div>';
   }
+  cuerpoHtml += buildRcEspecsBlock(sku, sid, area, esMaster);
   return '<div class="rc" id="rc-' + sid + '">' +
     '<div class="rc-hdr" onclick="toggleRcCard(\'' + sid + '\')">' +
       '<span class="rc-sku">' + escHtml(sku) + '</span>' +
@@ -1695,6 +1727,71 @@ async function subirFotoEnvase(sid, inputEl) {
 
   RECETAS_MAP[sku].foto_url = url;
   toast('✓ Foto guardada', 'ok');
+  renderRecetario();
+}
+
+// ── Especificaciones técnicas (Guardados) ───────────────────────
+// Fecha/hora en zona horaria de Guatemala — timestamptz viene en UTC del
+// servidor, no se puede cortar el string como con las columnas DATE.
+function fmtFechaHoraGT(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala', day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch (e) { return ''; }
+}
+
+function buildRcEspecsBlock(sku, sid, area, esMaster) {
+  var campos = CAMPOS_POR_AREA[area];
+  if (!campos) return '';
+  var datos = ESPECS_MAP[sku] || {};
+  var filas = '';
+  var masReciente = null;
+  campos.forEach(function(campo) {
+    var actual = datos[campo];
+    var val = actual ? (actual.valor || '') : '';
+    var fid = 'rce-' + sid + '-' + safeSku(campo);
+    filas += '<div class="rce-row">' +
+      '<span class="rce-lbl">' + escHtml(campo) + '</span>' +
+      '<input class="rce-in" id="' + fid + '" value="' + escHtml(val) + '" placeholder="—"' + (esMaster ? '' : ' disabled') + '>' +
+    '</div>';
+    if (actual && actual.actualizado_en && (!masReciente || actual.actualizado_en > masReciente.actualizado_en)) masReciente = actual;
+  });
+  var meta = masReciente
+    ? '<div class="rce-meta">Actualizado por ' + escHtml(masReciente.actualizado_por || '—') + ' · ' + fmtFechaHoraGT(masReciente.actualizado_en) + '</div>'
+    : '';
+  var foot = esMaster
+    ? '<div class="rce-foot"><button class="rc-save-btn" id="rcesave-' + sid + '" onclick="guardarEspecs(\'' + sid + '\')">Guardar especificaciones</button><span class="rc-foto-status" id="rce-status-' + sid + '"></span></div>'
+    : '';
+  return '<div class="rce-wrap">' +
+    '<div class="rce-hdr-title">🧬 Especificaciones técnicas · ' + escHtml(AREA_LABELS[area] || area) + '</div>' +
+    filas + meta + foot +
+  '</div>';
+}
+
+async function guardarEspecs(sid) {
+  var sku = RECET_SID_SKU[sid];
+  var receta = sku ? RECETAS_MAP[sku] : null;
+  var area = receta ? (receta.area || '') : '';
+  var campos = CAMPOS_POR_AREA[area];
+  if (!sku || !campos) return;
+
+  var btn = document.getElementById('rcesave-' + sid);
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+
+  var quien = TETRA.nombre || TETRA.email || null;
+  var filas = campos.map(function(campo) {
+    var fid = 'rce-' + sid + '-' + safeSku(campo);
+    var val = ((document.getElementById(fid) || {}).value || '').trim();
+    return { sku: sku, area: area, campo: campo, valor: val || null, actualizado_por: quien };
+  });
+
+  var up = await db.from('sku_especificaciones').upsert(filas, { onConflict: 'sku,area,campo' }).select();
+  if (btn) { btn.disabled = false; btn.textContent = 'Guardar especificaciones'; }
+  if (up.error) { toast('Error al guardar especificaciones: ' + up.error.message, 'err'); return; }
+
+  if (!ESPECS_MAP[sku]) ESPECS_MAP[sku] = {};
+  (up.data || filas).forEach(function(f) { ESPECS_MAP[sku][f.campo] = f; });
+  toast('✓ Especificaciones guardadas', 'ok');
   renderRecetario();
 }
 
