@@ -189,12 +189,12 @@ Notas críticas:
    fórmula de tinta en Serigrafía, familia/accesorios en Tapas). RLS igual a `sku_recetas` (master).
 8. `sql/operativo_produccion_v1.sql` — rol `operativo_prod` + usuario produccion@tetrapp.app +
    políticas insert/update/delete en produccion_diaria. Correr DESPUÉS del 5 (necesita la tabla).
-9. `sql/personal_edad_v1.sql` — columna `edad` (smallint) en `personal`. ⚠️ Sin correr esto,
-   Guardar en gestion.html → Personal falla (columna no existe en el schema cache de PostgREST).
-10. `sql/rrhh_faltas_v1.sql` — tabla `rrhh_faltas` (alerta hasta justificar, texto y/o foto) +
-    políticas RLS del bucket Storage `justificaciones`. ⚠️ El bucket en sí (público) hay que
-    crearlo MANUAL en Dashboard → Storage → New bucket (igual que `envases`) — sin eso, subir
-    foto de justificación falla aunque el SQL ya haya corrido.
+9. `sql/rrhh_faltas_backfill_v1.sql` — trae a `rrhh_faltas` las ausencias que YA estaban
+   marcadas en `asistencia_diaria` (Serigrafía) antes de que existiera la sincronización
+   automática (`toggleAsistCell`, que solo dispara hacia adelante). Correr UNA vez; es
+   idempotente. Requiere `sql/rrhh_faltas_v1.sql` ya corrido (columna `origen`).
+   ⚠️ El bucket Storage `justificaciones` (público) sigue pendiente de crear MANUAL en
+   Dashboard → Storage → New bucket — sin eso, subir foto de justificación falla.
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
@@ -203,6 +203,8 @@ Notas críticas:
   y `solicitud_lineas` limitado a los 4 oficiales; habilita `parcial`, elimina `programada`/`entregada`
 - `sql/sku_recetario_fotos_v1.sql` (24-ago-2026) — columna `foto_url` en `sku_recetas` + bucket Storage `envases`
 - `sql/gestion_v1.sql` (27-ago-2026) — tablas `mejoras_planta`/`rrhh_permisos`/`rrhh_incidentes` + cols RRHH en `personal`
+- `sql/personal_edad_v1.sql` (27-ago-2026) — columna `edad` (smallint) en `personal`
+- `sql/rrhh_faltas_v1.sql` (27-ago-2026) — tabla `rrhh_faltas` (incluye columna `origen`) + políticas RLS del bucket `justificaciones`
 
 ---
 
