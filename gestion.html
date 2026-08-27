@@ -111,19 +111,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .pill-pendiente{background:var(--amber-l);color:var(--amber)}
 .pill-aprobado{background:var(--green-l);color:var(--green)}
 .pill-rechazado{background:var(--red-l);color:var(--red)}
-.pill-area-tapas{background:var(--teal-xl);color:var(--teal)}
-.pill-area-serig{background:var(--serig-l);color:var(--serig-m)}
 
-/* PERSONAL GRID */
-.pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;padding:16px}
-.op-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;transition:all .15s}
-.op-card:hover{border-color:var(--gest-m);box-shadow:0 4px 14px rgba(0,0,0,.08)}
-.op-top{display:flex;gap:12px;align-items:center}
-.op-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
-.op-name{font-size:13px;font-weight:700}
-.op-proc{font-size:10px;color:var(--gray);margin-top:2px}
-.op-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center}
-.op-rrhh-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+/* Mini-badges (usados en celdas de la tabla) */
 .op-mini{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--bg);color:var(--gray-l)}
 .op-mini.ok{background:var(--green-l);color:var(--green)}
 .op-mini.warn{background:var(--amber-l);color:var(--amber)}
@@ -211,7 +200,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   .tabs{gap:0;padding:0 8px;overflow-x:auto}
   .tab{font-size:12px;padding:10px 7px;white-space:nowrap}
   .fr{grid-template-columns:1fr!important}
-  .pg{grid-template-columns:1fr}
   .modal{width:96%;max-height:92vh}
 }
 </style>
@@ -278,6 +266,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <button class="seg-btn seg-active" id="seg-area-todos"  onclick="setFiltroArea('todos')">Todos</button>
           <button class="seg-btn"            id="seg-area-tapas"  onclick="setFiltroArea('tapas')">🏷 Tapas</button>
           <button class="seg-btn"            id="seg-area-serig"  onclick="setFiltroArea('serig')">🎨 Serigrafía</button>
+          <button class="seg-btn"            id="seg-area-produccion" onclick="setFiltroArea('produccion')">🏭 Producción</button>
           <input class="fi" id="pBuscar" placeholder="🔍 Buscar nombre o código" oninput="renderPersonalGrid()" style="width:180px">
           <label class="fchk" style="font-size:11px;font-weight:600">
             <input type="checkbox" id="pSoloActivos" checked onchange="renderPersonalGrid()"> Solo activos
@@ -340,6 +329,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
             <select class="fs" id="mpArea" style="width:100%">
               <option value="tapas">🏷 Tapas</option>
               <option value="serig">🎨 Serigrafía</option>
+              <option value="produccion">🏭 Producción</option>
             </select>
           </div>
         </div>
@@ -470,6 +460,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
       <!-- ── Faltas ── -->
       <div class="mp-panel" id="mp-faltas">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <input class="fi" id="faltasMesSel" type="month" style="width:auto" onchange="cambiarMesFaltas()">
+          <span id="faltasMesLbl" style="font-size:11px;color:var(--gray)"></span>
+        </div>
         <div id="faltasList" class="rec-list"></div>
         <button class="btn btn-g btn-sm" id="btnNuevaFalta" onclick="toggleFormFalta()">+ Registrar falta</button>
         <div id="formFalta" style="display:none;margin-top:12px;padding:12px;background:var(--bg);border-radius:10px">
@@ -628,7 +622,7 @@ async function renderKpis() {
 
 function setFiltroArea(area) {
   filtroArea = area;
-  ['todos', 'tapas', 'serig'].forEach(function(a) {
+  ['todos', 'tapas', 'serig', 'produccion'].forEach(function(a) {
     document.getElementById('seg-area-' + a).classList.toggle('seg-active', a === area);
   });
   renderPersonalGrid();
@@ -656,14 +650,13 @@ function renderPersonalGrid() {
       '<div style="font-size:32px;margin-bottom:8px">🧑‍🤝‍🧑</div>No hay personas que coincidan con el filtro.</div>';
     return;
   }
-  g.innerHTML = (filtroArea === 'todos')
-    ? '<div class="p-table-wrap">' + buildPersonalTable(lista) + '</div>'
-    : '<div class="pg">' + lista.map(buildPersonalCard).join('') + '</div>';
+  g.innerHTML = '<div class="p-table-wrap">' + buildPersonalTable(lista) + '</div>';
 }
 
 var AREA_GRUPOS = [
   { key: 'tapas', label: '🏷 Tapas' },
-  { key: 'serig', label: '🎨 Serigrafía' }
+  { key: 'serig', label: '🎨 Serigrafía' },
+  { key: 'produccion', label: '🏭 Producción' }
 ];
 
 var P_TABLE_COLS = 11;
@@ -723,32 +716,6 @@ function buildPersonalRow(p) {
     '<td>' + faltasBadge + '</td>' +
     '<td>' + justifCell + '</td>' +
   '</tr>';
-}
-
-function buildPersonalCard(p) {
-  var iniciales = escHtml(p.iniciales || (p.nombre ? p.nombre.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase() : '?'));
-  var areaBadge = p.area === 'serig'
-    ? '<span class="pill pill-area-serig">🎨 Serigrafía</span>'
-    : '<span class="pill pill-area-tapas">🏷 Tapas</span>';
-  var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-activo' : 'pill-inactivo') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>';
-  var rolTxt = p.rol === 'supervisor' ? 'Supervisor' : (p.proceso_hab || 'Operador');
-
-  var rrhhRow = '';
-  var lockerChip = p.locker ? '<span class="op-mini ok">🗄 ' + escHtml(p.locker) + '</span>' : '';
-  var eppChip = p.epp_asignado ? '<span class="op-mini ok">🦺 EPP</span>' : '<span class="op-mini warn">🦺 Pendiente</span>';
-  rrhhRow = '<div class="op-rrhh-row">' + eppChip + lockerChip + '</div>';
-
-  return '<div class="op-card" onclick="abrirPerfil(\'' + p.id + '\')" style="' + (p.activo ? '' : 'opacity:.55') + '">' +
-    '<div class="op-top">' +
-      '<div class="op-avatar" style="background:' + (p.color_hex || '#6B6B6A') + '">' + iniciales + '</div>' +
-      '<div style="flex:1;min-width:0">' +
-        '<div class="op-name">' + escHtml(p.nombre) + '</div>' +
-        '<div class="op-proc">' + escHtml(rolTxt) + '</div>' +
-      '</div>' +
-    '</div>' +
-    '<div class="op-badges">' + areaBadge + estadoBadge + '</div>' +
-    rrhhRow +
-  '</div>';
 }
 
 // ════════════════════════════════════════════════════════════
@@ -824,7 +791,8 @@ function abrirPerfil(id) {
   switchMpTab('gen');
   document.getElementById('modalPersona').classList.add('open');
   cargarPermisos(p.id);
-  cargarFaltas(p.id);
+  faltasMesActual = mesActualStr();
+  cargarFaltas(p.id, faltasMesActual);
   cargarIncidentes(p.id);
 }
 
@@ -876,7 +844,7 @@ async function guardarPersona() {
       r = await db.from('personal').update(payload).eq('id', mpEditId);
     } else {
       payload.codigo = codigo;
-      payload.color_hex = area === 'serig' ? '#5A2D9E' : '#1A6B5B';
+      payload.color_hex = area === 'serig' ? '#5A2D9E' : (area === 'produccion' ? '#B07D2A' : '#1A6B5B');
       r = await db.from('personal').insert(payload);
     }
     if (r.error) throw r.error;
@@ -1070,13 +1038,42 @@ async function cargarFaltasResumen() {
   });
 }
 
-async function cargarFaltas(personalId) {
+var faltasMesActual = '';
+
+function mesActualStr() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function rangoDelMes(mesStr) {
+  var año = parseInt(mesStr.slice(0, 4), 10);
+  var mes = parseInt(mesStr.slice(5, 7), 10);
+  var ultimoDia = new Date(año, mes, 0).getDate();
+  return { desde: mesStr + '-01', hasta: mesStr + '-' + String(ultimoDia).padStart(2, '0') };
+}
+
+function cambiarMesFaltas() {
+  var sel = document.getElementById('faltasMesSel').value;
+  if (!sel || !mpEditId) return;
+  faltasMesActual = sel;
+  cargarFaltas(mpEditId, faltasMesActual);
+}
+
+async function cargarFaltas(personalId, mesStr) {
+  mesStr = mesStr || faltasMesActual || mesActualStr();
+  faltasMesActual = mesStr;
+  document.getElementById('faltasMesSel').value = mesStr;
+  var rango = rangoDelMes(mesStr);
+  var lbl = document.getElementById('faltasMesLbl');
+  if (lbl) lbl.textContent = new Date(mesStr + '-02T12:00:00').toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+
   var cont = document.getElementById('faltasList');
   cont.innerHTML = '<div class="rec-empty">Cargando…</div>';
-  var r = await db.from('rrhh_faltas').select('*').eq('personal_id', personalId).order('fecha', { ascending: false });
+  var r = await db.from('rrhh_faltas').select('*').eq('personal_id', personalId)
+    .gte('fecha', rango.desde).lte('fecha', rango.hasta).order('fecha', { ascending: false });
   if (r.error) { cont.innerHTML = '<div class="rec-empty">Error al cargar</div>'; return; }
   var rows = r.data || [];
-  if (!rows.length) { cont.innerHTML = '<div class="rec-empty">Sin faltas registradas.</div>'; return; }
+  if (!rows.length) { cont.innerHTML = '<div class="rec-empty">Sin faltas registradas en este mes.</div>'; return; }
   cont.innerHTML = rows.map(buildFaltaItem).join('');
 }
 
@@ -1158,7 +1155,7 @@ async function sincronizarAsistenciaDesdeFalta(personalId, fecha) {
       area: 'serig', turno: 'dia', estado: 'ausente',
       updated_at: new Date().toISOString()
     }, { onConflict: 'fecha,operador_codigo,area,turno' });
-  } catch (e) { /* no bloquear el registro de la falta por esto */ }
+  } catch (e) { console.warn('Sync falta→asistencia falló:', e); }
 }
 
 async function guardarTextoJustificacion(faltaId) {

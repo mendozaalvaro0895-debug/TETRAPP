@@ -4593,7 +4593,7 @@ async function sincronizarFaltaDesdeAsistencia(codigo, fecha, estado) {
         .eq('personal_id', op.id).eq('fecha', fecha).eq('origen', 'asistencia_serig')
         .is('justificacion_texto', null).is('justificacion_foto_url', null);
     }
-  } catch (e) { /* no bloquear el flujo de asistencia por esto */ }
+  } catch (e) { console.warn('Sync falta↔asistencia falló (revisa que sql/rrhh_faltas_v1.sql esté corrido):', e); }
 }
 
 

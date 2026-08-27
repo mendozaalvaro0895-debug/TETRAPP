@@ -46,7 +46,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | `inventario.html` | Gestión de SKUs, existencias, importación Excel |
 | `ventas.html` | Ventas y Financiero: Resumen · Productos · Clientes · Rotación · Importar facturación (Excel/CSV cols A-R) · toggle IVA |
 | `produccion.html` | Sopladoras: Ingreso PDF/manual (pdf.js) · Reporte Semanal (pivote máquina×SKU) · Mensual |
-| `gestion.html` | Gestión de Personal y Planta (v1, solo Personal construido): grid unificado tapas+serig sobre la misma tabla `personal` + RRHH (locker/EPP/talla) + permisos/incidentes. Master-only. |
+| `gestion.html` | Gestión de Personal y Planta (v1, solo Personal construido): tabla unificada tapas+serig+producción sobre la misma tabla `personal` + RRHH (locker/EPP/talla) + permisos/incidentes/faltas. Master-only. |
 
 Bodega bloqueado via `<a class="nav-locked">` en toda la navegación.
 
@@ -125,12 +125,18 @@ Tabs: Personal (activo) · Planta (WIP — tabla mejoras_planta ya existe, vista
 
 view-personal: grid unificado de TODA la tabla personal (área tapas + serig juntas,
   sin duplicar el CRUD que ya existe en tapas.html/serigrafia.html — es la misma tabla,
-  los cambios se ven de inmediato en cualquier módulo).
-  Filtros: área (Todos/Tapas/Serigrafía) · buscador nombre/código · toggle solo activos.
-  Click en tarjeta → modalPersona con 4 sub-tabs:
-    Datos generales (editable: nombre/iniciales/código/área/rol/proceso_hab/teléfono/activo/fechas)
+  los cambios se ven de inmediato en cualquier módulo). SIEMPRE tabla (buildPersonalTable),
+  agrupada por área — ya no hay vista de tarjetas (buildPersonalCard se eliminó).
+  Filtros: área (Todos/Tapas/Serigrafía/Producción) · buscador nombre/código · toggle solo activos.
+  `area` de personal ahora acepta también 'produccion' (antes solo 'tapas'/'serig' —
+  produccion.html en sí sigue sin leer la tabla `personal`, es solo para llevar su RRHH aquí).
+  Click en fila → modalPersona con 5 sub-tabs:
+    Datos generales (editable: nombre/iniciales/código/área/rol/proceso_hab/teléfono/edad/activo/fechas)
     RRHH           (editable: locker/talla_uniforme/epp_asignado/epp_fecha/notas_rrhh)
     Permisos       (historial rrhh_permisos + registrar nuevo)
+    Faltas         (historial rrhh_faltas con selector de mes, default mes actual — alerta
+                     hasta justificar con texto y/o foto; ver sincronización con Asistencia
+                     Mensual de serigrafia.html más abajo)
     Incidentes     (historial rrhh_incidentes + registrar nuevo)
 
 ⚠️ Al editar una persona EXISTENTE desde acá, NO se toca color_hex/mtx_rol/mtx_linea —
