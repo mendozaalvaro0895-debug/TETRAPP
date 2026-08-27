@@ -145,9 +145,13 @@ view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la dispo
   calcula en vivo desde `personal.locker` (personas activas) vía `renderLockers()`, ya
   disparado dentro de `cargarPersonal()`. `parseLockerNum()` extrae el primer número del
   texto libre (tolera "L-14"/"L14"/"14"); lo que no matchea 1–86 se lista aparte en
-  `#lockersExtra` sin perderse. Clic en un locker ocupado abre el perfil de esa persona
-  (`abrirPerfil`) — asignar/liberar un locker se sigue haciendo desde ahí (pestaña RRHH),
-  no hay UI de asignación directa en esta vista (evita duplicar la lógica de escritura).
+  `#lockersExtra` sin perderse.
+  Clic en CUALQUIER ficha (libre u ocupada) → `abrirModalLocker(numero)`: select con todas
+  las personas activas para vincular/reasignar ese locker, o "— Sin asignar —" para
+  liberarlo. `guardarLocker()` primero desvincula a quien lo tenía (si cambia de dueño) y
+  luego escribe `personal.locker = 'L-N'` en la nueva persona — sigue siendo el mismo campo
+  de siempre, sin tabla ni lógica de escritura duplicada. Botón "Ver perfil completo" dentro
+  del modal (solo si hay ocupante) para ir al perfil vía `abrirPerfil`.
 
 view-personal: grid unificado de TODA la tabla personal (área tapas + serig juntas,
   sin duplicar el CRUD que ya existe en tapas.html/serigrafia.html — es la misma tabla,

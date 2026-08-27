@@ -114,10 +114,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 /* LOCKERS */
 .lockers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px;padding:16px}
-.locker-cell{border-radius:10px;padding:10px 6px;text-align:center;border:1.5px solid var(--border);transition:all .15s}
+.locker-cell{border-radius:10px;padding:10px 6px;text-align:center;border:1.5px solid var(--border);transition:all .15s;cursor:pointer}
+.locker-cell:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);transform:translateY(-1px)}
 .locker-cell.libre{background:var(--green-l);border-color:#86efac}
-.locker-cell.ocupado{background:var(--red-l);border-color:#fca5a5;cursor:pointer}
-.locker-cell.ocupado:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);transform:translateY(-1px)}
+.locker-cell.ocupado{background:var(--red-l);border-color:#fca5a5}
 .locker-num{font-family:var(--mono);font-weight:800;font-size:13px;color:var(--ink)}
 .locker-owner{font-size:9.5px;margin-top:4px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -560,6 +560,29 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 </div>
 
+<!-- ══════════════════ MODAL LOCKER ═══════════════════════ -->
+<div class="overlay" id="modalLocker" onclick="cerrarSiOverlayLocker(event)">
+  <div class="modal" style="max-width:420px">
+    <div class="mh">
+      <div class="mh-title" id="mlTitle">Locker</div>
+      <button class="m-close" onclick="cerrarModalLocker()">✕</button>
+    </div>
+    <div class="mb" style="padding:20px">
+      <div class="fg full" id="mlPerfilLink" style="display:none;margin-bottom:14px">
+        <button class="btn btn-g btn-sm" onclick="verPerfilDesdeLocker()">👤 Ver perfil completo</button>
+      </div>
+      <div class="fg full">
+        <div class="fl">Persona asignada</div>
+        <select class="fs" id="mlPersona" style="width:100%"></select>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cerrarModalLocker()">Cancelar</button>
+      <button class="btn btn-s" onclick="guardarLocker()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // escHtml() lo provee shared/auth.js de forma global.
 
@@ -651,29 +674,31 @@ function parseLockerNum(raw) {
   return (n >= 1 && n <= LOCKERS_TOTAL) ? n : null;
 }
 
+var LOCKERS_OCUPACION = {}; // { numero: persona } — cache del último render, la usa el modal
+
 function renderLockers() {
   var cont = document.getElementById('lockersGrid');
   if (!cont) return;
 
-  var ocupacion = {}; // { numero: persona } — solo personas activas ocupan locker
-  var extras = [];    // locker con texto que no matchea 1..86 (se listan aparte, no se pierden)
+  LOCKERS_OCUPACION = {};
+  var extras = []; // locker con texto que no matchea 1..86 (se listan aparte, no se pierden)
   personalTodos.filter(function(p) { return p.activo && p.locker; }).forEach(function(p) {
     var n = parseLockerNum(p.locker);
-    if (n && !ocupacion[n]) ocupacion[n] = p;
+    if (n && !LOCKERS_OCUPACION[n]) LOCKERS_OCUPACION[n] = p;
     else if (!n) extras.push(p);
   });
 
-  var libres = LOCKERS_TOTAL - Object.keys(ocupacion).length;
+  var libres = LOCKERS_TOTAL - Object.keys(LOCKERS_OCUPACION).length;
   var resumen = document.getElementById('lockersResumen');
-  if (resumen) resumen.textContent = libres + ' disponibles de ' + LOCKERS_TOTAL;
+  if (resumen) resumen.textContent = libres + ' disponibles de ' + LOCKERS_TOTAL + ' · clic en cualquier ficha para vincular una persona';
 
   var html = '';
   for (var i = 1; i <= LOCKERS_TOTAL; i++) {
-    var p = ocupacion[i];
+    var p = LOCKERS_OCUPACION[i];
     html += p
-      ? '<div class="locker-cell ocupado" onclick="abrirPerfil(\'' + p.id + '\')" title="' + escHtml(p.nombre) + ' — clic para ver su perfil">' +
+      ? '<div class="locker-cell ocupado" onclick="abrirModalLocker(' + i + ')" title="' + escHtml(p.nombre) + ' — clic para reasignar o liberar">' +
           '<div class="locker-num">L-' + i + '</div><div class="locker-owner">' + escHtml(p.nombre) + '</div></div>'
-      : '<div class="locker-cell libre" title="Disponible">' +
+      : '<div class="locker-cell libre" onclick="abrirModalLocker(' + i + ')" title="Disponible — clic para asignar">' +
           '<div class="locker-num">L-' + i + '</div><div class="locker-owner">Disponible</div></div>';
   }
   cont.innerHTML = html;
@@ -685,6 +710,69 @@ function renderLockers() {
       '<div style="padding:0 16px 16px;font-size:12px;color:var(--gray)">' +
         extras.map(function(p) { return escHtml(p.nombre) + ' (' + escHtml(p.locker) + ')'; }).join(' · ') +
       '</div>';
+  }
+}
+
+// ── Modal: vincular/reasignar/liberar un locker ──────────────
+var mlNumeroActual = null;
+var mlPersonaActualId = null;
+
+function abrirModalLocker(numero) {
+  mlNumeroActual = numero;
+  var actual = LOCKERS_OCUPACION[numero] || null;
+  mlPersonaActualId = actual ? actual.id : null;
+
+  document.getElementById('mlTitle').textContent = 'Locker L-' + numero;
+  document.getElementById('mlPerfilLink').style.display = actual ? 'block' : 'none';
+
+  var activos = personalTodos.filter(function(p) { return p.activo; })
+    .sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
+  var opts = '<option value="">— Sin asignar (disponible) —</option>';
+  activos.forEach(function(p) {
+    var otroLocker = parseLockerNum(p.locker);
+    var etiqueta = p.nombre + ' (' + p.codigo + ')' + (otroLocker && otroLocker !== numero ? ' — actualmente L-' + otroLocker : '');
+    var sel = actual && String(actual.id) === String(p.id) ? ' selected' : '';
+    opts += '<option value="' + p.id + '"' + sel + '>' + escHtml(etiqueta) + '</option>';
+  });
+  document.getElementById('mlPersona').innerHTML = opts;
+  document.getElementById('modalLocker').classList.add('open');
+}
+
+function cerrarModalLocker() {
+  document.getElementById('modalLocker').classList.remove('open');
+  mlNumeroActual = null;
+  mlPersonaActualId = null;
+}
+function cerrarSiOverlayLocker(e) {
+  if (e.target === document.getElementById('modalLocker')) cerrarModalLocker();
+}
+function verPerfilDesdeLocker() {
+  var id = mlPersonaActualId;
+  cerrarModalLocker();
+  if (id) abrirPerfil(id);
+}
+
+async function guardarLocker() {
+  if (!mlNumeroActual) return;
+  var etiqueta = 'L-' + mlNumeroActual;
+  var personaId = document.getElementById('mlPersona').value;
+  var actual = LOCKERS_OCUPACION[mlNumeroActual] || null;
+
+  try {
+    // Si este locker cambia de dueño (o se libera), primero se desvincula al que lo tenía
+    if (actual && String(actual.id) !== personaId) {
+      var r0 = await db.from('personal').update({ locker: null }).eq('id', actual.id);
+      if (r0.error) throw r0.error;
+    }
+    if (personaId) {
+      var r1 = await db.from('personal').update({ locker: etiqueta }).eq('id', personaId);
+      if (r1.error) throw r1.error;
+    }
+    cerrarModalLocker();
+    await cargarPersonal();
+    showToast('✅ Locker actualizado');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
   }
 }
 
