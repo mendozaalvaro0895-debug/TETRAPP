@@ -73,7 +73,7 @@ alter table public.personal add column if not exists notas_rrhh      text;
 -- ─────────────────────────────────────────────────────────────
 create table if not exists public.rrhh_permisos (
   id           serial primary key,
-  personal_id  integer references public.personal(id) on delete set null,
+  personal_id  uuid references public.personal(id) on delete set null,
   tipo         text not null
                check (tipo in ('permiso','ausencia','tardanza','licencia','vacacion','otro')),
   fecha_inicio date not null,
@@ -94,7 +94,7 @@ create index if not exists idx_permisos_fecha    on public.rrhh_permisos(fecha_i
 -- ─────────────────────────────────────────────────────────────
 create table if not exists public.rrhh_incidentes (
   id           serial primary key,
-  personal_id  integer references public.personal(id) on delete set null,
+  personal_id  uuid references public.personal(id) on delete set null,
   tipo         text not null
                check (tipo in ('accidente','amonestacion','reconocimiento','capacitacion','otro')),
   fecha        date not null default current_date,
