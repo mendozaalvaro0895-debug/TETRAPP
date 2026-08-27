@@ -1865,6 +1865,14 @@ async function cargarRecetario() {
   // Materias primas de Bodega 7 — autocomplete en ficha técnica de producción
   var rb7 = await db.from('inventario').select('sku,descripcion').eq('bodega','B7').order('descripcion').limit(2000);
   INV_MAT = rb7.error ? [] : (rb7.data || []);
+  if (!INV_MAT.length && !rb7.error) {
+    // B7 sin resultados: usar todo el inventario como fallback y avisar
+    INV_MAT = INV_REC.slice();
+    console.warn('[Recetario] bodega="B7" devolvió 0 filas — revisa el valor real del campo bodega en Supabase. Usando inventario completo como fallback.');
+    toast('⚠️ Bodega "B7" sin resultados en inventario — autocomplete muestra todo el catálogo. Confirma el valor del campo bodega.', 'err');
+  } else {
+    console.log('[Recetario] INV_MAT Bodega 7:', INV_MAT.length, 'ítems');
+  }
 
   var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado,foto_url');
   RECETAS_MAP = {};
@@ -2285,11 +2293,13 @@ function rcMatBuscar(sid, tipo, idx) {
   var inp = row.querySelector('.rce-mat-ac');
   if (!inp) return;
   var q = inp.value.trim().toLowerCase();
-  if (q.length < 2) { drop.classList.remove('open'); return; }
+  if (q.length < 1) { drop.classList.remove('open'); return; }
+  console.log('[rcMatBuscar] q="' + q + '" INV_MAT.length=' + INV_MAT.length);
   var res = INV_MAT.filter(function(item) {
     return String(item.sku || '').toLowerCase().indexOf(q) !== -1 ||
            String(item.descripcion || '').toLowerCase().indexOf(q) !== -1;
   }).slice(0, 14);
+  console.log('[rcMatBuscar] resultados:', res.length);
   if (!res.length) { drop.classList.remove('open'); return; }
   drop.innerHTML = res.map(function(item) {
     return '<div class="rc-opt" data-sid="' + esc(sid) + '" data-tipo="' + tipo + '" data-idx="' + idx +
