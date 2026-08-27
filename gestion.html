@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0C0C0B">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>TETRAPLASTIC — Gestión de Personal y Planta</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="shared/auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+:root {
+  --ink: #0C0C0B;
+  --teal: #1A6B5B;
+  --teal-l: #C8EDE7;
+  --teal-xl: #EBF7F4;
+  --serig-m: #5A2D9E;
+  --serig-l: #F0EBFF;
+  --gest-m: var(--gestion, #4338CA);
+  --gest-l: var(--gestion-l, #E0E7FF);
+  --red: #B83232;
+  --red-l: #FEE2E2;
+  --amber: #B87200;
+  --amber-l: #FFF3D6;
+  --green: #166534;
+  --green-l: #DCFCE7;
+  --bg: #F7F6F2;
+  --bg2: #EBE9E4;
+  --card: #FFFFFF;
+  --border: #E0DED8;
+  --gray: #6B6B6A;
+  --gray-l: #A8A6A0;
+  --font: 'DM Sans', sans-serif;
+  --display: 'Playfair Display', serif;
+  --mono: 'DM Mono', monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:var(--ink);padding:10px 20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;border-bottom:2px solid var(--gest-m)}
+.logo{font-family:var(--display);font-size:18px;font-weight:900;color:#fff}
+.logo span{color:#7ECEC0}
+.logo-wrap{position:relative;cursor:pointer;user-select:none;display:flex;align-items:center}
+.logo-chevron{font-size:10px;color:rgba(255,255,255,.4);margin-left:6px;transition:transform .2s}
+.logo-chevron.open{transform:rotate(180deg);color:#7ECEC0}
+.logo-nav{display:none;position:absolute;top:calc(100% + 12px);left:0;background:#1A1A19;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:6px;min-width:214px;box-shadow:0 8px 28px rgba(0,0,0,.5);z-index:9999}
+.logo-nav.open{display:block}
+.logo-nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,.8);text-decoration:none;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;transition:background .12s}
+.logo-nav a:hover{background:rgba(255,255,255,.09);color:#fff}
+.logo-nav a.nav-active{background:var(--gest-m);color:#fff}
+.logo-nav a.nav-locked{color:rgba(255,255,255,.3);cursor:not-allowed;pointer-events:none}
+.logo-nav a.nav-locked::after{content:'🔒';font-size:10px;margin-left:auto}
+.logo-nav-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
+.topbar-sep{width:1px;height:24px;background:rgba(255,255,255,.2)}
+.topbar-sub{font-size:13px;color:rgba(255,255,255,.7);flex:1}
+.clock{font-family:var(--mono);font-size:12px;color:#7ECEC0;background:rgba(0,0,0,.3);padding:4px 10px;border-radius:20px}
+.user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:4px 12px;border-radius:20px}
+.uavatar{width:28px;height:28px;border-radius:50%;background:var(--gest-m);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff}
+.uname{font-size:12px;color:#fff}
+
+/* APP LAYOUT */
+.app{display:flex;height:calc(100vh - 56px);overflow:hidden}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* TABS */
+.tabs{display:flex;align-items:center;background:var(--card);border-bottom:1px solid var(--border);padding:0 16px;gap:4px;flex-shrink:0}
+.tab{display:flex;align-items:center;gap:7px;padding:12px 10px;font-size:13px;font-weight:600;color:var(--gray);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+.tab:hover{color:var(--gest-m)}
+.tab.active{color:var(--gest-m);border-bottom-color:var(--gest-m)}
+.tabs-r{flex:1;display:flex;justify-content:flex-end;gap:8px;padding-left:8px}
+
+/* BUTTONS */
+.btn{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:var(--font);transition:all .15s}
+.btn:active{transform:scale(.97)}
+.btn-s{background:var(--gest-m);color:#fff}
+.btn-s:hover{background:var(--gestion-dark,#312E81)}
+.btn-g{background:var(--bg);border:1px solid var(--border);color:var(--ink)}
+.btn-g:hover{background:var(--gest-l);border-color:var(--gest-m)}
+.btn-d{background:var(--red-l);color:var(--red)}
+.btn-d:hover{background:#FCA5A5}
+.btn-sm{padding:4px 10px;font-size:11px}
+.btn-xs{padding:3px 8px;font-size:10px}
+
+/* KPI STRIP */
+.kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;padding:7px 16px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0}
+.kpi{background:var(--bg);border-radius:8px;padding:6px 10px}
+.kpi-l{font-size:8.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--gray);margin-bottom:2px}
+.kpi-v{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--ink);line-height:1.1}
+.kpi-s{font-size:8px;color:var(--gray-l);margin-top:1px}
+
+/* PAGE HEADER (por vista) */
+.ph{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;gap:8px}
+.ph-title{font-family:var(--display);font-size:16px;font-weight:700}
+.ph-sub{font-size:11px;color:var(--gray);margin-top:2px}
+.ph-r{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fi{padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--font);background:var(--bg)}
+
+/* SEGMENTED */
+.seg-btn{background:var(--bg);border:1.5px solid var(--border);padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;color:var(--gray);cursor:pointer;transition:all .15s;font-family:var(--font)}
+.seg-btn:hover{border-color:var(--gest-m);color:var(--gest-m)}
+.seg-btn.seg-active{background:var(--gest-m);border-color:var(--gest-m);color:#fff}
+
+/* PILLS */
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700}
+.pill-activo{background:var(--green-l);color:var(--green)}
+.pill-inactivo{background:#E5E7EB;color:#374151}
+.pill-pendiente{background:var(--amber-l);color:var(--amber)}
+.pill-aprobado{background:var(--green-l);color:var(--green)}
+.pill-rechazado{background:var(--red-l);color:var(--red)}
+.pill-area-tapas{background:var(--teal-xl);color:var(--teal)}
+.pill-area-serig{background:var(--serig-l);color:var(--serig-m)}
+
+/* PERSONAL GRID */
+.pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;padding:16px}
+.op-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;transition:all .15s}
+.op-card:hover{border-color:var(--gest-m);box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.op-top{display:flex;gap:12px;align-items:center}
+.op-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.op-name{font-size:13px;font-weight:700}
+.op-proc{font-size:10px;color:var(--gray);margin-top:2px}
+.op-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center}
+.op-rrhh-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.op-mini{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--bg);color:var(--gray-l)}
+.op-mini.ok{background:var(--green-l);color:var(--green)}
+.op-mini.warn{background:var(--amber-l);color:var(--amber)}
+
+/* MODAL */
+.overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(12,12,11,.8);z-index:10000;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--card);border-radius:16px;width:92%;max-width:660px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 40px rgba(0,0,0,.3)}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)}
+.mh-title{font-family:var(--display);font-size:18px;font-weight:700}
+.m-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray)}
+.mb{padding:0;overflow-y:auto;flex:1}
+.mf{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;border-top:1px solid var(--border)}
+.mf-r{display:flex;gap:10px}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg.full{grid-column:1/-1}
+.fl{font-size:11px;font-weight:700;color:var(--gray)}
+.fs{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font)}
+.fta{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--font);resize:vertical;min-height:56px}
+.fchk{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;font-weight:500}
+.fchk input{width:16px;height:16px;cursor:pointer;accent-color:var(--gest-m)}
+
+/* Sub-tabs dentro del modal de persona */
+.mp-tabs{display:flex;gap:4px;padding:12px 20px 0;border-bottom:1px solid var(--border)}
+.mptab{padding:9px 12px;font-size:12px;font-weight:700;color:var(--gray);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.mptab:hover{color:var(--gest-m)}
+.mptab.active{color:var(--gest-m);border-bottom-color:var(--gest-m)}
+.mptab.disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
+.mp-panel{display:none;padding:18px 20px}
+.mp-panel.active{display:block}
+
+/* Listas de permisos/incidentes */
+.rec-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.rec-item{border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.rec-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.rec-tipo{font-size:12px;font-weight:700}
+.rec-fecha{font-size:10px;color:var(--gray);margin-top:2px}
+.rec-txt{font-size:11px;color:var(--gray);margin-top:6px;line-height:1.5}
+.rec-del{background:none;border:none;color:var(--gray-l);cursor:pointer;font-size:13px;padding:2px 6px}
+.rec-del:hover{color:var(--red)}
+.rec-empty{text-align:center;color:var(--gray-l);font-size:12px;padding:20px}
+
+/* Formulario de vista general (búsqueda vacía) */
+.wip-view{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:48px 32px;text-align:center;overflow-y:auto}
+.wip-icon{font-size:64px;line-height:1}
+.wip-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--ink)}
+.wip-sub{font-size:13px;color:var(--gray);max-width:400px;line-height:1.7}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .tabs{gap:0;padding:0 8px;overflow-x:auto}
+  .tab{font-size:12px;padding:10px 7px;white-space:nowrap}
+  .fr{grid-template-columns:1fr!important}
+  .pg{grid-template-columns:1fr}
+  .modal{width:96%;max-height:92vh}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ TOPBAR ══════════════════════════════ -->
+<div class="topbar">
+  <div class="logo-wrap" onclick="toggleLogoNav(event)">
+    <div class="logo">TETRA<span>PLASTIC</span><span class="logo-chevron" id="logoChev">▾</span></div>
+    <div class="logo-nav" id="logoNav">
+      <a href="index.html">🏠 Inicio</a>
+      <div class="logo-nav-sep"></div>
+      <a href="tapas.html">🏷 Tapas</a>
+      <a href="serigrafia.html">🎨 Serigrafía</a>
+      <a href="dashboard.html">📊 Dashboard</a>
+      <div class="logo-nav-sep"></div>
+      <a href="inventario.html">📦 Inventario <span class="inv-dot" id="invNavBadge" style="display:none"></span></a>
+      <div class="logo-nav-sep"></div>
+      <a href="produccion.html">🏭 Producción</a>
+      <a href="ventas.html">💼 Ventas</a>
+      <a href="gestion.html" class="nav-active">🧑‍💼 Gestión</a>
+      <a class="nav-locked">📦 Bodega</a>
+    </div>
+  </div>
+  <div class="topbar-sep"></div>
+  <div class="topbar-sub">Gestión · Personal y Planta</div>
+  <div class="clock" id="clk"></div>
+  <div class="user-pill">
+    <div class="uavatar">AM</div>
+    <div class="uname">Álvaro Mendoza</div>
+  </div>
+  <a href="index.html" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;">🏠 Inicio</a>
+</div>
+
+<!-- ══════════════════ APP ════════════════════════════════ -->
+<div class="app">
+<div class="main">
+
+  <div class="tabs" id="mainTabs">
+    <div class="tab active" id="tab-personal" onclick="switchTab('personal')">🧑‍🤝‍🧑 Personal</div>
+    <div class="tab" id="tab-planta" onclick="switchTab('planta')">🏗 Planta</div>
+  </div>
+
+  <div class="kpi-strip" id="kpiStrip">
+    <div class="kpi"><div class="kpi-l">Total activos</div><div class="kpi-v" id="kTotal">—</div></div>
+    <div class="kpi"><div class="kpi-l">Tapas</div><div class="kpi-v" id="kTapas">—</div></div>
+    <div class="kpi"><div class="kpi-l">Serigrafía</div><div class="kpi-v" id="kSerig">—</div></div>
+    <div class="kpi"><div class="kpi-l">Permisos pendientes</div><div class="kpi-v" id="kPermisos">—</div></div>
+    <div class="kpi"><div class="kpi-l">EPP pendiente</div><div class="kpi-v" id="kEpp">—</div></div>
+  </div>
+
+  <div class="views">
+
+    <!-- ══ PERSONAL ══════════════════════════════════════════ -->
+    <div class="view" style="display:flex;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
+      <div class="ph">
+        <div>
+          <div class="ph-title">Personal</div>
+          <div class="ph-sub">Fuente única — los cambios se ven de inmediato en cada módulo de área</div>
+        </div>
+        <div class="ph-r">
+          <button class="seg-btn seg-active" id="seg-area-todos"  onclick="setFiltroArea('todos')">Todos</button>
+          <button class="seg-btn"            id="seg-area-tapas"  onclick="setFiltroArea('tapas')">🏷 Tapas</button>
+          <button class="seg-btn"            id="seg-area-serig"  onclick="setFiltroArea('serig')">🎨 Serigrafía</button>
+          <input class="fi" id="pBuscar" placeholder="🔍 Buscar nombre o código" oninput="renderPersonalGrid()" style="width:180px">
+          <label class="fchk" style="font-size:11px;font-weight:600">
+            <input type="checkbox" id="pSoloActivos" checked onchange="renderPersonalGrid()"> Solo activos
+          </label>
+          <button class="btn btn-s btn-sm" onclick="abrirNuevaPersona()">+ Nueva persona</button>
+        </div>
+      </div>
+      <div id="personalGrid" style="flex:1;overflow-y:auto"></div>
+    </div>
+
+    <!-- ══ PLANTA (pendiente) ═══════════════════════════════ -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-planta">
+      <div class="wip-view">
+        <div class="wip-icon">🏗</div>
+        <div class="wip-title">Mejoras de Planta</div>
+        <div class="wip-sub">La tabla <code>mejoras_planta</code> ya existe en la base de datos. Esta vista se construye en la siguiente iteración del módulo.</div>
+      </div>
+    </div>
+
+  </div><!-- /views -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ══════════════════ MODAL PERSONA ══════════════════════ -->
+<div class="overlay" id="modalPersona" onclick="cerrarSiOverlayPersona(event)">
+  <div class="modal">
+    <div class="mh">
+      <div class="mh-title" id="mpTitle">Nueva persona</div>
+      <button class="m-close" onclick="cerrarModalPersona()">✕</button>
+    </div>
+
+    <div class="mp-tabs">
+      <div class="mptab active" id="mptab-gen" onclick="switchMpTab('gen')">Datos generales</div>
+      <div class="mptab" id="mptab-rrhh" onclick="switchMpTab('rrhh')">RRHH</div>
+      <div class="mptab" id="mptab-permisos" onclick="switchMpTab('permisos')">Permisos</div>
+      <div class="mptab" id="mptab-incidentes" onclick="switchMpTab('incidentes')">Incidentes</div>
+    </div>
+
+    <div class="mb">
+      <!-- ── Datos generales ── -->
+      <div class="mp-panel active" id="mp-gen">
+        <div class="fr">
+          <div class="fg">
+            <div class="fl">Nombre completo *</div>
+            <input class="fi" id="mpNombre" placeholder="Ej: Gabriela Gonzales" style="width:100%">
+          </div>
+          <div class="fg">
+            <div class="fl">Iniciales *</div>
+            <input class="fi" id="mpIniciales" placeholder="GG" maxlength="3" style="width:100%;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+          </div>
+        </div>
+        <div class="fr">
+          <div class="fg">
+            <div class="fl">Código único *</div>
+            <input class="fi" id="mpCodigo" placeholder="Ej: T5" style="width:100%">
+          </div>
+          <div class="fg">
+            <div class="fl">Área *</div>
+            <select class="fs" id="mpArea" style="width:100%">
+              <option value="tapas">🏷 Tapas</option>
+              <option value="serig">🎨 Serigrafía</option>
+            </select>
+          </div>
+        </div>
+        <div class="fr">
+          <div class="fg">
+            <div class="fl">Rol</div>
+            <select class="fs" id="mpRolBase" style="width:100%">
+              <option value="operador">Operador</option>
+              <option value="supervisor">Supervisor</option>
+            </select>
+          </div>
+          <div class="fg">
+            <div class="fl">Proceso habitual</div>
+            <input class="fi" id="mpProceso" placeholder="Ej: Armado, Flameado…" style="width:100%">
+          </div>
+        </div>
+        <div class="fr">
+          <div class="fg">
+            <div class="fl">Teléfono</div>
+            <input class="fi" id="mpTelefono" placeholder="Ej: 5555-5555" style="width:100%">
+          </div>
+          <div class="fg">
+            <div class="fl">&nbsp;</div>
+            <label class="fchk">
+              <input type="checkbox" id="mpActivo" checked> Persona activa
+            </label>
+          </div>
+        </div>
+        <div class="fr">
+          <div class="fg">
+            <div class="fl">Fecha de inicio</div>
+            <input class="fi" id="mpFechaInicio" type="date" style="width:100%">
+          </div>
+          <div class="fg">
+            <div class="fl">Fecha de baja</div>
+            <input class="fi" id="mpFechaBaja" type="date" style="width:100%" onchange="if(this.value)document.getElementById('mpActivo').checked=false">
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RRHH ── -->
+      <div class="mp-panel" id="mp-rrhh">
+        <div class="fr">
+          <div class="fg">
+            <div class="fl">Locker</div>
+            <input class="fi" id="mpLocker" placeholder="Ej: L-14" style="width:100%">
+          </div>
+          <div class="fg">
+            <div class="fl">Talla de uniforme</div>
+            <select class="fs" id="mpTalla" style="width:100%">
+              <option value="">— Sin definir —</option>
+              <option value="XS">XS</option><option value="S">S</option>
+              <option value="M">M</option><option value="L">L</option>
+              <option value="XL">XL</option><option value="XXL">XXL</option>
+            </select>
+          </div>
+        </div>
+        <div class="fr">
+          <div class="fg">
+            <label class="fchk">
+              <input type="checkbox" id="mpEppAsignado"> EPP asignado
+            </label>
+          </div>
+          <div class="fg">
+            <div class="fl">Fecha de entrega EPP</div>
+            <input class="fi" id="mpEppFecha" type="date" style="width:100%">
+          </div>
+        </div>
+        <div class="fg full">
+          <div class="fl">Notas RRHH</div>
+          <textarea class="fta" id="mpNotasRrhh" placeholder="Observaciones generales de RRHH…" style="width:100%"></textarea>
+        </div>
+      </div>
+
+      <!-- ── Permisos ── -->
+      <div class="mp-panel" id="mp-permisos">
+        <div id="permisosList" class="rec-list"></div>
+        <button class="btn btn-g btn-sm" id="btnNuevoPermiso" onclick="toggleFormPermiso()">+ Registrar permiso / ausencia</button>
+        <div id="formPermiso" style="display:none;margin-top:12px;padding:12px;background:var(--bg);border-radius:10px">
+          <div class="fr">
+            <div class="fg">
+              <div class="fl">Tipo</div>
+              <select class="fs" id="npTipo" style="width:100%">
+                <option value="permiso">Permiso</option>
+                <option value="ausencia">Ausencia</option>
+                <option value="tardanza">Tardanza</option>
+                <option value="licencia">Licencia</option>
+                <option value="vacacion">Vacación</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div class="fg">
+              <div class="fl">Estado</div>
+              <select class="fs" id="npEstado" style="width:100%">
+                <option value="pendiente">Pendiente</option>
+                <option value="aprobado">Aprobado</option>
+                <option value="rechazado">Rechazado</option>
+              </select>
+            </div>
+          </div>
+          <div class="fr">
+            <div class="fg">
+              <div class="fl">Fecha inicio *</div>
+              <input class="fi" id="npFechaInicio" type="date" style="width:100%">
+            </div>
+            <div class="fg">
+              <div class="fl">Fecha fin</div>
+              <input class="fi" id="npFechaFin" type="date" style="width:100%">
+            </div>
+          </div>
+          <div class="fg full">
+            <div class="fl">Motivo</div>
+            <input class="fi" id="npMotivo" placeholder="Motivo breve" style="width:100%">
+          </div>
+          <div class="fg full">
+            <div class="fl">Notas</div>
+            <textarea class="fta" id="npNotas" style="width:100%"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-g btn-sm" onclick="toggleFormPermiso()">Cancelar</button>
+            <button class="btn btn-s btn-sm" onclick="guardarPermiso()">Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Incidentes ── -->
+      <div class="mp-panel" id="mp-incidentes">
+        <div id="incidentesList" class="rec-list"></div>
+        <button class="btn btn-g btn-sm" id="btnNuevoIncidente" onclick="toggleFormIncidente()">+ Registrar incidente</button>
+        <div id="formIncidente" style="display:none;margin-top:12px;padding:12px;background:var(--bg);border-radius:10px">
+          <div class="fr">
+            <div class="fg">
+              <div class="fl">Tipo</div>
+              <select class="fs" id="niTipo" style="width:100%">
+                <option value="accidente">Accidente</option>
+                <option value="amonestacion">Amonestación</option>
+                <option value="reconocimiento">Reconocimiento</option>
+                <option value="capacitacion">Capacitación</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div class="fg">
+              <div class="fl">Fecha *</div>
+              <input class="fi" id="niFecha" type="date" style="width:100%">
+            </div>
+          </div>
+          <div class="fg full">
+            <div class="fl">Descripción</div>
+            <textarea class="fta" id="niDescripcion" style="width:100%"></textarea>
+          </div>
+          <div class="fg full">
+            <div class="fl">Seguimiento</div>
+            <textarea class="fta" id="niSeguimiento" style="width:100%"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-g btn-sm" onclick="toggleFormIncidente()">Cancelar</button>
+            <button class="btn btn-s btn-sm" onclick="guardarIncidente()">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mf">
+      <button class="btn btn-d btn-sm" id="btnEliminarPersona" style="display:none" onclick="eliminarPersonaActual()">🗑 Eliminar</button>
+      <div class="mf-r" style="margin-left:auto">
+        <button class="btn btn-g" onclick="cerrarModalPersona()">Cancelar</button>
+        <button class="btn btn-s" onclick="guardarPersona()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// escHtml() lo provee shared/auth.js de forma global.
+
+function fechaHoy() {
+  var d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+function tick() {
+  var el = document.getElementById('clk');
+  if (el) el.textContent = new Date().toLocaleString('es-GT', {hour:'2-digit', minute:'2-digit'});
+}
+tick();
+setInterval(tick, 30000);
+
+function toggleLogoNav(e) {
+  e.stopPropagation();
+  var n = document.getElementById('logoNav'), c = document.getElementById('logoChev');
+  var o = n.classList.toggle('open');
+  c.classList.toggle('open', o);
+}
+document.addEventListener('click', function() {
+  var n = document.getElementById('logoNav'), c = document.getElementById('logoChev');
+  if (n) n.classList.remove('open');
+  if (c) c.classList.remove('open');
+});
+
+function showToast(msg, color) {
+  color = color || 'var(--gest-m)'.replace('var(--gest-m)', '#4338CA');
+  var t = document.getElementById('tetraToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'tetraToast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0C0C0B;color:#fff;padding:11px 20px;border-radius:12px;font:600 13px "DM Sans",sans-serif;z-index:99999;box-shadow:0 8px 28px rgba(0,0,0,.4);display:none';
+    document.body.appendChild(t);
+  }
+  t.style.borderLeft = '4px solid ' + color;
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(function() { t.style.display = 'none'; }, 2600);
+}
+
+// ════════════════════════════════════════════════════════════
+// TABS PRINCIPALES
+// ════════════════════════════════════════════════════════════
+function switchTab(tab) {
+  ['personal', 'planta'].forEach(function(t) {
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+    document.getElementById('view-' + t).style.display = (t === tab) ? 'flex' : 'none';
+  });
+  document.getElementById('kpiStrip').style.display = (tab === 'personal') ? 'grid' : 'none';
+}
+
+// ════════════════════════════════════════════════════════════
+// PERSONAL — carga y render
+// ════════════════════════════════════════════════════════════
+var personalTodos = [];
+var filtroArea = 'todos';
+
+async function cargarPersonal() {
+  var r = await db.from('personal').select('*').order('activo', { ascending: false }).order('nombre');
+  if (r.error) { showToast('❌ Error cargando personal: ' + r.error.message, '#B83232'); return; }
+  personalTodos = r.data || [];
+  renderKpis();
+  renderPersonalGrid();
+}
+
+async function renderKpis() {
+  var activos = personalTodos.filter(function(p) { return p.activo; });
+  document.getElementById('kTotal').textContent = activos.length;
+  document.getElementById('kTapas').textContent = activos.filter(function(p) { return p.area === 'tapas'; }).length;
+  document.getElementById('kSerig').textContent = activos.filter(function(p) { return p.area === 'serig'; }).length;
+  document.getElementById('kEpp').textContent = activos.filter(function(p) { return !p.epp_asignado; }).length;
+
+  try {
+    var rp = await db.from('rrhh_permisos').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente');
+    document.getElementById('kPermisos').textContent = (rp.count != null) ? rp.count : '—';
+  } catch (e) {
+    document.getElementById('kPermisos').textContent = '—';
+  }
+}
+
+function setFiltroArea(area) {
+  filtroArea = area;
+  ['todos', 'tapas', 'serig'].forEach(function(a) {
+    document.getElementById('seg-area-' + a).classList.toggle('seg-active', a === area);
+  });
+  renderPersonalGrid();
+}
+
+function renderPersonalGrid() {
+  var g = document.getElementById('personalGrid');
+  if (!g) return;
+  var q = (document.getElementById('pBuscar').value || '').trim().toLowerCase();
+  var soloActivos = document.getElementById('pSoloActivos').checked;
+
+  var lista = personalTodos.filter(function(p) {
+    if (filtroArea !== 'todos' && p.area !== filtroArea) return false;
+    if (soloActivos && !p.activo) return false;
+    if (q) {
+      var hay = (p.nombre || '').toLowerCase().indexOf(q) !== -1 ||
+                (p.codigo || '').toLowerCase().indexOf(q) !== -1;
+      if (!hay) return false;
+    }
+    return true;
+  });
+
+  if (!lista.length) {
+    g.innerHTML = '<div style="padding:40px;text-align:center;color:var(--gray-l)">' +
+      '<div style="font-size:32px;margin-bottom:8px">🧑‍🤝‍🧑</div>No hay personas que coincidan con el filtro.</div>';
+    return;
+  }
+  g.innerHTML = '<div class="pg">' + lista.map(buildPersonalCard).join('') + '</div>';
+}
+
+function buildPersonalCard(p) {
+  var iniciales = escHtml(p.iniciales || (p.nombre ? p.nombre.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase() : '?'));
+  var areaBadge = p.area === 'serig'
+    ? '<span class="pill pill-area-serig">🎨 Serigrafía</span>'
+    : '<span class="pill pill-area-tapas">🏷 Tapas</span>';
+  var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-activo' : 'pill-inactivo') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>';
+  var rolTxt = p.rol === 'supervisor' ? 'Supervisor' : (p.proceso_hab || 'Operador');
+
+  var rrhhRow = '';
+  var lockerChip = p.locker ? '<span class="op-mini ok">🗄 ' + escHtml(p.locker) + '</span>' : '';
+  var eppChip = p.epp_asignado ? '<span class="op-mini ok">🦺 EPP</span>' : '<span class="op-mini warn">🦺 Pendiente</span>';
+  rrhhRow = '<div class="op-rrhh-row">' + eppChip + lockerChip + '</div>';
+
+  return '<div class="op-card" onclick="abrirPerfil(\'' + p.id + '\')" style="' + (p.activo ? '' : 'opacity:.55') + '">' +
+    '<div class="op-top">' +
+      '<div class="op-avatar" style="background:' + (p.color_hex || '#6B6B6A') + '">' + iniciales + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="op-name">' + escHtml(p.nombre) + '</div>' +
+        '<div class="op-proc">' + escHtml(rolTxt) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="op-badges">' + areaBadge + estadoBadge + '</div>' +
+    rrhhRow +
+  '</div>';
+}
+
+// ════════════════════════════════════════════════════════════
+// MODAL PERSONA — abrir / cerrar / tabs internos
+// ════════════════════════════════════════════════════════════
+var mpEditId = null;
+
+function switchMpTab(tab) {
+  ['gen', 'rrhh', 'permisos', 'incidentes'].forEach(function(t) {
+    document.getElementById('mptab-' + t).classList.toggle('active', t === tab);
+    document.getElementById('mp-' + t).classList.toggle('active', t === tab);
+  });
+}
+
+function abrirNuevaPersona() {
+  mpEditId = null;
+  document.getElementById('mpTitle').textContent = 'Nueva persona';
+  document.getElementById('mpNombre').value = '';
+  document.getElementById('mpIniciales').value = '';
+  document.getElementById('mpCodigo').value = '';
+  document.getElementById('mpCodigo').disabled = false;
+  document.getElementById('mpArea').value = 'tapas';
+  document.getElementById('mpRolBase').value = 'operador';
+  document.getElementById('mpProceso').value = '';
+  document.getElementById('mpTelefono').value = '';
+  document.getElementById('mpActivo').checked = true;
+  document.getElementById('mpFechaInicio').value = fechaHoy();
+  document.getElementById('mpFechaBaja').value = '';
+  document.getElementById('mpLocker').value = '';
+  document.getElementById('mpTalla').value = '';
+  document.getElementById('mpEppAsignado').checked = false;
+  document.getElementById('mpEppFecha').value = '';
+  document.getElementById('mpNotasRrhh').value = '';
+  document.getElementById('btnEliminarPersona').style.display = 'none';
+  ['permisos', 'incidentes'].forEach(function(t) {
+    document.getElementById('mptab-' + t).classList.add('disabled');
+  });
+  switchMpTab('gen');
+  document.getElementById('modalPersona').classList.add('open');
+  setTimeout(function() { document.getElementById('mpNombre').focus(); }, 50);
+}
+
+function abrirPerfil(id) {
+  var p = personalTodos.find(function(x) { return String(x.id) === String(id); });
+  if (!p) return;
+  mpEditId = p.id;
+  document.getElementById('mpTitle').textContent = p.nombre;
+  document.getElementById('mpNombre').value = p.nombre || '';
+  document.getElementById('mpIniciales').value = p.iniciales || '';
+  document.getElementById('mpCodigo').value = p.codigo || '';
+  document.getElementById('mpCodigo').disabled = true;
+  document.getElementById('mpArea').value = p.area || 'tapas';
+  document.getElementById('mpRolBase').value = p.rol === 'supervisor' ? 'supervisor' : 'operador';
+  document.getElementById('mpProceso').value = p.proceso_hab || '';
+  document.getElementById('mpTelefono').value = p.telefono || '';
+  document.getElementById('mpActivo').checked = !!p.activo;
+  document.getElementById('mpFechaInicio').value = p.fecha_inicio || '';
+  document.getElementById('mpFechaBaja').value = p.fecha_baja || '';
+  document.getElementById('mpLocker').value = p.locker || '';
+  document.getElementById('mpTalla').value = p.talla_uniforme || '';
+  document.getElementById('mpEppAsignado').checked = !!p.epp_asignado;
+  document.getElementById('mpEppFecha').value = p.epp_fecha || '';
+  document.getElementById('mpNotasRrhh').value = p.notas_rrhh || '';
+  document.getElementById('btnEliminarPersona').style.display = 'inline-block';
+  ['permisos', 'incidentes'].forEach(function(t) {
+    document.getElementById('mptab-' + t).classList.remove('disabled');
+  });
+  document.getElementById('formPermiso').style.display = 'none';
+  document.getElementById('formIncidente').style.display = 'none';
+  switchMpTab('gen');
+  document.getElementById('modalPersona').classList.add('open');
+  cargarPermisos(p.id);
+  cargarIncidentes(p.id);
+}
+
+function cerrarModalPersona() {
+  document.getElementById('modalPersona').classList.remove('open');
+  mpEditId = null;
+}
+function cerrarSiOverlayPersona(e) {
+  if (e.target === document.getElementById('modalPersona')) cerrarModalPersona();
+}
+
+async function guardarPersona() {
+  var nombre    = (document.getElementById('mpNombre').value    || '').trim();
+  var iniciales = (document.getElementById('mpIniciales').value || '').trim().toUpperCase();
+  var codigo    = (document.getElementById('mpCodigo').value    || '').trim();
+  var area      = document.getElementById('mpArea').value;
+  var rolBase   = document.getElementById('mpRolBase').value;
+  var proceso   = (document.getElementById('mpProceso').value || '').trim();
+  var telefono  = (document.getElementById('mpTelefono').value || '').trim() || null;
+  var fechaBaja = document.getElementById('mpFechaBaja').value || null;
+  var activo    = fechaBaja ? false : document.getElementById('mpActivo').checked;
+  var fechaInicio = document.getElementById('mpFechaInicio').value || null;
+
+  if (!nombre)    { showToast('⚠️ Nombre requerido', '#B83232'); return; }
+  if (!iniciales) { showToast('⚠️ Iniciales requeridas', '#B83232'); return; }
+  if (!codigo)    { showToast('⚠️ Código requerido', '#B83232'); return; }
+
+  var payload = {
+    nombre: nombre, iniciales: iniciales, area: area, rol: rolBase,
+    proceso_hab: proceso, telefono: telefono, activo: activo,
+    fecha_inicio: fechaInicio, fecha_baja: fechaBaja,
+    locker: (document.getElementById('mpLocker').value || '').trim() || null,
+    talla_uniforme: document.getElementById('mpTalla').value || null,
+    epp_asignado: document.getElementById('mpEppAsignado').checked,
+    epp_fecha: document.getElementById('mpEppFecha').value || null,
+    notas_rrhh: (document.getElementById('mpNotasRrhh').value || '').trim() || null
+  };
+
+  try {
+    var r;
+    if (mpEditId) {
+      r = await db.from('personal').update(payload).eq('id', mpEditId);
+    } else {
+      payload.codigo = codigo;
+      payload.color_hex = area === 'serig' ? '#5A2D9E' : '#1A6B5B';
+      r = await db.from('personal').insert(payload);
+    }
+    if (r.error) throw r.error;
+    cerrarModalPersona();
+    await cargarPersonal();
+    showToast(mpEditId ? '✅ Persona actualizada' : '✅ Persona creada');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+async function eliminarPersonaActual() {
+  if (!mpEditId) return;
+  if (!confirm('¿Eliminar a esta persona? La acción no se puede deshacer.')) return;
+  try {
+    var r = await db.from('personal').delete().eq('id', mpEditId);
+    if (r.error) throw r.error;
+    cerrarModalPersona();
+    await cargarPersonal();
+    showToast('🗑 Persona eliminada');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// PERMISOS
+// ════════════════════════════════════════════════════════════
+var PERMISO_LBL = { permiso:'Permiso', ausencia:'Ausencia', tardanza:'Tardanza', licencia:'Licencia', vacacion:'Vacación', otro:'Otro' };
+
+async function cargarPermisos(personalId) {
+  var cont = document.getElementById('permisosList');
+  cont.innerHTML = '<div class="rec-empty">Cargando…</div>';
+  var r = await db.from('rrhh_permisos').select('*').eq('personal_id', personalId).order('fecha_inicio', { ascending: false });
+  if (r.error) { cont.innerHTML = '<div class="rec-empty">Error al cargar</div>'; return; }
+  var rows = r.data || [];
+  if (!rows.length) { cont.innerHTML = '<div class="rec-empty">Sin registros de permisos o ausencias.</div>'; return; }
+  cont.innerHTML = rows.map(buildPermisoItem).join('');
+}
+
+function buildPermisoItem(r) {
+  var rango = r.fecha_fin && r.fecha_fin !== r.fecha_inicio ? (r.fecha_inicio + ' → ' + r.fecha_fin) : r.fecha_inicio;
+  return '<div class="rec-item">' +
+    '<div class="rec-top">' +
+      '<div><div class="rec-tipo">' + (PERMISO_LBL[r.tipo] || r.tipo) + ' <span class="pill pill-' + r.estado + '">' + r.estado + '</span></div>' +
+      '<div class="rec-fecha">' + rango + '</div></div>' +
+      '<button class="rec-del" onclick="eliminarPermiso(' + r.id + ')" title="Eliminar">🗑</button>' +
+    '</div>' +
+    (r.motivo ? '<div class="rec-txt"><strong>Motivo:</strong> ' + escHtml(r.motivo) + '</div>' : '') +
+    (r.notas ? '<div class="rec-txt">' + escHtml(r.notas) + '</div>' : '') +
+  '</div>';
+}
+
+function toggleFormPermiso() {
+  var f = document.getElementById('formPermiso');
+  var abrir = f.style.display === 'none';
+  f.style.display = abrir ? 'block' : 'none';
+  if (abrir) {
+    document.getElementById('npTipo').value = 'permiso';
+    document.getElementById('npEstado').value = 'pendiente';
+    document.getElementById('npFechaInicio').value = fechaHoy();
+    document.getElementById('npFechaFin').value = '';
+    document.getElementById('npMotivo').value = '';
+    document.getElementById('npNotas').value = '';
+  }
+}
+
+async function guardarPermiso() {
+  if (!mpEditId) return;
+  var fechaInicio = document.getElementById('npFechaInicio').value;
+  if (!fechaInicio) { showToast('⚠️ Fecha de inicio requerida', '#B83232'); return; }
+  var payload = {
+    personal_id: mpEditId,
+    tipo: document.getElementById('npTipo').value,
+    estado: document.getElementById('npEstado').value,
+    fecha_inicio: fechaInicio,
+    fecha_fin: document.getElementById('npFechaFin').value || null,
+    motivo: (document.getElementById('npMotivo').value || '').trim() || null,
+    notas: (document.getElementById('npNotas').value || '').trim() || null
+  };
+  try {
+    var r = await db.from('rrhh_permisos').insert(payload);
+    if (r.error) throw r.error;
+    toggleFormPermiso();
+    await cargarPermisos(mpEditId);
+    renderKpis();
+    showToast('✅ Registro guardado');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+async function eliminarPermiso(id) {
+  if (!confirm('¿Eliminar este registro?')) return;
+  try {
+    var r = await db.from('rrhh_permisos').delete().eq('id', id);
+    if (r.error) throw r.error;
+    await cargarPermisos(mpEditId);
+    renderKpis();
+    showToast('🗑 Eliminado');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// INCIDENTES
+// ════════════════════════════════════════════════════════════
+var INCIDENTE_LBL = { accidente:'Accidente', amonestacion:'Amonestación', reconocimiento:'Reconocimiento', capacitacion:'Capacitación', otro:'Otro' };
+var INCIDENTE_ICO = { accidente:'⚠️', amonestacion:'📋', reconocimiento:'🏆', capacitacion:'🎓', otro:'❓' };
+
+async function cargarIncidentes(personalId) {
+  var cont = document.getElementById('incidentesList');
+  cont.innerHTML = '<div class="rec-empty">Cargando…</div>';
+  var r = await db.from('rrhh_incidentes').select('*').eq('personal_id', personalId).order('fecha', { ascending: false });
+  if (r.error) { cont.innerHTML = '<div class="rec-empty">Error al cargar</div>'; return; }
+  var rows = r.data || [];
+  if (!rows.length) { cont.innerHTML = '<div class="rec-empty">Sin incidentes registrados.</div>'; return; }
+  cont.innerHTML = rows.map(buildIncidenteItem).join('');
+}
+
+function buildIncidenteItem(r) {
+  return '<div class="rec-item">' +
+    '<div class="rec-top">' +
+      '<div><div class="rec-tipo">' + (INCIDENTE_ICO[r.tipo] || '') + ' ' + (INCIDENTE_LBL[r.tipo] || r.tipo) + '</div>' +
+      '<div class="rec-fecha">' + r.fecha + '</div></div>' +
+      '<button class="rec-del" onclick="eliminarIncidente(' + r.id + ')" title="Eliminar">🗑</button>' +
+    '</div>' +
+    (r.descripcion ? '<div class="rec-txt">' + escHtml(r.descripcion) + '</div>' : '') +
+    (r.seguimiento ? '<div class="rec-txt"><strong>Seguimiento:</strong> ' + escHtml(r.seguimiento) + '</div>' : '') +
+  '</div>';
+}
+
+function toggleFormIncidente() {
+  var f = document.getElementById('formIncidente');
+  var abrir = f.style.display === 'none';
+  f.style.display = abrir ? 'block' : 'none';
+  if (abrir) {
+    document.getElementById('niTipo').value = 'accidente';
+    document.getElementById('niFecha').value = fechaHoy();
+    document.getElementById('niDescripcion').value = '';
+    document.getElementById('niSeguimiento').value = '';
+  }
+}
+
+async function guardarIncidente() {
+  if (!mpEditId) return;
+  var fecha = document.getElementById('niFecha').value;
+  if (!fecha) { showToast('⚠️ Fecha requerida', '#B83232'); return; }
+  var payload = {
+    personal_id: mpEditId,
+    tipo: document.getElementById('niTipo').value,
+    fecha: fecha,
+    descripcion: (document.getElementById('niDescripcion').value || '').trim() || null,
+    seguimiento: (document.getElementById('niSeguimiento').value || '').trim() || null
+  };
+  try {
+    var r = await db.from('rrhh_incidentes').insert(payload);
+    if (r.error) throw r.error;
+    toggleFormIncidente();
+    await cargarIncidentes(mpEditId);
+    showToast('✅ Incidente guardado');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+async function eliminarIncidente(id) {
+  if (!confirm('¿Eliminar este incidente?')) return;
+  try {
+    var r = await db.from('rrhh_incidentes').delete().eq('id', id);
+    if (r.error) throw r.error;
+    await cargarIncidentes(mpEditId);
+    showToast('🗑 Eliminado');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════
+cargarPersonal();
+</script>
+
+</body>
+</html>

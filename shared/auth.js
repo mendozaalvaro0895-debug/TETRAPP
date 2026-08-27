@@ -34,6 +34,10 @@ var TETRA_PAGINAS_OPERATIVO = {
   'operativo_serig': 'registro-serigrafia'
 };
 
+// Páginas restringidas SOLO a rol master (datos sensibles de RRHH).
+// Cualquier otro rol que intente entrar es redirigido a index.html.
+var TETRA_PAGINAS_MASTER = ['gestion'];
+
 // Tabla que el rol operativo_prod SÍ puede escribir (endpoint REST de Supabase).
 var TETRA_PROD_TABLA = 'produccion_diaria';
 
@@ -228,6 +232,13 @@ function tetraVigilarInactividad() {
         location.replace(paginaPermitida + '.html');
         return;
       }
+    }
+
+    // Páginas master-only: cualquier otro rol fuera, antes de revelar nada
+    var nombrePagina = location.pathname.replace(/\.html$/, '').replace(/\/+$/, '').split('/').pop();
+    if (TETRA_PAGINAS_MASTER.indexOf(nombrePagina) !== -1 && TETRA.rol !== 'master') {
+      location.replace('index.html');
+      return;
     }
 
     tetraVigilarInactividad();
