@@ -36,7 +36,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 ### Módulos activos
 | Archivo | Descripción |
 |---|---|
-| `index.html` | Fachada principal — 6 cards de módulo |
+| `index.html` | Fachada principal — 7 cards de módulo |
 | `tapas.html` | Módulo completo Tapas: hub + pedidos + movimientos (salidas/ingresos/rechazos) + personal |
 | `serigrafia.html` | Módulo admin Serigrafía: Inicio (board) + Movimientos + Productividad + Personal |
 | `registro-serigrafia.html` | Formulario móvil rol `operativo_serig`: Flameado / Impresión / Empaque |
@@ -46,6 +46,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | `inventario.html` | Gestión de SKUs, existencias, importación Excel |
 | `ventas.html` | Ventas y Financiero: Resumen · Productos · Clientes · Rotación · Importar facturación (Excel/CSV cols A-R) · toggle IVA |
 | `produccion.html` | Sopladoras: Ingreso PDF/manual (pdf.js) · Reporte Semanal (pivote máquina×SKU) · Mensual |
+| `gestion.html` | Gestión de Personal y Planta (v1, solo Personal construido): grid unificado tapas+serig sobre la misma tabla `personal` + RRHH (locker/EPP/talla) + permisos/incidentes. Master-only. |
 
 Bodega bloqueado via `<a class="nav-locked">` en toda la navegación.
 
@@ -102,6 +103,29 @@ Transiciones automáticas en `boardDrop()`:
 Tier de color: `lista`=2 verde · `parcial`=1 amarillo · resto=0 rojo.
 Orden dentro de cada desplegable: rojo → amarillo → verde.
 
+## gestion.html — Arquitectura de vistas
+
+```
+Tabs: Personal (activo) · Planta (WIP — tabla mejoras_planta ya existe, vista pendiente)
+
+view-personal: grid unificado de TODA la tabla personal (área tapas + serig juntas,
+  sin duplicar el CRUD que ya existe en tapas.html/serigrafia.html — es la misma tabla,
+  los cambios se ven de inmediato en cualquier módulo).
+  Filtros: área (Todos/Tapas/Serigrafía) · buscador nombre/código · toggle solo activos.
+  Click en tarjeta → modalPersona con 4 sub-tabs:
+    Datos generales (editable: nombre/iniciales/código/área/rol/proceso_hab/teléfono/activo/fechas)
+    RRHH           (editable: locker/talla_uniforme/epp_asignado/epp_fecha/notas_rrhh)
+    Permisos       (historial rrhh_permisos + registrar nuevo)
+    Incidentes     (historial rrhh_incidentes + registrar nuevo)
+
+⚠️ Al editar una persona EXISTENTE desde acá, NO se toca color_hex/mtx_rol/mtx_linea —
+  esos campos gobiernan la matriz de líneas del board en serigrafia.html y solo se
+  actualizan desde el picker de roles de esa página, para no romper esa sincronización.
+  Sí se asigna un color por defecto al CREAR una persona nueva.
+
+Acceso: restringido a rol master vía TETRA_PAGINAS_MASTER en shared/auth.js.
+```
+
 ## registro-serigrafia.html — Flujos
 Ver flujos completos y componentes en `.claude/docs/design-system.md` § Flujos.
 Pantallas: `scrTarea(0)` → Impresión / Flameado / Empaque → `scrOk*`.
@@ -115,7 +139,12 @@ Ver descripciones completas: `.claude/docs/schema-tablas.md`
 Notas críticas:
 - `produccion_diaria`: llave única incluye `documento` — un turno puede tener varias requis con cantidades que se SUMAN
 - `inventario`: +3 cols producción: `meta_12hrs`, `maquina_default`, `precio_ponderado_manual`
-- `personal`: fuente única de supervisores — registro-tapas.html NO los hardcodea
+- `personal`: fuente única de supervisores — registro-tapas.html NO los hardcodea. `area` es 1:1
+  por persona (solo valores `'tapas'`/`'serig'` — produccion.html no usa esta tabla). +5 cols RRHH
+  (`locker`, `talla_uniforme`, `epp_asignado`, `epp_fecha`, `notas_rrhh`) gestionadas desde gestion.html
+- `rrhh_permisos` / `rrhh_incidentes`: historial por persona (FK `personal_id` uuid), master-only
+  lectura+escritura (RLS). Gestionadas desde gestion.html
+- `mejoras_planta`: seguimiento de infraestructura — tabla lista, vista pendiente en gestion.html
 - `ventas`: fecha→DATE, RLS master-only escritura; importador reemplaza por rango de fechas (sin duplicar)
 - `bot_estado`: 1 fila por número (`whatsapp_from` UNIQUE)
 - `rechazos`: existe, RLS pendiente (sql/rechazos_rls_fix.sql)
@@ -146,6 +175,7 @@ Notas críticas:
 - `sql/solicitudes_parcial_constraint.sql` (19-ago-2026) — CHECK de estado en `solicitudes`
   y `solicitud_lineas` limitado a los 4 oficiales; habilita `parcial`, elimina `programada`/`entregada`
 - `sql/sku_recetario_fotos_v1.sql` (24-ago-2026) — columna `foto_url` en `sku_recetas` + bucket Storage `envases`
+- `sql/gestion_v1.sql` (27-ago-2026) — tablas `mejoras_planta`/`rrhh_permisos`/`rrhh_incidentes` + cols RRHH en `personal`
 
 ---
 
@@ -159,6 +189,8 @@ Sólido: sin secretos hardcodeados; CSP + HSTS + X-Frame-Options en vercel.json;
 - `operativo_serig` → enjaulado en registro-serigrafia.html; INSERT en registro_tiros_serig, paros_serig, registro_flameado_serig, registro_empaque_serig
 - `operativo_prod` → NO enjaulado: ve TODOS los módulos en lectura (como visor), pero solo escribe en produccion_diaria (registrar turnos). auth.js bloquea escrituras a otras tablas (flag TETRA.esProdEditor + TETRA_PROD_TABLA); RLS lo respalda. Exento de logout por inactividad. NO edita recetas/fichas (solo-master)
 - La jaula vive en TETRA_PAGINAS_OPERATIVO (auth.js): rol → página permitida
+- TETRA_PAGINAS_MASTER (auth.js): páginas restringidas SOLO a master (ej. `gestion`) — cualquier
+  otro rol es redirigido a index.html antes de revelar contenido (dato sensible de RRHH)
 - Sesiones expiran a 60 min de inactividad, EXCEPTO roles operativos (pantallas de planta)
 
 ---
