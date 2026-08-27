@@ -13,8 +13,14 @@ create table if not exists public.rrhh_faltas (
   notas                  text,
   justificacion_texto    text,
   justificacion_foto_url text,
+  origen                 text not null default 'manual',
   created_at             timestamptz not null default now()
 );
+
+-- Idempotente también si la tabla ya existía sin esta columna (corridas previas)
+alter table public.rrhh_faltas add column if not exists origen text not null default 'manual';
+-- origen: 'manual' (registrada desde Gestión) · 'asistencia_serig' (auto-generada al
+-- marcar "ausente" en la Asistencia Mensual de serigrafia.html — sincronización 1-a-1)
 
 create index if not exists idx_faltas_personal on public.rrhh_faltas(personal_id);
 create index if not exists idx_faltas_fecha    on public.rrhh_faltas(fecha desc);

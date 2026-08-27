@@ -1083,6 +1083,8 @@ async function cargarFaltas(personalId) {
 function buildFaltaItem(f) {
   var justificada = !!(f.justificacion_texto || f.justificacion_foto_url);
   var estadoBadge = justificada ? '<span class="falta-ok">✅ Justificada</span>' : '<span class="falta-alert">🚨 Sin justificar</span>';
+  var origenBadge = f.origen === 'asistencia_serig'
+    ? '<span class="op-mini" style="margin-left:6px">🔄 Auto · Asistencia Serigrafía</span>' : '';
   var cuerpo;
   if (justificada) {
     var foto = f.justificacion_foto_url
@@ -1102,7 +1104,7 @@ function buildFaltaItem(f) {
   }
   return '<div class="rec-item">' +
     '<div class="rec-top">' +
-      '<div><div class="rec-tipo">Falta ' + estadoBadge + '</div><div class="rec-fecha">' + f.fecha + '</div></div>' +
+      '<div><div class="rec-tipo">Falta ' + estadoBadge + origenBadge + '</div><div class="rec-fecha">' + f.fecha + '</div></div>' +
       '<button class="rec-del" onclick="eliminarFalta(' + f.id + ')" title="Eliminar">🗑</button>' +
     '</div>' +
     (f.notas ? '<div class="rec-txt">' + escHtml(f.notas) + '</div>' : '') +
@@ -1127,6 +1129,7 @@ async function guardarFalta() {
   var payload = {
     personal_id: mpEditId,
     fecha: fecha,
+    origen: 'manual',
     notas: (document.getElementById('nfNotas').value || '').trim() || null
   };
   try {
@@ -1136,10 +1139,26 @@ async function guardarFalta() {
     await cargarFaltas(mpEditId);
     await cargarFaltasResumen();
     renderKpis();
+    sincronizarAsistenciaDesdeFalta(mpEditId, fecha);
     showToast('✅ Falta registrada');
   } catch (e) {
     showToast('❌ Error: ' + e.message, '#B83232');
   }
+}
+
+// Solo Serigrafía tiene Asistencia Mensual por ahora (serigrafia.html).
+// Al registrar una falta manual para alguien de esa área, se refleja
+// también ahí — best-effort, no interrumpe el flujo si falla.
+async function sincronizarAsistenciaDesdeFalta(personalId, fecha) {
+  try {
+    var p = personalTodos.find(function(x) { return String(x.id) === String(personalId); });
+    if (!p || p.area !== 'serig') return;
+    await db.from('asistencia_diaria').upsert({
+      fecha: fecha, operador_codigo: p.codigo, operador_nombre: p.nombre,
+      area: 'serig', turno: 'dia', estado: 'ausente',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'fecha,operador_codigo,area,turno' });
+  } catch (e) { /* no bloquear el registro de la falta por esto */ }
 }
 
 async function guardarTextoJustificacion(faltaId) {

@@ -4560,12 +4560,40 @@ async function toggleAsistCell(codigo, fecha) {
     }
     if (r.error) throw r.error;
     faltasMesCache = null;
+    sincronizarFaltaDesdeAsistencia(codigo, fecha, next);
   } catch(e) {
     if (curRaw === undefined) delete byPD[codigo][fecha];
     else byPD[codigo][fecha] = curRaw;
     renderAsistGrid();
     showToast('❌ Error al guardar asistencia', '#B83232');
   }
+}
+
+// ── Sincronización con Gestión → Personal → Faltas (rrhh_faltas) ──
+// Al marcar "ausente" en la Asistencia Mensual, se crea (si no existe ya)
+// una falta auto-generada para que aparezca como alerta en gestion.html
+// hasta que se justifique. Al destildar "ausente", se borra la falta
+// auto-generada SOLO si sigue sin justificar (una ya justificada se deja,
+// es un registro de RRHH). No bloquea el flujo de asistencia si falla
+// (ej. sql/rrhh_faltas_v1.sql todavía no corrido en Supabase).
+async function sincronizarFaltaDesdeAsistencia(codigo, fecha, estado) {
+  try {
+    var op = (personalData && personalData.serig ? personalData.serig : []).find(function(x) { return x.codigo === codigo; });
+    if (!op || !op.id) return;
+    if (estado === 'ausente') {
+      var ex = await db.from('rrhh_faltas').select('id')
+        .eq('personal_id', op.id).eq('fecha', fecha).eq('origen', 'asistencia_serig').maybeSingle();
+      if (ex.error || ex.data) return;
+      await db.from('rrhh_faltas').insert({
+        personal_id: op.id, fecha: fecha, origen: 'asistencia_serig',
+        notas: 'Falta detectada automáticamente desde Asistencia Mensual (Serigrafía)'
+      });
+    } else {
+      await db.from('rrhh_faltas').delete()
+        .eq('personal_id', op.id).eq('fecha', fecha).eq('origen', 'asistencia_serig')
+        .is('justificacion_texto', null).is('justificacion_foto_url', null);
+    }
+  } catch (e) { /* no bloquear el flujo de asistencia por esto */ }
 }
 
 

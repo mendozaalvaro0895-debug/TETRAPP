@@ -82,6 +82,21 @@ view-productividad: si la fecha está vacía, buildUltimasLecturasHint() muestra
   10 lecturas clicables para saltar a su fecha — distingue "base vacía" de "fecha equivocada"
 ```
 
+### Asistencia Mensual ↔ gestion.html → Personal → Faltas (sincronización)
+`toggleAsistCell(codigo, fecha)` (grilla del board, `#asistGrid`) es la ÚNICA fuente que
+dispara la sync — NO los otros toggles de asistencia del archivo (`toggleAsistHoy`,
+`toggleAsistencia`), esos son paneles rápidos aparte y no sincronizan.
+- Marcar `ausente` en la grilla → `sincronizarFaltaDesdeAsistencia()` crea (si no existe)
+  una fila en `rrhh_faltas` con `origen='asistencia_serig'` → aparece como alerta 🚨 en
+  gestion.html hasta justificarse.
+- Destildar `ausente` → borra esa fila auto-generada SOLO si sigue sin justificar (una ya
+  justificada se deja intacta, es registro de RRHH).
+- Dirección inversa: registrar una falta manual en gestion.html para alguien de `area='serig'`
+  → `sincronizarAsistenciaDesdeFalta()` marca `ausente` en `asistencia_diaria` para esa fecha.
+  Solo Serigrafía tiene Asistencia Mensual por ahora — Tapas no sincroniza.
+- Todo el flujo es best-effort (try/catch silencioso): si `sql/rrhh_faltas_v1.sql` no ha
+  corrido, la asistencia normal sigue funcionando igual.
+
 ### Estados de ficha — SOLO 4 (`ESTADOS_SERIG`)
 `nueva` ⚪ → `proceso` 🔵 → `parcial` 🟡 → `lista` 🟢
 **`lista` = ENTREGADO / COMPLETADO** — estado final, pinta la ficha de verde con badge
