@@ -131,21 +131,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 /* TABLA — vista "Todos" agrupada por área */
 .p-table-wrap{padding:16px;overflow-x:auto}
 .p-table{width:auto;table-layout:fixed;border-collapse:collapse}
-.p-table thead th{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);padding:8px 10px;border-bottom:1px solid var(--border);text-align:left}
-.p-table tbody td{padding:8px 10px;border-bottom:1px solid var(--bg2);font-size:12px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.p-table col.c-persona{width:190px}
-.p-table col.c-codigo{width:64px}
-.p-table col.c-edad{width:56px}
-.p-table col.c-numero{width:108px}
-.p-table col.c-inicio{width:96px}
-.p-table col.c-rol{width:130px}
-.p-table col.c-estado{width:76px}
-.p-table col.c-locker{width:130px}
+.p-table thead th{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);padding:10px 10px;border-bottom:1px solid var(--border);text-align:left}
+.p-table tbody td{padding:10px 10px;border-bottom:1px solid var(--bg2);font-size:14px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-table col.c-persona{width:210px}
+.p-table col.c-codigo{width:70px}
+.p-table col.c-edad{width:60px}
+.p-table col.c-numero{width:120px}
+.p-table col.c-inicio{width:106px}
+.p-table col.c-talla{width:68px}
+.p-table col.c-rol{width:150px}
+.p-table col.c-estado{width:86px}
+.p-table col.c-locker{width:150px}
+.p-table col.c-faltas{width:150px}
+.p-table col.c-justif{width:130px}
 .p-table tr.p-row{cursor:pointer;transition:background .12s}
 .p-table tr.p-row:hover{background:var(--gest-l)}
 .p-table tr.p-row.inactivo{opacity:.55}
 .p-table tr.p-group td{background:var(--bg2);font-weight:800;font-size:11px;letter-spacing:.4px;padding:8px 12px;color:var(--ink);border-bottom:1px solid var(--border)}
-.p-row-avatar{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;margin-right:8px;vertical-align:middle}
+.p-row-avatar{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;margin-right:8px;vertical-align:middle}
 
 /* MODAL */
 .overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(12,12,11,.8);z-index:10000;align-items:center;justify-content:center}
@@ -185,6 +188,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rec-del{background:none;border:none;color:var(--gray-l);cursor:pointer;font-size:13px;padding:2px 6px}
 .rec-del:hover{color:var(--red)}
 .rec-empty{text-align:center;color:var(--gray-l);font-size:12px;padding:20px}
+
+/* Faltas — alerta hasta justificar */
+.falta-alert{background:var(--red-l);color:var(--red);font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.falta-ok{background:var(--green-l);color:var(--green);font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.falta-none{color:var(--gray-l);font-size:11px}
+.just-btn{background:var(--amber-l);color:var(--amber);border:none;border-radius:8px;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap}
+.just-btn:hover{background:#FDE68A}
+.just-inline{margin-top:10px;padding:10px;background:var(--bg);border-radius:8px}
+.just-foto-btn{display:inline-block;background:var(--card);border:1.5px dashed var(--border);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;color:var(--gray);cursor:pointer}
+.just-foto-btn:hover{border-color:var(--gest-m);color:var(--gest-m)}
+.falta-foto-thumb{width:52px;height:52px;border-radius:8px;object-fit:cover;cursor:pointer;border:1px solid var(--border);display:block;margin-top:6px}
 
 /* Formulario de vista general (búsqueda vacía) */
 .wip-view{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:48px 32px;text-align:center;overflow-y:auto}
@@ -248,6 +262,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="kpi"><div class="kpi-l">Serigrafía</div><div class="kpi-v" id="kSerig">—</div></div>
     <div class="kpi"><div class="kpi-l">Permisos pendientes</div><div class="kpi-v" id="kPermisos">—</div></div>
     <div class="kpi"><div class="kpi-l">EPP pendiente</div><div class="kpi-v" id="kEpp">—</div></div>
+    <div class="kpi"><div class="kpi-l">Faltas sin justificar</div><div class="kpi-v" id="kFaltas">—</div></div>
   </div>
 
   <div class="views">
@@ -298,6 +313,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="mptab active" id="mptab-gen" onclick="switchMpTab('gen')">Datos generales</div>
       <div class="mptab" id="mptab-rrhh" onclick="switchMpTab('rrhh')">RRHH</div>
       <div class="mptab" id="mptab-permisos" onclick="switchMpTab('permisos')">Permisos</div>
+      <div class="mptab" id="mptab-faltas" onclick="switchMpTab('faltas')">Faltas</div>
       <div class="mptab" id="mptab-incidentes" onclick="switchMpTab('incidentes')">Incidentes</div>
     </div>
 
@@ -452,6 +468,26 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
       </div>
 
+      <!-- ── Faltas ── -->
+      <div class="mp-panel" id="mp-faltas">
+        <div id="faltasList" class="rec-list"></div>
+        <button class="btn btn-g btn-sm" id="btnNuevaFalta" onclick="toggleFormFalta()">+ Registrar falta</button>
+        <div id="formFalta" style="display:none;margin-top:12px;padding:12px;background:var(--bg);border-radius:10px">
+          <div class="fg full">
+            <div class="fl">Fecha *</div>
+            <input class="fi" id="nfFecha" type="date" style="width:100%">
+          </div>
+          <div class="fg full">
+            <div class="fl">Notas</div>
+            <textarea class="fta" id="nfNotas" placeholder="Detalle de la falta (opcional)…" style="width:100%"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-g btn-sm" onclick="toggleFormFalta()">Cancelar</button>
+            <button class="btn btn-s btn-sm" onclick="guardarFalta()">Guardar</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ── Incidentes ── -->
       <div class="mp-panel" id="mp-incidentes">
         <div id="incidentesList" class="rec-list"></div>
@@ -560,11 +596,13 @@ function switchTab(tab) {
 // ════════════════════════════════════════════════════════════
 var personalTodos = [];
 var filtroArea = 'todos';
+var FALTAS_RESUMEN = {};
 
 async function cargarPersonal() {
   var r = await db.from('personal').select('*').order('activo', { ascending: false }).order('nombre');
   if (r.error) { showToast('❌ Error cargando personal: ' + r.error.message, '#B83232'); return; }
   personalTodos = r.data || [];
+  await cargarFaltasResumen();
   renderKpis();
   renderPersonalGrid();
 }
@@ -575,6 +613,10 @@ async function renderKpis() {
   document.getElementById('kTapas').textContent = activos.filter(function(p) { return p.area === 'tapas'; }).length;
   document.getElementById('kSerig').textContent = activos.filter(function(p) { return p.area === 'serig'; }).length;
   document.getElementById('kEpp').textContent = activos.filter(function(p) { return !p.epp_asignado; }).length;
+
+  var totalFaltasPend = 0;
+  Object.keys(FALTAS_RESUMEN).forEach(function(pid) { totalFaltasPend += FALTAS_RESUMEN[pid].pendientes; });
+  document.getElementById('kFaltas').textContent = totalFaltasPend;
 
   try {
     var rp = await db.from('rrhh_permisos').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente');
@@ -624,25 +666,28 @@ var AREA_GRUPOS = [
   { key: 'serig', label: '🎨 Serigrafía' }
 ];
 
+var P_TABLE_COLS = 11;
+
 function buildPersonalTable(lista) {
   var html = '<table class="p-table"><colgroup>' +
     '<col class="c-persona"><col class="c-codigo"><col class="c-edad"><col class="c-numero">' +
-    '<col class="c-inicio"><col class="c-rol"><col class="c-estado"><col class="c-locker">' +
+    '<col class="c-inicio"><col class="c-talla"><col class="c-rol"><col class="c-estado">' +
+    '<col class="c-locker"><col class="c-faltas"><col class="c-justif">' +
     '</colgroup><thead><tr>' +
-    '<th>Persona</th><th>Código</th><th>Edad</th><th>Número</th><th>Fecha de inicio</th>' +
-    '<th>Rol / Proceso</th><th>Estado</th><th>Locker asignado</th>' +
+    '<th>Persona</th><th>Código</th><th>Edad</th><th>Número</th><th>Fecha de inicio</th><th>Talla</th>' +
+    '<th>Rol / Proceso</th><th>Estado</th><th>Locker asignado</th><th>Faltas</th><th>Justificación</th>' +
     '</tr></thead><tbody>';
   var vistos = {};
   AREA_GRUPOS.forEach(function(a) {
     var grupo = lista.filter(function(p) { return p.area === a.key; });
     vistos[a.key] = true;
     if (!grupo.length) return;
-    html += '<tr class="p-group"><td colspan="5">' + a.label + ' · ' + grupo.length + '</td></tr>';
+    html += '<tr class="p-group"><td colspan="' + P_TABLE_COLS + '">' + a.label + ' · ' + grupo.length + '</td></tr>';
     html += grupo.map(buildPersonalRow).join('');
   });
   var otros = lista.filter(function(p) { return !vistos[p.area]; });
   if (otros.length) {
-    html += '<tr class="p-group"><td colspan="5">Otras áreas · ' + otros.length + '</td></tr>';
+    html += '<tr class="p-group"><td colspan="' + P_TABLE_COLS + '">Otras áreas · ' + otros.length + '</td></tr>';
     html += otros.map(buildPersonalRow).join('');
   }
   html += '</tbody></table>';
@@ -656,15 +701,27 @@ function buildPersonalRow(p) {
   var lockerChip = p.locker
     ? '<span class="op-mini ok">🗄️ ' + escHtml(p.locker) + '</span>'
     : '<span class="op-mini warn">🗄️ Pendiente</span>';
+  var resumen = FALTAS_RESUMEN[p.id] || { total: 0, pendientes: 0 };
+  var faltasBadge = !resumen.total
+    ? '<span class="falta-none">—</span>'
+    : (resumen.pendientes > 0
+      ? '<span class="falta-alert">🚨 ' + resumen.pendientes + ' sin justificar</span>'
+      : '<span class="falta-ok">✅ Al día</span>');
+  var justifCell = resumen.pendientes > 0
+    ? '<button class="just-btn" onclick="event.stopPropagation();abrirPerfilEnFaltas(\'' + p.id + '\')">📎 Justificar</button>'
+    : '<span class="falta-none">—</span>';
   return '<tr class="p-row' + (p.activo ? '' : ' inactivo') + '" onclick="abrirPerfil(\'' + p.id + '\')">' +
     '<td><span class="p-row-avatar" style="background:' + (p.color_hex || '#6B6B6A') + '">' + iniciales + '</span>' + escHtml(p.nombre) + '</td>' +
     '<td style="font-family:var(--mono);font-size:11px">' + escHtml(p.codigo) + '</td>' +
     '<td>' + (p.edad != null ? escHtml(p.edad) : '—') + '</td>' +
     '<td>' + (p.telefono ? escHtml(p.telefono) : '—') + '</td>' +
     '<td>' + (p.fecha_inicio ? escHtml(p.fecha_inicio) : '—') + '</td>' +
+    '<td>' + (p.talla_uniforme ? escHtml(p.talla_uniforme) : '—') + '</td>' +
     '<td>' + escHtml(rolTxt) + '</td>' +
     '<td>' + estadoBadge + '</td>' +
     '<td>' + lockerChip + '</td>' +
+    '<td>' + faltasBadge + '</td>' +
+    '<td>' + justifCell + '</td>' +
   '</tr>';
 }
 
@@ -700,7 +757,7 @@ function buildPersonalCard(p) {
 var mpEditId = null;
 
 function switchMpTab(tab) {
-  ['gen', 'rrhh', 'permisos', 'incidentes'].forEach(function(t) {
+  ['gen', 'rrhh', 'permisos', 'faltas', 'incidentes'].forEach(function(t) {
     document.getElementById('mptab-' + t).classList.toggle('active', t === tab);
     document.getElementById('mp-' + t).classList.toggle('active', t === tab);
   });
@@ -727,7 +784,7 @@ function abrirNuevaPersona() {
   document.getElementById('mpEppFecha').value = '';
   document.getElementById('mpNotasRrhh').value = '';
   document.getElementById('btnEliminarPersona').style.display = 'none';
-  ['permisos', 'incidentes'].forEach(function(t) {
+  ['permisos', 'faltas', 'incidentes'].forEach(function(t) {
     document.getElementById('mptab-' + t).classList.add('disabled');
   });
   switchMpTab('gen');
@@ -758,15 +815,22 @@ function abrirPerfil(id) {
   document.getElementById('mpEppFecha').value = p.epp_fecha || '';
   document.getElementById('mpNotasRrhh').value = p.notas_rrhh || '';
   document.getElementById('btnEliminarPersona').style.display = 'inline-block';
-  ['permisos', 'incidentes'].forEach(function(t) {
+  ['permisos', 'faltas', 'incidentes'].forEach(function(t) {
     document.getElementById('mptab-' + t).classList.remove('disabled');
   });
   document.getElementById('formPermiso').style.display = 'none';
+  document.getElementById('formFalta').style.display = 'none';
   document.getElementById('formIncidente').style.display = 'none';
   switchMpTab('gen');
   document.getElementById('modalPersona').classList.add('open');
   cargarPermisos(p.id);
+  cargarFaltas(p.id);
   cargarIncidentes(p.id);
+}
+
+function abrirPerfilEnFaltas(id) {
+  abrirPerfil(id);
+  switchMpTab('faltas');
 }
 
 function cerrarModalPersona() {
@@ -986,6 +1050,148 @@ async function eliminarIncidente(id) {
     var r = await db.from('rrhh_incidentes').delete().eq('id', id);
     if (r.error) throw r.error;
     await cargarIncidentes(mpEditId);
+    showToast('🗑 Eliminado');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// FALTAS — alerta hasta que se presente justificación (texto/foto)
+// ════════════════════════════════════════════════════════════
+async function cargarFaltasResumen() {
+  FALTAS_RESUMEN = {};
+  var r = await db.from('rrhh_faltas').select('personal_id,justificacion_texto,justificacion_foto_url');
+  if (r.error) return;
+  (r.data || []).forEach(function(f) {
+    if (!FALTAS_RESUMEN[f.personal_id]) FALTAS_RESUMEN[f.personal_id] = { total: 0, pendientes: 0 };
+    FALTAS_RESUMEN[f.personal_id].total++;
+    if (!f.justificacion_texto && !f.justificacion_foto_url) FALTAS_RESUMEN[f.personal_id].pendientes++;
+  });
+}
+
+async function cargarFaltas(personalId) {
+  var cont = document.getElementById('faltasList');
+  cont.innerHTML = '<div class="rec-empty">Cargando…</div>';
+  var r = await db.from('rrhh_faltas').select('*').eq('personal_id', personalId).order('fecha', { ascending: false });
+  if (r.error) { cont.innerHTML = '<div class="rec-empty">Error al cargar</div>'; return; }
+  var rows = r.data || [];
+  if (!rows.length) { cont.innerHTML = '<div class="rec-empty">Sin faltas registradas.</div>'; return; }
+  cont.innerHTML = rows.map(buildFaltaItem).join('');
+}
+
+function buildFaltaItem(f) {
+  var justificada = !!(f.justificacion_texto || f.justificacion_foto_url);
+  var estadoBadge = justificada ? '<span class="falta-ok">✅ Justificada</span>' : '<span class="falta-alert">🚨 Sin justificar</span>';
+  var cuerpo;
+  if (justificada) {
+    var foto = f.justificacion_foto_url
+      ? '<img class="falta-foto-thumb" src="' + escHtml(f.justificacion_foto_url) + '" onclick="window.open(\'' + escHtml(f.justificacion_foto_url) + '\',\'_blank\')">'
+      : '';
+    cuerpo = (f.justificacion_texto ? '<div class="rec-txt"><strong>Justificación:</strong> ' + escHtml(f.justificacion_texto) + '</div>' : '') + foto;
+  } else {
+    cuerpo = '<div class="just-inline">' +
+      '<textarea class="fta" id="just-texto-' + f.id + '" placeholder="Justificación escrita…" style="width:100%;margin-bottom:8px"></textarea>' +
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+        '<label class="just-foto-btn" for="just-foto-' + f.id + '">📷 Adjuntar foto</label>' +
+        '<input type="file" accept="image/*" id="just-foto-' + f.id + '" style="display:none" onchange="subirFotoJustificacion(' + f.id + ', this)">' +
+        '<span id="just-foto-status-' + f.id + '" style="font-size:10px;color:var(--gray)"></span>' +
+        '<button class="btn btn-s btn-sm" style="margin-left:auto" onclick="guardarTextoJustificacion(' + f.id + ')">Guardar justificación</button>' +
+      '</div>' +
+    '</div>';
+  }
+  return '<div class="rec-item">' +
+    '<div class="rec-top">' +
+      '<div><div class="rec-tipo">Falta ' + estadoBadge + '</div><div class="rec-fecha">' + f.fecha + '</div></div>' +
+      '<button class="rec-del" onclick="eliminarFalta(' + f.id + ')" title="Eliminar">🗑</button>' +
+    '</div>' +
+    (f.notas ? '<div class="rec-txt">' + escHtml(f.notas) + '</div>' : '') +
+    cuerpo +
+  '</div>';
+}
+
+function toggleFormFalta() {
+  var f = document.getElementById('formFalta');
+  var abrir = f.style.display === 'none';
+  f.style.display = abrir ? 'block' : 'none';
+  if (abrir) {
+    document.getElementById('nfFecha').value = fechaHoy();
+    document.getElementById('nfNotas').value = '';
+  }
+}
+
+async function guardarFalta() {
+  if (!mpEditId) return;
+  var fecha = document.getElementById('nfFecha').value;
+  if (!fecha) { showToast('⚠️ Fecha requerida', '#B83232'); return; }
+  var payload = {
+    personal_id: mpEditId,
+    fecha: fecha,
+    notas: (document.getElementById('nfNotas').value || '').trim() || null
+  };
+  try {
+    var r = await db.from('rrhh_faltas').insert(payload);
+    if (r.error) throw r.error;
+    toggleFormFalta();
+    await cargarFaltas(mpEditId);
+    await cargarFaltasResumen();
+    renderKpis();
+    showToast('✅ Falta registrada');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+async function guardarTextoJustificacion(faltaId) {
+  var texto = (document.getElementById('just-texto-' + faltaId).value || '').trim();
+  if (!texto) { showToast('⚠️ Escribe una justificación o adjunta una foto', '#B83232'); return; }
+  try {
+    var r = await db.from('rrhh_faltas').update({ justificacion_texto: texto }).eq('id', faltaId);
+    if (r.error) throw r.error;
+    await cargarFaltas(mpEditId);
+    await cargarFaltasResumen();
+    renderKpis();
+    showToast('✅ Justificación guardada');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+async function subirFotoJustificacion(faltaId, inputEl) {
+  var file = inputEl.files && inputEl.files[0];
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { showToast('⚠️ El archivo debe ser una imagen', '#B83232'); inputEl.value = ''; return; }
+  if (file.size > 6 * 1024 * 1024) { showToast('⚠️ Imagen muy pesada (máx 6MB)', '#B83232'); inputEl.value = ''; return; }
+  var status = document.getElementById('just-foto-status-' + faltaId);
+  if (status) status.textContent = 'Subiendo…';
+  var ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  var path = 'falta-' + faltaId + '.' + ext;
+  try {
+    var up = await db.storage.from('justificaciones').upload(path, file, { upsert: true, contentType: file.type });
+    if (up.error) throw up.error;
+    var pub = db.storage.from('justificaciones').getPublicUrl(path);
+    var url = pub.data.publicUrl + '?v=' + new Date().getTime();
+    var upd = await db.from('rrhh_faltas').update({ justificacion_foto_url: url }).eq('id', faltaId);
+    if (upd.error) throw upd.error;
+    await cargarFaltas(mpEditId);
+    await cargarFaltasResumen();
+    renderKpis();
+    showToast('✅ Foto de justificación guardada');
+  } catch (e) {
+    if (status) status.textContent = '';
+    showToast('❌ Error al subir la foto: ' + e.message, '#B83232');
+    inputEl.value = '';
+  }
+}
+
+async function eliminarFalta(id) {
+  if (!confirm('¿Eliminar este registro de falta?')) return;
+  try {
+    var r = await db.from('rrhh_faltas').delete().eq('id', id);
+    if (r.error) throw r.error;
+    await cargarFaltas(mpEditId);
+    await cargarFaltasResumen();
+    renderKpis();
     showToast('🗑 Eliminado');
   } catch (e) {
     showToast('❌ Error: ' + e.message, '#B83232');

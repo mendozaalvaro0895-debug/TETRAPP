@@ -170,6 +170,10 @@ Notas críticas:
    políticas insert/update/delete en produccion_diaria. Correr DESPUÉS del 5 (necesita la tabla).
 9. `sql/personal_edad_v1.sql` — columna `edad` (smallint) en `personal`. ⚠️ Sin correr esto,
    Guardar en gestion.html → Personal falla (columna no existe en el schema cache de PostgREST).
+10. `sql/rrhh_faltas_v1.sql` — tabla `rrhh_faltas` (alerta hasta justificar, texto y/o foto) +
+    políticas RLS del bucket Storage `justificaciones`. ⚠️ El bucket en sí (público) hay que
+    crearlo MANUAL en Dashboard → Storage → New bucket (igual que `envases`) — sin eso, subir
+    foto de justificación falla aunque el SQL ya haya corrido.
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
