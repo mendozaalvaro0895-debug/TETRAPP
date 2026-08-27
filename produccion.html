@@ -1835,6 +1835,7 @@ var RECET_TAB = 'pendientes';
 var INV_REC = [];
 var RECET_SID_SKU = {};
 var ESPECS_MAP = {};
+var INV_MAT = [];   // [{sku, descripcion}] de Bodega 7 — materias primas y colorantes
 
 var PROCESOS_FIJOS = ['Armado','Liner','Banda','Flameado','Impresión','Empaque','Serigrafía','Revisado','Limpiar pestaña','Apoyo'];
 var AREA_LABELS = {tapas:'Tapas', serigrafia:'Serigrafía', produccion:'Producción'};
@@ -1860,6 +1861,10 @@ async function cargarRecetario() {
   INV_REC = INV_LISTA.map(function(i) { return { sku: i.sku, descripcion: i.descripcion || '' }; });
   RECET_SKUS = INV_REC.slice().sort(function(a, b) { return String(a.sku || '').localeCompare(String(b.sku || '')); })
     .map(function(i) { return { sku_fact: i.sku, desc: i.descripcion }; });
+
+  // Materias primas de Bodega 7 — autocomplete en ficha técnica de producción
+  var rb7 = await db.from('inventario').select('sku,descripcion').eq('bodega','B7').order('descripcion').limit(2000);
+  INV_MAT = rb7.error ? [] : (rb7.data || []);
 
   var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado,foto_url');
   RECETAS_MAP = {};
@@ -2202,10 +2207,18 @@ function buildRcEspecsProd(sku, sid, esMaster) {
 
 function buildMatRows(items, sid, tipo, esMaster) {
   if (!items.length) return esMaster ? '' : '<div style="font-size:11px;color:var(--gray-l);padding:4px 0">Sin datos</div>';
+  var ph = tipo === 'mat' ? 'PP, Regrind…' : 'Nombre colorante';
   return items.map(function(item, i) {
+    var acId = 'rce-ac-' + sid + '-' + tipo + '-' + i;
     var del = esMaster ? '<button class="rc-del" onclick="delMatRow(\'' + sid + '\',\'' + tipo + '\',' + i + ')">✕</button>' : '<span></span>';
+    var acAttrs = esMaster
+      ? ' oninput="rcMatBuscar(\'' + sid + '\',\'' + tipo + '\',' + i + ')" onblur="setTimeout(function(){rcMatCerrar(\'' + acId + '\')},180)"'
+      : ' disabled';
     return '<div class="rce-mat-row" id="rce-' + tipo + '-row-' + sid + '-' + i + '">' +
-      '<input class="rce-in" value="' + esc(item.nombre || '') + '" placeholder="' + (tipo === 'mat' ? 'PP, Regrind…' : 'Nombre') + '"' + (esMaster ? '' : ' disabled') + '>' +
+      '<div class="rc-wrap">' +
+        '<input class="rce-in rce-mat-ac" value="' + esc(item.nombre || '') + '" placeholder="' + ph + '"' + acAttrs + '>' +
+        '<div class="rc-drop" id="' + acId + '"></div>' +
+      '</div>' +
       '<input class="rce-in" type="number" step="0.001" min="0" value="' + esc(item.cantidad || '') + '" placeholder="0.000"' + (esMaster ? '' : ' disabled') + '>' +
       '<input class="rce-in" type="number" step="0.1" min="0" max="100" value="' + esc(item.pct || '') + '" placeholder="0"' + (esMaster ? '' : ' disabled') + '>' +
       del +
@@ -2217,15 +2230,25 @@ function addMatRow(sid, tipo) {
   var cont = document.getElementById('rce-' + tipo + '-' + sid);
   if (!cont) return;
   var i = cont.querySelectorAll('.rce-mat-row').length;
+  var acId = 'rce-ac-' + sid + '-' + tipo + '-' + i;
+  var ph = tipo === 'mat' ? 'PP, Regrind…' : 'Nombre colorante';
   var div = document.createElement('div');
   div.className = 'rce-mat-row';
   div.id = 'rce-' + tipo + '-row-' + sid + '-' + i;
   div.innerHTML =
-    '<input class="rce-in" placeholder="' + (tipo === 'mat' ? 'PP, Regrind…' : 'Nombre') + '">' +
+    '<div class="rc-wrap">' +
+      '<input class="rce-in rce-mat-ac" placeholder="' + ph + '" ' +
+        'oninput="rcMatBuscar(\'' + sid + '\',\'' + tipo + '\',' + i + ')" ' +
+        'onblur="setTimeout(function(){rcMatCerrar(\'' + acId + '\')},180)">' +
+      '<div class="rc-drop" id="' + acId + '"></div>' +
+    '</div>' +
     '<input class="rce-in" type="number" step="0.001" min="0" placeholder="0.000">' +
     '<input class="rce-in" type="number" step="0.1" min="0" max="100" placeholder="0">' +
     '<button class="rc-del" onclick="delMatRow(\'' + sid + '\',\'' + tipo + '\',' + i + ')">✕</button>';
   cont.appendChild(div);
+  // Focus el input de nombre de la fila nueva
+  var inp = div.querySelector('.rce-mat-ac');
+  if (inp) inp.focus();
 }
 
 function delMatRow(sid, tipo, idx) {
@@ -2252,6 +2275,48 @@ function getMatRows(sid, tipo) {
     if (nombre || cantidad) rows.push({nombre: nombre, cantidad: cantidad, pct: pct});
   });
   return rows;
+}
+
+// Autocomplete Bodega 7 para filas de materia prima y colorante
+function rcMatBuscar(sid, tipo, idx) {
+  var row  = document.getElementById('rce-' + tipo + '-row-' + sid + '-' + idx);
+  var drop = document.getElementById('rce-ac-' + sid + '-' + tipo + '-' + idx);
+  if (!row || !drop) return;
+  var inp = row.querySelector('.rce-mat-ac');
+  if (!inp) return;
+  var q = inp.value.trim().toLowerCase();
+  if (q.length < 2) { drop.classList.remove('open'); return; }
+  var res = INV_MAT.filter(function(item) {
+    return String(item.sku || '').toLowerCase().indexOf(q) !== -1 ||
+           String(item.descripcion || '').toLowerCase().indexOf(q) !== -1;
+  }).slice(0, 14);
+  if (!res.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = res.map(function(item) {
+    return '<div class="rc-opt" data-sid="' + esc(sid) + '" data-tipo="' + tipo + '" data-idx="' + idx +
+      '" data-val="' + esc(String(item.sku || '') + (item.descripcion ? ' — ' + item.descripcion : '')) +
+      '" data-cant="' + esc(String(item.sku || '')) + '" onmousedown="rcMatElegirEv(this)">' +
+      '<b>' + esc(String(item.sku || '')) + '</b>' +
+      (item.descripcion ? ' · ' + esc(item.descripcion.slice(0, 50)) : '') +
+    '</div>';
+  }).join('');
+  drop.classList.add('open');
+}
+
+function rcMatElegirEv(el) {
+  var sid = el.dataset.sid, tipo = el.dataset.tipo, idx = parseInt(el.dataset.idx, 10);
+  var val = el.dataset.val;
+  var row = document.getElementById('rce-' + tipo + '-row-' + sid + '-' + idx);
+  if (!row) return;
+  var inp = row.querySelector('.rce-mat-ac');
+  if (inp) inp.value = val;
+  rcMatCerrar('rce-ac-' + sid + '-' + tipo + '-' + idx);
+  var inputs = row.querySelectorAll('input');
+  if (inputs[1]) inputs[1].focus();
+}
+
+function rcMatCerrar(dropId) {
+  var d = document.getElementById(dropId);
+  if (d) d.classList.remove('open');
 }
 
 function buildCapacidadHtml(cicloStr) {
@@ -2290,7 +2355,7 @@ async function guardarEspecsProd(sid) {
   if (up.error) { toast('Error al guardar: ' + up.error.message, 'err'); return; }
   if (!ESPECS_MAP[sku]) ESPECS_MAP[sku] = {};
   (up.data || filas).forEach(function(f) { ESPECS_MAP[sku][f.campo] = f; });
-  toast('✓ Especificaciones guardadas', 'ok');
+  toast('✓ Guardado en Supabase — visible en Producción, Ventas y Serigrafía', 'ok');
   renderRecetario();
 }
 
