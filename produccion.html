@@ -2015,6 +2015,7 @@ function buildRcCuerpo(sku, sid, desc, receta, partes) {
     ? '<div id="rc-add-wrap-' + sid + '"' + (isProduccion ? ' style="display:none"' : '') + '>' + buildRcAddForm(sid) + '</div>' +
       '<div id="rc-dir-msg-' + sid + '" style="padding:8px 14px;font-size:11px;color:var(--green);font-weight:600;' + (isProduccion ? '' : 'display:none') + '">✓ Directo desde Producción — sin proceso adicional</div>'
     : '';
+  var specsHtml = isProduccion ? buildRcEspecsProd(sku, sid, esMaster) : '';
   var foot = esMaster
     ? '<div class="rc-foot"><button class="rc-save-btn" id="rcsave-' + sid + '" onclick="guardarReceta(\'' + sid + '\')">Guardar receta ✓</button></div>'
     : '';
@@ -2023,7 +2024,9 @@ function buildRcCuerpo(sku, sid, desc, receta, partes) {
       '<input class="rc-desc-inp" id="rc-desc-' + sid + '" value="' + esc(descVal) + '" placeholder="Descripción del producto terminado"' + (esMaster ? '' : ' disabled') + '>' +
     '</div>' +
     buildRcAreaSelector(sid, currentArea) +
-    partesHdr + partesHtml + addSection + foot;
+    partesHdr + partesHtml + addSection +
+    '<div id="rc-specs-' + sid + '">' + specsHtml + '</div>' +
+    foot;
 }
 
 function buildRcAreaSelector(sid, currentArea) {
@@ -2047,6 +2050,16 @@ function rcSetArea(sid, area) {
   if (addWrap) addWrap.style.display = area === 'produccion' ? 'none' : '';
   var dirMsg = document.getElementById('rc-dir-msg-' + sid);
   if (dirMsg) dirMsg.style.display = area === 'produccion' ? '' : 'none';
+  // Inyectar / quitar ficha de producción según el área seleccionada
+  var specsWrap = document.getElementById('rc-specs-' + sid);
+  if (specsWrap) {
+    if (area === 'produccion') {
+      var sku = RECET_SID_SKU[sid];
+      specsWrap.innerHTML = sku ? buildRcEspecsProd(sku, sid, TETRA.rol === 'master') : '';
+    } else {
+      specsWrap.innerHTML = '';
+    }
+  }
 }
 
 function buildRcParteRow(p, esMaster) {
@@ -2318,8 +2331,29 @@ async function guardarReceta(sid) {
   RECETAS_MAP[sku].guardado = true;
   RECETAS_MAP[sku].es_directo = esDirecto;
   if (desc) RECETAS_MAP[sku].descripcion = desc;
+  // Para producción, guardar specs al mismo tiempo si hay datos
+  if (area === 'produccion') await guardarEspecsProdSilente(sid, sku);
   toast('✓ Receta guardada', 'ok');
   renderRecetario();
+}
+
+async function guardarEspecsProdSilente(sid, sku) {
+  var quien = TETRA.nombre || TETRA.email || null;
+  var matRows = getMatRows(sid, 'mat');
+  var colRows = getMatRows(sid, 'col');
+  var peso  = ((document.getElementById('rce-peso-'  + sid) || {}).value || '').trim();
+  var ciclo = ((document.getElementById('rce-ciclo-' + sid) || {}).value || '').trim();
+  if (!matRows.length && !colRows.length && !peso && !ciclo) return;
+  var filas = [
+    { sku: sku, area: 'produccion', campo: 'Materia prima', valor: JSON.stringify(matRows), actualizado_por: quien },
+    { sku: sku, area: 'produccion', campo: 'Colorante',     valor: JSON.stringify(colRows), actualizado_por: quien },
+    { sku: sku, area: 'produccion', campo: 'Peso (g)',       valor: peso  || null, actualizado_por: quien },
+    { sku: sku, area: 'produccion', campo: 'Ciclo (s)',      valor: ciclo || null, actualizado_por: quien }
+  ];
+  var up = await db.from('sku_especificaciones').upsert(filas, { onConflict: 'sku,area,campo' }).select();
+  if (up.error) return;
+  if (!ESPECS_MAP[sku]) ESPECS_MAP[sku] = {};
+  (up.data || filas).forEach(function(f) { ESPECS_MAP[sku][f.campo] = f; });
 }
 
 async function deshacerReceta(sid) {
