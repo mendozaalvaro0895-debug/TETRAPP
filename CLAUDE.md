@@ -137,6 +137,8 @@ Notas críticas:
 7. `sql/sku_especificaciones_v1.sql` — tabla `sku_especificaciones` (ficha técnica extensible por
    SKU+área: Fase 2 del Recetario unificado — peso/material/colorante en Producción, tiros/colores/
    fórmula de tinta en Serigrafía, familia/accesorios en Tapas). RLS igual a `sku_recetas` (master).
+8. `sql/operativo_produccion_v1.sql` — rol `operativo_prod` + usuario produccion@tetrapp.app +
+   políticas insert/update/delete en produccion_diaria. Correr DESPUÉS del 5 (necesita la tabla).
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
@@ -155,6 +157,7 @@ Sólido: sin secretos hardcodeados; CSP + HSTS + X-Frame-Options en vercel.json;
 - `master` → todo · `visor` → solo lectura (banner Modo Visual)
 - `operativo` → enjaulado en registro-tapas.html; INSERT solo en comandas/comanda_tareas
 - `operativo_serig` → enjaulado en registro-serigrafia.html; INSERT en registro_tiros_serig, paros_serig, registro_flameado_serig, registro_empaque_serig
+- `operativo_prod` → enjaulado en produccion.html; INSERT/UPDATE/DELETE en produccion_diaria (registrar turnos + ver reportes). NO edita recetas/fichas (solo-master)
 - La jaula vive en TETRA_PAGINAS_OPERATIVO (auth.js): rol → página permitida
 - Sesiones expiran a 60 min de inactividad, EXCEPTO roles operativos (pantallas de planta)
 

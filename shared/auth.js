@@ -27,7 +27,8 @@ var TETRA = { rol: null, nombre: '', email: null, esVisor: false, esOperativo: f
 // Cada área tiene su propio rol + página; ninguno puede salirse de la suya.
 var TETRA_PAGINAS_OPERATIVO = {
   'operativo':       'registro-tapas',
-  'operativo_serig': 'registro-serigrafia'
+  'operativo_serig': 'registro-serigrafia',
+  'operativo_prod':  'produccion'
 };
 
 // ── Escape universal anti-XSS para texto dinámico en innerHTML ──
