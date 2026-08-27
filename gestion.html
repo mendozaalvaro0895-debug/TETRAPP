@@ -121,6 +121,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .locker-num{font-family:var(--mono);font-weight:800;font-size:13px;color:var(--ink)}
 .locker-owner{font-size:9.5px;margin-top:4px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+/* Autocompletar de persona (modal Locker) */
+.pk-wrap{position:relative}
+.pk-drop{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card);border:1.5px solid var(--gest-m);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.14);z-index:50;max-height:220px;overflow-y:auto}
+.pk-drop.open{display:block}
+.pk-item{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--bg)}
+.pk-item:last-child{border-bottom:none}
+.pk-item:hover{background:var(--gest-l)}
+.pk-item-nombre{font-size:13px;font-weight:600}
+.pk-item-meta{font-size:10px;color:var(--gray)}
+
 /* Mini-badges (usados en celdas de la tabla) */
 .op-mini{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--bg);color:var(--gray-l)}
 .op-mini.ok{background:var(--green-l);color:var(--green)}
@@ -573,7 +583,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
       <div class="fg full">
         <div class="fl">Persona asignada</div>
-        <select class="fs" id="mlPersona" style="width:100%"></select>
+        <div class="pk-wrap">
+          <input class="fi" id="mlPersonaTexto" style="width:100%" placeholder="Buscar por nombre o código…" autocomplete="off"
+            oninput="filtrarPersonasLocker()" onfocus="filtrarPersonasLocker()"
+            onblur="setTimeout(function(){document.getElementById('mlPersonaDrop').classList.remove('open')},150)">
+          <div class="pk-drop" id="mlPersonaDrop"></div>
+        </div>
+        <button class="btn btn-g btn-xs" style="margin-top:8px;align-self:flex-start" onclick="quitarPersonaLocker()">🗑️ Quitar del locker</button>
       </div>
     </div>
     <div class="mf">
@@ -716,32 +732,62 @@ function renderLockers() {
 // ── Modal: vincular/reasignar/liberar un locker ──────────────
 var mlNumeroActual = null;
 var mlPersonaActualId = null;
+var mlPersonaSeleccionadaId = null;
 
 function abrirModalLocker(numero) {
   mlNumeroActual = numero;
   var actual = LOCKERS_OCUPACION[numero] || null;
   mlPersonaActualId = actual ? actual.id : null;
+  mlPersonaSeleccionadaId = actual ? actual.id : null;
 
   document.getElementById('mlTitle').textContent = 'Locker L-' + numero;
   document.getElementById('mlPerfilLink').style.display = actual ? 'block' : 'none';
-
-  var activos = personalTodos.filter(function(p) { return p.activo; })
-    .sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
-  var opts = '<option value="">— Sin asignar (disponible) —</option>';
-  activos.forEach(function(p) {
-    var otroLocker = parseLockerNum(p.locker);
-    var etiqueta = p.nombre + ' (' + p.codigo + ')' + (otroLocker && otroLocker !== numero ? ' — actualmente L-' + otroLocker : '');
-    var sel = actual && String(actual.id) === String(p.id) ? ' selected' : '';
-    opts += '<option value="' + p.id + '"' + sel + '>' + escHtml(etiqueta) + '</option>';
-  });
-  document.getElementById('mlPersona').innerHTML = opts;
+  document.getElementById('mlPersonaTexto').value = actual ? (actual.nombre + ' (' + actual.codigo + ')') : '';
+  document.getElementById('mlPersonaDrop').innerHTML = '';
+  document.getElementById('mlPersonaDrop').classList.remove('open');
   document.getElementById('modalLocker').classList.add('open');
+  setTimeout(function() { document.getElementById('mlPersonaTexto').focus(); }, 50);
+}
+
+function filtrarPersonasLocker() {
+  mlPersonaSeleccionadaId = null; // escribir invalida la selección previa hasta elegir de nuevo
+  var q = (document.getElementById('mlPersonaTexto').value || '').trim().toLowerCase();
+  var drop = document.getElementById('mlPersonaDrop');
+  var activos = personalTodos.filter(function(p) { return p.activo; });
+  var filtrados = (q ? activos.filter(function(p) {
+    return (p.nombre || '').toLowerCase().indexOf(q) !== -1 || (p.codigo || '').toLowerCase().indexOf(q) !== -1;
+  }) : activos).sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
+
+  drop.innerHTML = !filtrados.length
+    ? '<div class="pk-item" style="color:var(--gray-l);cursor:default">Sin resultados</div>'
+    : filtrados.slice(0, 30).map(function(p) {
+        var otroLocker = parseLockerNum(p.locker);
+        var meta = p.codigo + (otroLocker && otroLocker !== mlNumeroActual ? ' · actualmente L-' + otroLocker : '');
+        return '<div class="pk-item" onmousedown="seleccionarPersonaLocker(\'' + p.id + '\')">' +
+          '<div class="pk-item-nombre">' + escHtml(p.nombre) + '</div><div class="pk-item-meta">' + escHtml(meta) + '</div></div>';
+      }).join('');
+  drop.classList.add('open');
+}
+
+function seleccionarPersonaLocker(id) {
+  var p = personalTodos.find(function(x) { return String(x.id) === String(id); });
+  if (!p) return;
+  mlPersonaSeleccionadaId = p.id;
+  document.getElementById('mlPersonaTexto').value = p.nombre + ' (' + p.codigo + ')';
+  document.getElementById('mlPersonaDrop').classList.remove('open');
+}
+
+function quitarPersonaLocker() {
+  mlPersonaSeleccionadaId = null;
+  document.getElementById('mlPersonaTexto').value = '';
+  document.getElementById('mlPersonaDrop').classList.remove('open');
 }
 
 function cerrarModalLocker() {
   document.getElementById('modalLocker').classList.remove('open');
   mlNumeroActual = null;
   mlPersonaActualId = null;
+  mlPersonaSeleccionadaId = null;
 }
 function cerrarSiOverlayLocker(e) {
   if (e.target === document.getElementById('modalLocker')) cerrarModalLocker();
@@ -755,7 +801,7 @@ function verPerfilDesdeLocker() {
 async function guardarLocker() {
   if (!mlNumeroActual) return;
   var etiqueta = 'L-' + mlNumeroActual;
-  var personaId = document.getElementById('mlPersona').value;
+  var personaId = mlPersonaSeleccionadaId;
   var actual = LOCKERS_OCUPACION[mlNumeroActual] || null;
 
   try {

@@ -146,9 +146,11 @@ view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la dispo
   disparado dentro de `cargarPersonal()`. `parseLockerNum()` extrae el primer número del
   texto libre (tolera "L-14"/"L14"/"14"); lo que no matchea 1–86 se lista aparte en
   `#lockersExtra` sin perderse.
-  Clic en CUALQUIER ficha (libre u ocupada) → `abrirModalLocker(numero)`: select con todas
-  las personas activas para vincular/reasignar ese locker, o "— Sin asignar —" para
-  liberarlo. `guardarLocker()` primero desvincula a quien lo tenía (si cambia de dueño) y
+  Clic en CUALQUIER ficha (libre u ocupada) → `abrirModalLocker(numero)`: cuadro de texto
+  autorrellenable (`filtrarPersonasLocker`/`seleccionarPersonaLocker`, patrón `.pk-*` propio
+  de este archivo — mismo estilo que el autocomplete de SKU en otros módulos, no lo reusa)
+  filtra por nombre o código entre las personas activas; dejar el campo vacío = liberar.
+  `guardarLocker()` primero desvincula a quien lo tenía (si cambia de dueño) y
   luego escribe `personal.locker = 'L-N'` en la nueva persona — sigue siendo el mismo campo
   de siempre, sin tabla ni lógica de escritura duplicada. Botón "Ver perfil completo" dentro
   del modal (solo si hay ocupante) para ir al perfil vía `abrirPerfil`.
