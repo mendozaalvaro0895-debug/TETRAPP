@@ -17,11 +17,13 @@
 --   C. Políticas RLS en produccion_diaria: lectura con perfil, escritura
 --      (insert/update/delete) para operativo_prod y para master
 --
--- Alcance del rol (enjaulado en produccion.html por auth.js):
---   PUEDE  → registrar/editar/borrar turnos de producción (produccion_diaria)
---            y ver los reportes semanal/mensual (lectura con perfil)
---   NO PUEDE → editar recetas ni fichas técnicas de SKU (siguen solo-master,
---            gateadas en la UI y por RLS), ni entrar a otros módulos.
+-- Alcance del rol (auth.js: ve todos los módulos, edita solo Producción):
+--   PUEDE  → ver TODOS los módulos en modo lectura (lectura_con_perfil, igual
+--            que visor) y registrar/editar/borrar turnos de producción
+--            (produccion_diaria) + ver los reportes semanal/mensual.
+--   NO PUEDE → escribir en ninguna otra tabla (bloqueado por RLS del lado
+--            servidor y por la capa UX de auth.js), incluidas recetas/fichas
+--            de SKU (siguen solo-master).
 --   Nota: el "recordar máquina" (inventario.maquina_default) que produccion.html
 --   intenta al guardar es opcional y está en try/catch — para operativo_prod
 --   simplemente no persiste (no bloquea el registro). Si más adelante se quiere

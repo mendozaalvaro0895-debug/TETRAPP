@@ -5,31 +5,37 @@
 //
 // Provee a cada página (reemplaza sus declaraciones locales):
 //   SUPA_URL, SUPA_KEY, db (cliente único), HEADERS (con token vivo)
-//   TETRA = { rol, nombre, email, esVisor, esOperativo }
+//   TETRA = { rol, nombre, email, esVisor, esOperativo, esProdEditor }
 //
 // Reglas:
 //   - Sin sesión → redirige a login.html
 //   - Sesión sin perfil → cierra sesión y redirige (usuario no autorizado)
 //   - Rol visor → banner "Modo Visual" + bloqueo de escrituras en cliente
 //     (la protección REAL es el RLS en Supabase; esto es solo UX)
-//   - Rol operativo → solo puede estar en registro-tapas.html; cualquier
-//     otra página lo redirige ahí (el RLS limita sus escrituras a
-//     INSERT en comandas/comanda_tareas del lado servidor)
+//   - Roles operativo/operativo_serig → enjaulados: solo pueden estar en su
+//     formulario de registro; cualquier otra página los redirige ahí
+//   - Rol operativo_prod → NO enjaulado: ve todos los módulos en lectura,
+//     pero solo puede escribir en produccion_diaria (registrar turnos). El
+//     bloqueo de escritura a otras tablas es UX; el RLS es la protección real
 // ═══════════════════════════════════════════════════════════════
 
 var SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
 var SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
 var db = supabase.createClient(SUPA_URL, SUPA_KEY);
 var HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
-var TETRA = { rol: null, nombre: '', email: null, esVisor: false, esOperativo: false };
+var TETRA = { rol: null, nombre: '', email: null, esVisor: false, esOperativo: false, esProdEditor: false };
 
-// Página permitida por cada rol operativo (sin extensión por cleanUrls).
-// Cada área tiene su propio rol + página; ninguno puede salirse de la suya.
+// Página permitida por cada rol operativo ENJAULADO (sin extensión por
+// cleanUrls). Cada área tiene su rol + página; no puede salirse de la suya.
+// (operativo_prod NO está aquí a propósito: ve todos los módulos; su límite
+//  es de escritura, no de navegación — ver bloqueo de escrituras abajo.)
 var TETRA_PAGINAS_OPERATIVO = {
   'operativo':       'registro-tapas',
-  'operativo_serig': 'registro-serigrafia',
-  'operativo_prod':  'produccion'
+  'operativo_serig': 'registro-serigrafia'
 };
+
+// Tabla que el rol operativo_prod SÍ puede escribir (endpoint REST de Supabase).
+var TETRA_PROD_TABLA = 'produccion_diaria';
 
 // ── Escape universal anti-XSS para texto dinámico en innerHTML ──
 // (serigrafia.html tiene su propia copia equivalente; misma firma)
@@ -55,21 +61,32 @@ function tetraRevelar() {
   if (v) v.remove();
 }
 
-// ── Bloqueo de escrituras en modo visor (capa UX) ────────────────
+// ── Bloqueo de escrituras (capa UX; el RLS es la protección real) ─
+// - visor: bloquea TODA escritura.
+// - operativo_prod: bloquea toda escritura MENOS a la tabla produccion_diaria.
 (function () {
   var fetchOriginal = window.fetch.bind(window);
+  function bloquear(msg, code) {
+    return Promise.resolve(new Response(
+      JSON.stringify({ message: msg, code: code }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    ));
+  }
   window.fetch = function (input, init) {
     var url = String(input && input.url ? input.url : input);
     var method = ((init && init.method) || (input && input.method) || 'GET').toUpperCase();
     var esEscritura = method !== 'GET' && method !== 'HEAD';
     var esSupa = url.indexOf(SUPA_URL) === 0;
     var esAuth = url.indexOf(SUPA_URL + '/auth/') === 0;
-    if (TETRA.esVisor && esSupa && !esAuth && esEscritura) {
-      tetraToastVisor();
-      return Promise.resolve(new Response(
-        JSON.stringify({ message: 'Modo Visual: sin permisos de edición', code: 'visor' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      ));
+    if (esSupa && !esAuth && esEscritura) {
+      if (TETRA.esVisor) {
+        tetraToastVisor();
+        return bloquear('Modo Visual: sin permisos de edición', 'visor');
+      }
+      if (TETRA.esProdEditor && url.indexOf('/rest/v1/' + TETRA_PROD_TABLA) === -1) {
+        tetraToastProd();
+        return bloquear('Cuenta de Producción: solo puedes editar en el módulo Producción', 'solo_prod');
+      }
     }
     return fetchOriginal(input, init);
   };
@@ -96,6 +113,32 @@ function tetraBannerVisor() {
   b.id = 'tetraBannerVisor';
   b.style.cssText = 'background:#FEF3C7;border-bottom:1.5px solid #FDE68A;color:#92400E;font:600 12px "DM Sans",sans-serif;text-align:center;padding:7px 16px;letter-spacing:.3px';
   b.innerHTML = '👁 MODO VISUAL — acceso de solo lectura, sin permisos de edición';
+  var topbar = document.querySelector('.topbar');
+  if (topbar && topbar.parentNode) topbar.parentNode.insertBefore(b, topbar.nextSibling);
+  else document.body.insertBefore(b, document.body.firstChild);
+}
+
+// Toast para operativo_prod cuando intenta editar fuera de Producción
+function tetraToastProd() {
+  var t = document.getElementById('tetraToastProd');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'tetraToastProd';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0C0C0B;color:#fff;padding:12px 22px;border-radius:12px;font:600 13px "DM Sans",sans-serif;z-index:99999;box-shadow:0 8px 28px rgba(0,0,0,.4);border:1px solid #1A6B5B;display:none;align-items:center;gap:8px';
+    t.innerHTML = '🏭 Cuenta de Producción — solo puedes editar en el módulo Producción';
+    document.body.appendChild(t);
+  }
+  t.style.display = 'flex';
+  clearTimeout(tetraToastTimer);
+  tetraToastTimer = setTimeout(function () { t.style.display = 'none'; }, 2800);
+}
+
+// Banner permanente para operativo_prod (en todos los módulos)
+function tetraBannerProd() {
+  var b = document.createElement('div');
+  b.id = 'tetraBannerProd';
+  b.style.cssText = 'background:#E8F5F2;border-bottom:1.5px solid #A7D8CC;color:#134F43;font:600 12px "DM Sans",sans-serif;text-align:center;padding:7px 16px;letter-spacing:.3px';
+  b.innerHTML = '🏭 CUENTA DE PRODUCCIÓN — ves todos los módulos; solo puedes editar en Producción';
   var topbar = document.querySelector('.topbar');
   if (topbar && topbar.parentNode) topbar.parentNode.insertBefore(b, topbar.nextSibling);
   else document.body.insertBefore(b, document.body.firstChild);
@@ -142,7 +185,7 @@ function tetraCerrarPorInactividad() {
 }
 
 function tetraVigilarInactividad() {
-  if (TETRA.esOperativo) return; // pantallas de planta: sesión persistente
+  if (TETRA.esOperativo || TETRA.esProdEditor) return; // cuentas de planta: sesión persistente
   if (tetraSesionVencida()) { tetraCerrarPorInactividad(); return; }
   tetraMarcarActividad();
   ['click', 'keydown', 'touchstart', 'scroll', 'pointerdown'].forEach(function (ev) {
@@ -174,6 +217,7 @@ function tetraVigilarInactividad() {
     TETRA.rol = r.data.rol;
     TETRA.nombre = r.data.nombre || session.user.email;
     TETRA.esVisor = r.data.rol === 'visor';
+    TETRA.esProdEditor = r.data.rol === 'operativo_prod';
     var paginaPermitida = TETRA_PAGINAS_OPERATIVO[r.data.rol];
     TETRA.esOperativo = !!paginaPermitida;
 
@@ -190,6 +234,7 @@ function tetraVigilarInactividad() {
 
     var pintar = function () {
       if (TETRA.esVisor) tetraBannerVisor();
+      else if (TETRA.esProdEditor) tetraBannerProd();
       tetraPintarUsuario();
       tetraRevelar();
     };

@@ -157,7 +157,7 @@ Sólido: sin secretos hardcodeados; CSP + HSTS + X-Frame-Options en vercel.json;
 - `master` → todo · `visor` → solo lectura (banner Modo Visual)
 - `operativo` → enjaulado en registro-tapas.html; INSERT solo en comandas/comanda_tareas
 - `operativo_serig` → enjaulado en registro-serigrafia.html; INSERT en registro_tiros_serig, paros_serig, registro_flameado_serig, registro_empaque_serig
-- `operativo_prod` → enjaulado en produccion.html; INSERT/UPDATE/DELETE en produccion_diaria (registrar turnos + ver reportes). NO edita recetas/fichas (solo-master)
+- `operativo_prod` → NO enjaulado: ve TODOS los módulos en lectura (como visor), pero solo escribe en produccion_diaria (registrar turnos). auth.js bloquea escrituras a otras tablas (flag TETRA.esProdEditor + TETRA_PROD_TABLA); RLS lo respalda. Exento de logout por inactividad. NO edita recetas/fichas (solo-master)
 - La jaula vive en TETRA_PAGINAS_OPERATIVO (auth.js): rol → página permitida
 - Sesiones expiran a 60 min de inactividad, EXCEPTO roles operativos (pantallas de planta)
 
