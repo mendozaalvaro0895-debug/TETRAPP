@@ -139,7 +139,15 @@ Orden dentro de cada desplegable: rojo → amarillo → verde.
 ## gestion.html — Arquitectura de vistas
 
 ```
-Tabs: Personal (activo) · Planta (WIP — tabla mejoras_planta ya existe, vista pendiente)
+Tabs: Personal (activo) · Lockers (activo) · Planta (WIP — tabla mejoras_planta ya existe, vista pendiente)
+
+view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la disponibilidad se
+  calcula en vivo desde `personal.locker` (personas activas) vía `renderLockers()`, ya
+  disparado dentro de `cargarPersonal()`. `parseLockerNum()` extrae el primer número del
+  texto libre (tolera "L-14"/"L14"/"14"); lo que no matchea 1–86 se lista aparte en
+  `#lockersExtra` sin perderse. Clic en un locker ocupado abre el perfil de esa persona
+  (`abrirPerfil`) — asignar/liberar un locker se sigue haciendo desde ahí (pestaña RRHH),
+  no hay UI de asignación directa en esta vista (evita duplicar la lógica de escritura).
 
 view-personal: grid unificado de TODA la tabla personal (área tapas + serig juntas,
   sin duplicar el CRUD que ya existe en tapas.html/serigrafia.html — es la misma tabla,
