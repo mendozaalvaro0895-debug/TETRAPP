@@ -128,6 +128,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .op-mini.ok{background:var(--green-l);color:var(--green)}
 .op-mini.warn{background:var(--amber-l);color:var(--amber)}
 
+/* TABLA — vista "Todos" agrupada por área */
+.p-table-wrap{padding:16px;overflow-x:auto}
+.p-table{width:100%;min-width:560px;border-collapse:collapse}
+.p-table thead th{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left}
+.p-table tbody td{padding:9px 12px;border-bottom:1px solid var(--bg2);font-size:12px;vertical-align:middle}
+.p-table tr.p-row{cursor:pointer;transition:background .12s}
+.p-table tr.p-row:hover{background:var(--gest-l)}
+.p-table tr.p-row.inactivo{opacity:.55}
+.p-table tr.p-group td{background:var(--bg2);font-weight:800;font-size:11px;letter-spacing:.4px;padding:8px 12px;color:var(--ink);border-bottom:1px solid var(--border)}
+.p-row-avatar{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;margin-right:8px;vertical-align:middle}
+
 /* MODAL */
 .overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(12,12,11,.8);z-index:10000;align-items:center;justify-content:center}
 .overlay.open{display:flex}
@@ -592,7 +603,50 @@ function renderPersonalGrid() {
       '<div style="font-size:32px;margin-bottom:8px">🧑‍🤝‍🧑</div>No hay personas que coincidan con el filtro.</div>';
     return;
   }
-  g.innerHTML = '<div class="pg">' + lista.map(buildPersonalCard).join('') + '</div>';
+  g.innerHTML = (filtroArea === 'todos')
+    ? '<div class="p-table-wrap">' + buildPersonalTable(lista) + '</div>'
+    : '<div class="pg">' + lista.map(buildPersonalCard).join('') + '</div>';
+}
+
+var AREA_GRUPOS = [
+  { key: 'tapas', label: '🏷 Tapas' },
+  { key: 'serig', label: '🎨 Serigrafía' }
+];
+
+function buildPersonalTable(lista) {
+  var html = '<table class="p-table"><thead><tr>' +
+    '<th>Persona</th><th>Código</th><th>Rol / Proceso</th><th>Estado</th><th>RRHH</th>' +
+    '</tr></thead><tbody>';
+  var vistos = {};
+  AREA_GRUPOS.forEach(function(a) {
+    var grupo = lista.filter(function(p) { return p.area === a.key; });
+    vistos[a.key] = true;
+    if (!grupo.length) return;
+    html += '<tr class="p-group"><td colspan="5">' + a.label + ' · ' + grupo.length + '</td></tr>';
+    html += grupo.map(buildPersonalRow).join('');
+  });
+  var otros = lista.filter(function(p) { return !vistos[p.area]; });
+  if (otros.length) {
+    html += '<tr class="p-group"><td colspan="5">Otras áreas · ' + otros.length + '</td></tr>';
+    html += otros.map(buildPersonalRow).join('');
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+function buildPersonalRow(p) {
+  var iniciales = escHtml(p.iniciales || (p.nombre ? p.nombre.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase() : '?'));
+  var rolTxt = p.rol === 'supervisor' ? 'Supervisor' : (p.proceso_hab || 'Operador');
+  var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-activo' : 'pill-inactivo') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>';
+  var lockerChip = p.locker ? '<span class="op-mini ok">🗄 ' + escHtml(p.locker) + '</span>' : '';
+  var eppChip = p.epp_asignado ? '<span class="op-mini ok">🦺 EPP</span>' : '<span class="op-mini warn">🦺 Pendiente</span>';
+  return '<tr class="p-row' + (p.activo ? '' : ' inactivo') + '" onclick="abrirPerfil(\'' + p.id + '\')">' +
+    '<td><span class="p-row-avatar" style="background:' + (p.color_hex || '#6B6B6A') + '">' + iniciales + '</span>' + escHtml(p.nombre) + '</td>' +
+    '<td style="font-family:var(--mono);font-size:11px">' + escHtml(p.codigo) + '</td>' +
+    '<td>' + escHtml(rolTxt) + '</td>' +
+    '<td>' + estadoBadge + '</td>' +
+    '<td>' + eppChip + ' ' + lockerChip + '</td>' +
+  '</tr>';
 }
 
 function buildPersonalCard(p) {
