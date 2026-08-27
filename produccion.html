@@ -1862,14 +1862,12 @@ async function cargarRecetario() {
   RECET_SKUS = INV_REC.slice().sort(function(a, b) { return String(a.sku || '').localeCompare(String(b.sku || '')); })
     .map(function(i) { return { sku_fact: i.sku, desc: i.descripcion }; });
 
-  // Materias primas de Bodega 7 — autocomplete en ficha técnica de producción
-  var rb7 = await db.from('inventario').select('sku,descripcion').eq('bodega','B7').order('descripcion').limit(2000);
+  // Materias primas de Bodega 7 — tabla insumos_b7 (separada de inventario)
+  var rb7 = await db.from('insumos_b7').select('sku,descripcion').order('descripcion').limit(2000);
   INV_MAT = rb7.error ? [] : (rb7.data || []);
-  if (!INV_MAT.length && !rb7.error) {
-    // B7 sin resultados: usar todo el inventario como fallback y avisar
+  if (!INV_MAT.length) {
     INV_MAT = INV_REC.slice();
-    console.warn('[Recetario] bodega="B7" devolvió 0 filas — revisa el valor real del campo bodega en Supabase. Usando inventario completo como fallback.');
-    toast('⚠️ Bodega "B7" sin resultados en inventario — autocomplete muestra todo el catálogo. Confirma el valor del campo bodega.', 'err');
+    console.warn('[Recetario] insumos_b7 sin resultados — usando inventario completo como fallback.');
   } else {
     console.log('[Recetario] INV_MAT Bodega 7:', INV_MAT.length, 'ítems');
   }
@@ -2196,7 +2194,7 @@ function buildRcEspecsProd(sku, sid, esMaster) {
     '<div class="rce-hdr-title">🧬 Especificaciones técnicas · Producción</div>' +
     '<div class="rce-prod-section">' +
       '<div class="rce-prod-title">Materia prima</div>' +
-      '<div class="rce-mat-hdr"><span>Material</span><span>Cantidad (kg)</span><span>%</span><span></span></div>' +
+      '<div class="rce-mat-hdr"><span>Material</span><span>Cantidad (g)</span><span>%</span><span></span></div>' +
       '<div id="rce-mat-' + sid + '">' + buildMatRows(matData, sid, 'mat', esMaster) + '</div>' +
       (esMaster ? '<button class="rce-add-row" onclick="addMatRow(\'' + sid + '\',\'mat\')">+ Agregar material</button>' : '') +
     '</div>' +
