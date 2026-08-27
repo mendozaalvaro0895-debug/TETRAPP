@@ -120,8 +120,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 /* TABLA — vista "Todos" agrupada por área */
 .p-table-wrap{padding:16px;overflow-x:auto}
 .p-table{width:auto;table-layout:fixed;border-collapse:collapse}
-.p-table thead th{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);padding:10px 10px;border-bottom:1px solid var(--border);text-align:left}
+.p-table thead th{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);padding:10px 10px;border-bottom:2px solid var(--border);text-align:left;position:sticky;top:0;background:var(--card);z-index:5}
 .p-table tbody td{padding:10px 10px;border-bottom:1px solid var(--bg2);font-size:14px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-table tbody td.td-multi{white-space:normal;overflow:visible;cursor:pointer}
+.p-table tbody td.td-multi div{line-height:1.8}
 .p-table col.c-persona{width:210px}
 .p-table col.c-codigo{width:70px}
 .p-table col.c-edad{width:60px}
@@ -182,8 +184,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .falta-alert{background:var(--red-l);color:var(--red);font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap}
 .falta-ok{background:var(--green-l);color:var(--green);font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap}
 .falta-none{color:var(--gray-l);font-size:11px}
-.just-btn{background:var(--amber-l);color:var(--amber);border:none;border-radius:8px;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap}
-.just-btn:hover{background:#FDE68A}
+.falta-si{color:var(--green);font-weight:800;font-size:11px}
+.falta-no{color:var(--red);font-weight:800;font-size:11px}
 .just-inline{margin-top:10px;padding:10px;background:var(--bg);border-radius:8px}
 .just-foto-btn{display:inline-block;background:var(--card);border:1.5px dashed var(--border);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;color:var(--gray);cursor:pointer}
 .just-foto-btn:hover{border-color:var(--gest-m);color:var(--gest-m)}
@@ -539,6 +541,11 @@ function fechaHoy() {
     String(d.getDate()).padStart(2, '0');
 }
 
+function formatFechaCorta(iso) {
+  var p = iso.split('-');
+  return p[2] + '/' + p[1];
+}
+
 function tick() {
   var el = document.getElementById('clk');
   if (el) el.textContent = new Date().toLocaleString('es-GT', {hour:'2-digit', minute:'2-digit'});
@@ -668,7 +675,8 @@ function buildPersonalTable(lista) {
     '<col class="c-locker"><col class="c-faltas"><col class="c-justif">' +
     '</colgroup><thead><tr>' +
     '<th>Persona</th><th>Código</th><th>Edad</th><th>Número</th><th>Fecha de inicio</th><th>Talla</th>' +
-    '<th>Rol / Proceso</th><th>Estado</th><th>Locker asignado</th><th>Faltas</th><th>Justificación</th>' +
+    '<th>Rol / Proceso</th><th>Estado</th><th>Locker asignado</th>' +
+    '<th title="Solo el mes en curso">Faltas</th><th title="Solo el mes en curso">Justificación</th>' +
     '</tr></thead><tbody>';
   var vistos = {};
   AREA_GRUPOS.forEach(function(a) {
@@ -694,15 +702,17 @@ function buildPersonalRow(p) {
   var lockerChip = p.locker
     ? '<span class="op-mini ok">🗄️ ' + escHtml(p.locker) + '</span>'
     : '<span class="op-mini warn">🗄️ Pendiente</span>';
-  var resumen = FALTAS_RESUMEN[p.id] || { total: 0, pendientes: 0 };
-  var faltasBadge = !resumen.total
-    ? '<span class="falta-none">—</span>'
-    : (resumen.pendientes > 0
-      ? '<span class="falta-alert">🚨 ' + resumen.pendientes + ' sin justificar</span>'
-      : '<span class="falta-ok">✅ Al día</span>');
-  var justifCell = resumen.pendientes > 0
-    ? '<button class="just-btn" onclick="event.stopPropagation();abrirPerfilEnFaltas(\'' + p.id + '\')">📎 Justificar</button>'
-    : '<span class="falta-none">—</span>';
+  var resumen = FALTAS_RESUMEN[p.id] || { total: 0, pendientes: 0, lista: [] };
+  var faltasCell, justifCell;
+  if (!resumen.lista.length) {
+    faltasCell = '<span class="falta-none">—</span>';
+    justifCell = '<span class="falta-none">—</span>';
+  } else {
+    faltasCell = resumen.lista.map(function(f) { return '<div>' + formatFechaCorta(f.fecha) + '</div>'; }).join('');
+    justifCell = resumen.lista.map(function(f) {
+      return f.justificada ? '<div class="falta-si">SI</div>' : '<div class="falta-no">NO</div>';
+    }).join('');
+  }
   return '<tr class="p-row' + (p.activo ? '' : ' inactivo') + '" onclick="abrirPerfil(\'' + p.id + '\')">' +
     '<td><span class="p-row-avatar" style="background:' + (p.color_hex || '#6B6B6A') + '">' + iniciales + '</span>' + escHtml(p.nombre) + '</td>' +
     '<td style="font-family:var(--mono);font-size:11px">' + escHtml(p.codigo) + '</td>' +
@@ -713,8 +723,8 @@ function buildPersonalRow(p) {
     '<td>' + escHtml(rolTxt) + '</td>' +
     '<td>' + estadoBadge + '</td>' +
     '<td>' + lockerChip + '</td>' +
-    '<td>' + faltasBadge + '</td>' +
-    '<td>' + justifCell + '</td>' +
+    '<td class="td-multi" onclick="event.stopPropagation();abrirPerfilEnFaltas(\'' + p.id + '\')">' + faltasCell + '</td>' +
+    '<td class="td-multi" onclick="event.stopPropagation();abrirPerfilEnFaltas(\'' + p.id + '\')">' + justifCell + '</td>' +
   '</tr>';
 }
 
@@ -1029,12 +1039,17 @@ async function eliminarIncidente(id) {
 // ════════════════════════════════════════════════════════════
 async function cargarFaltasResumen() {
   FALTAS_RESUMEN = {};
-  var r = await db.from('rrhh_faltas').select('personal_id,justificacion_texto,justificacion_foto_url');
+  // Solo el mes en curso — una falta sin justificar de un mes anterior ya no cuenta acá
+  var rango = rangoDelMes(mesActualStr());
+  var r = await db.from('rrhh_faltas').select('personal_id,fecha,justificacion_texto,justificacion_foto_url')
+    .gte('fecha', rango.desde).lte('fecha', rango.hasta).order('fecha', { ascending: false });
   if (r.error) return;
   (r.data || []).forEach(function(f) {
-    if (!FALTAS_RESUMEN[f.personal_id]) FALTAS_RESUMEN[f.personal_id] = { total: 0, pendientes: 0 };
+    if (!FALTAS_RESUMEN[f.personal_id]) FALTAS_RESUMEN[f.personal_id] = { total: 0, pendientes: 0, lista: [] };
+    var justificada = !!(f.justificacion_texto || f.justificacion_foto_url);
     FALTAS_RESUMEN[f.personal_id].total++;
-    if (!f.justificacion_texto && !f.justificacion_foto_url) FALTAS_RESUMEN[f.personal_id].pendientes++;
+    if (!justificada) FALTAS_RESUMEN[f.personal_id].pendientes++;
+    FALTAS_RESUMEN[f.personal_id].lista.push({ fecha: f.fecha, justificada: justificada });
   });
 }
 

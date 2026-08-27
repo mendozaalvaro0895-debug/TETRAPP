@@ -148,6 +148,11 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   Filtros: área (Todos/Tapas/Serigrafía/Producción) · buscador nombre/código · toggle solo activos.
   `area` de personal ahora acepta también 'produccion' (antes solo 'tapas'/'serig' —
   produccion.html en sí sigue sin leer la tabla `personal`, es solo para llevar su RRHH aquí).
+  Encabezado de la tabla con `position:sticky` (no se pierde al hacer scroll).
+  Columnas Faltas/Justificación: listan cada fecha del MES EN CURSO (rrhh_faltas vía
+  `cargarFaltasResumen()`, que ya filtra por mes — una falta sin justificar de un mes
+  anterior deja de contar/alertar) con su SI/NO de justificación en la misma fila; clic
+  en cualquiera de las dos abre el perfil directo en la pestaña Faltas (`abrirPerfilEnFaltas`).
   Click en fila → modalPersona con 5 sub-tabs:
     Datos generales (editable: nombre/iniciales/código/área/rol/proceso_hab/teléfono/edad/activo/fechas)
     RRHH           (editable: locker/talla_uniforme/epp_asignado/epp_fecha/notas_rrhh)
