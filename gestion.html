@@ -130,14 +130,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 /* TABLA — vista "Todos" agrupada por área */
 .p-table-wrap{padding:16px;overflow-x:auto}
-.p-table{width:100%;max-width:720px;min-width:520px;table-layout:fixed;border-collapse:collapse}
+.p-table{width:auto;table-layout:fixed;border-collapse:collapse}
 .p-table thead th{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);padding:8px 10px;border-bottom:1px solid var(--border);text-align:left}
 .p-table tbody td{padding:8px 10px;border-bottom:1px solid var(--bg2);font-size:12px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.p-table col.c-persona{width:32%}
-.p-table col.c-codigo{width:12%}
-.p-table col.c-rol{width:20%}
-.p-table col.c-estado{width:14%}
-.p-table col.c-locker{width:22%}
+.p-table col.c-persona{width:190px}
+.p-table col.c-codigo{width:64px}
+.p-table col.c-edad{width:56px}
+.p-table col.c-numero{width:108px}
+.p-table col.c-inicio{width:96px}
+.p-table col.c-rol{width:130px}
+.p-table col.c-estado{width:76px}
+.p-table col.c-locker{width:130px}
 .p-table tr.p-row{cursor:pointer;transition:background .12s}
 .p-table tr.p-row:hover{background:var(--gest-l)}
 .p-table tr.p-row.inactivo{opacity:.55}
@@ -343,10 +346,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
             <input class="fi" id="mpTelefono" placeholder="Ej: 5555-5555" style="width:100%">
           </div>
           <div class="fg">
-            <div class="fl">&nbsp;</div>
-            <label class="fchk">
-              <input type="checkbox" id="mpActivo" checked> Persona activa
-            </label>
+            <div class="fl">Edad</div>
+            <input class="fi" id="mpEdad" type="number" min="16" max="99" placeholder="Ej: 28" style="width:100%">
           </div>
         </div>
         <div class="fr">
@@ -358,6 +359,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
             <div class="fl">Fecha de baja</div>
             <input class="fi" id="mpFechaBaja" type="date" style="width:100%" onchange="if(this.value)document.getElementById('mpActivo').checked=false">
           </div>
+        </div>
+        <div class="fg full">
+          <label class="fchk">
+            <input type="checkbox" id="mpActivo" checked> Persona activa
+          </label>
         </div>
       </div>
 
@@ -620,9 +626,11 @@ var AREA_GRUPOS = [
 
 function buildPersonalTable(lista) {
   var html = '<table class="p-table"><colgroup>' +
-    '<col class="c-persona"><col class="c-codigo"><col class="c-rol"><col class="c-estado"><col class="c-locker">' +
+    '<col class="c-persona"><col class="c-codigo"><col class="c-edad"><col class="c-numero">' +
+    '<col class="c-inicio"><col class="c-rol"><col class="c-estado"><col class="c-locker">' +
     '</colgroup><thead><tr>' +
-    '<th>Persona</th><th>Código</th><th>Rol / Proceso</th><th>Estado</th><th>Locker asignado</th>' +
+    '<th>Persona</th><th>Código</th><th>Edad</th><th>Número</th><th>Fecha de inicio</th>' +
+    '<th>Rol / Proceso</th><th>Estado</th><th>Locker asignado</th>' +
     '</tr></thead><tbody>';
   var vistos = {};
   AREA_GRUPOS.forEach(function(a) {
@@ -651,6 +659,9 @@ function buildPersonalRow(p) {
   return '<tr class="p-row' + (p.activo ? '' : ' inactivo') + '" onclick="abrirPerfil(\'' + p.id + '\')">' +
     '<td><span class="p-row-avatar" style="background:' + (p.color_hex || '#6B6B6A') + '">' + iniciales + '</span>' + escHtml(p.nombre) + '</td>' +
     '<td style="font-family:var(--mono);font-size:11px">' + escHtml(p.codigo) + '</td>' +
+    '<td>' + (p.edad != null ? escHtml(p.edad) : '—') + '</td>' +
+    '<td>' + (p.telefono ? escHtml(p.telefono) : '—') + '</td>' +
+    '<td>' + (p.fecha_inicio ? escHtml(p.fecha_inicio) : '—') + '</td>' +
     '<td>' + escHtml(rolTxt) + '</td>' +
     '<td>' + estadoBadge + '</td>' +
     '<td>' + lockerChip + '</td>' +
@@ -706,6 +717,7 @@ function abrirNuevaPersona() {
   document.getElementById('mpRolBase').value = 'operador';
   document.getElementById('mpProceso').value = '';
   document.getElementById('mpTelefono').value = '';
+  document.getElementById('mpEdad').value = '';
   document.getElementById('mpActivo').checked = true;
   document.getElementById('mpFechaInicio').value = fechaHoy();
   document.getElementById('mpFechaBaja').value = '';
@@ -736,6 +748,7 @@ function abrirPerfil(id) {
   document.getElementById('mpRolBase').value = p.rol === 'supervisor' ? 'supervisor' : 'operador';
   document.getElementById('mpProceso').value = p.proceso_hab || '';
   document.getElementById('mpTelefono').value = p.telefono || '';
+  document.getElementById('mpEdad').value = (p.edad != null) ? p.edad : '';
   document.getElementById('mpActivo').checked = !!p.activo;
   document.getElementById('mpFechaInicio').value = p.fecha_inicio || '';
   document.getElementById('mpFechaBaja').value = p.fecha_baja || '';
@@ -772,6 +785,8 @@ async function guardarPersona() {
   var rolBase   = document.getElementById('mpRolBase').value;
   var proceso   = (document.getElementById('mpProceso').value || '').trim();
   var telefono  = (document.getElementById('mpTelefono').value || '').trim() || null;
+  var edadVal   = document.getElementById('mpEdad').value;
+  var edad      = edadVal !== '' ? parseInt(edadVal, 10) : null;
   var fechaBaja = document.getElementById('mpFechaBaja').value || null;
   var activo    = fechaBaja ? false : document.getElementById('mpActivo').checked;
   var fechaInicio = document.getElementById('mpFechaInicio').value || null;
@@ -782,7 +797,7 @@ async function guardarPersona() {
 
   var payload = {
     nombre: nombre, iniciales: iniciales, area: area, rol: rolBase,
-    proceso_hab: proceso, telefono: telefono, activo: activo,
+    proceso_hab: proceso, telefono: telefono, edad: edad, activo: activo,
     fecha_inicio: fechaInicio, fecha_baja: fechaBaja,
     locker: (document.getElementById('mpLocker').value || '').trim() || null,
     talla_uniforme: document.getElementById('mpTalla').value || null,

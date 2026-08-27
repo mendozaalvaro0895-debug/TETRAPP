@@ -168,6 +168,8 @@ Notas críticas:
    fórmula de tinta en Serigrafía, familia/accesorios en Tapas). RLS igual a `sku_recetas` (master).
 8. `sql/operativo_produccion_v1.sql` — rol `operativo_prod` + usuario produccion@tetrapp.app +
    políticas insert/update/delete en produccion_diaria. Correr DESPUÉS del 5 (necesita la tabla).
+9. `sql/personal_edad_v1.sql` — columna `edad` (smallint) en `personal`. ⚠️ Sin correr esto,
+   Guardar en gestion.html → Personal falla (columna no existe en el schema cache de PostgREST).
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
