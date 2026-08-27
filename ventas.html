@@ -1394,11 +1394,24 @@ function toggleRecetario() {
 
 // SKUs únicos de VENTAS (en memoria) + fusión con inventario para autocomplete.
 // Se usa en la carga inicial y para refrescar tras una importación sin volver a golpear la DB.
+// "Productos que escupen las máquinas": SKUs de inventario con bodega B2 o cuya
+// descripción los delata como envase/tapa — aunque nunca se hayan facturado.
+var PALABRAS_ENVASE = ['ENVASE', 'TAPA', 'BASE', 'CONTRATAPA', 'ROLL ON'];
+function esCandidatoEnvase(row) {
+  if (row.bodega === 'B2') return true;
+  var d = String(row.descripcion || '').toUpperCase();
+  return PALABRAS_ENVASE.some(function(p) { return d.indexOf(p) !== -1; });
+}
+
 function construirRecetSkus() {
   var skuMap = {};
   VENTAS.forEach(function(v) {
     if (!v.sku) return;
     if (!skuMap[v.sku] || (!skuMap[v.sku] && v.descripcion)) skuMap[v.sku] = v.descripcion || '';
+  });
+  INV_REC.forEach(function(i) {
+    if (!i.sku || skuMap[i.sku] !== undefined) return;
+    if (esCandidatoEnvase(i)) skuMap[i.sku] = i.descripcion || '';
   });
   RECET_SKUS = Object.keys(skuMap).sort().map(function(s) { return {sku_fact: s, desc: skuMap[s]}; });
 
@@ -1424,11 +1437,12 @@ function refrescarRecetarioSkus() {
 async function cargarRecetario() {
   document.getElementById('recetLista').innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">Cargando…</div>';
 
-  // 1. Inventario para autocomplete (inventario + SKUs facturables no presentes en inventario)
-  var ri = await db.from('inventario').select('sku,descripcion').order('sku').limit(5000);
+  // 1. Inventario — para autocomplete Y para detectar candidatos "que escupen las
+  //    máquinas" (bodega B2 o descripción de envase) que nunca se han facturado
+  var ri = await db.from('inventario').select('sku,descripcion,bodega').order('sku').limit(5000);
   INV_REC = ri.error ? [] : (ri.data || []);
 
-  // 2. SKUs únicos de VENTAS (ya cargado en memoria) fusionados en INV_REC
+  // 2. SKUs de VENTAS + candidatos de inventario, fusionados en INV_REC
   construirRecetSkus();
 
   // 3. Recetas existentes
