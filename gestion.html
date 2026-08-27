@@ -130,9 +130,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 /* TABLA — vista "Todos" agrupada por área */
 .p-table-wrap{padding:16px;overflow-x:auto}
-.p-table{width:100%;min-width:560px;border-collapse:collapse}
-.p-table thead th{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left}
-.p-table tbody td{padding:9px 12px;border-bottom:1px solid var(--bg2);font-size:12px;vertical-align:middle}
+.p-table{width:100%;max-width:720px;min-width:520px;table-layout:fixed;border-collapse:collapse}
+.p-table thead th{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);padding:8px 10px;border-bottom:1px solid var(--border);text-align:left}
+.p-table tbody td{padding:8px 10px;border-bottom:1px solid var(--bg2);font-size:12px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-table col.c-persona{width:32%}
+.p-table col.c-codigo{width:12%}
+.p-table col.c-rol{width:20%}
+.p-table col.c-estado{width:14%}
+.p-table col.c-locker{width:22%}
 .p-table tr.p-row{cursor:pointer;transition:background .12s}
 .p-table tr.p-row:hover{background:var(--gest-l)}
 .p-table tr.p-row.inactivo{opacity:.55}
@@ -614,8 +619,10 @@ var AREA_GRUPOS = [
 ];
 
 function buildPersonalTable(lista) {
-  var html = '<table class="p-table"><thead><tr>' +
-    '<th>Persona</th><th>Código</th><th>Rol / Proceso</th><th>Estado</th><th>RRHH</th>' +
+  var html = '<table class="p-table"><colgroup>' +
+    '<col class="c-persona"><col class="c-codigo"><col class="c-rol"><col class="c-estado"><col class="c-locker">' +
+    '</colgroup><thead><tr>' +
+    '<th>Persona</th><th>Código</th><th>Rol / Proceso</th><th>Estado</th><th>Locker asignado</th>' +
     '</tr></thead><tbody>';
   var vistos = {};
   AREA_GRUPOS.forEach(function(a) {
@@ -638,14 +645,15 @@ function buildPersonalRow(p) {
   var iniciales = escHtml(p.iniciales || (p.nombre ? p.nombre.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase() : '?'));
   var rolTxt = p.rol === 'supervisor' ? 'Supervisor' : (p.proceso_hab || 'Operador');
   var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-activo' : 'pill-inactivo') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>';
-  var lockerChip = p.locker ? '<span class="op-mini ok">🗄 ' + escHtml(p.locker) + '</span>' : '';
-  var eppChip = p.epp_asignado ? '<span class="op-mini ok">🦺 EPP</span>' : '<span class="op-mini warn">🦺 Pendiente</span>';
+  var lockerChip = p.locker
+    ? '<span class="op-mini ok">🗄️ ' + escHtml(p.locker) + '</span>'
+    : '<span class="op-mini warn">🗄️ Pendiente</span>';
   return '<tr class="p-row' + (p.activo ? '' : ' inactivo') + '" onclick="abrirPerfil(\'' + p.id + '\')">' +
     '<td><span class="p-row-avatar" style="background:' + (p.color_hex || '#6B6B6A') + '">' + iniciales + '</span>' + escHtml(p.nombre) + '</td>' +
     '<td style="font-family:var(--mono);font-size:11px">' + escHtml(p.codigo) + '</td>' +
     '<td>' + escHtml(rolTxt) + '</td>' +
     '<td>' + estadoBadge + '</td>' +
-    '<td>' + eppChip + ' ' + lockerChip + '</td>' +
+    '<td>' + lockerChip + '</td>' +
   '</tr>';
 }
 
