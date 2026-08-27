@@ -368,12 +368,20 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
           <div class="fg">
             <div class="fl">Área *</div>
-            <select class="fs" id="mpArea" style="width:100%">
+            <select class="fs" id="mpArea" style="width:100%" onchange="toggleTurnoWrap()">
               <option value="tapas">🏷 Tapas</option>
               <option value="serig">🎨 Serigrafía</option>
               <option value="produccion">🏭 Producción</option>
             </select>
           </div>
+        </div>
+        <div class="fg full" id="mpTurnoWrap" style="display:none">
+          <div class="fl">Turno</div>
+          <select class="fs" id="mpTurno" style="width:100%">
+            <option value="">— Sin definir —</option>
+            <option value="alex">Turno Alex</option>
+            <option value="gabino">Turno Gabino</option>
+          </select>
         </div>
         <div class="fr">
           <div class="fg">
@@ -966,6 +974,12 @@ function switchMpTab(tab) {
   });
 }
 
+function toggleTurnoWrap() {
+  var esProduccion = document.getElementById('mpArea').value === 'produccion';
+  document.getElementById('mpTurnoWrap').style.display = esProduccion ? 'block' : 'none';
+  if (!esProduccion) document.getElementById('mpTurno').value = '';
+}
+
 function abrirNuevaPersona() {
   mpEditId = null;
   document.getElementById('mpTitle').textContent = 'Nueva persona';
@@ -974,6 +988,8 @@ function abrirNuevaPersona() {
   document.getElementById('mpCodigo').value = '';
   document.getElementById('mpCodigo').disabled = false;
   document.getElementById('mpArea').value = 'tapas';
+  document.getElementById('mpTurno').value = '';
+  toggleTurnoWrap();
   document.getElementById('mpRolBase').value = 'operador';
   document.getElementById('mpProceso').value = '';
   document.getElementById('mpTelefono').value = '';
@@ -1005,6 +1021,8 @@ function abrirPerfil(id) {
   document.getElementById('mpCodigo').value = p.codigo || '';
   document.getElementById('mpCodigo').disabled = true;
   document.getElementById('mpArea').value = p.area || 'tapas';
+  document.getElementById('mpTurno').value = p.turno || '';
+  toggleTurnoWrap();
   document.getElementById('mpRolBase').value = p.rol === 'supervisor' ? 'supervisor' : 'operador';
   document.getElementById('mpProceso').value = p.proceso_hab || '';
   document.getElementById('mpTelefono').value = p.telefono || '';
@@ -1058,6 +1076,7 @@ async function guardarPersona() {
   var fechaBaja = document.getElementById('mpFechaBaja').value || null;
   var activo    = fechaBaja ? false : document.getElementById('mpActivo').checked;
   var fechaInicio = document.getElementById('mpFechaInicio').value || null;
+  var turno     = area === 'produccion' ? (document.getElementById('mpTurno').value || null) : null;
 
   if (!nombre)    { showToast('⚠️ Nombre requerido', '#B83232'); return; }
   if (!iniciales) { showToast('⚠️ Iniciales requeridas', '#B83232'); return; }
@@ -1065,7 +1084,7 @@ async function guardarPersona() {
 
   var payload = {
     nombre: nombre, iniciales: iniciales, area: area, rol: rolBase,
-    proceso_hab: proceso, telefono: telefono, edad: edad, activo: activo,
+    proceso_hab: proceso, telefono: telefono, edad: edad, activo: activo, turno: turno,
     fecha_inicio: fechaInicio, fecha_baja: fechaBaja,
     locker: (document.getElementById('mpLocker').value || '').trim() || null,
     talla_uniforme: document.getElementById('mpTalla').value || null,

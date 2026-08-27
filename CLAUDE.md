@@ -165,6 +165,10 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   ⚠️ `personal` tiene un CHECK constraint `personal_area_check` creado manual en el dashboard
   (no versionado en ningún CREATE TABLE) — hay que mantenerlo sincronizado a mano si se agrega
   otro valor de área nuevo. Ver `sql/personal_area_produccion_v1.sql`.
+  Columna `turno` ('alex'|'gabino', propia constraint `personal_turno_check`) — SOLO aplica a
+  Producción: el campo "Turno" del modal se muestra/oculta con `toggleTurnoWrap()` según el
+  `<select>` de Área (`onchange`), y `guardarPersona()` fuerza `turno=null` si el área no es
+  'produccion' para que no quede dato viejo colgado al cambiar de área. Ver `sql/personal_turno_v1.sql`.
   Encabezado de la tabla con `position:sticky` (no se pierde al hacer scroll).
   Grupos por área desplegables (clic en el header del grupo, `toggleGrupoArea()`) — estado
   en `gruposColapsados{}`, expandido por default; cada grupo es su propio `<tbody>`.
