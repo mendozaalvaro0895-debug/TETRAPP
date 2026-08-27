@@ -1434,17 +1434,27 @@ async function cargarRecetario() {
   // 3. Recetas existentes
   var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado,foto_url');
   RECETAS_MAP = {};
-  if (!rr.error) (rr.data || []).forEach(function(r) { RECETAS_MAP[r.sku_fact] = r; });
+  if (rr.error) {
+    toast('⛔ No se pudieron cargar las recetas guardadas: ' + rr.error.message + ' — probablemente falta correr sql/sku_recetario_fotos_v1.sql en Supabase', 'err');
+  } else {
+    (rr.data || []).forEach(function(r) { RECETAS_MAP[r.sku_fact] = r; });
+  }
 
   // 4. Partes de todas las recetas
   var rp = await db.from('sku_receta_partes').select('id,receta_id,tipo,codigo,nota,orden').order('receta_id').order('orden');
   PARTES_MAP = {};
-  if (!rp.error) (rp.data || []).forEach(function(p) {
-    if (!PARTES_MAP[p.receta_id]) PARTES_MAP[p.receta_id] = [];
-    PARTES_MAP[p.receta_id].push(p);
-  });
+  if (rp.error) {
+    toast('⛔ No se pudieron cargar las partes de las recetas: ' + rp.error.message, 'err');
+  } else {
+    (rp.data || []).forEach(function(p) {
+      if (!PARTES_MAP[p.receta_id]) PARTES_MAP[p.receta_id] = [];
+      PARTES_MAP[p.receta_id].push(p);
+    });
+  }
 
-  RECETARIO_CARGADO = true;
+  // Si falló la carga de recetas/partes, no marcamos como "cargado": al volver a
+  // abrir el panel (sin recargar la página) reintenta en vez de mostrarlo vacío para siempre.
+  RECETARIO_CARGADO = !rr.error && !rp.error;
   renderRecetario();
 }
 
