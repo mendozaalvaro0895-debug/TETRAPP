@@ -92,10 +92,28 @@ dispara la sync — NO los otros toggles de asistencia del archivo (`toggleAsist
 - Destildar `ausente` → borra esa fila auto-generada SOLO si sigue sin justificar (una ya
   justificada se deja intacta, es registro de RRHH).
 - Dirección inversa: registrar una falta manual en gestion.html para alguien de `area='serig'`
-  → `sincronizarAsistenciaDesdeFalta()` marca `ausente` en `asistencia_diaria` para esa fecha.
-  Solo Serigrafía tiene Asistencia Mensual por ahora — Tapas no sincroniza.
+  → `sincronizarAsistenciaDesdeFalta()` marca `ausente` en `asistencia_diaria` para esa fecha
+  (salvo que sea feriado — ver abajo). Solo Serigrafía tiene Asistencia Mensual por ahora —
+  Tapas no sincroniza.
 - Todo el flujo es best-effort (try/catch silencioso): si `sql/rrhh_faltas_v1.sql` no ha
   corrido, la asistencia normal sigue funcionando igual.
+- ⚠️ La sync solo dispara hacia ADELANTE (clics nuevos). Ausencias que ya estaban en
+  `asistencia_diaria` antes de que existiera este código no llegan solas — usar
+  `sql/rrhh_faltas_backfill_v1.sql` (idempotente) para traerlas una vez.
+
+### Días feriados — casilla gris en Asistencia Mensual (tabla `dias_feriados`)
+Se tratan EXACTAMENTE igual que un domingo: `feriadosSet[fecha]` (cache global, cargado en
+`init()` vía `cargarFeriados()`) se combina con `dow===0` en cada punto donde antes solo se
+chequeaba domingo — `toggleAsistCell`, `buildRows`/`thDays` (grilla en vivo, `#asistGrid` y
+`#personalAsist`) y `buildPersonaRows`/`thDias` (`exportarAsistGridPDF`). Un feriado:
+- Nunca puede quedar en `ausente`/`tarde`/`velada` (el ciclo de clic salta directo a
+  finde↔presente, igual que domingo) → nunca dispara `sincronizarFaltaDesdeAsistencia`.
+- No rompe la racha "fila verde = asistencia completa del mes".
+- **Clic derecho en el número del día** (header de la grilla) → `toggleFeriado(fecha)`
+  marca/quita el feriado (pide descripción, requiere tabla desbloqueada — `asistLocked`).
+- `sql/dias_feriados_v1.sql` crea la tabla + marca 2026-08-15 + limpia lo que ya se había
+  generado mal ese día (faltas auto + registro 'ausente') — correr ANTES de
+  `rrhh_faltas_backfill_v1.sql` si vas a correr ambos, para que el backfill ya los excluya.
 
 ### Estados de ficha — SOLO 4 (`ESTADOS_SERIG`)
 `nueva` ⚪ → `proceso` 🔵 → `parcial` 🟡 → `lista` 🟢
@@ -189,12 +207,16 @@ Notas críticas:
    fórmula de tinta en Serigrafía, familia/accesorios en Tapas). RLS igual a `sku_recetas` (master).
 8. `sql/operativo_produccion_v1.sql` — rol `operativo_prod` + usuario produccion@tetrapp.app +
    políticas insert/update/delete en produccion_diaria. Correr DESPUÉS del 5 (necesita la tabla).
-9. `sql/rrhh_faltas_backfill_v1.sql` — trae a `rrhh_faltas` las ausencias que YA estaban
-   marcadas en `asistencia_diaria` (Serigrafía) antes de que existiera la sincronización
-   automática (`toggleAsistCell`, que solo dispara hacia adelante). Correr UNA vez; es
-   idempotente. Requiere `sql/rrhh_faltas_v1.sql` ya corrido (columna `origen`).
-   ⚠️ El bucket Storage `justificaciones` (público) sigue pendiente de crear MANUAL en
-   Dashboard → Storage → New bucket — sin eso, subir foto de justificación falla.
+9. `sql/dias_feriados_v1.sql` — tabla `dias_feriados` (casilla gris en Asistencia Mensual,
+   no cuenta como falta) + marca 2026-08-15 + limpia lo que ya se había generado mal ese día
+   (falta auto + registro 'ausente'). Correr ANTES del punto 10.
+10. `sql/rrhh_faltas_backfill_v1.sql` — trae a `rrhh_faltas` las ausencias que YA estaban
+    marcadas en `asistencia_diaria` (Serigrafía) antes de que existiera la sincronización
+    automática (`toggleAsistCell`, que solo dispara hacia adelante). Correr UNA vez; es
+    idempotente. Requiere `sql/rrhh_faltas_v1.sql` (columna `origen`) y `dias_feriados_v1.sql`
+    ya corridos — excluye feriados.
+    ⚠️ El bucket Storage `justificaciones` (público) sigue pendiente de crear MANUAL en
+    Dashboard → Storage → New bucket — sin eso, subir foto de justificación falla.
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)

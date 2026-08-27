@@ -1938,6 +1938,7 @@ var ausentesDia    = {};         // { codigo: true } ausentes del día activo (g
 var posColDispo    = null;       // null = aún no se sabe; false si la tabla matriz_dia_serig no existe
 var posAvisoMostrado = false;    // para avisar una sola vez si no se pueden guardar posiciones
 var asistLocked    = true;       // tabla de asistencia bloqueada por defecto (evita clicasos)
+var feriadosSet    = {};         // { 'YYYY-MM-DD': descripcion } — días feriados (casilla gris, no cuentan como falta)
 var MATRIZ_DIA_TABLE = 'matriz_dia_serig'; // posición de matriz por día — SEPARADA de asistencia
 var prodMesNav        = null;  // null = mes actual; 'YYYY-MM' = mes seleccionado en el gráfico
 var prodCompararActivo = false; // mostrar gráfica del mes anterior alineada debajo
@@ -4321,6 +4322,39 @@ async function renderFaltasChart() {
   }, 50);
 }
 
+async function cargarFeriados() {
+  try {
+    var r = await db.from('dias_feriados').select('fecha,descripcion');
+    if (r.error) throw r.error;
+    feriadosSet = {};
+    (r.data || []).forEach(function(f) { feriadosSet[f.fecha] = f.descripcion || 'Feriado'; });
+  } catch (e) { feriadosSet = {}; }
+}
+
+async function toggleFeriado(fecha) {
+  if (asistLocked) { showToast('🔒 Desbloquea la tabla de asistencia para marcar feriados', '#92400e'); return; }
+  var esFeriadoActual = !!feriadosSet[fecha];
+  if (esFeriadoActual) {
+    if (!confirm('¿Quitar ' + fecha + ' como feriado?')) return;
+    try {
+      var r = await db.from('dias_feriados').delete().eq('fecha', fecha);
+      if (r.error) throw r.error;
+      delete feriadosSet[fecha];
+      showToast('✅ Feriado quitado');
+    } catch (e) { showToast('❌ Error: ' + e.message, '#B83232'); return; }
+  } else {
+    var desc = prompt('Descripción del feriado en ' + fecha + ' (opcional):', '');
+    if (desc === null) return;
+    try {
+      var r2 = await db.from('dias_feriados').upsert({ fecha: fecha, descripcion: desc || null });
+      if (r2.error) throw r2.error;
+      feriadosSet[fecha] = desc || 'Feriado';
+      showToast('✅ Marcado como feriado');
+    } catch (e) { showToast('❌ Error: ' + e.message, '#B83232'); return; }
+  }
+  renderAsistGrid();
+}
+
 async function renderAsistGrid() {
   var _agTargets = ['asistGrid', 'personalAsist'].map(function(id){ return document.getElementById(id); }).filter(Boolean);
   if (!_agTargets.length) return;
@@ -4389,12 +4423,15 @@ async function renderAsistGrid() {
   var thDays = dias.map(function(f) {
     var dn   = parseInt(f.slice(8));
     var dow  = new Date(f + 'T12:00:00').getDay();
+    var esFeriadoTh = !!feriadosSet[f];
     var esAnt = !!esAnteriorSet[f];
-    var cls  = 'ag-th' + (f === hoy ? ' hoy' : '') + (dow === 0 ? ' finde' : '') + (f === posFecha ? ' ag-col-sel' : '') +
+    var cls  = 'ag-th' + ((dow === 0 || esFeriadoTh) ? ' finde' : '') + (f === hoy ? ' hoy' : '') + (f === posFecha ? ' ag-col-sel' : '') +
       (esAnt ? ' ag-th-anterior' : '') + (f === ultimoDiaAnterior ? ' ag-divider-th' : '');
     var lbl  = esAnt ? (dn + '<span class="ag-th-mes">' + MESES_PER_C[parseInt(f.slice(5,7),10)-1] + '</span>') : dn;
-    var clk  = (f <= hoy && f >= ASIST_FECHA_MIN) ? ' onclick="irDiaEspecifico(\'' + f + '\')" style="cursor:pointer" title="Ver este día en Personal y Roles"' : '';
-    return '<th class="' + cls + '"' + clk + '>' + lbl + '</th>';
+    var clk  = (f <= hoy && f >= ASIST_FECHA_MIN) ? ' onclick="irDiaEspecifico(\'' + f + '\')" style="cursor:pointer"' : '';
+    var tit  = esFeriadoTh ? (feriadosSet[f] + ' · clic derecho para quitar feriado') : 'Ver este día en Personal y Roles · clic derecho para marcar feriado';
+    var ctx  = ' oncontextmenu="event.preventDefault();toggleFeriado(\'' + f + '\')"';
+    return '<th class="' + cls + '"' + clk + ctx + ' title="' + tit + '">' + lbl + '</th>';
   }).join('');
 
   function buildRows(lista, secLabel) {
@@ -4410,7 +4447,7 @@ async function renderAsistGrid() {
         if (fechaInicio && f < fechaInicio) return; // antes de ingreso — no cuenta para racha
         if (fechaBaja && f > fechaBaja) return; // tras baja — no cuenta para racha
         var dow = new Date(f + 'T12:00:00').getDay();
-        if (dow === 0) return;
+        if (dow === 0 || feriadosSet[f]) return;
         if (daysByP[f] === 'pendiente') return;
         if (f === hoy && !daysByP[f]) return;
         var est = daysByP[f] || 'presente';
@@ -4427,7 +4464,8 @@ async function renderAsistGrid() {
         var esFuturo = f > hoy;
         var esAntesIngreso = fechaInicio && f < fechaInicio;
         var dow = new Date(f + 'T12:00:00').getDay();
-        var esFinde = dow === 0;
+        var esFeriadoCell = !!feriadosSet[f];
+        var esFinde = dow === 0 || esFeriadoCell;
         var divCls = f === ultimoDiaAnterior ? ' ag-divider-cell' : '';
         var esPostBaja = fechaBaja && f > fechaBaja;
         if (esFuturo || esAntesIngreso || esPostBaja) {
@@ -4440,7 +4478,8 @@ async function renderAsistGrid() {
           var cod = p.codigo.replace(/'/g, "\\'");
           var notaPend = esPendiente ? ' · Aún no se toma asistencia' : (est === 'pendiente' ? ' · Sin registrar (ej. antes de ingresar)' : '');
           var domTrabajado = esFinde && daysByP[f] === 'presente';
-          var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esFinde && !domTrabajado ? ' · Domingo (no cuenta)' : '') + notaPend;
+          var motivoFinde = esFeriadoCell ? (' · ' + feriadosSet[f] + ' (no cuenta)') : (dow === 0 ? ' · Domingo (no cuenta)' : '');
+          var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esFinde && !domTrabajado ? motivoFinde : '') + notaPend;
           html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrabajado ? ' dom-trabajado' : '') + (f === posFecha ? ' ag-col-sel' : '') + divCls + '" onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + '</td>';
         }
       });
@@ -4478,8 +4517,8 @@ async function renderAsistGrid() {
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#fef3c7;border:1px solid #fde68a"></span>Tarde (!)</span>' +
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#ede9fe;border:1px solid #ddd6fe"></span>Velada (🌙)</span>' +
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#e2e8f0;border:1px solid #cbd5e1"></span>Pendiente (hoy sin tomar, o antes de ingresar)</span>' +
-        '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#eef2f7;border:1px solid #cbd5e1"></span>Domingo (no cuenta)</span>' +
-        '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Fila verde = asistencia completa del mes</span>' +
+        '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#eef2f7;border:1px solid #cbd5e1"></span>Domingo / Feriado (no cuenta)</span>' +
+        '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Clic derecho en el día para marcar/quitar feriado · Fila verde = asistencia completa del mes</span>' +
       '</div>' +
     '</div>';
 
@@ -4507,12 +4546,13 @@ async function toggleAsistCell(codigo, fecha) {
   var curRaw = byPD[codigo] && byPD[codigo][fecha];
   var hoy = fechaHoy();
   var esDomingo = new Date(fecha + 'T12:00:00').getDay() === 0;
-  // Para hoy sin registro = 'pendiente'; domingos sin registro = 'finde'; resto = 'presente'
-  var cur = curRaw !== undefined ? curRaw : (fecha === hoy ? 'pendiente' : (esDomingo ? 'finde' : 'presente'));
-  // Ciclo domingos: finde(gris) → presente(verde) → null (vuelve a gris)
-  // Ciclo resto:    pendiente → presente → ausente → tarde → velada → null
+  var esFeriado = !!feriadosSet[fecha];
+  // Para hoy sin registro = 'pendiente'; domingos/feriados sin registro = 'finde'; resto = 'presente'
+  var cur = curRaw !== undefined ? curRaw : (fecha === hoy ? 'pendiente' : ((esDomingo || esFeriado) ? 'finde' : 'presente'));
+  // Ciclo domingos/feriados: finde(gris) → presente(verde) → null (vuelve a gris)
+  // Ciclo resto:             pendiente → presente → ausente → tarde → velada → null
   var next;
-  if (esDomingo) {
+  if (esDomingo || esFeriado) {
     // finde(gris) → presente(verde) → null (vuelve a gris sin registro)
     next = cur === 'presente' ? null : 'presente';
   } else {
@@ -4578,6 +4618,7 @@ async function toggleAsistCell(codigo, fecha) {
 // (ej. sql/rrhh_faltas_v1.sql todavía no corrido en Supabase).
 async function sincronizarFaltaDesdeAsistencia(codigo, fecha, estado) {
   try {
+    if (feriadosSet[fecha]) return; // un feriado nunca genera falta
     var op = (personalData && personalData.serig ? personalData.serig : []).find(function(x) { return x.codigo === codigo; });
     if (!op || !op.id) return;
     if (estado === 'ausente') {
@@ -4668,7 +4709,7 @@ async function exportarAsistGridPDF() {
   function thDias() {
     return dias.map(function(f) {
       var dow = new Date(f+'T12:00:00').getDay();
-      var esFin = dow === 0;
+      var esFin = dow === 0 || !!feriadosSet[f];
       var esAnt = !!esAnteriorSet[f];
       var bg = esAnt ? '#fffbeb' : esFin ? '#e2e8f0' : f === hoy ? '#dbeafe' : '#f8fafc';
       var lbl = esAnt
@@ -4688,7 +4729,7 @@ async function exportarAsistGridPDF() {
       var isFullGreen = diasActual.every(function(f) { // la cola del mes anterior no cuenta para la racha
         if (f > hoy) return true;
         var dow = new Date(f+'T12:00:00').getDay();
-        if (dow === 0) return true;
+        if (dow === 0 || feriadosSet[f]) return true;
         if (daysByP[f] === 'pendiente') return true; // explícito (ej. antes de ingresar) — no cuenta
         if (f === hoy && !daysByP[f]) return true; // pendiente implícito, no cuenta aún
         return (daysByP[f] || 'presente') === 'presente';
@@ -4699,7 +4740,7 @@ async function exportarAsistGridPDF() {
       html += '<td style="background:' + nameBg + ';color:' + nameClr + ';font-size:8px;font-weight:' + (isFullGreen?'700':'600') + ';padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + '</td>';
       dias.forEach(function(f) {
         var dow = new Date(f+'T12:00:00').getDay();
-        var esFin = dow === 0;
+        var esFin = dow === 0 || !!feriadosSet[f];
         var esPendiente = f === hoy && !daysByP[f];
         var est = esPendiente ? 'pendiente' : (daysByP[f] || (f > hoy ? '' : (esFin ? 'finde' : 'presente')));
         var domTrab = esFin && (est === 'presente' || est === 'tarde' || est === 'velada');
@@ -4712,7 +4753,7 @@ async function exportarAsistGridPDF() {
                 : '#f8fafc';
         if (domTrab) bg = '#22c55e';
         var clr = '#fff';
-        var lbl = est === 'ausente' ? '&#10007;' : est === 'tarde' ? '!' : est === 'velada' ? '&#9790;' : '';
+        var lbl = (esFin && !domTrab) ? '' : (est === 'ausente' ? '&#10007;' : est === 'tarde' ? '!' : est === 'velada' ? '&#9790;' : '');
         html += '<td style="background:' + bg + ';color:' + clr + ';font-size:7px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
       });
       html += '</tr>';
@@ -11537,7 +11578,7 @@ async function init() {
   if (fi) fi.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 
   // Carga paralela de datos
-  await Promise.all([cargarInventario(), cargarPersonal(), cargarEntregasSerig(), cargarOrdenSinAsignar()]);
+  await Promise.all([cargarInventario(), cargarPersonal(), cargarEntregasSerig(), cargarOrdenSinAsignar(), cargarFeriados()]);
   await cargarSalidaRequiMap(); // debe ir después de cargarEntregasSerig
   await cargarAusentesHoy(); // filtra ausentes de la matriz (llama renderMatriz internamente)
   await cargarPosDia(posFecha); // posiciones guardadas del día (matriz por día)

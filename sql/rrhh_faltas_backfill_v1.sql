@@ -9,7 +9,9 @@
 -- sola vez. Es idempotente (se puede correr varias veces sin duplicar).
 --
 -- Requiere que sql/rrhh_faltas_v1.sql (con la columna `origen`) ya
--- haya corrido. Correr en Supabase Dashboard → SQL Editor.
+-- haya corrido. Excluye fechas marcadas en sql/dias_feriados_v1.sql
+-- (correr ese primero si ya tienes feriados registrados). Correr en
+-- Supabase Dashboard → SQL Editor.
 -- ════════════════════════════════════════════════════════════════
 
 insert into public.rrhh_faltas (personal_id, fecha, origen, notas)
@@ -28,6 +30,9 @@ where a.estado = 'ausente'
     where f.personal_id = p.id
       and f.fecha = a.fecha
       and f.origen = 'asistencia_serig'
+  )
+  and not exists (
+    select 1 from public.dias_feriados df where df.fecha = a.fecha
   );
 
 -- ─────────────────────────────────────────────────────────────

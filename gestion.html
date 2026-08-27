@@ -1150,6 +1150,8 @@ async function sincronizarAsistenciaDesdeFalta(personalId, fecha) {
   try {
     var p = personalTodos.find(function(x) { return String(x.id) === String(personalId); });
     if (!p || p.area !== 'serig') return;
+    var fer = await db.from('dias_feriados').select('fecha').eq('fecha', fecha).maybeSingle();
+    if (fer.data) return; // un feriado no se marca como ausente en Asistencia Mensual
     await db.from('asistencia_diaria').upsert({
       fecha: fecha, operador_codigo: p.codigo, operador_nombre: p.nombre,
       area: 'serig', turno: 'dia', estado: 'ausente',
