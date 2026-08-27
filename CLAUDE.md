@@ -162,6 +162,9 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   Filtros: área (Todos/Tapas/Serigrafía/Producción) · buscador nombre/código · toggle solo activos.
   `area` de personal ahora acepta también 'produccion' (antes solo 'tapas'/'serig' —
   produccion.html en sí sigue sin leer la tabla `personal`, es solo para llevar su RRHH aquí).
+  ⚠️ `personal` tiene un CHECK constraint `personal_area_check` creado manual en el dashboard
+  (no versionado en ningún CREATE TABLE) — hay que mantenerlo sincronizado a mano si se agrega
+  otro valor de área nuevo. Ver `sql/personal_area_produccion_v1.sql`.
   Encabezado de la tabla con `position:sticky` (no se pierde al hacer scroll).
   Grupos por área desplegables (clic en el header del grupo, `toggleGrupoArea()`) — estado
   en `gruposColapsados{}`, expandido por default; cada grupo es su propio `<tbody>`.
@@ -228,16 +231,9 @@ Notas críticas:
    fórmula de tinta en Serigrafía, familia/accesorios en Tapas). RLS igual a `sku_recetas` (master).
 8. `sql/operativo_produccion_v1.sql` — rol `operativo_prod` + usuario produccion@tetrapp.app +
    políticas insert/update/delete en produccion_diaria. Correr DESPUÉS del 5 (necesita la tabla).
-9. `sql/dias_feriados_v1.sql` — tabla `dias_feriados` (casilla gris en Asistencia Mensual,
-   no cuenta como falta) + marca 2026-08-15 + limpia lo que ya se había generado mal ese día
-   (falta auto + registro 'ausente'). Correr ANTES del punto 10.
-10. `sql/rrhh_faltas_backfill_v1.sql` — trae a `rrhh_faltas` las ausencias que YA estaban
-    marcadas en `asistencia_diaria` (Serigrafía) antes de que existiera la sincronización
-    automática (`toggleAsistCell`, que solo dispara hacia adelante). Correr UNA vez; es
-    idempotente. Requiere `sql/rrhh_faltas_v1.sql` (columna `origen`) y `dias_feriados_v1.sql`
-    ya corridos — excluye feriados.
-    ⚠️ El bucket Storage `justificaciones` (público) sigue pendiente de crear MANUAL en
-    Dashboard → Storage → New bucket — sin eso, subir foto de justificación falla.
+9. `sql/personal_area_produccion_v1.sql` — agrega 'produccion' al CHECK constraint
+   `personal_area_check` (creado manual en el dashboard, bloqueaba crear personas de esa
+   área desde gestion.html con "violates check constraint personal_area_check").
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
@@ -248,6 +244,7 @@ Notas críticas:
 - `sql/gestion_v1.sql` (27-ago-2026) — tablas `mejoras_planta`/`rrhh_permisos`/`rrhh_incidentes` + cols RRHH en `personal`
 - `sql/personal_edad_v1.sql` (27-ago-2026) — columna `edad` (smallint) en `personal`
 - `sql/rrhh_faltas_v1.sql` (27-ago-2026) — tabla `rrhh_faltas` (incluye columna `origen`) + políticas RLS del bucket `justificaciones`
+- `sql/dias_feriados_v1.sql` (27-ago-2026) — tabla `dias_feriados`; bucket Storage `justificaciones` confirmado creado
 
 ---
 
