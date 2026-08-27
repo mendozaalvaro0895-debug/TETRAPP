@@ -17,7 +17,7 @@
   --prod:#B07D2A; --prod-d:#8A6220; --prod-xl:#FFFBEB; --prod-l:#F5E6C8;
   --ink:#0C0C0B; --bg:#F7F6F2; --bg2:#F0EDEA; --card:#FFFFFF;
   --border:#E0DED8; --gray:#6B6B6A; --gray-l:#9A9A98;
-  --green:#16A34A; --red:#EF4444; --amber:#D97706; --ven:#1D4ED8;
+  --green:#16A34A; --green-l:#ECFDF5; --red:#EF4444; --amber:#D97706; --amber-l:#FFFBEB; --ven:#1D4ED8; --ven-l:#BFDBFE; --ven-xl:#EFF6FF; --ven-dark:#1E3A8A;
   --font:'DM Sans',sans-serif; --display:'Playfair Display',serif; --mono:'DM Mono',monospace;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -218,6 +218,86 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 @media(max-width:1024px){.kpi-strip{grid-template-columns:repeat(2,1fr)}.ing-grid{grid-template-columns:1fr}}
 @media(max-width:640px){.kpi-strip{grid-template-columns:1fr}.imp-sum{grid-template-columns:repeat(2,1fr)}.page{padding:14px}}
+/* ── RECETARIO ─────────────────────────────────────────────────── */
+.recet-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:18px}
+.recet-tabs{display:flex;border-bottom:1px solid var(--border)}
+.recet-tab{flex:1;padding:10px 6px;font-size:12px;font-weight:700;text-align:center;cursor:pointer;color:var(--gray);border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;font-family:var(--font)}
+.recet-tab.act{color:var(--prod);border-bottom-color:var(--prod);background:var(--prod-xl)}
+.recet-tab:hover:not(.act){color:var(--prod);background:var(--prod-xl)}
+.recet-inner{padding:14px 16px}
+.recet-barra{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.recet-search{flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:var(--font);outline:none;transition:border-color .15s}
+.recet-search:focus{border-color:var(--prod)}
+.recet-count{font-size:11px;color:var(--gray);white-space:nowrap;flex-shrink:0}
+.recet-ver-mas{display:block;width:100%;padding:9px;background:none;border:1.5px dashed var(--border);border-radius:8px;font-size:12px;font-weight:600;color:var(--gray);cursor:pointer;margin-top:4px;transition:border-color .15s,color .15s}
+.recet-ver-mas:hover{border-color:var(--prod);color:var(--prod)}
+.rc-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;user-select:none;background:var(--bg);border-radius:9px}
+.rc-hdr:hover{background:var(--prod-xl)}
+.rc-sku{font-family:var(--mono);font-weight:700;color:var(--prod);font-size:12px;white-space:nowrap;flex-shrink:0}
+.rc-desc{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--gray);flex:1;min-width:0}
+.rc-badge{background:var(--prod-l);color:var(--prod-d);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.rc-badge.vacio{background:var(--bg2);color:var(--gray-l)}
+.rc-badge.dir{background:var(--green-l);color:var(--green)}
+.rc-badge.foto-pend{background:var(--amber-l);color:#92400E}
+.rc-chev{font-size:11px;color:var(--gray);transition:transform .2s;flex-shrink:0}
+.rc-chev.open{transform:rotate(180deg)}
+.rc-cuerpo{display:none;border-top:1px solid var(--border);background:var(--card);border-radius:0 0 9px 9px}
+.rc-cuerpo.open{display:block}
+.rc-area-row{display:flex;align-items:center;gap:8px;padding:10px 14px 6px}
+.rc-lbl{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);white-space:nowrap;flex-shrink:0}
+.rc-area-btns{display:flex;gap:5px;flex-wrap:wrap}
+.rc-area-btn{padding:4px 12px;border:1.5px solid var(--border);border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:none;color:var(--gray);transition:all .15s;font-family:var(--font)}
+.rc-area-btn:hover{border-color:var(--prod);color:var(--prod)}
+.rc-area-btn.sel.tapas{border-color:#4e8df5;background:#eef3ff;color:#2056c0}
+.rc-area-btn.sel.serigrafia{border-color:#e07b39;background:#fff4ed;color:#b85010}
+.rc-area-btn.sel.produccion{border-color:var(--prod);background:var(--prod-xl);color:var(--prod-d)}
+.rc-area-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.rc-area-badge.tapas{background:#eef3ff;color:#2056c0}
+.rc-area-badge.serigrafia{background:#fff4ed;color:#b85010}
+.rc-area-badge.produccion{background:var(--prod-xl);color:var(--prod-d)}
+.rc-desc-row{display:flex;align-items:center;gap:8px;padding:4px 14px 10px}
+.rc-desc-inp{flex:1;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:var(--font);outline:none;transition:border-color .15s}
+.rc-desc-inp:focus{border-color:var(--prod)}
+.rc-partes-hdr{display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:6px;padding:4px 14px;font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);border-bottom:1px solid var(--bg2)}
+.rc-parte{display:grid;grid-template-columns:80px 1fr 1fr 28px;gap:6px;align-items:center;padding:6px 14px;border-bottom:1px solid var(--bg)}
+.rc-parte:last-of-type{border-bottom:none}
+.rc-add{display:grid;grid-template-columns:80px 1fr 1fr auto;gap:6px;align-items:center;padding:8px 14px 10px;border-top:1px solid var(--border);margin-top:4px}
+.rc-tipo{padding:5px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:var(--font);outline:none;background:var(--card);width:100%}
+.rc-tipo:focus{border-color:var(--prod)}
+.rc-in{padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:var(--mono);font-weight:600;outline:none;width:100%;box-sizing:border-box;transition:border-color .15s}
+.rc-in:focus{border-color:var(--prod)}
+.rc-in.nota{font-family:var(--font);font-weight:400}
+.rc-del{background:none;border:none;cursor:pointer;color:var(--gray-l);font-size:13px;padding:3px 5px;border-radius:5px;line-height:1;transition:color .15s}
+.rc-del:hover{color:var(--red)}
+.rc-wrap{position:relative}
+.rc-drop{display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;background:var(--card);border:1.5px solid var(--prod);border-radius:10px;max-height:260px;overflow-y:auto;z-index:60;box-shadow:0 10px 28px rgba(0,0,0,.18)}
+.rc-drop.open{display:block}
+.rc-opt{padding:10px 13px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border);line-height:1.4}
+.rc-opt:last-child{border-bottom:none}
+.rc-opt:hover{background:var(--prod-xl)}
+.rc-opt b{font-family:var(--mono);color:var(--prod);font-size:12px}
+.rc-foto-wrap{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--bg2)}
+.rc-foto-img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;flex-shrink:0}
+.rc-foto-vacia{width:64px;height:64px;border-radius:8px;border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--gray-l);text-align:center;flex-shrink:0}
+.rc-foto-acciones{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rc-foto-btn{padding:6px 14px;border:1.5px solid var(--border);border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;color:var(--ink);transition:all .15s}
+.rc-foto-btn:hover{border-color:var(--prod);color:var(--prod)}
+.rc-foto-status{font-size:11px;color:var(--gray)}
+.rc-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg);border-radius:0 0 9px 9px}
+.rc-save-btn{padding:6px 18px;background:var(--prod);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);transition:opacity .15s}
+.rc-save-btn:disabled{opacity:.5;cursor:not-allowed}
+.rc-undo-btn{padding:3px 10px;background:none;border:1.5px solid var(--border);border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;color:var(--gray);flex-shrink:0;transition:all .15s;font-family:var(--font)}
+.rc-undo-btn:hover{border-color:var(--red);color:var(--red)}
+.rce-wrap{padding:10px 14px;border-top:1px solid var(--bg2)}
+.rce-hdr-title{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);margin-bottom:8px}
+.rce-row{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;margin-bottom:6px}
+.rce-lbl{font-size:11px;font-weight:700;color:var(--gray-l)}
+.rce-in{padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:var(--font);outline:none;width:100%;box-sizing:border-box;transition:border-color .15s}
+.rce-in:focus{border-color:var(--prod)}
+.rce-meta{font-size:10px;color:var(--gray-l);margin:4px 0 8px}
+.rce-foot{display:flex;align-items:center;gap:10px}
+.rc{margin-bottom:4px}
+@media(max-width:600px){.rc-sku{font-size:11px}.rc-partes-hdr,.rc-parte,.rc-add{grid-template-columns:70px 1fr 1fr 26px}.rc-area-btn{padding:4px 8px;font-size:10px}.rce-row{grid-template-columns:90px 1fr}}
 </style>
 </head>
 <body>
@@ -258,6 +338,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <button class="tab active" id="tab-ingreso" onclick="switchTab('ingreso')">📥 Ingreso</button>
     <button class="tab" id="tab-semanal" onclick="switchTab('semanal')">📊 Reporte Semanal</button>
     <button class="tab" id="tab-mensual" onclick="switchTab('mensual')">📅 Mensual</button>
+    <button class="tab" id="tab-recetario" onclick="switchTab('recetario')">📋 Recetario</button>
   </div>
 
   <!-- ══════════ VIEW INGRESO ══════════ -->
@@ -421,6 +502,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     </div>
   </div>
 
+  <!-- ══════════ VIEW RECETARIO ══════════ -->
+  <div id="view-recetario" style="display:none">
+    <div class="recet-panel">
+      <div class="recet-tabs">
+        <button class="recet-tab act" id="recetTabPend" onclick="switchRecetTab('pendientes')">Pendientes (—)</button>
+        <button class="recet-tab" id="recetTabGuard" onclick="switchRecetTab('guardados')">Guardados (—)</button>
+      </div>
+      <div class="recet-inner">
+        <div class="recet-barra">
+          <input class="recet-search" type="search" placeholder="Buscar SKU o descripción…" oninput="filtrarRecetario(this.value)">
+          <span class="recet-count" id="recetCount">—</span>
+        </div>
+        <div id="recetLista"><div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">Cargando…</div></div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- MODAL PREVIEW -->
@@ -564,12 +662,13 @@ document.addEventListener('click', function () {
 });
 
 function switchTab(tab) {
-  ['ingreso', 'semanal', 'mensual'].forEach(function (t) {
+  ['ingreso', 'semanal', 'mensual', 'recetario'].forEach(function (t) {
     document.getElementById('view-' + t).style.display = t === tab ? 'block' : 'none';
     document.getElementById('tab-' + t).classList.toggle('active', t === tab);
   });
   if (tab === 'semanal') renderSemanal();
   if (tab === 'mensual') renderMensual();
+  if (tab === 'recetario' && !RECETARIO_CARGADO) cargarRecetario();
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1712,6 +1811,498 @@ async function init() {
   }
   try { await cargarPrecios(); } catch (e) { console.warn(e); }
   await cargarUltimos();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RECETARIO DE SKUs — Producción
+   ══════════════════════════════════════════════════════════════ */
+var RECET_SKUS = [];
+var RECETAS_MAP = {};
+var PARTES_MAP = {};
+var RECETARIO_CARGADO = false;
+var RECET_FILTRO = '';
+var RECET_VISIBLE = 30;
+var RECET_TAB = 'pendientes';
+var INV_REC = [];
+var RECET_SID_SKU = {};
+var ESPECS_MAP = {};
+
+var PROCESOS_FIJOS = ['Armado','Liner','Banda','Flameado','Impresión','Empaque','Serigrafía','Revisado','Limpiar pestaña','Apoyo'];
+var AREA_LABELS = {tapas:'Tapas', serigrafia:'Serigrafía', produccion:'Producción'};
+var CAMPOS_POR_AREA = {
+  tapas: ['Familia', 'Accesorios', 'Procesos'],
+  serigrafia: ['Tiros', 'Colores', 'Fórmula de tinta', 'Procesos', 'Empaque'],
+  produccion: ['Materia prima', 'Colorante', 'Mezcla', 'Peso', 'Detalles técnicos']
+};
+
+function safeSku(s) { return String(s).replace(/[^a-zA-Z0-9]/g, '_'); }
+
+function fmtFechaHoraGT(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala', day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch (e) { return ''; }
+}
+
+async function cargarRecetario() {
+  document.getElementById('recetLista').innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">Cargando…</div>';
+
+  // Usar el inventario ya cargado — INV_LISTA tiene todos los SKUs
+  INV_REC = INV_LISTA.map(function(i) { return { sku: i.sku, descripcion: i.descripcion || '' }; });
+  RECET_SKUS = INV_REC.slice().sort(function(a, b) { return String(a.sku || '').localeCompare(String(b.sku || '')); })
+    .map(function(i) { return { sku_fact: i.sku, desc: i.descripcion }; });
+
+  var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado,foto_url');
+  RECETAS_MAP = {};
+  if (rr.error) {
+    toast('⛔ No se pudieron cargar las recetas: ' + rr.error.message, 'err');
+  } else {
+    (rr.data || []).forEach(function(r) { RECETAS_MAP[r.sku_fact] = r; });
+  }
+
+  var rp = await db.from('sku_receta_partes').select('id,receta_id,tipo,codigo,nota,orden').order('receta_id').order('orden');
+  PARTES_MAP = {};
+  if (rp.error) {
+    toast('⛔ No se pudieron cargar las partes de las recetas: ' + rp.error.message, 'err');
+  } else {
+    (rp.data || []).forEach(function(p) {
+      if (!PARTES_MAP[p.receta_id]) PARTES_MAP[p.receta_id] = [];
+      PARTES_MAP[p.receta_id].push(p);
+    });
+  }
+
+  var re = await db.from('sku_especificaciones').select('sku,area,campo,valor,nota,actualizado_por,actualizado_en');
+  ESPECS_MAP = {};
+  if (re.error) {
+    toast('⛔ No se pudieron cargar las especificaciones: ' + re.error.message + ' — probablemente falta correr sql/sku_especificaciones_v1.sql en Supabase', 'err');
+  } else {
+    (re.data || []).forEach(function(e) {
+      if (!ESPECS_MAP[e.sku]) ESPECS_MAP[e.sku] = {};
+      ESPECS_MAP[e.sku][e.campo] = e;
+    });
+  }
+
+  RECETARIO_CARGADO = !rr.error && !rp.error && !re.error;
+  renderRecetario();
+}
+
+function filtrarRecetario(q) {
+  RECET_FILTRO = q;
+  RECET_VISIBLE = 30;
+  renderRecetario();
+}
+
+function switchRecetTab(tab) {
+  RECET_TAB = tab;
+  RECET_VISIBLE = 30;
+  document.getElementById('recetTabPend').classList.toggle('act', tab === 'pendientes');
+  document.getElementById('recetTabGuard').classList.toggle('act', tab === 'guardados');
+  renderRecetario();
+}
+
+function renderRecetario() {
+  var q = RECET_FILTRO.toLowerCase();
+  var lista = RECET_SKUS.filter(function(s) {
+    return !q || String(s.sku_fact || '').toLowerCase().indexOf(q) !== -1 || String(s.desc || '').toLowerCase().indexOf(q) !== -1;
+  });
+  var pendientes = lista.filter(function(s) { var r = RECETAS_MAP[s.sku_fact]; return !r || !r.guardado; });
+  var guardados  = lista.filter(function(s) { var r = RECETAS_MAP[s.sku_fact]; return r && r.guardado; });
+
+  var tp = document.getElementById('recetTabPend');
+  var tg = document.getElementById('recetTabGuard');
+  if (tp) tp.textContent = 'Pendientes (' + pendientes.length + ')';
+  if (tg) tg.textContent = 'Guardados (' + guardados.length + ')';
+
+  var current = RECET_TAB === 'guardados' ? guardados : pendientes;
+  var shown = current.slice(0, RECET_VISIBLE);
+  RECET_SID_SKU = {};
+  var html = '';
+  shown.forEach(function(s) {
+    var sid = safeSku(s.sku_fact);
+    RECET_SID_SKU[sid] = s.sku_fact;
+    var receta = RECETAS_MAP[s.sku_fact] || null;
+    var partes = receta ? (PARTES_MAP[receta.id] || []) : [];
+    html += RECET_TAB === 'guardados'
+      ? buildRecetCardGuardado(s.sku_fact, s.desc, receta, partes)
+      : buildRecetCard(s.sku_fact, s.desc, receta, partes);
+  });
+
+  var emptyMsg = RECET_TAB === 'guardados' ? 'Sin SKUs guardados aún' : (q ? 'Sin resultados' : 'Sin SKUs pendientes — ¡todo guardado!');
+  document.getElementById('recetCount').textContent = current.length + ' SKUs' + (q ? ' (filtrado)' : '');
+  document.getElementById('recetLista').innerHTML = html || '<div style="text-align:center;padding:24px;color:var(--gray);font-size:13px">' + emptyMsg + '</div>';
+
+  if (current.length > RECET_VISIBLE) {
+    var btn = document.createElement('button');
+    btn.className = 'recet-ver-mas';
+    btn.textContent = 'Ver ' + Math.min(30, current.length - RECET_VISIBLE) + ' más (' + (current.length - RECET_VISIBLE) + ' restantes)';
+    btn.onclick = function() { RECET_VISIBLE += 30; renderRecetario(); };
+    document.getElementById('recetLista').appendChild(btn);
+  }
+}
+
+function buildRecetCard(sku, desc, receta, partes) {
+  var sid = safeSku(sku);
+  var nP = partes.length;
+  var badgeTxt = nP ? nP + (nP === 1 ? ' parte' : ' partes') : 'Sin receta';
+  var badgeCls = nP ? 'rc-badge' : 'rc-badge vacio';
+  return '<div class="rc" id="rc-' + sid + '">' +
+    '<div class="rc-hdr" onclick="toggleRcCard(\'' + sid + '\')">' +
+      '<span class="rc-sku">' + esc(sku) + '</span>' +
+      '<span class="rc-desc">' + esc(desc || '—') + '</span>' +
+      '<span class="' + badgeCls + '" id="rc-badge-' + sid + '">' + badgeTxt + '</span>' +
+      '<span class="rc-chev" id="rc-chev-' + sid + '">▾</span>' +
+    '</div>' +
+    '<div class="rc-cuerpo" id="rc-body-' + sid + '">' + buildRcCuerpo(sku, sid, desc, receta, partes) + '</div>' +
+  '</div>';
+}
+
+function buildRecetCardGuardado(sku, desc, receta, partes) {
+  var sid = safeSku(sku);
+  var area = receta ? (receta.area || '') : '';
+  var nP = partes.length;
+  var esDir = receta && receta.es_directo;
+  var esMaster = TETRA.rol === 'master';
+  var badgeTxt = esDir ? 'Directo' : (nP + (nP === 1 ? ' parte' : ' partes'));
+  var badgeCls = esDir ? 'rc-badge dir' : 'rc-badge';
+  var areaBadge = area ? '<span class="rc-area-badge ' + area + '">' + esc(AREA_LABELS[area] || area) + '</span>' : '';
+  var fotoBadge = (receta && receta.foto_url) ? '' : '<span class="rc-badge foto-pend">📷 PENDIENTE DE FOTOS</span>';
+  var undoBtn = esMaster
+    ? '<button class="rc-undo-btn" onclick="event.stopPropagation();deshacerReceta(\'' + sid + '\')">↩ Deshacer</button>'
+    : '';
+  var cuerpoHtml = buildRcFotoBlock(sku, sid, receta, esMaster);
+  if (partes.length) {
+    cuerpoHtml += '<div class="rc-partes-hdr"><span>Tipo</span><span>Código / Proceso</span><span>Nota</span><span></span></div>';
+    partes.forEach(function(p) { cuerpoHtml += buildRcParteRow(p, false); });
+  } else if (esDir) {
+    cuerpoHtml += '<div style="padding:10px 14px;font-size:11px;color:var(--green);font-weight:600">✓ Directo desde Producción</div>';
+  } else {
+    cuerpoHtml += '<div style="padding:10px 14px;font-size:11px;color:var(--gray)">Sin partes registradas</div>';
+  }
+  cuerpoHtml += buildRcEspecsBlock(sku, sid, area, esMaster);
+  return '<div class="rc" id="rc-' + sid + '">' +
+    '<div class="rc-hdr" onclick="toggleRcCard(\'' + sid + '\')">' +
+      '<span class="rc-sku">' + esc(sku) + '</span>' +
+      '<span class="rc-desc">' + esc(desc || '—') + '</span>' +
+      areaBadge + fotoBadge +
+      '<span class="' + badgeCls + '">' + badgeTxt + '</span>' +
+      undoBtn +
+      '<span class="rc-chev" id="rc-chev-' + sid + '">▾</span>' +
+    '</div>' +
+    '<div class="rc-cuerpo" id="rc-body-' + sid + '">' + cuerpoHtml + '</div>' +
+  '</div>';
+}
+
+function buildRcCuerpo(sku, sid, desc, receta, partes) {
+  var descVal = receta ? (receta.descripcion || desc || '') : (desc || '');
+  var currentArea = receta ? (receta.area || '') : '';
+  var esMaster = TETRA.rol === 'master';
+  var partesHdr = partes.length
+    ? '<div class="rc-partes-hdr"><span>Tipo</span><span>Código / Proceso</span><span>Nota</span><span></span></div>'
+    : '';
+  var partesHtml = '';
+  partes.forEach(function(p) { partesHtml += buildRcParteRow(p, esMaster); });
+  var isProduccion = currentArea === 'produccion';
+  var addSection = esMaster
+    ? '<div id="rc-add-wrap-' + sid + '"' + (isProduccion ? ' style="display:none"' : '') + '>' + buildRcAddForm(sid) + '</div>' +
+      '<div id="rc-dir-msg-' + sid + '" style="padding:8px 14px;font-size:11px;color:var(--green);font-weight:600;' + (isProduccion ? '' : 'display:none') + '">✓ Directo desde Producción — sin proceso adicional</div>'
+    : '';
+  var foot = esMaster
+    ? '<div class="rc-foot"><button class="rc-save-btn" id="rcsave-' + sid + '" onclick="guardarReceta(\'' + sid + '\')">Guardar receta ✓</button></div>'
+    : '';
+  return '<div class="rc-desc-row">' +
+      '<span class="rc-lbl">Descripción</span>' +
+      '<input class="rc-desc-inp" id="rc-desc-' + sid + '" value="' + esc(descVal) + '" placeholder="Descripción del producto terminado"' + (esMaster ? '' : ' disabled') + '>' +
+    '</div>' +
+    buildRcAreaSelector(sid, currentArea) +
+    partesHdr + partesHtml + addSection + foot;
+}
+
+function buildRcAreaSelector(sid, currentArea) {
+  var areas = [{val:'tapas',label:'Tapas'},{val:'serigrafia',label:'Serigrafía'},{val:'produccion',label:'Producción'}];
+  var btns = areas.map(function(a) {
+    var cls = 'rc-area-btn' + (a.val === currentArea ? ' sel ' + a.val : '');
+    return '<button class="' + cls + '" id="rcab-' + sid + '-' + a.val + '" onclick="rcSetArea(\'' + sid + '\',\'' + a.val + '\')">' + a.label + '</button>';
+  }).join('');
+  return '<div class="rc-area-row"><span class="rc-lbl">Área</span><div class="rc-area-btns">' + btns + '</div>' +
+    '<input type="hidden" id="rcarea-' + sid + '" value="' + esc(currentArea) + '"></div>';
+}
+
+function rcSetArea(sid, area) {
+  var hidden = document.getElementById('rcarea-' + sid);
+  if (hidden) hidden.value = area;
+  ['tapas','serigrafia','produccion'].forEach(function(a) {
+    var btn = document.getElementById('rcab-' + sid + '-' + a);
+    if (btn) btn.className = 'rc-area-btn' + (a === area ? ' sel ' + a : '');
+  });
+  var addWrap = document.getElementById('rc-add-wrap-' + sid);
+  if (addWrap) addWrap.style.display = area === 'produccion' ? 'none' : '';
+  var dirMsg = document.getElementById('rc-dir-msg-' + sid);
+  if (dirMsg) dirMsg.style.display = area === 'produccion' ? '' : 'none';
+}
+
+function buildRcParteRow(p, esMaster) {
+  var tipoLabel = {base:'Base', accesorio:'Accesorio', proceso:'Proceso'}[p.tipo] || p.tipo;
+  var del = esMaster ? '<button class="rc-del" onclick="eliminarParte(' + p.id + ')" title="Eliminar">✕</button>' : '<span></span>';
+  return '<div class="rc-parte">' +
+    '<span style="font-size:11px;font-weight:700;color:var(--gray-l)">' + esc(tipoLabel) + '</span>' +
+    '<span style="font-family:var(--mono);font-size:11px;font-weight:700">' + esc(p.codigo) + '</span>' +
+    '<span style="font-size:11px;color:var(--gray)">' + esc(p.nota || '—') + '</span>' +
+    del +
+  '</div>';
+}
+
+function buildRcFotoBlock(sku, sid, receta, esMaster) {
+  var url = receta && receta.foto_url ? receta.foto_url : null;
+  var img = url
+    ? '<img class="rc-foto-img" src="' + esc(url) + '" alt="Foto ' + esc(sku) + '" onclick="window.open(\'' + esc(url) + '\',\'_blank\')">'
+    : '<div class="rc-foto-vacia">Sin foto</div>';
+  var accion = esMaster
+    ? '<label class="rc-foto-btn" for="rcfoto-' + sid + '">' + (url ? '🔄 Cambiar foto' : '📷 Subir foto') + '</label>' +
+      '<input type="file" accept="image/*" id="rcfoto-' + sid + '" style="display:none" onchange="subirFotoEnvase(\'' + sid + '\', this)">'
+    : '';
+  return '<div class="rc-foto-wrap">' + img +
+    '<div class="rc-foto-acciones">' + accion + '<span class="rc-foto-status" id="rcfoto-status-' + sid + '"></span></div>' +
+  '</div>';
+}
+
+async function subirFotoEnvase(sid, inputEl) {
+  var sku = RECET_SID_SKU[sid];
+  var receta = sku ? RECETAS_MAP[sku] : null;
+  var file = inputEl.files && inputEl.files[0];
+  if (!sku || !receta || !file) return;
+  if (!/^image\//.test(file.type)) { toast('El archivo debe ser una imagen', 'err'); inputEl.value = ''; return; }
+  if (file.size > 6 * 1024 * 1024) { toast('Imagen muy pesada (máx 6MB)', 'err'); inputEl.value = ''; return; }
+  var status = document.getElementById('rcfoto-status-' + sid);
+  if (status) status.textContent = 'Subiendo…';
+  var ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  var path = sku + '.' + ext;
+  var up = await db.storage.from('envases').upload(path, file, { upsert: true, contentType: file.type });
+  if (up.error) { if (status) status.textContent = ''; toast('Error al subir la foto: ' + up.error.message, 'err'); inputEl.value = ''; return; }
+  var pub = db.storage.from('envases').getPublicUrl(path);
+  var url = pub.data.publicUrl + '?v=' + new Date().getTime();
+  var upd = await db.from('sku_recetas').update({ foto_url: url }).eq('id', receta.id);
+  if (upd.error) { if (status) status.textContent = ''; toast('Error al guardar la foto: ' + upd.error.message, 'err'); inputEl.value = ''; return; }
+  RECETAS_MAP[sku].foto_url = url;
+  toast('✓ Foto guardada', 'ok');
+  renderRecetario();
+}
+
+function buildRcEspecsBlock(sku, sid, area, esMaster) {
+  var campos = CAMPOS_POR_AREA[area];
+  if (!campos) return '';
+  var datos = ESPECS_MAP[sku] || {};
+  var filas = '';
+  var masReciente = null;
+  campos.forEach(function(campo) {
+    var actual = datos[campo];
+    var val = actual ? (actual.valor || '') : '';
+    var fid = 'rce-' + sid + '-' + safeSku(campo);
+    filas += '<div class="rce-row"><span class="rce-lbl">' + esc(campo) + '</span>' +
+      '<input class="rce-in" id="' + fid + '" value="' + esc(val) + '" placeholder="—"' + (esMaster ? '' : ' disabled') + '></div>';
+    if (actual && actual.actualizado_en && (!masReciente || actual.actualizado_en > masReciente.actualizado_en)) masReciente = actual;
+  });
+  var meta = masReciente
+    ? '<div class="rce-meta">Actualizado por ' + esc(masReciente.actualizado_por || '—') + ' · ' + fmtFechaHoraGT(masReciente.actualizado_en) + '</div>'
+    : '';
+  var foot = esMaster
+    ? '<div class="rce-foot"><button class="rc-save-btn" id="rcesave-' + sid + '" onclick="guardarEspecs(\'' + sid + '\')">Guardar especificaciones</button><span class="rc-foto-status" id="rce-status-' + sid + '"></span></div>'
+    : '';
+  return '<div class="rce-wrap"><div class="rce-hdr-title">🧬 Especificaciones técnicas · ' + esc(AREA_LABELS[area] || area) + '</div>' +
+    filas + meta + foot + '</div>';
+}
+
+async function guardarEspecs(sid) {
+  var sku = RECET_SID_SKU[sid];
+  var receta = sku ? RECETAS_MAP[sku] : null;
+  var area = receta ? (receta.area || '') : '';
+  var campos = CAMPOS_POR_AREA[area];
+  if (!sku || !campos) return;
+  var btn = document.getElementById('rcesave-' + sid);
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  var quien = TETRA.nombre || TETRA.email || null;
+  var filas = campos.map(function(campo) {
+    var fid = 'rce-' + sid + '-' + safeSku(campo);
+    var val = ((document.getElementById(fid) || {}).value || '').trim();
+    return { sku: sku, area: area, campo: campo, valor: val || null, actualizado_por: quien };
+  });
+  var up = await db.from('sku_especificaciones').upsert(filas, { onConflict: 'sku,area,campo' }).select();
+  if (btn) { btn.disabled = false; btn.textContent = 'Guardar especificaciones'; }
+  if (up.error) { toast('Error al guardar especificaciones: ' + up.error.message, 'err'); return; }
+  if (!ESPECS_MAP[sku]) ESPECS_MAP[sku] = {};
+  (up.data || filas).forEach(function(f) { ESPECS_MAP[sku][f.campo] = f; });
+  toast('✓ Especificaciones guardadas', 'ok');
+  renderRecetario();
+}
+
+function buildRcAddForm(sid) {
+  return '<div class="rc-add">' +
+    '<select class="rc-tipo" id="rct-' + sid + '"><option value="base">Base</option><option value="accesorio">Accesorio</option><option value="proceso">Proceso</option></select>' +
+    '<div class="rc-wrap"><input class="rc-in" id="rcc-' + sid + '" placeholder="Código o proceso…" autocomplete="off" ' +
+      'oninput="rcAcBuscar(\'' + sid + '\')" onblur="setTimeout(function(){rcAcCerrar(\'' + sid + '\')},180)">' +
+      '<div class="rc-drop" id="rcd-' + sid + '"></div></div>' +
+    '<input class="rc-in nota" id="rcn-' + sid + '" placeholder="Nota (opcional)">' +
+    '<button class="btn btn-prod" id="rcb-' + sid + '" style="padding:5px 10px;font-size:11px;white-space:nowrap" onclick="agregarParte(\'' + sid + '\')">+ Añadir</button>' +
+  '</div>';
+}
+
+function toggleRcCard(sid) {
+  var body = document.getElementById('rc-body-' + sid);
+  var chev = document.getElementById('rc-chev-' + sid);
+  if (!body) return;
+  var open = body.classList.toggle('open');
+  if (chev) chev.classList.toggle('open', open);
+}
+
+async function guardarReceta(sid) {
+  var sku = RECET_SID_SKU[sid];
+  if (!sku) return;
+  var area = ((document.getElementById('rcarea-' + sid) || {}).value || '').trim();
+  if (!area) { toast('Seleccioná un área: Tapas, Serigrafía o Producción', 'err'); return; }
+  var desc = ((document.getElementById('rc-desc-' + sid) || {}).value || '').trim();
+  var esDirecto = area === 'produccion';
+  var btn = document.getElementById('rcsave-' + sid);
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  var recetaId = await ensureReceta(sku, sid);
+  if (!recetaId) { if (btn) { btn.disabled = false; btn.textContent = 'Guardar receta ✓'; } return; }
+  var upd = await db.from('sku_recetas').update({area: area, guardado: true, es_directo: esDirecto, descripcion: desc || null}).eq('id', recetaId);
+  if (upd.error) { if (btn) { btn.disabled = false; btn.textContent = 'Guardar receta ✓'; } toast('Error al guardar: ' + upd.error.message, 'err'); return; }
+  if (!RECETAS_MAP[sku]) RECETAS_MAP[sku] = {id: recetaId, sku_fact: sku};
+  RECETAS_MAP[sku].area = area;
+  RECETAS_MAP[sku].guardado = true;
+  RECETAS_MAP[sku].es_directo = esDirecto;
+  if (desc) RECETAS_MAP[sku].descripcion = desc;
+  toast('✓ Receta guardada', 'ok');
+  renderRecetario();
+}
+
+async function deshacerReceta(sid) {
+  var sku = RECET_SID_SKU[sid];
+  if (!sku) return;
+  var receta = RECETAS_MAP[sku];
+  if (!receta) return;
+  var upd = await db.from('sku_recetas').update({guardado: false}).eq('id', receta.id);
+  if (upd.error) { toast('Error: ' + upd.error.message, 'err'); return; }
+  RECETAS_MAP[sku].guardado = false;
+  toast('Receta devuelta a Pendientes', 'ok');
+  switchRecetTab('pendientes');
+}
+
+async function ensureReceta(sku, sid) {
+  if (RECETAS_MAP[sku]) return RECETAS_MAP[sku].id;
+  var desc = ((document.getElementById('rc-desc-' + sid) || {}).value || '').trim();
+  var rc = await db.from('sku_recetas').insert({sku_fact: sku, descripcion: desc || null}).select().single();
+  if (rc.error) {
+    if (rc.error.code === '23505') {
+      var fe = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado,foto_url').eq('sku_fact', sku).single();
+      if (fe.error || !fe.data) { toast('Error al acceder a la receta', 'err'); return null; }
+      RECETAS_MAP[sku] = fe.data;
+      if (!PARTES_MAP[fe.data.id]) PARTES_MAP[fe.data.id] = [];
+      return fe.data.id;
+    }
+    toast('Error: ' + rc.error.message, 'err');
+    return null;
+  }
+  RECETAS_MAP[sku] = rc.data;
+  PARTES_MAP[rc.data.id] = [];
+  return rc.data.id;
+}
+
+async function agregarParte(sid) {
+  var sku = RECET_SID_SKU[sid];
+  if (!sku) return;
+  var tipo   = (document.getElementById('rct-' + sid) || {}).value || 'base';
+  var codigo = ((document.getElementById('rcc-' + sid) || {}).value || '').trim();
+  var nota   = ((document.getElementById('rcn-' + sid) || {}).value || '').trim();
+  if (!codigo) { toast('Ingresa un código o nombre de proceso', 'err'); return; }
+  var btn = document.getElementById('rcb-' + sid);
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  var recetaId = await ensureReceta(sku, sid);
+  if (!recetaId) { if (btn) { btn.disabled = false; btn.textContent = '+ Añadir'; } return; }
+  var orden = (PARTES_MAP[recetaId] || []).length + 1;
+  var rp = await db.from('sku_receta_partes').insert({receta_id: recetaId, tipo: tipo, codigo: codigo, nota: nota || null, orden: orden}).select().single();
+  if (btn) { btn.disabled = false; btn.textContent = '+ Añadir'; }
+  if (rp.error) { toast('Error al guardar: ' + rp.error.message, 'err'); return; }
+  PARTES_MAP[recetaId].push(rp.data);
+  refreshRcCard(sku);
+  document.getElementById('rcc-' + sid).value = '';
+  document.getElementById('rcn-' + sid).value = '';
+  toast('✓ Parte añadida', 'ok');
+}
+
+async function eliminarParte(parteId) {
+  var recetaId = null;
+  Object.keys(PARTES_MAP).forEach(function(rid) {
+    (PARTES_MAP[rid] || []).forEach(function(p) { if (p.id === parteId) recetaId = parseInt(rid, 10); });
+  });
+  var rd = await db.from('sku_receta_partes').delete().eq('id', parteId);
+  if (rd.error) { toast('Error al eliminar', 'err'); return; }
+  if (recetaId != null) PARTES_MAP[recetaId] = (PARTES_MAP[recetaId] || []).filter(function(p) { return p.id !== parteId; });
+  var sku = null;
+  Object.keys(RECETAS_MAP).forEach(function(s) { if (RECETAS_MAP[s].id === recetaId) sku = s; });
+  if (sku) refreshRcCard(sku);
+  toast('Parte eliminada', 'ok');
+}
+
+function refreshRcCard(sku) {
+  var sid = safeSku(sku);
+  var receta = RECETAS_MAP[sku] || null;
+  var partes = receta ? (PARTES_MAP[receta.id] || []) : [];
+  var skuData = null;
+  RECET_SKUS.forEach(function(s) { if (s.sku_fact === sku) skuData = s; });
+  var nP = partes.length;
+  var badge = document.getElementById('rc-badge-' + sid);
+  if (badge) { badge.textContent = nP ? nP + (nP === 1 ? ' parte' : ' partes') : 'Sin receta'; badge.className = nP ? 'rc-badge' : 'rc-badge vacio'; }
+  var body = document.getElementById('rc-body-' + sid);
+  if (body && body.classList.contains('open')) {
+    var selArea = ((document.getElementById('rcarea-' + sid) || {}).value) || (receta ? (receta.area || '') : '');
+    var fakeRec = receta ? Object.assign({}, receta, {area: selArea}) : {area: selArea, descripcion: ''};
+    body.innerHTML = buildRcCuerpo(sku, sid, skuData ? skuData.desc : '', fakeRec, partes);
+  }
+}
+
+function rcAcBuscar(sid) {
+  var q = ((document.getElementById('rcc-' + sid) || {}).value || '').trim().toLowerCase();
+  var drop = document.getElementById('rcd-' + sid);
+  if (!drop) return;
+  if (q.length < 2) { drop.classList.remove('open'); return; }
+  var tipo = (document.getElementById('rct-' + sid) || {}).value || 'base';
+  var res = [];
+  if (tipo === 'proceso') {
+    res = PROCESOS_FIJOS.filter(function(p) { return p.toLowerCase().indexOf(q) !== -1; }).map(function(p) { return {sku: '', descripcion: p}; }).slice(0, 10);
+  } else {
+    res = INV_REC.filter(function(i) {
+      return String(i.sku || '').toLowerCase().indexOf(q) === 0 || String(i.descripcion || '').toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 15);
+  }
+  if (!res.length) { drop.classList.remove('open'); return; }
+  var html = '';
+  res.forEach(function(i) { html += buildRcOpt(i, sid); });
+  drop.innerHTML = html;
+  drop.classList.add('open');
+}
+
+function buildRcOpt(item, sid) {
+  var display = item.sku
+    ? '<b>' + esc(String(item.sku)) + '</b> · ' + esc((item.descripcion || '').slice(0, 42))
+    : esc(item.descripcion);
+  var val = item.sku
+    ? String(item.sku) + (item.descripcion ? ' - ' + item.descripcion : '')
+    : (item.descripcion || '');
+  return '<div class="rc-opt" data-sid="' + sid + '" data-val="' + esc(val) + '" onmousedown="rcAcElegirEv(this)">' + display + '</div>';
+}
+
+function rcAcElegirEv(el) {
+  var sid = el.dataset.sid, val = el.dataset.val;
+  var inp = document.getElementById('rcc-' + sid);
+  if (inp) inp.value = val;
+  rcAcCerrar(sid);
+  var nota = document.getElementById('rcn-' + sid);
+  if (nota) nota.focus();
+}
+
+function rcAcCerrar(sid) {
+  var d = document.getElementById('rcd-' + sid);
+  if (d) d.classList.remove('open');
 }
 
 document.addEventListener('DOMContentLoaded', init);
