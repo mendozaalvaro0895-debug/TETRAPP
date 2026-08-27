@@ -149,6 +149,8 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   `area` de personal ahora acepta también 'produccion' (antes solo 'tapas'/'serig' —
   produccion.html en sí sigue sin leer la tabla `personal`, es solo para llevar su RRHH aquí).
   Encabezado de la tabla con `position:sticky` (no se pierde al hacer scroll).
+  Grupos por área desplegables (clic en el header del grupo, `toggleGrupoArea()`) — estado
+  en `gruposColapsados{}`, expandido por default; cada grupo es su propio `<tbody>`.
   Columnas Faltas/Justificación: listan cada fecha del MES EN CURSO (rrhh_faltas vía
   `cargarFaltasResumen()`, que ya filtra por mes — una falta sin justificar de un mes
   anterior deja de contar/alertar) con su SI/NO de justificación en la misma fila; clic

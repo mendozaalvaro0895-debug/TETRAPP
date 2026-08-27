@@ -141,7 +141,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .p-table tr.p-row{cursor:pointer;transition:background .12s}
 .p-table tr.p-row:hover{background:var(--gest-l)}
 .p-table tr.p-row.inactivo{opacity:.55}
-.p-table tr.p-group td{background:var(--bg2);font-weight:800;font-size:11px;letter-spacing:.4px;padding:8px 12px;color:var(--ink);border-bottom:1px solid var(--border)}
+.p-table tr.p-group{cursor:pointer;user-select:none}
+.p-table tr.p-group td{background:var(--bg2);font-weight:800;font-size:11px;letter-spacing:.4px;padding:8px 12px;color:var(--ink);border-bottom:1px solid var(--border);text-align:left}
+.p-table tr.p-group:hover td{background:var(--gest-l)}
 .p-row-avatar{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;margin-right:8px;vertical-align:middle}
 
 /* MODAL */
@@ -670,6 +672,21 @@ var AREA_GRUPOS = [
 ];
 
 var P_TABLE_COLS = 11;
+var gruposColapsados = {}; // { area: true } — colapsado; ausente/false = desplegado (default)
+
+function toggleGrupoArea(area) {
+  gruposColapsados[area] = !gruposColapsados[area];
+  renderPersonalGrid();
+}
+
+function buildGrupoBloque(key, label, grupo) {
+  var colapsado = !!gruposColapsados[key];
+  var chevron = colapsado ? '▸' : '▾';
+  var html = '<tbody><tr class="p-group" onclick="toggleGrupoArea(\'' + key + '\')">' +
+    '<td colspan="' + P_TABLE_COLS + '">' + chevron + ' ' + label + ' · ' + grupo.length + '</td></tr></tbody>';
+  if (!colapsado) html += '<tbody>' + grupo.map(buildPersonalRow).join('') + '</tbody>';
+  return html;
+}
 
 function buildPersonalTable(lista) {
   var html = '<table class="p-table"><colgroup>' +
@@ -680,21 +697,17 @@ function buildPersonalTable(lista) {
     '<th>Persona</th><th>Código</th><th>Edad</th><th>Número</th><th>Fecha de inicio</th><th>Talla</th>' +
     '<th>Rol / Proceso</th><th>Estado</th><th>Locker asignado</th>' +
     '<th title="Solo el mes en curso">Faltas</th><th title="Solo el mes en curso">Justificación</th>' +
-    '</tr></thead><tbody>';
+    '</tr></thead>';
   var vistos = {};
   AREA_GRUPOS.forEach(function(a) {
     var grupo = lista.filter(function(p) { return p.area === a.key; });
     vistos[a.key] = true;
     if (!grupo.length) return;
-    html += '<tr class="p-group"><td colspan="' + P_TABLE_COLS + '">' + a.label + ' · ' + grupo.length + '</td></tr>';
-    html += grupo.map(buildPersonalRow).join('');
+    html += buildGrupoBloque(a.key, a.label, grupo);
   });
   var otros = lista.filter(function(p) { return !vistos[p.area]; });
-  if (otros.length) {
-    html += '<tr class="p-group"><td colspan="' + P_TABLE_COLS + '">Otras áreas · ' + otros.length + '</td></tr>';
-    html += otros.map(buildPersonalRow).join('');
-  }
-  html += '</tbody></table>';
+  if (otros.length) html += buildGrupoBloque('otras', 'Otras áreas', otros);
+  html += '</table>';
   return html;
 }
 
