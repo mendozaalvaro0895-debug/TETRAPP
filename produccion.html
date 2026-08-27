@@ -297,7 +297,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rce-meta{font-size:10px;color:var(--gray-l);margin:4px 0 8px}
 .rce-foot{display:flex;align-items:center;gap:10px}
 .rc{margin-bottom:4px}
-@media(max-width:600px){.rc-sku{font-size:11px}.rc-partes-hdr,.rc-parte,.rc-add{grid-template-columns:70px 1fr 1fr 26px}.rc-area-btn{padding:4px 8px;font-size:10px}.rce-row{grid-template-columns:90px 1fr}}
+.rce-prod-section{margin-bottom:14px}
+.rce-prod-title{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);margin-bottom:6px}
+.rce-mat-hdr{display:grid;grid-template-columns:1fr 90px 60px 28px;gap:5px;padding:0 0 4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-l);border-bottom:1px solid var(--bg2)}
+.rce-mat-row{display:grid;grid-template-columns:1fr 90px 60px 28px;gap:5px;align-items:center;margin-top:5px}
+.rce-add-row{background:none;border:1.5px dashed var(--border);border-radius:6px;font-size:11px;font-weight:600;color:var(--gray);cursor:pointer;padding:5px 12px;width:100%;margin-top:6px;transition:border-color .15s,color .15s;font-family:var(--font)}
+.rce-add-row:hover{border-color:var(--prod);color:var(--prod)}
+.rce-cap{background:var(--prod-xl);border:1px solid var(--prod-l);border-radius:8px;padding:10px 14px;margin:10px 0}
+.rce-cap-lbl{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);margin-bottom:4px}
+.rce-cap-val{font-size:13px;font-weight:700;color:var(--prod-d);font-family:var(--mono)}
+@media(max-width:600px){.rc-sku{font-size:11px}.rc-partes-hdr,.rc-parte,.rc-add{grid-template-columns:70px 1fr 1fr 26px}.rc-area-btn{padding:4px 8px;font-size:10px}.rce-row{grid-template-columns:90px 1fr}.rce-mat-hdr,.rce-mat-row{grid-template-columns:1fr 70px 50px 24px}}
 </style>
 </head>
 <body>
@@ -1832,7 +1841,7 @@ var AREA_LABELS = {tapas:'Tapas', serigrafia:'Serigrafía', produccion:'Producci
 var CAMPOS_POR_AREA = {
   tapas: ['Familia', 'Accesorios', 'Procesos'],
   serigrafia: ['Tiros', 'Colores', 'Fórmula de tinta', 'Procesos', 'Empaque'],
-  produccion: ['Materia prima', 'Colorante', 'Mezcla', 'Peso', 'Detalles técnicos']
+  produccion: ['Materia prima', 'Colorante', 'Peso (g)', 'Ciclo (s)']
 };
 
 function safeSku(s) { return String(s).replace(/[^a-zA-Z0-9]/g, '_'); }
@@ -2088,6 +2097,7 @@ async function subirFotoEnvase(sid, inputEl) {
 }
 
 function buildRcEspecsBlock(sku, sid, area, esMaster) {
+  if (area === 'produccion') return buildRcEspecsProd(sku, sid, esMaster);
   var campos = CAMPOS_POR_AREA[area];
   if (!campos) return '';
   var datos = ESPECS_MAP[sku] || {};
@@ -2128,6 +2138,143 @@ async function guardarEspecs(sid) {
   var up = await db.from('sku_especificaciones').upsert(filas, { onConflict: 'sku,area,campo' }).select();
   if (btn) { btn.disabled = false; btn.textContent = 'Guardar especificaciones'; }
   if (up.error) { toast('Error al guardar especificaciones: ' + up.error.message, 'err'); return; }
+  if (!ESPECS_MAP[sku]) ESPECS_MAP[sku] = {};
+  (up.data || filas).forEach(function(f) { ESPECS_MAP[sku][f.campo] = f; });
+  toast('✓ Especificaciones guardadas', 'ok');
+  renderRecetario();
+}
+
+/* ── Especificaciones Producción — ficha estructurada ─────────── */
+function buildRcEspecsProd(sku, sid, esMaster) {
+  var datos = ESPECS_MAP[sku] || {};
+  var matData = [];
+  try { matData = JSON.parse((datos['Materia prima'] || {}).valor || '[]'); } catch(e) { matData = []; }
+  if (!Array.isArray(matData)) matData = [];
+  var colData = [];
+  try { colData = JSON.parse((datos['Colorante'] || {}).valor || '[]'); } catch(e) { colData = []; }
+  if (!Array.isArray(colData)) colData = [];
+  var pesoVal  = (datos['Peso (g)']  || {}).valor || '';
+  var cicloVal = (datos['Ciclo (s)'] || {}).valor || '';
+  var masReciente = null;
+  ['Materia prima','Colorante','Peso (g)','Ciclo (s)'].forEach(function(c) {
+    var d = datos[c];
+    if (d && d.actualizado_en && (!masReciente || d.actualizado_en > masReciente.actualizado_en)) masReciente = d;
+  });
+  var meta = masReciente
+    ? '<div class="rce-meta">Actualizado por ' + esc(masReciente.actualizado_por || '—') + ' · ' + fmtFechaHoraGT(masReciente.actualizado_en) + '</div>'
+    : '';
+  var foot = esMaster
+    ? '<div class="rce-foot"><button class="rc-save-btn" id="rcesave-' + sid + '" onclick="guardarEspecsProd(\'' + sid + '\')">Guardar especificaciones</button><span class="rc-foto-status" id="rce-status-' + sid + '"></span></div>'
+    : '';
+  return '<div class="rce-wrap">' +
+    '<div class="rce-hdr-title">🧬 Especificaciones técnicas · Producción</div>' +
+    '<div class="rce-prod-section">' +
+      '<div class="rce-prod-title">Materia prima</div>' +
+      '<div class="rce-mat-hdr"><span>Material</span><span>Cantidad (kg)</span><span>%</span><span></span></div>' +
+      '<div id="rce-mat-' + sid + '">' + buildMatRows(matData, sid, 'mat', esMaster) + '</div>' +
+      (esMaster ? '<button class="rce-add-row" onclick="addMatRow(\'' + sid + '\',\'mat\')">+ Agregar material</button>' : '') +
+    '</div>' +
+    '<div class="rce-prod-section">' +
+      '<div class="rce-prod-title">Colorante</div>' +
+      '<div class="rce-mat-hdr"><span>Colorante</span><span>Cantidad (g)</span><span>%</span><span></span></div>' +
+      '<div id="rce-col-' + sid + '">' + buildMatRows(colData, sid, 'col', esMaster) + '</div>' +
+      (esMaster ? '<button class="rce-add-row" onclick="addMatRow(\'' + sid + '\',\'col\')">+ Agregar colorante</button>' : '') +
+    '</div>' +
+    '<div class="rce-row"><span class="rce-lbl">Peso (g)</span><input class="rce-in" id="rce-peso-' + sid + '" type="number" step="0.01" min="0" value="' + esc(pesoVal) + '" placeholder="0.00"' + (esMaster ? '' : ' disabled') + '></div>' +
+    '<div class="rce-row"><span class="rce-lbl">Ciclo (s)</span><input class="rce-in" id="rce-ciclo-' + sid + '" type="number" step="0.1" min="0" value="' + esc(cicloVal) + '" placeholder="0.0" oninput="calcCapacidad(\'' + sid + '\')"' + (esMaster ? '' : ' disabled') + '></div>' +
+    '<div id="rce-cap-' + sid + '">' + buildCapacidadHtml(cicloVal) + '</div>' +
+    meta + foot +
+  '</div>';
+}
+
+function buildMatRows(items, sid, tipo, esMaster) {
+  if (!items.length) return esMaster ? '' : '<div style="font-size:11px;color:var(--gray-l);padding:4px 0">Sin datos</div>';
+  return items.map(function(item, i) {
+    var del = esMaster ? '<button class="rc-del" onclick="delMatRow(\'' + sid + '\',\'' + tipo + '\',' + i + ')">✕</button>' : '<span></span>';
+    return '<div class="rce-mat-row" id="rce-' + tipo + '-row-' + sid + '-' + i + '">' +
+      '<input class="rce-in" value="' + esc(item.nombre || '') + '" placeholder="' + (tipo === 'mat' ? 'PP, Regrind…' : 'Nombre') + '"' + (esMaster ? '' : ' disabled') + '>' +
+      '<input class="rce-in" type="number" step="0.001" min="0" value="' + esc(item.cantidad || '') + '" placeholder="0.000"' + (esMaster ? '' : ' disabled') + '>' +
+      '<input class="rce-in" type="number" step="0.1" min="0" max="100" value="' + esc(item.pct || '') + '" placeholder="0"' + (esMaster ? '' : ' disabled') + '>' +
+      del +
+    '</div>';
+  }).join('');
+}
+
+function addMatRow(sid, tipo) {
+  var cont = document.getElementById('rce-' + tipo + '-' + sid);
+  if (!cont) return;
+  var i = cont.querySelectorAll('.rce-mat-row').length;
+  var div = document.createElement('div');
+  div.className = 'rce-mat-row';
+  div.id = 'rce-' + tipo + '-row-' + sid + '-' + i;
+  div.innerHTML =
+    '<input class="rce-in" placeholder="' + (tipo === 'mat' ? 'PP, Regrind…' : 'Nombre') + '">' +
+    '<input class="rce-in" type="number" step="0.001" min="0" placeholder="0.000">' +
+    '<input class="rce-in" type="number" step="0.1" min="0" max="100" placeholder="0">' +
+    '<button class="rc-del" onclick="delMatRow(\'' + sid + '\',\'' + tipo + '\',' + i + ')">✕</button>';
+  cont.appendChild(div);
+}
+
+function delMatRow(sid, tipo, idx) {
+  var row = document.getElementById('rce-' + tipo + '-row-' + sid + '-' + idx);
+  if (row) row.remove();
+  var cont = document.getElementById('rce-' + tipo + '-' + sid);
+  if (!cont) return;
+  cont.querySelectorAll('.rce-mat-row').forEach(function(r, i) {
+    r.id = 'rce-' + tipo + '-row-' + sid + '-' + i;
+    var btn = r.querySelector('.rc-del');
+    if (btn) btn.setAttribute('onclick', 'delMatRow(\'' + sid + '\',\'' + tipo + '\',' + i + ')');
+  });
+}
+
+function getMatRows(sid, tipo) {
+  var cont = document.getElementById('rce-' + tipo + '-' + sid);
+  if (!cont) return [];
+  var rows = [];
+  cont.querySelectorAll('.rce-mat-row').forEach(function(r) {
+    var inputs = r.querySelectorAll('input');
+    var nombre   = inputs[0] ? inputs[0].value.trim() : '';
+    var cantidad = inputs[1] ? inputs[1].value.trim() : '';
+    var pct      = inputs[2] ? inputs[2].value.trim() : '';
+    if (nombre || cantidad) rows.push({nombre: nombre, cantidad: cantidad, pct: pct});
+  });
+  return rows;
+}
+
+function buildCapacidadHtml(cicloStr) {
+  var c = parseFloat(cicloStr);
+  if (!(c > 0)) return '';
+  var porHora  = Math.round(3600 / c);
+  var porTurno = Math.round(3600 / c * 12);
+  return '<div class="rce-cap"><div class="rce-cap-lbl">📊 Capacidad estimada</div>' +
+    '<div class="rce-cap-val">' + porHora.toLocaleString('es-GT') + ' pcs/hora &nbsp;·&nbsp; ' + porTurno.toLocaleString('es-GT') + ' pcs/turno (12 h)</div></div>';
+}
+
+function calcCapacidad(sid) {
+  var inp = document.getElementById('rce-ciclo-' + sid);
+  var cap = document.getElementById('rce-cap-' + sid);
+  if (inp && cap) cap.innerHTML = buildCapacidadHtml(inp.value);
+}
+
+async function guardarEspecsProd(sid) {
+  var sku = RECET_SID_SKU[sid];
+  if (!sku) return;
+  var btn = document.getElementById('rcesave-' + sid);
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  var quien = TETRA.nombre || TETRA.email || null;
+  var matRows = getMatRows(sid, 'mat');
+  var colRows = getMatRows(sid, 'col');
+  var peso  = ((document.getElementById('rce-peso-'  + sid) || {}).value || '').trim();
+  var ciclo = ((document.getElementById('rce-ciclo-' + sid) || {}).value || '').trim();
+  var filas = [
+    { sku: sku, area: 'produccion', campo: 'Materia prima', valor: JSON.stringify(matRows), actualizado_por: quien },
+    { sku: sku, area: 'produccion', campo: 'Colorante',     valor: JSON.stringify(colRows), actualizado_por: quien },
+    { sku: sku, area: 'produccion', campo: 'Peso (g)',       valor: peso  || null, actualizado_por: quien },
+    { sku: sku, area: 'produccion', campo: 'Ciclo (s)',      valor: ciclo || null, actualizado_por: quien }
+  ];
+  var up = await db.from('sku_especificaciones').upsert(filas, { onConflict: 'sku,area,campo' }).select();
+  if (btn) { btn.disabled = false; btn.textContent = 'Guardar especificaciones'; }
+  if (up.error) { toast('Error al guardar: ' + up.error.message, 'err'); return; }
   if (!ESPECS_MAP[sku]) ESPECS_MAP[sku] = {};
   (up.data || filas).forEach(function(f) { ESPECS_MAP[sku][f.campo] = f; });
   toast('✓ Especificaciones guardadas', 'ok');
