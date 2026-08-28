@@ -1032,7 +1032,7 @@ function abrirPerfil(id) {
   document.getElementById('mpCodigo').value = p.codigo || '';
   document.getElementById('mpCodigo').disabled = true;
   document.getElementById('mpArea').value = p.area || 'tapas';
-  document.getElementById('mpTurno').value = p.turno || '';
+  document.getElementById('mpTurno').value = p.turno_produccion || '';
   toggleTurnoWrap();
   document.getElementById('mpRolBase').value = p.rol === 'supervisor' ? 'supervisor' : 'operador';
   document.getElementById('mpProceso').value = p.proceso_hab || '';
@@ -1087,7 +1087,7 @@ async function guardarPersona() {
   var fechaBaja = document.getElementById('mpFechaBaja').value || null;
   var activo    = fechaBaja ? false : document.getElementById('mpActivo').checked;
   var fechaInicio = document.getElementById('mpFechaInicio').value || null;
-  var turno     = area === 'produccion' ? (document.getElementById('mpTurno').value || null) : null;
+  var turnoProduccion = area === 'produccion' ? (document.getElementById('mpTurno').value || null) : null;
 
   if (!nombre)    { showToast('⚠️ Nombre requerido', '#B83232'); return; }
   if (!iniciales) { showToast('⚠️ Iniciales requeridas', '#B83232'); return; }
@@ -1095,7 +1095,7 @@ async function guardarPersona() {
 
   var payload = {
     nombre: nombre, iniciales: iniciales, area: area, rol: rolBase,
-    proceso_hab: proceso, telefono: telefono, edad: edad, activo: activo, turno: turno,
+    proceso_hab: proceso, telefono: telefono, edad: edad, activo: activo, turno_produccion: turnoProduccion,
     fecha_inicio: fechaInicio, fecha_baja: fechaBaja,
     locker: (document.getElementById('mpLocker').value || '').trim() || null,
     talla_uniforme: document.getElementById('mpTalla').value || null,

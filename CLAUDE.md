@@ -168,10 +168,18 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   ⚠️ `personal` tiene un CHECK constraint `personal_area_check` creado manual en el dashboard
   (no versionado en ningún CREATE TABLE) — hay que mantenerlo sincronizado a mano si se agrega
   otro valor de área nuevo. Ver `sql/personal_area_produccion_v1.sql`.
-  Columna `turno` ('alex'|'gabino', propia constraint `personal_turno_check`) — SOLO aplica a
-  Producción: el campo "Turno" del modal se muestra/oculta con `toggleTurnoWrap()` según el
-  `<select>` de Área (`onchange`), y `guardarPersona()` fuerza `turno=null` si el área no es
-  'produccion' para que no quede dato viejo colgado al cambiar de área. Ver `sql/personal_turno_v1.sql`.
+  Columna `turno_produccion` ('alex'|'gabino', constraint `personal_turno_produccion_check`) —
+  SOLO aplica a Producción: el campo "Turno" del modal se muestra/oculta con
+  `toggleTurnoWrap()` según el `<select>` de Área (`onchange`), y `guardarPersona()` fuerza
+  `turno_produccion=null` si el área no es 'produccion'. Ver `sql/personal_turno_produccion_v1.sql`.
+  ⚠️ `personal` YA TENÍA una columna `turno` (texto libre, 'AM' en TODAS las filas de TODAS
+  las áreas — ningún HTML del repo la lee/escribe, parece dato viejo sin explotar) — NO es la
+  misma columna, NO se toca. `sql/personal_turno_v1.sql` (obsoleto, no correr) intentó reusar
+  ese nombre y falló con "check constraint personal_turno_check is violated by some row".
+  Antes de agregar cualquier columna nueva a `personal`, verificar primero con
+  `select column_name from information_schema.columns where table_name='personal'` que el
+  nombre no esté ya en uso — esta tabla se creó y se sigue editando manual en el dashboard,
+  sin CREATE TABLE versionado, así que puede tener columnas que no aparecen documentadas acá.
   Encabezado de la tabla con `position:sticky` (no se pierde al hacer scroll).
   Grupos por área desplegables (clic en el header del grupo, `toggleGrupoArea()`) — estado
   en `gruposColapsados{}`, expandido por default; cada grupo es su propio `<tbody>`.
@@ -241,6 +249,10 @@ Notas críticas:
 9. `sql/personal_area_produccion_v1.sql` — agrega 'produccion' al CHECK constraint
    `personal_area_check` (creado manual en el dashboard, bloqueaba crear personas de esa
    área desde gestion.html con "violates check constraint personal_area_check").
+10. `sql/personal_turno_produccion_v1.sql` — columna `turno_produccion` ('alex'|'gabino') para
+    el campo Turno de Producción en gestion.html. `sql/personal_turno_v1.sql` (mismo objetivo,
+    nombre de columna distinto) quedó OBSOLETO — chocaba con una columna `turno` (AM/PM) que
+    ya existía en `personal`; no correrlo.
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
