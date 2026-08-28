@@ -152,7 +152,10 @@ view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la dispo
   filtra por nombre o código entre las personas activas; dejar el campo vacío = liberar.
   `guardarLocker()` primero desvincula a quien lo tenía (si cambia de dueño) y
   luego escribe `personal.locker = 'L-N'` en la nueva persona — sigue siendo el mismo campo
-  de siempre, sin tabla ni lógica de escritura duplicada. Botón "Ver perfil completo" dentro
+  de siempre, sin tabla ni lógica de escritura duplicada. Botón "+ Nueva persona" dentro del
+  modal (`nuevaPersonaDesdeLocker()`) abre el mismo alta central (`abrirNuevaPersona()`) con
+  `mpLocker` precargado a ese número — el área se sigue eligiendo ahí como siempre, no se
+  bypasea ese paso. Botón "Ver perfil completo" dentro
   del modal (solo si hay ocupante) para ir al perfil vía `abrirPerfil`.
 
 view-personal: grid unificado de TODA la tabla personal (área tapas + serig juntas,

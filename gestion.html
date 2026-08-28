@@ -600,6 +600,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
         <button class="btn btn-g btn-xs" style="margin-top:8px;align-self:flex-start" onclick="quitarPersonaLocker()">🗑️ Quitar del locker</button>
       </div>
+      <div class="fg full" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <button class="btn btn-g btn-sm" onclick="nuevaPersonaDesdeLocker()">+ Nueva persona (queda vinculada a este locker)</button>
+        <div style="font-size:10px;color:var(--gray-l);margin-top:6px">Se crea desde el registro central de Personal — ahí se le asigna su área correspondiente.</div>
+      </div>
     </div>
     <div class="mf">
       <button class="btn btn-g" onclick="cerrarModalLocker()">Cancelar</button>
@@ -805,6 +809,13 @@ function verPerfilDesdeLocker() {
   var id = mlPersonaActualId;
   cerrarModalLocker();
   if (id) abrirPerfil(id);
+}
+
+function nuevaPersonaDesdeLocker() {
+  var etiqueta = 'L-' + mlNumeroActual;
+  cerrarModalLocker();
+  abrirNuevaPersona(); // mismo alta central de Personal — el área se elige ahí como siempre
+  document.getElementById('mpLocker').value = etiqueta;
 }
 
 async function guardarLocker() {
