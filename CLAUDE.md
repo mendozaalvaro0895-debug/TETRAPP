@@ -180,6 +180,9 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   `select column_name from information_schema.columns where table_name='personal'` que el
   nombre no esté ya en uso — esta tabla se creó y se sigue editando manual en el dashboard,
   sin CREATE TABLE versionado, así que puede tener columnas que no aparecen documentadas acá.
+  Columna Turno en la tabla: Producción muestra `turno_produccion` ("Turno Alex"/"Turno
+  Gabino"/"—"); Tapas y Serigrafía muestran fijo "Matutino" (mismo turno para todos, no hay
+  columna que lo respalde — es solo la etiqueta, no dato editable para esas áreas).
   Encabezado de la tabla con `position:sticky` (no se pierde al hacer scroll).
   Grupos por área desplegables (clic en el header del grupo, `toggleGrupoArea()`) — estado
   en `gruposColapsados{}`, expandido por default; cada grupo es su propio `<tbody>`.

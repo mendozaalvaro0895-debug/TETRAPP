@@ -153,6 +153,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .p-table col.c-inicio{width:106px}
 .p-table col.c-talla{width:68px}
 .p-table col.c-rol{width:150px}
+.p-table col.c-turno{width:100px}
 .p-table col.c-estado{width:86px}
 .p-table col.c-locker{width:150px}
 .p-table col.c-faltas{width:150px}
@@ -900,7 +901,7 @@ var AREA_GRUPOS = [
   { key: 'produccion', label: '🏭 Producción' }
 ];
 
-var P_TABLE_COLS = 11;
+var P_TABLE_COLS = 12;
 var gruposColapsados = {}; // { area: true } — colapsado; ausente/false = desplegado (default)
 
 function toggleGrupoArea(area) {
@@ -920,11 +921,11 @@ function buildGrupoBloque(key, label, grupo) {
 function buildPersonalTable(lista) {
   var html = '<table class="p-table"><colgroup>' +
     '<col class="c-persona"><col class="c-codigo"><col class="c-edad"><col class="c-numero">' +
-    '<col class="c-inicio"><col class="c-talla"><col class="c-rol"><col class="c-estado">' +
+    '<col class="c-inicio"><col class="c-talla"><col class="c-rol"><col class="c-turno"><col class="c-estado">' +
     '<col class="c-locker"><col class="c-faltas"><col class="c-justif">' +
     '</colgroup><thead><tr>' +
     '<th>Persona</th><th>Código</th><th>Edad</th><th>Número</th><th>Fecha de inicio</th><th>Talla</th>' +
-    '<th>Rol / Proceso</th><th>Estado</th><th>Locker asignado</th>' +
+    '<th>Rol / Proceso</th><th>Turno</th><th>Estado</th><th>Locker asignado</th>' +
     '<th title="Solo el mes en curso">Faltas</th><th title="Solo el mes en curso">Justificación</th>' +
     '</tr></thead>';
   var vistos = {};
@@ -940,9 +941,14 @@ function buildPersonalTable(lista) {
   return html;
 }
 
+var TURNO_PRODUCCION_LBL = { alex: 'Turno Alex', gabino: 'Turno Gabino' };
+
 function buildPersonalRow(p) {
   var iniciales = escHtml(p.iniciales || (p.nombre ? p.nombre.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase() : '?'));
   var rolTxt = p.rol === 'supervisor' ? 'Supervisor' : (p.proceso_hab || 'Operador');
+  var turnoTxt = p.area === 'produccion'
+    ? (TURNO_PRODUCCION_LBL[p.turno_produccion] || '—')
+    : 'Matutino';
   var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-activo' : 'pill-inactivo') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>';
   var lockerChip = p.locker
     ? '<span class="op-mini ok">🗄️ ' + escHtml(p.locker) + '</span>'
@@ -966,6 +972,7 @@ function buildPersonalRow(p) {
     '<td>' + (p.fecha_inicio ? escHtml(p.fecha_inicio) : '—') + '</td>' +
     '<td>' + (p.talla_uniforme ? escHtml(p.talla_uniforme) : '—') + '</td>' +
     '<td>' + escHtml(rolTxt) + '</td>' +
+    '<td>' + escHtml(turnoTxt) + '</td>' +
     '<td>' + estadoBadge + '</td>' +
     '<td>' + lockerChip + '</td>' +
     '<td class="td-multi" onclick="event.stopPropagation();abrirPerfilEnFaltas(\'' + p.id + '\')">' + faltasCell + '</td>' +
