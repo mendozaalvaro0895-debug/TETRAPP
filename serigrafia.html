@@ -4772,8 +4772,23 @@ async function exportarAsistGridPDF() {
         var domTrab = esFin && (est === 'presente' || est === 'tarde' || est === 'velada');
         var bg = (esFin && !domTrab) ? '#475569' : est === 'pendiente' ? '#cbd5e1' : est === 'ausente' ? '#dc2626' : est === 'tarde' ? '#d97706' : est === 'velada' ? '#7c3aed' : est === 'presente' ? '#22c55e' : '#f8fafc';
         if (domTrab) bg = '#22c55e';
-        var lbl = (esFin && !domTrab) ? '' : (est === 'ausente' ? '&#10007;' : est === 'tarde' ? '!' : est === 'velada' ? '&#9790;' : '');
-        html += '<td style="background:' + bg + ';color:#fff;font-size:7px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
+        // Rol del día (solo para el mes actual; los días del mes anterior no tienen datos de rol)
+        var diasOp = matrizByOpDia[p.codigo] || {};
+        var rolPos = Object.prototype.hasOwnProperty.call(diasOp, f) ? diasOp[f] : null;
+        var rolLbl = rolPos !== null ? abrevRol(rolPos) : '';
+        var lbl;
+        if (esFin && !domTrab) {
+          lbl = '';
+        } else if (est === 'ausente') {
+          lbl = '&#10007;';
+        } else if (est === 'tarde') {
+          lbl = '!';
+        } else if (est === 'velada') {
+          lbl = '&#9790;';
+        } else {
+          lbl = rolLbl; // presente o domtrab: muestra el rol
+        }
+        html += '<td style="background:' + bg + ';color:#fff;font-size:6.5px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
       });
       html += '</tr>';
     });
@@ -4856,12 +4871,14 @@ async function exportarAsistGridPDF() {
   }
 
   var leyendaHtml =
-    '<div style="display:flex;gap:14px;margin-top:8px;font-size:8px;color:#475569">' +
-      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;background:#dcfce7;border:1px solid #86efac"></span>Presente</span>' +
-      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;background:#dc2626"></span>✗ Ausente</span>' +
-      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;background:#d97706"></span>! Tarde</span>' +
-      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;background:#7c3aed"></span>☾ Velada</span>' +
-      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;background:#22c55e"></span>Fila verde = quincena completa</span>' +
+    '<div style="display:flex;gap:12px;margin-top:8px;font-size:7.5px;color:#475569;flex-wrap:wrap">' +
+      '<span><span style="display:inline-block;width:24px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#22c55e;font-size:6px;color:#fff;text-align:center;line-height:10px">R1</span>Presente (rol del día)</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#dc2626;font-size:6px;color:#fff;text-align:center;line-height:10px">✗</span>Ausente</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#d97706;font-size:6px;color:#fff;text-align:center;line-height:10px">!</span>Tarde</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#7c3aed;font-size:6px;color:#fff;text-align:center;line-height:10px">☾</span>Velada</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#475569"></span>Dom / Feriado</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#e2e8f0"></span>Antes de ingreso / tras baja</span>' +
+      '<span style="font-weight:700;color:#22c55e">Fila verde = quincena completa</span>' +
     '</div>';
 
   var rolesLeyenda =
@@ -4889,25 +4906,6 @@ async function exportarAsistGridPDF() {
         thDiasArr(diasQ, anteriorSet) +
       '</tr></thead><tbody>' + rowsQ + '</tbody></table>' +
       leyendaHtml;
-
-    if (hayRoles && diasActQ.length) {
-      var rolesQ = buildRolesRowsArr(plazaFija, diasActQ, null) +
-                   (prestados.length ? buildRolesRowsArr(prestados, diasActQ, 'Prestados') : '');
-      secHtml +=
-        '<div style="margin-top:18px">' +
-          '<div style="font-size:10px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">Roles del Día · ' + qTitulo + '</div>' +
-          '<table><thead><tr>' +
-            '<th style="background:#f8fafc;font-size:8px;font-weight:700;text-align:left;padding:3px 6px;border:1px solid #cbd5e1;min-width:110px">Operador</th>' +
-            diasActQ.map(function(f) {
-              var dow = new Date(f+'T12:00:00').getDay();
-              var bg  = dow === 0 ? '#64748b' : '#f8fafc';
-              var clr = dow === 0 ? '#fff' : '#64748b';
-              return '<th style="background:' + bg + ';color:' + clr + ';width:18px;min-width:18px;font-size:7px;font-weight:700;text-align:center;padding:3px 0;border:1px solid #cbd5e1">' + parseInt(f.slice(8)) + '</th>';
-            }).join('') +
-          '</tr></thead><tbody>' + rolesQ + '</tbody></table>' +
-          rolesLeyenda +
-        '</div>';
-    }
 
     var res = buildResumenQ(diasQ);
     secHtml +=
