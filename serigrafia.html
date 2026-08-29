@@ -4737,11 +4737,16 @@ async function exportarAsistGridPDF() {
     var html = '';
     if (secLabel) html += '<tr><td colspan="' + (diasArr.length+1) + '" style="background:#f1f5f9;font-size:7px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;padding:3px 6px;border:1px solid #cbd5e1">' + secLabel + '</td></tr>';
     lista.forEach(function(p) {
-      var daysByP = byPD[p.codigo] || {};
+      var daysByP    = byPD[p.codigo] || {};
+      var fechaIni   = p.fecha_inicio || (p.created_at ? p.created_at.slice(0,10) : null);
+      var fechaBaj   = !p.activo ? (p.fecha_baja || null) : null;
       // fila verde = asistencia completa en los días del mes actual de ESTA quincena
+      // (excluye días antes del ingreso o tras la baja)
       var diasActQ = diasArr.filter(function(f){ return !anteriorSet[f]; });
       var isFullGreen = diasActQ.every(function(f) {
         if (f > hoy) return true;
+        if (fechaIni && f < fechaIni) return true; // antes de ingreso → no cuenta
+        if (fechaBaj && f > fechaBaj) return true; // tras baja → no cuenta
         var dow = new Date(f+'T12:00:00').getDay();
         if (dow === 0 || feriadosSet[f]) return true;
         if (daysByP[f] === 'pendiente') return true;
@@ -4751,10 +4756,17 @@ async function exportarAsistGridPDF() {
       var nameBg  = isFullGreen ? '#22c55e' : '#fff';
       var nameClr = isFullGreen ? '#fff' : '#111';
       html += '<tr>';
-      html += '<td style="background:' + nameBg + ';color:' + nameClr + ';font-size:8px;font-weight:' + (isFullGreen?'700':'600') + ';padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + '</td>';
+      html += '<td style="background:' + nameBg + ';color:' + nameClr + ';font-size:8px;font-weight:' + (isFullGreen?'700':'600') + ';padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + (!p.activo ? ' <span style="font-size:6px;color:#9ca3af">(inactivo)</span>' : '') + '</td>';
       diasArr.forEach(function(f) {
         var dow = new Date(f+'T12:00:00').getDay();
         var esFin = dow === 0 || !!feriadosSet[f];
+        var esAntesIngreso = fechaIni && f < fechaIni;
+        var esPostBaja     = fechaBaj && f > fechaBaj;
+        if (esAntesIngreso || esPostBaja) {
+          // Celda gris: el operario no existía / ya estaba de baja
+          html += '<td style="background:#e2e8f0;border:1px solid #cbd5e1"></td>';
+          return;
+        }
         var esPendiente = f === hoy && !daysByP[f];
         var est = esPendiente ? 'pendiente' : (daysByP[f] || (f > hoy ? '' : (esFin ? 'finde' : 'presente')));
         var domTrab = esFin && (est === 'presente' || est === 'tarde' || est === 'velada');
