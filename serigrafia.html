@@ -4646,19 +4646,28 @@ async function exportarAsistGridPDF() {
   var mesN   = parseInt(mesStr.slice(5,7));
   var hoy    = fechaHoy();
   var ultimoDia = new Date(año, mesN, 0).getDate();
-  var diasActual = [];
-  for (var dd = 1; dd <= ultimoDia; dd++) diasActual.push(mesStr + '-' + (dd < 10 ? '0'+dd : dd));
 
-  var ultimoDiaAnteriorDate = new Date(año, mesN - 1, 0);
-  var diasAnterior = [];
-  for (var ka = ASIST_DIAS_ANTERIOR - 1; ka >= 0; ka--) {
-    var da = new Date(ultimoDiaAnteriorDate);
-    da.setDate(ultimoDiaAnteriorDate.getDate() - ka);
-    diasAnterior.push(da.getFullYear() + '-' + String(da.getMonth()+1).padStart(2,'0') + '-' + String(da.getDate()).padStart(2,'0'));
+  // ── Rangos por quincena ───────────────────────────────────────
+  // Q1: últimos 2 días del mes anterior + días 1–13 del mes actual
+  // Q2: días 14–(ultimoDia-2) del mes actual
+  var prevDate   = new Date(año, mesN - 1, 0);  // último día del mes anterior
+  var diasMesAnt = prevDate.getDate();
+  var prevMesStr = prevDate.getFullYear() + '-' + String(prevDate.getMonth()+1).padStart(2,'0');
+
+  var diasQ1 = [], anteriorQ1 = {};
+  for (var dpa = diasMesAnt - 1; dpa <= diasMesAnt; dpa++) {
+    var fAntQ = prevMesStr + '-' + String(dpa).padStart(2,'0');
+    diasQ1.push(fAntQ);
+    anteriorQ1[fAntQ] = true;
   }
-  var esAnteriorSet = {};
-  diasAnterior.forEach(function(f){ esAnteriorSet[f] = true; });
-  var dias = diasAnterior.concat(diasActual);
+  for (var d1a = 1; d1a <= 13; d1a++) diasQ1.push(mesStr + '-' + String(d1a).padStart(2,'0'));
+
+  var diasQ2 = [];
+  var finQ2 = ultimoDia - 2;
+  for (var d2a = 14; d2a <= finQ2; d2a++) diasQ2.push(mesStr + '-' + String(d2a).padStart(2,'0'));
+
+  // Días del mes actual dentro de cada quincena (para roles)
+  var diasActQ1 = diasQ1.filter(function(f){ return f.slice(0,7) === mesStr; });
 
   // Cargar roles del mes completo desde matriz_dia_serig
   var matrizByOpDia = {};
@@ -4667,12 +4676,12 @@ async function exportarAsistGridPDF() {
       .select('fecha,operador_codigo,mtx_pos')
       .eq('area', 'serig')
       .gte('fecha', mesStr + '-01')
-      .lte('fecha', mesStr + '-' + String(ultimoDia).padStart(2, '0'));
+      .lte('fecha', mesStr + '-' + String(ultimoDia).padStart(2,'0'));
     (rMat.data || []).forEach(function(row) {
       if (!matrizByOpDia[row.operador_codigo]) matrizByOpDia[row.operador_codigo] = {};
       matrizByOpDia[row.operador_codigo][row.fecha] = row.mtx_pos;
     });
-  } catch(e) { /* si la tabla no existe, la sección de roles queda vacía */ }
+  } catch(e) {}
 
   function abrevRol(pos) {
     if (pos === null || pos === undefined) return '';
@@ -4685,7 +4694,7 @@ async function exportarAsistGridPDF() {
       var r = p[0] === 'flameador' ? 'F' : p[0] === 'imprime' ? 'I' : p[0] === 'recibe' ? 'R' : p[0].charAt(0).toUpperCase();
       return r + p[1];
     }
-    return pos.slice(0, 4).toUpperCase();
+    return pos.slice(0,4).toUpperCase();
   }
   function colorRol(pos) {
     if (pos === null || pos === undefined) return '#f8fafc';
@@ -4700,80 +4709,73 @@ async function exportarAsistGridPDF() {
     return '#64748b';
   }
 
-  var personas = (personalData && personalData.serig ? personalData.serig : []).filter(function(p){ return p.activo; });
+  var personas  = (personalData && personalData.serig ? personalData.serig : []).filter(function(p){ return p.activo; });
   var plazaFija = personas.filter(function(p){ return (p.proceso_hab||'') !== 'Prestado'; });
-  var prestados  = personas.filter(function(p){ return (p.proceso_hab||'') === 'Prestado'; });
-
+  var prestados = personas.filter(function(p){ return (p.proceso_hab||'') === 'Prestado'; });
   var mesNombre = new Date(año, mesN-1, 1).toLocaleDateString('es-GT', { month:'long', year:'numeric' });
+  var prevNom   = prevDate.toLocaleDateString('es-GT', { month:'long' });
 
-  function thDias() {
-    return dias.map(function(f) {
-      var dow = new Date(f+'T12:00:00').getDay();
+  // Etiquetas de cada quincena
+  var lblQ1 = (diasMesAnt-1) + '–' + diasMesAnt + ' ' + prevNom + ' · 01–13 ' + MESES_PER_C[mesN-1];
+  var lblQ2 = '14–' + finQ2 + ' ' + MESES_PER_C[mesN-1];
+
+  // ── Helpers paramétricos ──────────────────────────────────────
+  function thDiasArr(diasArr, anteriorSet) {
+    return diasArr.map(function(f) {
+      var dow  = new Date(f+'T12:00:00').getDay();
       var esFin = dow === 0 || !!feriadosSet[f];
-      var esAnt = !!esAnteriorSet[f];
-      var bg = esAnt ? '#fffbeb' : esFin ? '#e2e8f0' : f === hoy ? '#dbeafe' : '#f8fafc';
-      var lbl = esAnt
+      var esAnt = !!anteriorSet[f];
+      var bg   = esAnt ? '#fffbeb' : esFin ? '#e2e8f0' : f === hoy ? '#dbeafe' : '#f8fafc';
+      var lbl  = esAnt
         ? parseInt(f.slice(8)) + '<div style="font-size:5.5px;font-weight:800;color:#92400e">' + MESES_PER_C[parseInt(f.slice(5,7),10)-1] + '</div>'
         : parseInt(f.slice(8));
       return '<th style="background:' + bg + ';width:18px;min-width:18px;font-size:7px;font-weight:700;text-align:center;padding:3px 0;border:1px solid #cbd5e1">' + lbl + '</th>';
     }).join('');
   }
 
-  function buildPersonaRows(lista, secLabel) {
+  function buildPersonaRowsArr(lista, diasArr, anteriorSet, secLabel) {
     var html = '';
-    if (secLabel) {
-      html += '<tr><td colspan="' + (dias.length+1) + '" style="background:#f1f5f9;font-size:7px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;padding:3px 6px;border:1px solid #cbd5e1">' + secLabel + '</td></tr>';
-    }
+    if (secLabel) html += '<tr><td colspan="' + (diasArr.length+1) + '" style="background:#f1f5f9;font-size:7px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;padding:3px 6px;border:1px solid #cbd5e1">' + secLabel + '</td></tr>';
     lista.forEach(function(p) {
       var daysByP = byPD[p.codigo] || {};
-      var isFullGreen = diasActual.every(function(f) { // la cola del mes anterior no cuenta para la racha
+      // fila verde = asistencia completa en los días del mes actual de ESTA quincena
+      var diasActQ = diasArr.filter(function(f){ return !anteriorSet[f]; });
+      var isFullGreen = diasActQ.every(function(f) {
         if (f > hoy) return true;
         var dow = new Date(f+'T12:00:00').getDay();
         if (dow === 0 || feriadosSet[f]) return true;
-        if (daysByP[f] === 'pendiente') return true; // explícito (ej. antes de ingresar) — no cuenta
-        if (f === hoy && !daysByP[f]) return true; // pendiente implícito, no cuenta aún
+        if (daysByP[f] === 'pendiente') return true;
+        if (f === hoy && !daysByP[f]) return true;
         return (daysByP[f] || 'presente') === 'presente';
       });
       var nameBg  = isFullGreen ? '#22c55e' : '#fff';
       var nameClr = isFullGreen ? '#fff' : '#111';
       html += '<tr>';
       html += '<td style="background:' + nameBg + ';color:' + nameClr + ';font-size:8px;font-weight:' + (isFullGreen?'700':'600') + ';padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + '</td>';
-      dias.forEach(function(f) {
+      diasArr.forEach(function(f) {
         var dow = new Date(f+'T12:00:00').getDay();
         var esFin = dow === 0 || !!feriadosSet[f];
         var esPendiente = f === hoy && !daysByP[f];
         var est = esPendiente ? 'pendiente' : (daysByP[f] || (f > hoy ? '' : (esFin ? 'finde' : 'presente')));
         var domTrab = esFin && (est === 'presente' || est === 'tarde' || est === 'velada');
-        var bg  = (esFin && !domTrab) ? '#475569'
-                : est === 'pendiente' ? '#cbd5e1'
-                : est === 'ausente'   ? '#dc2626'
-                : est === 'tarde'     ? '#d97706'
-                : est === 'velada'    ? '#7c3aed'
-                : est === 'presente'  ? '#22c55e'
-                : '#f8fafc';
+        var bg = (esFin && !domTrab) ? '#475569' : est === 'pendiente' ? '#cbd5e1' : est === 'ausente' ? '#dc2626' : est === 'tarde' ? '#d97706' : est === 'velada' ? '#7c3aed' : est === 'presente' ? '#22c55e' : '#f8fafc';
         if (domTrab) bg = '#22c55e';
-        var clr = '#fff';
         var lbl = (esFin && !domTrab) ? '' : (est === 'ausente' ? '&#10007;' : est === 'tarde' ? '!' : est === 'velada' ? '&#9790;' : '');
-        html += '<td style="background:' + bg + ';color:' + clr + ';font-size:7px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
+        html += '<td style="background:' + bg + ';color:#fff;font-size:7px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
       });
       html += '</tr>';
     });
     return html;
   }
 
-  var tableRows = buildPersonaRows(plazaFija, null);
-  if (prestados.length) tableRows += buildPersonaRows(prestados, 'Prestados');
-
-  // ── Tabla de roles diarios ─────────────────────────────────────
-  function buildRolesRows(lista, secLabel) {
+  function buildRolesRowsArr(lista, diasActArr, secLabel) {
     var html = '';
-    if (secLabel) html += '<tr><td colspan="' + (diasActual.length+1) + '" style="background:#f1f5f9;font-size:7px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;padding:3px 6px;border:1px solid #cbd5e1">' + secLabel + '</td></tr>';
+    if (secLabel) html += '<tr><td colspan="' + (diasActArr.length+1) + '" style="background:#f1f5f9;font-size:7px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;padding:3px 6px;border:1px solid #cbd5e1">' + secLabel + '</td></tr>';
     lista.forEach(function(p) {
       var diasOp = matrizByOpDia[p.codigo] || {};
-      html += '<tr>';
-      html += '<td style="font-size:8px;font-weight:600;padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + '</td>';
-      diasActual.forEach(function(f) {
-        var dow = new Date(f + 'T12:00:00').getDay();
+      html += '<tr><td style="font-size:8px;font-weight:600;padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + '</td>';
+      diasActArr.forEach(function(f) {
+        var dow = new Date(f+'T12:00:00').getDay();
         var esFin = dow === 0;
         var pos = Object.prototype.hasOwnProperty.call(diasOp, f) ? diasOp[f] : null;
         var bg  = esFin ? '#475569' : (pos !== null ? colorRol(pos) : '#f8fafc');
@@ -4786,65 +4788,53 @@ async function exportarAsistGridPDF() {
     return html;
   }
 
-  var hayRoles = Object.keys(matrizByOpDia).length > 0;
-  var rolesRows = buildRolesRows(plazaFija, null);
-  if (prestados.length) rolesRows += buildRolesRows(prestados, 'Prestados');
-
-  // ── Calcular resumen por categoría ────────────────────────────
-  var resAusentes  = [];
-  var resTardanzas = [];
-  var resVeladas   = [];
-  var resDomingos  = [];
-  var resInicios   = [];
-  var resBajas     = [];
-
-  var todasPDF = plazaFija.concat(prestados);
-  todasPDF.forEach(function(p) {
-    var daysByP = byPD[p.codigo] || {};
-    var fAus = [], fTard = [], fVel = [], fDom = [];
-    diasActual.forEach(function(f) { // resumen = solo el mes actual; la cola del anterior es de otro corte
-      if (f > hoy) return;
-      var dow = new Date(f+'T12:00:00').getDay();
-      var est = daysByP[f];
-      if (!est || est === 'pendiente') return;
-      if (est === 'ausente') fAus.push(parseInt(f.slice(8)));
-      if (est === 'tarde')   fTard.push(parseInt(f.slice(8)));
-      if (est === 'velada')  fVel.push(parseInt(f.slice(8)));
-      if (dow === 0 && (est === 'presente' || est === 'tarde' || est === 'velada')) fDom.push(parseInt(f.slice(8)));
+  function buildResumenQ(diasQ) {
+    var resAus = [], resTard = [], resVel = [], resDom = [], resIni = [], resBaj = [];
+    var dMin = diasQ[0], dMax = diasQ[diasQ.length-1];
+    var todas = plazaFija.concat(prestados);
+    todas.forEach(function(p) {
+      var daysByP = byPD[p.codigo] || {};
+      var fAus = [], fTard = [], fVel = [], fDom = [];
+      diasQ.forEach(function(f) {
+        if (f > hoy) return;
+        var dow = new Date(f+'T12:00:00').getDay();
+        var est = daysByP[f];
+        if (!est || est === 'pendiente') return;
+        var lbl = f.slice(8) + '/' + f.slice(5,7); // 'dd/mm' directo
+        if (est === 'ausente') fAus.push(lbl);
+        if (est === 'tarde')   fTard.push(lbl);
+        if (est === 'velada')  fVel.push(lbl);
+        if (dow === 0 && (est === 'presente' || est === 'tarde' || est === 'velada')) fDom.push(lbl);
+      });
+      var nom = p.nombre || p.codigo;
+      if (fAus.length)  resAus.push({nombre: nom, fechas: fAus});
+      if (fTard.length) resTard.push({nombre: nom, fechas: fTard});
+      if (fVel.length)  resVel.push({nombre: nom, fechas: fVel});
+      if (fDom.length)  resDom.push({nombre: nom, fechas: fDom});
+      if (p.fecha_inicio && p.fecha_inicio >= dMin && p.fecha_inicio <= dMax)
+        resIni.push({nombre: nom, fechas: [p.fecha_inicio.slice(8) + '/' + p.fecha_inicio.slice(5,7)]});
+      if (p.fecha_baja && p.fecha_baja >= dMin && p.fecha_baja <= dMax)
+        resBaj.push({nombre: nom, fechas: [p.fecha_baja.slice(8) + '/' + p.fecha_baja.slice(5,7)]});
     });
-    var nom = p.nombre || p.codigo;
-    if (fAus.length)  resAusentes.push({nombre: nom, fechas: fAus});
-    if (fTard.length) resTardanzas.push({nombre: nom, fechas: fTard});
-    if (fVel.length)  resVeladas.push({nombre: nom, fechas: fVel});
-    if (fDom.length)  resDomingos.push({nombre: nom, fechas: fDom});
-    if (p.fecha_inicio && p.fecha_inicio.slice(0,7) === mesStr)
-      resInicios.push({nombre: nom, fecha: parseInt(p.fecha_inicio.slice(8)) + '/' + p.fecha_inicio.slice(5,7)});
-    if (p.fecha_baja && p.fecha_baja.slice(0,7) === mesStr)
-      resBajas.push({nombre: nom, fecha: parseInt(p.fecha_baja.slice(8)) + '/' + p.fecha_baja.slice(5,7)});
-  });
-  // Bajas de personas inactivas con registros en el mes
-  (personalData && personalData.serig ? personalData.serig : []).forEach(function(p) {
-    if (p.activo) return;
-    if (p.fecha_baja && p.fecha_baja.slice(0,7) === mesStr) {
-      var ya = resBajas.some(function(x){ return x.nombre === (p.nombre || p.codigo); });
-      if (!ya) resBajas.push({nombre: p.nombre || p.codigo, fecha: parseInt(p.fecha_baja.slice(8)) + '/' + p.fecha_baja.slice(5,7)});
-    }
-  });
+    (personalData && personalData.serig ? personalData.serig : []).forEach(function(p) {
+      if (p.activo) return;
+      if (p.fecha_baja && p.fecha_baja >= dMin && p.fecha_baja <= dMax) {
+        var ya = resBaj.some(function(x){ return x.nombre === (p.nombre||p.codigo); });
+        if (!ya) resBaj.push({nombre: p.nombre||p.codigo, fechas: [p.fecha_baja.slice(8)+'/'+p.fecha_baja.slice(5,7)]});
+      }
+    });
+    return {resAus: resAus, resTard: resTard, resVel: resVel, resDom: resDom, resIni: resIni, resBaj: resBaj};
+  }
 
   function buildResumenBloque(titulo, items, colorHdr) {
-    var sinItems = !items.length;
-    var total = sinItems ? 0 : items.reduce(function(s, it){ return s + (it.fechas ? it.fechas.length : 1); }, 0);
+    var total = items.reduce(function(s,it){ return s+(it.fechas?it.fechas.length:0); },0);
     var hdrTxt = titulo + (total ? ' (' + total + ')' : '');
-    var mm = mesN < 10 ? '0' + mesN : '' + mesN;
-    var body = sinItems
-      ? '<div style="color:#9ca3af;font-size:8px;font-style:italic;padding:4px 0">Ninguno este mes</div>'
+    var body = !items.length
+      ? '<div style="color:#9ca3af;font-size:8px;font-style:italic;padding:4px 0">Ninguno en la quincena</div>'
       : items.map(function(it) {
-          var fechasTxt = it.fechas
-            ? it.fechas.map(function(d){ return (d < 10 ? '0'+d : d) + '/' + mm; }).join(' — ')
-            : it.fecha;
           return '<div style="margin-bottom:6px">' +
             '<div style="font-weight:700;font-size:8.5px;color:#1e293b">' + escHtml(it.nombre) + '</div>' +
-            '<div style="font-size:7.5px;color:#64748b;padding-left:6px;margin-top:1px">' + fechasTxt + '</div>' +
+            '<div style="font-size:7.5px;color:#64748b;padding-left:6px;margin-top:1px">' + it.fechas.join(' — ') + '</div>' +
           '</div>';
         }).join('');
     return '<div style="break-inside:avoid">' +
@@ -4853,18 +4843,76 @@ async function exportarAsistGridPDF() {
     '</div>';
   }
 
-  var resumenHtml =
-    '<div style="margin-top:18px;page-break-inside:avoid">' +
-      '<div style="font-size:10px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">Resumen del mes</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px">' +
-        buildResumenBloque('⛔ Inasistencias',  resAusentes,  '#ef4444') +
-        buildResumenBloque('⏰ Llegadas tarde', resTardanzas, '#f59e0b') +
-        buildResumenBloque('🌙 Veladas',        resVeladas,   '#7c3aed') +
-        buildResumenBloque('📅 Domingos trab.', resDomingos,  '#0ea5e9') +
-        buildResumenBloque('🟢 Inicios',        resInicios,   '#22c55e') +
-        buildResumenBloque('🔴 Bajas',          resBajas,     '#6b7280') +
-      '</div>' +
+  var leyendaHtml =
+    '<div style="display:flex;gap:14px;margin-top:8px;font-size:8px;color:#475569">' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;background:#dcfce7;border:1px solid #86efac"></span>Presente</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;background:#dc2626"></span>✗ Ausente</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;background:#d97706"></span>! Tarde</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;background:#7c3aed"></span>☾ Velada</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle;background:#22c55e"></span>Fila verde = quincena completa</span>' +
     '</div>';
+
+  var rolesLeyenda =
+    '<div style="margin-top:6px;display:flex;gap:12px;font-size:7px;color:#475569;flex-wrap:wrap">' +
+      '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#d97706;border-radius:2px"></span>F# = Flameador</span>' +
+      '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#7c3aed;border-radius:2px"></span>I# = Impresora</span>' +
+      '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#16a34a;border-radius:2px"></span>R# = Receptor</span>' +
+      '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:2px"></span>SUP</span>' +
+      '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#0d9488;border-radius:2px"></span>EMP</span>' +
+      '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#6b7280;border-radius:2px"></span>AUX</span>' +
+    '</div>';
+
+  var hayRoles = Object.keys(matrizByOpDia).length > 0;
+  var genFecha = new Date().toLocaleDateString('es-GT');
+
+  function buildSeccion(qTitulo, qLbl, diasQ, anteriorSet, diasActQ) {
+    var rowsQ = buildPersonaRowsArr(plazaFija, diasQ, anteriorSet, null) +
+                (prestados.length ? buildPersonaRowsArr(prestados, diasQ, anteriorSet, 'Prestados') : '');
+
+    var secHtml =
+      '<h2>Tetraplastic · Serigrafía — ' + qTitulo + '</h2>' +
+      '<p style="text-transform:capitalize">' + mesNombre + ' &nbsp;·&nbsp; ' + qLbl + ' &nbsp;·&nbsp; Generado: ' + genFecha + '</p>' +
+      '<table><thead><tr>' +
+        '<th style="background:#f8fafc;font-size:8px;font-weight:700;text-align:left;padding:3px 6px;border:1px solid #cbd5e1;min-width:110px">Operador</th>' +
+        thDiasArr(diasQ, anteriorSet) +
+      '</tr></thead><tbody>' + rowsQ + '</tbody></table>' +
+      leyendaHtml;
+
+    if (hayRoles && diasActQ.length) {
+      var rolesQ = buildRolesRowsArr(plazaFija, diasActQ, null) +
+                   (prestados.length ? buildRolesRowsArr(prestados, diasActQ, 'Prestados') : '');
+      secHtml +=
+        '<div style="margin-top:18px">' +
+          '<div style="font-size:10px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">Roles del Día · ' + qTitulo + '</div>' +
+          '<table><thead><tr>' +
+            '<th style="background:#f8fafc;font-size:8px;font-weight:700;text-align:left;padding:3px 6px;border:1px solid #cbd5e1;min-width:110px">Operador</th>' +
+            diasActQ.map(function(f) {
+              var dow = new Date(f+'T12:00:00').getDay();
+              var bg  = dow === 0 ? '#64748b' : '#f8fafc';
+              var clr = dow === 0 ? '#fff' : '#64748b';
+              return '<th style="background:' + bg + ';color:' + clr + ';width:18px;min-width:18px;font-size:7px;font-weight:700;text-align:center;padding:3px 0;border:1px solid #cbd5e1">' + parseInt(f.slice(8)) + '</th>';
+            }).join('') +
+          '</tr></thead><tbody>' + rolesQ + '</tbody></table>' +
+          rolesLeyenda +
+        '</div>';
+    }
+
+    var res = buildResumenQ(diasQ);
+    secHtml +=
+      '<div style="margin-top:18px;page-break-inside:avoid">' +
+        '<div style="font-size:10px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">Resumen de la quincena</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px">' +
+          buildResumenBloque('⛔ Inasistencias',  res.resAus,  '#ef4444') +
+          buildResumenBloque('⏰ Llegadas tarde', res.resTard, '#f59e0b') +
+          buildResumenBloque('🌙 Veladas',        res.resVel,  '#7c3aed') +
+          buildResumenBloque('📅 Domingos trab.', res.resDom,  '#0ea5e9') +
+          buildResumenBloque('🟢 Inicios',        res.resIni,  '#22c55e') +
+          buildResumenBloque('🔴 Bajas',          res.resBaj,  '#6b7280') +
+        '</div>' +
+      '</div>';
+
+    return secHtml;
+  }
 
   var html = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
     '<title>Asistencia ' + mesNombre + '</title>' +
@@ -4875,47 +4923,11 @@ async function exportarAsistGridPDF() {
       'table{border-collapse:collapse;width:100%}' +
       'h2{margin:0 0 4px;font-size:13px;color:#1e293b}' +
       'p{margin:0 0 8px;font-size:9px;color:#64748b}' +
-      '.leyenda{display:flex;gap:14px;margin-top:8px;font-size:8px;color:#475569}' +
-      '.leg-dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}' +
+      '.q-sep{page-break-before:always;margin:0}' +
     '</style></head><body>' +
-    '<h2>Tetraplastic · Serigrafía — Asistencia Mensual</h2>' +
-    '<p style="text-transform:capitalize">' + mesNombre + ' &nbsp;·&nbsp; Generado: ' + new Date().toLocaleDateString('es-GT') + '</p>' +
-    '<table><thead><tr>' +
-      '<th style="background:#f8fafc;font-size:8px;font-weight:700;text-align:left;padding:3px 6px;border:1px solid #cbd5e1;min-width:110px">Operador</th>' +
-      thDias() +
-    '</tr></thead><tbody>' + tableRows + '</tbody></table>' +
-    '<div class="leyenda">' +
-      '<span><span class="leg-dot" style="background:#dcfce7;border:1px solid #86efac"></span>P = Presente</span>' +
-      '<span><span class="leg-dot" style="background:#fee2e2;border:1px solid #fca5a5"></span>A = Ausente</span>' +
-      '<span><span class="leg-dot" style="background:#fef3c7;border:1px solid #fde68a"></span>T = Tarde</span>' +
-      '<span><span class="leg-dot" style="background:#ede9fe;border:1px solid #c4b5fd"></span>V = Velada</span>' +
-      '<span><span class="leg-dot" style="background:#dcfce7;border:1px solid #86efac"></span>Fila verde = asistencia completa</span>' +
-    '</div>' +
-    (hayRoles
-      ? '<div style="margin-top:18px;page-break-before:always">' +
-          '<div style="font-size:10px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">Roles del Día · ' + mesNombre + '</div>' +
-          '<div style="font-size:7px;color:#64748b;margin-bottom:6px">F# = Flameador línea · I# = Impresora línea · R# = Receptor línea · SUP = Supervisor · AUX = Auxiliar · EMP = Empaque · POOL = Sin rol asignado</div>' +
-          '<table><thead><tr>' +
-            '<th style="background:#f8fafc;font-size:8px;font-weight:700;text-align:left;padding:3px 6px;border:1px solid #cbd5e1;min-width:110px">Operador</th>' +
-            diasActual.map(function(f) {
-              var dow = new Date(f + 'T12:00:00').getDay();
-              var dn  = parseInt(f.slice(8));
-              var bg  = dow === 0 ? '#64748b' : '#f8fafc';
-              var clr = dow === 0 ? '#fff' : '#64748b';
-              return '<th style="background:' + bg + ';color:' + clr + ';width:18px;min-width:18px;font-size:7px;font-weight:700;text-align:center;padding:3px 0;border:1px solid #cbd5e1">' + dn + '</th>';
-            }).join('') +
-          '</tr></thead><tbody>' + rolesRows + '</tbody></table>' +
-          '<div style="margin-top:6px;display:flex;gap:12px;font-size:7px;color:#475569;flex-wrap:wrap">' +
-            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#d97706;border-radius:2px"></span>F# = Flameador</span>' +
-            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#7c3aed;border-radius:2px"></span>I# = Impresora</span>' +
-            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#16a34a;border-radius:2px"></span>R# = Receptor</span>' +
-            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:2px"></span>SUP</span>' +
-            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#0d9488;border-radius:2px"></span>EMP</span>' +
-            '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:10px;background:#6b7280;border-radius:2px"></span>AUX</span>' +
-          '</div>' +
-        '</div>'
-      : '') +
-    resumenHtml +
+    buildSeccion('QUINCENA 1', lblQ1, diasQ1, anteriorQ1, diasActQ1) +
+    '<div class="q-sep"></div>' +
+    buildSeccion('QUINCENA 2', lblQ2, diasQ2, {}, diasQ2) +
     '<script>window.onload=function(){window.print();}<\/script>' +
     '</body></html>';
 
