@@ -4182,7 +4182,7 @@ async function cargarJustifMes(mesStr) {
     var año2 = parseInt(mesStr.slice(0,4)), mesN2 = parseInt(mesStr.slice(5,7));
     var fin2 = mesStr + '-' + String(new Date(año2, mesN2, 0).getDate()).padStart(2,'0');
     var rj = await db.from('rrhh_faltas')
-      .select('id,personal_id,fecha,justificacion_texto,tipo')
+      .select('id,personal_id,fecha,justificacion_texto,justificacion_foto_url,tipo')
       .eq('origen','asistencia_serig')
       .gte('fecha', mesStr + '-01').lte('fecha', fin2);
     if (rj.error || !rj.data) return;
@@ -4193,7 +4193,7 @@ async function cargarJustifMes(mesStr) {
       var cod2 = idToCod[row.personal_id];
       if (!cod2) return;
       if (!justifCache.byCodigoFecha[cod2]) justifCache.byCodigoFecha[cod2] = {};
-      justifCache.byCodigoFecha[cod2][row.fecha] = { id: row.id, texto: row.justificacion_texto || '', tipo: row.tipo || 'ausencia' };
+      justifCache.byCodigoFecha[cod2][row.fecha] = { id: row.id, texto: row.justificacion_texto || '', fotoUrl: row.justificacion_foto_url || '', tipo: row.tipo || 'ausencia' };
     });
   } catch(e) { /* tabla no disponible aún */ }
 }
@@ -4505,7 +4505,7 @@ async function renderAsistGrid() {
           var motivoFinde = esFeriadoCell ? (' · ' + feriadosSet[f] + ' (no cuenta)') : (dow === 0 ? ' · Domingo (no cuenta)' : '');
           var justifByCF  = justifCache ? (justifCache.byCodigoFecha[p.codigo] || {}) : {};
           var justifEntry = justifByCF[f];
-          var esJustif    = justifEntry && justifEntry.texto;
+          var esJustif    = justifEntry && (justifEntry.texto || justifEntry.fotoUrl);
           var jBadge      = esJustif ? '<span style="position:absolute;bottom:1px;right:1px;font-size:5px;font-weight:900;background:rgba(255,255,255,.35);border-radius:2px;padding:0 2px;line-height:1.5;pointer-events:none">J</span>' : '';
           var ctxMenu     = (est === 'ausente' || est === 'tarde') && !asistLocked
             ? ' oncontextmenu="event.preventDefault();abrirJustifPopover(\'' + cod + '\',\'' + f + '\',event)"'
@@ -4686,15 +4686,22 @@ function abrirJustifPopover(codigo, fecha, evt) {
   var justifByCF = justifCache ? (justifCache.byCodigoFecha[codigo] || {}) : {};
   var justif = justifByCF[fecha];
   var textoActual = justif ? (justif.texto || '') : '';
+  var fotoActual  = justif ? (justif.fotoUrl || '') : '';
   var faltaId = justif ? justif.id : null;
   var pop = document.createElement('div');
   pop.id = 'justifPopover';
-  pop.style.cssText = 'position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--serig-m);border-radius:10px;padding:14px 16px;min-width:260px;max-width:340px;box-shadow:0 8px 28px rgba(0,0,0,.22)';
-  var x = Math.min(evt.clientX, window.innerWidth - 360);
-  var y = Math.min(evt.clientY + 8, window.innerHeight - 200);
+  pop.style.cssText = 'position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--serig-m);border-radius:10px;padding:14px 16px;min-width:280px;max-width:360px;box-shadow:0 8px 28px rgba(0,0,0,.22)';
+  var x = Math.min(evt.clientX, window.innerWidth - 380);
+  var y = Math.min(evt.clientY + 8, window.innerHeight - 280);
   pop.style.left = x + 'px'; pop.style.top = y + 'px';
   var fechaFmt = fecha.slice(8) + '/' + fecha.slice(5,7) + '/' + fecha.slice(0,4);
   var codEsc = codigo.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var fotoPreviewHtml = fotoActual
+    ? '<div id="justifFotoPreview" style="margin-bottom:8px;position:relative">' +
+        '<img src="' + escHtml(fotoActual) + '" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">' +
+        '<button onclick="_justifBorrarFoto()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>' +
+      '</div>'
+    : '<div id="justifFotoPreview" style="display:none;margin-bottom:8px"></div>';
   pop.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">' +
       '<div><div style="font-size:12px;font-weight:800;color:var(--ink)">' + escHtml(nombre) + '</div>' +
@@ -4702,8 +4709,11 @@ function abrirJustifPopover(codigo, fecha, evt) {
       '<button onclick="document.getElementById(\'justifPopover\').remove()" style="background:none;border:none;font-size:17px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0 2px;margin-left:8px">✕</button>' +
     '</div>' +
     '<label style="font-size:10px;font-weight:700;color:var(--gray-l);display:block;margin-bottom:4px">Motivo / justificación</label>' +
-    '<textarea id="justifTexto" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:7px;padding:8px;font-size:12px;resize:vertical;min-height:72px;font-family:inherit;background:var(--bg);color:var(--ink)">' + escHtml(textoActual) + '</textarea>' +
-    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">' +
+    '<textarea id="justifTexto" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:7px;padding:8px;font-size:12px;resize:vertical;min-height:64px;font-family:inherit;background:var(--bg);color:var(--ink);margin-bottom:8px">' + escHtml(textoActual) + '</textarea>' +
+    fotoPreviewHtml +
+    '<input id="justifFotoInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="_justifPreviewFoto(this)">' +
+    '<button onclick="document.getElementById(\'justifFotoInput\').click()" style="width:100%;border:1.5px dashed var(--border);background:var(--bg);border-radius:7px;padding:7px;font-size:11px;cursor:pointer;color:var(--gray-l);margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:6px"><span style="font-size:15px">📷</span> Agregar / reemplazar foto</button>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end">' +
       '<button onclick="document.getElementById(\'justifPopover\').remove()" style="border:1px solid var(--border);background:none;border-radius:7px;padding:6px 14px;font-size:12px;cursor:pointer;color:var(--ink)">Cancelar</button>' +
       '<button onclick="guardarJustificacion(' + (faltaId !== null ? faltaId : 'null') + ',document.getElementById(\'justifTexto\').value,\'' + codEsc + '\',\'' + fecha + '\')" style="background:var(--serig-m);color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>' +
     '</div>';
@@ -4717,29 +4727,74 @@ function abrirJustifPopover(codigo, fecha, evt) {
   document.getElementById('justifTexto').focus();
 }
 
+function _justifPreviewFoto(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var prev = document.getElementById('justifFotoPreview');
+  if (!prev) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    prev.style.display = 'block';
+    prev.innerHTML =
+      '<div style="position:relative">' +
+        '<img src="' + e.target.result + '" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">' +
+        '<button onclick="_justifBorrarFoto()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>' +
+      '</div>';
+  };
+  reader.readAsDataURL(file);
+}
+
+function _justifBorrarFoto() {
+  var prev = document.getElementById('justifFotoPreview');
+  if (prev) { prev.style.display = 'none'; prev.innerHTML = ''; }
+  var inp = document.getElementById('justifFotoInput');
+  if (inp) inp.value = '';
+  // marca que la foto debe borrarse al guardar
+  var pop = document.getElementById('justifPopover');
+  if (pop) pop.dataset.borrarFoto = '1';
+}
+
 async function guardarJustificacion(faltaId, texto, codigo, fecha) {
   try {
     var op = (personalData && personalData.serig ? personalData.serig : []).find(function(x){ return x.codigo === codigo; });
     if (!op || !op.id) { showToast('Operario no encontrado', '#B83232'); return; }
     var textoVal = texto ? texto.trim() : null;
+    var pop3 = document.getElementById('justifPopover');
+    var borrarFoto = pop3 && pop3.dataset.borrarFoto === '1';
+    var fotoFile   = document.getElementById('justifFotoInput') && document.getElementById('justifFotoInput').files && document.getElementById('justifFotoInput').files[0];
+
+    // Subir foto a Storage si hay archivo nuevo
+    var fotoUrl = undefined; // undefined = sin cambio en DB
+    if (fotoFile) {
+      showToast('⬆️ Subiendo foto…');
+      var storagePath = 'faltas/' + op.id + '/' + fecha + '.jpg';
+      var ru = await db.storage.from('justificaciones').upload(storagePath, fotoFile, { upsert: true, contentType: fotoFile.type });
+      if (ru.error) throw new Error('Storage: ' + ru.error.message);
+      var pubData = db.storage.from('justificaciones').getPublicUrl(storagePath);
+      fotoUrl = pubData.data.publicUrl;
+    } else if (borrarFoto) {
+      fotoUrl = null; // borrar
+    }
+
+    var payload = { justificacion_texto: textoVal || null };
+    if (fotoUrl !== undefined) payload.justificacion_foto_url = fotoUrl;
+
     if (faltaId) {
-      var r = await db.from('rrhh_faltas').update({ justificacion_texto: textoVal || null }).eq('id', faltaId);
+      var r = await db.from('rrhh_faltas').update(payload).eq('id', faltaId);
       if (r.error) throw r.error;
     } else {
       var byPD2 = asistGridCache && asistGridCache.byPersonDay[codigo] ? asistGridCache.byPersonDay[codigo] : {};
       var estAct = byPD2[fecha] || 'ausente';
-      var r2 = await db.from('rrhh_faltas').insert({
+      var r2 = await db.from('rrhh_faltas').insert(Object.assign({
         personal_id: op.id, fecha: fecha, origen: 'asistencia_serig',
         tipo: estAct === 'tarde' ? 'tardanza' : 'ausencia',
-        justificacion_texto: textoVal || null,
         notas: 'Justificación ingresada desde Asistencia Mensual (Serigrafía)'
-      });
+      }, payload));
       if (r2.error) throw r2.error;
     }
     justifCache = null;
-    var pop3 = document.getElementById('justifPopover');
     if (pop3) pop3.remove();
-    showToast(textoVal ? '✅ Justificación guardada' : '🗑 Justificación borrada');
+    showToast(textoVal || fotoUrl ? '✅ Justificación guardada' : '🗑 Justificación borrada');
     await renderAsistGrid();
   } catch(e) { showToast('❌ Error al guardar: ' + e.message, '#B83232'); }
 }
