@@ -1548,8 +1548,6 @@ function periodoDe(iso) {
   var d = new Date(f + 'T12:00:00');
   if (isNaN(d.getTime())) return vacio;
   if (f < PERIODO_BASE) return PERIODO_HIST;
-  // setDate(1) antes de avanzar el mes: evita que un 30/01 salte a marzo
-  if (d.getDate() >= 28) { d.setDate(1); d.setMonth(d.getMonth() + 1); }
   var m = d.getMonth(), y = d.getFullYear();
   return {
     key:   y + '-' + String(m + 1).padStart(2, '0'),
