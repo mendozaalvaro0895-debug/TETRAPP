@@ -3247,8 +3247,9 @@ function renderBoard() {
   if (!contSin || !contLines) return;
   var items = [];
   solicitudes.forEach(function(s) {
-    var esActiva   = ['nueva','proceso','parcial'].indexOf(s.estado) >= 0;
-    var esListaSin = s.estado === 'lista' && !s.linea_id;
+    var esActiva       = ['nueva','proceso','parcial'].indexOf(s.estado) >= 0;
+    var tieneLineaAsig = s.lineas.some(function(l){ return l.linea_id; });
+    var esListaSin     = s.estado === 'lista' && !tieneLineaAsig;
     if (!esActiva && !esListaSin) return;
     var sTiros = s.tiros || Math.max.apply(null, (s.lineas.length ? s.lineas.map(function(l){ return l.tiros || 1; }) : [1]));
     if (s.lineas.length === 0) {
