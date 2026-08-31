@@ -6161,7 +6161,7 @@ async function renderConsolidadoEnvases() {
   var mapa = {};
   solicitudes.forEach(function(s) {
     if (ESTADOS_VIVOS.indexOf(s.estado) < 0) return;
-    var esAgo = periodoDe(s.created_at).key === perHoy;
+    var esAgo = mesSol(s) === perHoy;
     if (!esAgo) return; // solo fichas del mes en curso
     (s.lineas || []).forEach(function(l) {
       if ((l.estado || s.estado) === 'lista') return;
@@ -6186,7 +6186,7 @@ async function renderConsolidadoEnvases() {
   var huecos = [];
   solicitudes.forEach(function(s) {
     if (ESTADOS_VIVOS.indexOf(s.estado) < 0) return;
-    if (periodoDe(s.created_at).key !== perHoy) return;
+    if (mesSol(s) !== perHoy) return;
     (s.lineas || []).forEach(function(l) {
       if ((l.estado || s.estado) === 'lista') return;
       if (!(l.sku_base || '').trim()) {
