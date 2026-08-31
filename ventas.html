@@ -2302,23 +2302,9 @@ function generarReporte() {
     '<div class="kpi"><div class="kpi-l">Facturas</div><div class="kpi-v">' + nFact.toLocaleString('es-GT') + '</div><div class="kpi-s">' + nCli + ' clientes · ' + (nFact ? fmtQ(q / nFact) : '—') + ' prom.</div></div>' +
     '</div></div>' +
 
-    // ── SECCIÓN 2: PRODUCTOS ────────────────────────────────────
+    // ── SECCIÓN 2: CLIENTES ─────────────────────────────────────
     '<div class="section">' +
-    '<div class="section-title">2. Productos</div>' +
-    '<div class="tbl-wrap">' +
-    '<div class="tbl-sub">Se muestran ' + mostrar50.length + ' de ' + totalSkus + ' SKUs con venta en el periodo &nbsp;·&nbsp; ordenados por quetzales</div>' +
-    '<table><thead><tr>' +
-    '<th>#</th><th>SKU</th><th>Descripción</th><th>Familia</th>' +
-    '<th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th>' +
-    (ant ? '<th class="num">Δ vs ' + mesLabel(ant) + '</th>' : '') +
-    '</tr></thead><tbody>' + prodRows + '</tbody></table>' +
-    '</div>' +
-    (totalSkus > 50 ? '<div class="note">* ' + (totalSkus - 50) + ' SKUs adicionales no se muestran en este reporte.</div>' : '') +
-    '</div>' +
-
-    // ── SECCIÓN 3: CLIENTES ─────────────────────────────────────
-    '<div class="section">' +
-    '<div class="section-title">3. Clientes</div>' +
+    '<div class="section-title">2. Clientes</div>' +
     '<div class="kpis kpi-3" style="margin-bottom:14px">' +
     '<div class="kpi"><div class="kpi-l">Clientes activos</div><div class="kpi-v">' + nomsOrd.length + '</div><div class="kpi-s">con compras en el periodo</div></div>' +
     '<div class="kpi"><div class="kpi-l">Concentración top 3</div><div class="kpi-v">' + conc3 + '</div><div class="kpi-s">% de la venta en 3 clientes</div></div>' +
@@ -2331,6 +2317,20 @@ function generarReporte() {
     (ant ? '<th class="num">Δ vs ' + mesLabel(ant) + '</th>' : '') +
     '</tr></thead><tbody>' + cliRows + '</tbody></table>' +
     '</div></div>' +
+
+    // ── SECCIÓN 3: PRODUCTOS ────────────────────────────────────
+    '<div class="section">' +
+    '<div class="section-title">3. Productos</div>' +
+    '<div class="tbl-wrap">' +
+    '<div class="tbl-sub">Se muestran ' + mostrar50.length + ' de ' + totalSkus + ' SKUs con venta en el periodo &nbsp;·&nbsp; ordenados por quetzales</div>' +
+    '<table><thead><tr>' +
+    '<th>#</th><th>SKU</th><th>Descripción</th><th>Familia</th>' +
+    '<th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th>' +
+    (ant ? '<th class="num">Δ vs ' + mesLabel(ant) + '</th>' : '') +
+    '</tr></thead><tbody>' + prodRows + '</tbody></table>' +
+    '</div>' +
+    (totalSkus > 50 ? '<div class="note">* ' + (totalSkus - 50) + ' SKUs adicionales no se muestran en este reporte.</div>' : '') +
+    '</div>' +
 
     '</div></body></html>';
 
