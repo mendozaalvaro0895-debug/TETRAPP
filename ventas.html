@@ -347,6 +347,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <span class="iva-knob" id="ivaKnob"></span>
       </div>
       <span class="ult-fact-nota" id="ultActFecha"></span>
+      <button class="btn btn-ghost" onclick="generarReporte()" title="Generar reporte imprimible del periodo seleccionado">📄 Reporte</button>
       <button class="btn btn-ven" id="btnImportar" onclick="abrirImport()">📥 Importar facturación</button>
     </div>
   </div>
@@ -2006,6 +2007,178 @@ function rcAcElegirEv(el) {
 function rcAcCerrar(sid) {
   var d = document.getElementById('rcd-' + sid);
   if (d) d.classList.remove('open');
+}
+
+// ── GENERADOR DE REPORTE ────────────────────────────────────────
+function generarReporte() {
+  if (!VENTAS.length) { toast('Importa datos primero', 'err'); return; }
+
+  var periodo = mesLabel(mesSel);
+  var filas = filasDelPeriodo(mesSel);
+  var q = totalQ(filas);
+  var u = 0;
+  var factSet = {}, cliSet = {};
+  filas.forEach(function(v) {
+    u += v.total_unidades;
+    factSet[v.serie + '-' + v.docu] = 1;
+    cliSet[v.cliente] = 1;
+  });
+  var nFact = Object.keys(factSet).length;
+  var nCli = Object.keys(cliSet).length;
+
+  var ant = mesSel === 'todo' ? null : mesAnterior(mesSel);
+  var qAnt = ant ? totalQ(filasDelPeriodo(ant)) : null;
+  var deltaStr = '—', deltaColor = '#666', deltaLabel = '';
+  if (qAnt !== null) {
+    var pctD = qAnt > 0 ? (q - qAnt) / qAnt * 100 : (q > 0 ? 100 : 0);
+    var signo = pctD >= 0 ? '+' : '';
+    deltaStr = signo + fmtPct(pctD);
+    deltaColor = pctD >= 0 ? '#065F46' : '#B83232';
+    deltaLabel = mesLabel(ant) + ': ' + fmtQ(qAnt);
+  } else {
+    deltaLabel = mesSel === 'todo' ? 'Todo el periodo' : 'Primer mes con datos';
+  }
+
+  // PRODUCTOS — Top 50
+  var porProd = agrupar(filas, function(v){ return v.sku; });
+  var skusOrden = Object.keys(porProd).sort(function(a,b){ return porProd[b].q - porProd[a].q; });
+  var totalSkus = skusOrden.length;
+  var mostrar50 = skusOrden.slice(0, 50);
+  var prodRows = '';
+  mostrar50.forEach(function(sku, i) {
+    var dat = porProd[sku];
+    var pct = q > 0 ? dat.q / q * 100 : 0;
+    var m = dat.muestra;
+    prodRows += '<tr>' +
+      '<td class="idx">' + (i+1) + '</td>' +
+      '<td class="sku">' + escHtml(sku) + '</td>' +
+      '<td>' + escHtml(m.descripcion || '—') + '</td>' +
+      '<td><span class="pill">' + escHtml(m.descripcion_familia || '—') + '</span></td>' +
+      '<td class="num">' + fmtQ(dat.q) + '</td>' +
+      '<td class="num">' + fmtPct(pct) + '</td>' +
+      '<td class="num">' + fmtU(dat.u) + '</td>' +
+      '</tr>';
+  });
+
+  // CLIENTES
+  var porCli = agrupar(filas, function(v){ return v.cliente || '—'; });
+  var nomsOrd = Object.keys(porCli).sort(function(a,b){ return porCli[b].q - porCli[a].q; });
+  var top3q = 0;
+  nomsOrd.slice(0,3).forEach(function(n){ top3q += porCli[n].q; });
+  var conc3 = q > 0 ? fmtPct(top3q / q * 100) : '—';
+  var cli1 = nomsOrd.length ? nomsOrd[0] : '—';
+  var cli1Q = nomsOrd.length ? fmtQ(porCli[nomsOrd[0]].q) : '—';
+  var cli1Pct = (nomsOrd.length && q > 0) ? fmtPct(porCli[nomsOrd[0]].q / q * 100) : '—';
+  var cliRows = '';
+  nomsOrd.forEach(function(n, i) {
+    var dat = porCli[n];
+    var pct = q > 0 ? dat.q / q * 100 : 0;
+    cliRows += '<tr>' +
+      '<td class="idx">' + (i+1) + '</td>' +
+      '<td>' + escHtml(n) + '</td>' +
+      '<td class="num">' + fmtQ(dat.q) + '</td>' +
+      '<td class="num">' + fmtPct(pct) + '</td>' +
+      '<td class="num">' + fmtU(dat.u) + '</td>' +
+      '<td class="num">' + Object.keys(dat.facturas).length + '</td>' +
+      '</tr>';
+  });
+
+  var ivaNote = conIVA ? 'con IVA 12%' : 'sin IVA';
+  var hoy = new Date();
+  var fechaGen = ('0'+hoy.getDate()).slice(-2)+'/'+('0'+(hoy.getMonth()+1)).slice(-2)+'/'+hoy.getFullYear();
+
+  var html = '<!doctype html><html lang="es"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>Reporte Ventas ' + periodo + ' — Tetraplastic</title>' +
+    '<style>' +
+    '*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}' +
+    'body{font-family:"DM Sans",Arial,sans-serif;background:#f7f6f2;color:#0C0C0B;font-size:13px}' +
+    '.page{max-width:900px;margin:0 auto;padding:28px 20px}' +
+    '.rpt-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap}' +
+    '.rpt-brand{font-size:22px;font-weight:900;letter-spacing:-.5px}' +
+    '.rpt-brand span{color:#1D4ED8}' +
+    '.rpt-meta{text-align:right}' +
+    '.rpt-periodo{font-size:18px;font-weight:700;color:#1D4ED8}' +
+    '.rpt-gen{font-size:11px;color:#888;margin-top:2px}' +
+    '.section{margin-bottom:28px}' +
+    '.section-title{font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#888;padding-bottom:6px;border-bottom:1.5px solid #e0ded8;margin-bottom:14px}' +
+    '.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px}' +
+    '.kpi-3{grid-template-columns:repeat(3,1fr)}' +
+    '.kpi{background:#fff;border:1px solid #e0ded8;border-radius:10px;padding:14px 16px}' +
+    '.kpi-l{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#888}' +
+    '.kpi-v{font-size:20px;font-weight:700;margin-top:4px;font-family:"DM Mono",monospace;line-height:1.2}' +
+    '.kpi-s{font-size:11px;color:#aaa;margin-top:2px}' +
+    '.kpi-v.up{color:#065F46}.kpi-v.dn{color:#B83232}' +
+    'table{width:100%;border-collapse:collapse}' +
+    'thead th{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#888;padding:8px 12px;border-bottom:1px solid #e0ded8;background:#f0edea;text-align:left;white-space:nowrap}' +
+    'thead th.num{text-align:right}' +
+    'tbody td{padding:8px 12px;font-size:12px;border-bottom:1px solid #f0edea}' +
+    'tbody td.num{text-align:right;font-family:"DM Mono",monospace;font-weight:600;white-space:nowrap}' +
+    'tbody td.idx{color:#aaa;font-size:11px;width:30px}' +
+    'tbody td.sku{font-family:"DM Mono",monospace;font-weight:700;color:#1D4ED8;font-size:11px}' +
+    'tbody tr:last-child td{border-bottom:none}' +
+    'tbody tr:nth-child(even) td{background:#fafafa}' +
+    '.pill{background:#e0ded8;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;color:#555;white-space:nowrap}' +
+    '.tbl-wrap{background:#fff;border:1px solid #e0ded8;border-radius:10px;overflow:hidden}' +
+    '.tbl-sub{font-size:11px;color:#888;padding:9px 12px;border-bottom:1px solid #e0ded8;background:#f7f6f2}' +
+    '.note{font-size:10px;color:#aaa;margin-top:6px}' +
+    '.iva-tag{display:inline-block;background:#BFDBFE;color:#1E3A8A;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:6px}' +
+    '.print-btn{display:block;margin:0 auto 18px;padding:10px 28px;background:#1D4ED8;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}' +
+    '.print-btn:hover{background:#1E3A8A}' +
+    '@media print{.print-btn{display:none}body{background:#fff}.page{padding:12px}}' +
+    '</style></head><body>' +
+    '<div class="page">' +
+    '<button class="print-btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>' +
+    '<div class="rpt-head">' +
+    '<div class="rpt-brand">TETRA<span>PLASTIC</span></div>' +
+    '<div class="rpt-meta"><div class="rpt-periodo">Ventas — ' + periodo + '</div>' +
+    '<div class="rpt-gen">Generado ' + fechaGen + ' &nbsp;<span class="iva-tag">' + ivaNote + '</span></div>' +
+    '</div></div>' +
+
+    // ── SECCIÓN 1: GENERAL ──────────────────────────────────────
+    '<div class="section">' +
+    '<div class="section-title">1. General</div>' +
+    '<div class="kpis">' +
+    '<div class="kpi"><div class="kpi-l">Ventas del mes</div><div class="kpi-v">' + fmtQ(q) + '</div><div class="kpi-s">' + ivaNote + ' · ' + periodo + '</div></div>' +
+    '<div class="kpi"><div class="kpi-l">vs mes anterior</div><div class="kpi-v ' + (qAnt !== null ? (parseFloat(deltaStr) >= 0 ? 'up' : 'dn') : '') + '">' + deltaStr + '</div><div class="kpi-s">' + deltaLabel + '</div></div>' +
+    '<div class="kpi"><div class="kpi-l">Unidades</div><div class="kpi-v">' + fmtU(u) + '</div><div class="kpi-s">facturadas en el periodo</div></div>' +
+    '<div class="kpi"><div class="kpi-l">Facturas</div><div class="kpi-v">' + nFact.toLocaleString('es-GT') + '</div><div class="kpi-s">' + nCli + ' clientes · ' + (nFact ? fmtQ(q / nFact) : '—') + ' prom.</div></div>' +
+    '</div></div>' +
+
+    // ── SECCIÓN 2: PRODUCTOS ────────────────────────────────────
+    '<div class="section">' +
+    '<div class="section-title">2. Productos</div>' +
+    '<div class="tbl-wrap">' +
+    '<div class="tbl-sub">Se muestran ' + mostrar50.length + ' de ' + totalSkus + ' SKUs con venta en el periodo &nbsp;·&nbsp; ordenados por quetzales</div>' +
+    '<table><thead><tr>' +
+    '<th>#</th><th>SKU</th><th>Descripción</th><th>Familia</th>' +
+    '<th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th>' +
+    '</tr></thead><tbody>' + prodRows + '</tbody></table>' +
+    '</div>' +
+    (totalSkus > 50 ? '<div class="note">* ' + (totalSkus - 50) + ' SKUs adicionales no se muestran en este reporte.</div>' : '') +
+    '</div>' +
+
+    // ── SECCIÓN 3: CLIENTES ─────────────────────────────────────
+    '<div class="section">' +
+    '<div class="section-title">3. Clientes</div>' +
+    '<div class="kpis kpi-3" style="margin-bottom:14px">' +
+    '<div class="kpi"><div class="kpi-l">Clientes activos</div><div class="kpi-v">' + nomsOrd.length + '</div><div class="kpi-s">con compras en el periodo</div></div>' +
+    '<div class="kpi"><div class="kpi-l">Concentración top 3</div><div class="kpi-v">' + conc3 + '</div><div class="kpi-s">% de la venta en 3 clientes</div></div>' +
+    '<div class="kpi"><div class="kpi-l">Cliente #1</div><div class="kpi-v" style="font-size:14px;font-family:inherit">' + escHtml(cli1.length > 26 ? cli1.slice(0,26)+'…' : cli1) + '</div><div class="kpi-s">' + cli1Q + ' · ' + cli1Pct + ' del periodo</div></div>' +
+    '</div>' +
+    '<div class="tbl-wrap">' +
+    '<table><thead><tr>' +
+    '<th>#</th><th>Cliente</th>' +
+    '<th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th><th class="num">Facturas</th>' +
+    '</tr></thead><tbody>' + cliRows + '</tbody></table>' +
+    '</div></div>' +
+
+    '</div></body></html>';
+
+  var w = window.open('', '_blank');
+  if (!w) { toast('Permite ventanas emergentes para este sitio', 'err'); return; }
+  w.document.write(html);
+  w.document.close();
 }
 
 document.addEventListener('DOMContentLoaded', recargar);
