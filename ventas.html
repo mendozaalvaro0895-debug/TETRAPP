@@ -422,6 +422,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
       </div>
 
+      <!-- Stock Estancado -->
+      <div class="recet-panel" id="estancadoPanel">
+        <div class="recet-phdr" onclick="toggleEstancado()">
+          <div>
+            <div class="recet-phdr-t">📦 Stock Estancado <span id="estBadge" style="color:var(--red);font-size:12px;font-weight:700"></span></div>
+            <div class="recet-phdr-s">Cruza inventario vs ventas — productos con existencia pero sin facturar recientemente</div>
+          </div>
+          <span class="recet-pchev" id="estChev">▾</span>
+        </div>
+        <div class="recet-pbody" id="estBody"></div>
+      </div>
+
       <!-- Recetario de SKUs — instancia única, compartida con la tab Rotación (ver moveRecetarioPanel) -->
       <div id="recetarioSlotResumen">
         <div class="recet-panel" id="recetarioPanel">
@@ -1247,6 +1259,7 @@ async function recargar() {
     mesSel = MESES.length ? MESES[MESES.length - 1] : 'todo';
     poblarSelectores();
     renderTodo();
+    cargarStockEstancado(); // background, no await
     var maxFecha = VENTAS.length ? VENTAS[VENTAS.length - 1].fecha : null;
     var notaFecha = document.getElementById('ultActFecha');
     if (notaFecha) notaFecha.textContent = maxFecha ? 'Última actualización: ' + fmtFechaISO(maxFecha) : '';
@@ -2009,6 +2022,122 @@ function rcAcCerrar(sid) {
   if (d) d.classList.remove('open');
 }
 
+// ══════════════════════════════════════════════════════════════
+// STOCK ESTANCADO — cruza inventario vs ventas
+// ══════════════════════════════════════════════════════════════
+var STOCK_EST_INV = [];
+var STOCK_EST_CARGADO = false;
+var ESTANCADO_DIAS = 90;
+
+async function cargarStockEstancado() {
+  try {
+    var r = await db.from('inventario')
+      .select('sku,descripcion,existencia')
+      .eq('activo', true)
+      .gt('existencia', 0)
+      .order('descripcion')
+      .limit(2000);
+    STOCK_EST_INV = r.error ? [] : (r.data || []);
+    STOCK_EST_CARGADO = true;
+    renderStockEstancado();
+  } catch (e) {
+    STOCK_EST_CARGADO = true;
+  }
+}
+
+function toggleEstancado() {
+  var body = document.getElementById('estBody');
+  var chev = document.getElementById('estChev');
+  if (!body) return;
+  var open = body.classList.toggle('open');
+  if (chev) chev.classList.toggle('open', open);
+  if (open) renderStockEstancado();
+}
+
+function setEstancadoDias(d) {
+  ESTANCADO_DIAS = d;
+  renderStockEstancado();
+}
+
+function renderStockEstancado() {
+  if (!STOCK_EST_CARGADO) return;
+
+  var ultimaVenta = {};
+  VENTAS.forEach(function(v) {
+    if (!v.sku) return;
+    if (!ultimaVenta[v.sku] || v.fecha > ultimaVenta[v.sku]) ultimaVenta[v.sku] = v.fecha;
+  });
+
+  var hoyStr = fechaHoy();
+  var hoyMs = new Date(hoyStr + 'T12:00:00').getTime();
+
+  var estancados = [];
+  STOCK_EST_INV.forEach(function(item) {
+    var last = ultimaVenta[item.sku] || null;
+    var dias = last ? Math.floor((hoyMs - new Date(last + 'T12:00:00').getTime()) / 86400000) : null;
+    if (dias === null || dias >= ESTANCADO_DIAS) {
+      estancados.push({ sku: item.sku, descripcion: item.descripcion, existencia: item.existencia, ultimaVenta: last, dias: dias });
+    }
+  });
+  estancados.sort(function(a, b) {
+    if (a.dias === null && b.dias !== null) return -1;
+    if (a.dias !== null && b.dias === null) return 1;
+    if (a.dias === null && b.dias === null) return 0;
+    return b.dias - a.dias;
+  });
+
+  var badge = document.getElementById('estBadge');
+  if (badge) badge.textContent = estancados.length ? '(' + estancados.length + ')' : '';
+
+  var body = document.getElementById('estBody');
+  if (!body || !body.classList.contains('open')) return;
+
+  var umbralBtns = [60, 90, 180].map(function(d) {
+    var sel = ESTANCADO_DIAS === d;
+    return '<button onclick="setEstancadoDias(' + d + ')" style="padding:4px 12px;border:1.5px solid ' +
+      (sel ? 'var(--ven)' : 'var(--border)') +
+      ';border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;background:' +
+      (sel ? 'var(--ven)' : 'none') +
+      ';color:' + (sel ? '#fff' : 'var(--gray)') +
+      ';font-family:var(--font)">' + d + ' días</button>';
+  }).join('');
+
+  var html = '<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+    '<span style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Sin venta hace más de</span>' +
+    umbralBtns + '</div>';
+
+  if (!estancados.length) {
+    html += '<div style="text-align:center;padding:36px;color:var(--gray);font-size:13px">✅ No hay productos estancados con este umbral</div>';
+  } else {
+    var totalExist = 0;
+    estancados.forEach(function(i){ totalExist += i.existencia; });
+    html += '<div style="display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:120px"><div style="font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">SKUs estancados</div>' +
+      '<div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--red)">' + estancados.length + '</div></div>' +
+      '<div style="flex:1;min-width:120px"><div style="font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Total existencias</div>' +
+      '<div style="font-family:var(--mono);font-size:20px;font-weight:700">' + fmtU(totalExist) + '</div></div>' +
+      '</div>' +
+      '<div class="tbl-scroll"><table class="tbl"><thead><tr>' +
+      '<th>#</th><th>SKU</th><th>Descripción</th>' +
+      '<th class="num">Existencia</th><th class="num">Última venta</th><th class="num">Días sin venta</th>' +
+      '</tr></thead><tbody>';
+    estancados.forEach(function(item, i) {
+      var diasColor = item.dias === null ? 'var(--red)' : item.dias > 180 ? 'var(--red)' : item.dias > 90 ? 'var(--amber)' : 'var(--gray)';
+      html += '<tr>' +
+        '<td class="pct-cell">' + (i + 1) + '</td>' +
+        '<td class="sku-cell">' + escHtml(item.sku) + '</td>' +
+        '<td class="desc-cell">' + escHtml(item.descripcion || '—') + '</td>' +
+        '<td class="num">' + fmtU(item.existencia) + '</td>' +
+        '<td class="num">' + (item.ultimaVenta ? fmtFechaISO(item.ultimaVenta) : '<span style="color:var(--red);font-weight:700">Nunca</span>') + '</td>' +
+        '<td class="num"><span style="color:' + diasColor + ';font-weight:700">' +
+        (item.dias !== null ? item.dias + ' d' : 'Sin ventas') + '</span></td>' +
+        '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  body.innerHTML = html;
+}
+
 // ── GENERADOR DE REPORTE ────────────────────────────────────────
 function generarReporte() {
   if (!VENTAS.length) { toast('Importa datos primero', 'err'); return; }
@@ -2041,6 +2170,8 @@ function generarReporte() {
 
   // PRODUCTOS — Top 50
   var porProd = agrupar(filas, function(v){ return v.sku; });
+  var filasAnt = ant ? filasDelPeriodo(ant) : [];
+  var porProdAnt = ant ? agrupar(filasAnt, function(v){ return v.sku; }) : null;
   var skusOrden = Object.keys(porProd).sort(function(a,b){ return porProd[b].q - porProd[a].q; });
   var totalSkus = skusOrden.length;
   var mostrar50 = skusOrden.slice(0, 50);
@@ -2049,6 +2180,17 @@ function generarReporte() {
     var dat = porProd[sku];
     var pct = q > 0 ? dat.q / q * 100 : 0;
     var m = dat.muestra;
+    var deltaCell = '—';
+    if (porProdAnt !== null) {
+      var qp = porProdAnt[sku] ? porProdAnt[sku].q : 0;
+      if (qp === 0 && dat.q > 0) {
+        deltaCell = '<span style="color:#065F46;font-weight:700">nuevo</span>';
+      } else if (qp > 0) {
+        var dp = (dat.q - qp) / qp * 100;
+        var sp = dp >= 0 ? '+' : '';
+        deltaCell = '<span style="color:' + (dp >= 0 ? '#065F46' : '#B83232') + ';font-weight:700">' + sp + fmtPct(dp) + '</span>';
+      }
+    }
     prodRows += '<tr>' +
       '<td class="idx">' + (i+1) + '</td>' +
       '<td class="sku">' + escHtml(sku) + '</td>' +
@@ -2057,6 +2199,7 @@ function generarReporte() {
       '<td class="num">' + fmtQ(dat.q) + '</td>' +
       '<td class="num">' + fmtPct(pct) + '</td>' +
       '<td class="num">' + fmtU(dat.u) + '</td>' +
+      '<td class="num">' + deltaCell + '</td>' +
       '</tr>';
   });
 
@@ -2069,10 +2212,22 @@ function generarReporte() {
   var cli1 = nomsOrd.length ? nomsOrd[0] : '—';
   var cli1Q = nomsOrd.length ? fmtQ(porCli[nomsOrd[0]].q) : '—';
   var cli1Pct = (nomsOrd.length && q > 0) ? fmtPct(porCli[nomsOrd[0]].q / q * 100) : '—';
+  var porCliAnt = ant ? agrupar(filasAnt, function(v){ return v.cliente || '—'; }) : null;
   var cliRows = '';
   nomsOrd.forEach(function(n, i) {
     var dat = porCli[n];
     var pct = q > 0 ? dat.q / q * 100 : 0;
+    var deltaCli = '—';
+    if (porCliAnt !== null) {
+      var qca = porCliAnt[n] ? porCliAnt[n].q : 0;
+      if (qca === 0 && dat.q > 0) {
+        deltaCli = '<span style="color:#065F46;font-weight:700">nuevo</span>';
+      } else if (qca > 0) {
+        var dc = (dat.q - qca) / qca * 100;
+        var sc = dc >= 0 ? '+' : '';
+        deltaCli = '<span style="color:' + (dc >= 0 ? '#065F46' : '#B83232') + ';font-weight:700">' + sc + fmtPct(dc) + '</span>';
+      }
+    }
     cliRows += '<tr>' +
       '<td class="idx">' + (i+1) + '</td>' +
       '<td>' + escHtml(n) + '</td>' +
@@ -2080,6 +2235,7 @@ function generarReporte() {
       '<td class="num">' + fmtPct(pct) + '</td>' +
       '<td class="num">' + fmtU(dat.u) + '</td>' +
       '<td class="num">' + Object.keys(dat.facturas).length + '</td>' +
+      '<td class="num">' + deltaCli + '</td>' +
       '</tr>';
   });
 
@@ -2153,6 +2309,7 @@ function generarReporte() {
     '<table><thead><tr>' +
     '<th>#</th><th>SKU</th><th>Descripción</th><th>Familia</th>' +
     '<th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th>' +
+    (ant ? '<th class="num">Δ vs ' + mesLabel(ant) + '</th>' : '') +
     '</tr></thead><tbody>' + prodRows + '</tbody></table>' +
     '</div>' +
     (totalSkus > 50 ? '<div class="note">* ' + (totalSkus - 50) + ' SKUs adicionales no se muestran en este reporte.</div>' : '') +
@@ -2170,6 +2327,7 @@ function generarReporte() {
     '<table><thead><tr>' +
     '<th>#</th><th>Cliente</th>' +
     '<th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th><th class="num">Facturas</th>' +
+    (ant ? '<th class="num">Δ vs ' + mesLabel(ant) + '</th>' : '') +
     '</tr></thead><tbody>' + cliRows + '</tbody></table>' +
     '</div></div>' +
 
