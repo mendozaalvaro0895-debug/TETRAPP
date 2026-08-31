@@ -2032,16 +2032,18 @@ var ESTANCADO_DIAS = 90;
 async function cargarStockEstancado() {
   try {
     var r = await db.from('inventario')
-      .select('sku,descripcion,existencia')
-      .eq('activo', true)
-      .gt('existencia', 0)
+      .select('sku,descripcion,existencia,activo')
       .order('descripcion')
       .limit(2000);
-    STOCK_EST_INV = r.error ? [] : (r.data || []);
+    var todos = r.error ? [] : (r.data || []);
+    STOCK_EST_INV = todos.filter(function(item) {
+      return item.activo && (parseFloat(item.existencia) || 0) > 0;
+    });
     STOCK_EST_CARGADO = true;
     renderStockEstancado();
   } catch (e) {
     STOCK_EST_CARGADO = true;
+    renderStockEstancado();
   }
 }
 
@@ -2051,7 +2053,12 @@ function toggleEstancado() {
   if (!body) return;
   var open = body.classList.toggle('open');
   if (chev) chev.classList.toggle('open', open);
-  if (open) renderStockEstancado();
+  if (!open) return;
+  if (!STOCK_EST_CARGADO) {
+    body.innerHTML = '<div style="text-align:center;padding:36px;color:var(--gray);font-size:13px">Cargando inventario…</div>';
+  } else {
+    renderStockEstancado();
+  }
 }
 
 function setEstancadoDias(d) {
