@@ -4173,6 +4173,30 @@ function renderAsistHoy() {
 var faltasMesCache = null; // { _mes, ausentes:{fecha:n}, prestados:{fecha:n} }
 var asistGridCache = null; // { _mes, byPersonDay: { codigo: { fecha: estado } } }
 var asistGridMes   = null; // '2026-07' o null (usa mes actual)
+var justifCache    = null; // { _mes, byCodigoFecha: { codigo: { fecha: {id, texto, tipo} } } }
+
+async function cargarJustifMes(mesStr) {
+  if (justifCache && justifCache._mes === mesStr) return;
+  justifCache = { _mes: mesStr, byCodigoFecha: {} };
+  try {
+    var año2 = parseInt(mesStr.slice(0,4)), mesN2 = parseInt(mesStr.slice(5,7));
+    var fin2 = mesStr + '-' + String(new Date(año2, mesN2, 0).getDate()).padStart(2,'0');
+    var rj = await db.from('rrhh_faltas')
+      .select('id,personal_id,fecha,justificacion_texto,tipo')
+      .eq('origen','asistencia_serig')
+      .gte('fecha', mesStr + '-01').lte('fecha', fin2);
+    if (rj.error || !rj.data) return;
+    var opList2 = personalData && personalData.serig ? personalData.serig : [];
+    var idToCod = {};
+    opList2.forEach(function(op){ if (op.id) idToCod[op.id] = op.codigo; });
+    rj.data.forEach(function(row) {
+      var cod2 = idToCod[row.personal_id];
+      if (!cod2) return;
+      if (!justifCache.byCodigoFecha[cod2]) justifCache.byCodigoFecha[cod2] = {};
+      justifCache.byCodigoFecha[cod2][row.fecha] = { id: row.id, texto: row.justificacion_texto || '', tipo: row.tipo || 'ausencia' };
+    });
+  } catch(e) { /* tabla no disponible aún */ }
+}
 
 async function renderFaltasChart() {
   var el = document.getElementById('faltasChart');
@@ -4375,6 +4399,8 @@ async function renderAsistGrid() {
   var esAnteriorSet = {};
   diasAnterior.forEach(function(f){ esAnteriorSet[f] = true; });
 
+  await cargarJustifMes(mesStr);
+
   if (!asistGridCache || asistGridCache._mes !== mesStr) {
     try {
       var inicio = diasAnterior.length ? diasAnterior[0] : (mesStr + '-01');
@@ -4477,8 +4503,15 @@ async function renderAsistGrid() {
           var notaPend = esPendiente ? ' · Aún no se toma asistencia' : (est === 'pendiente' ? ' · Sin registrar (ej. antes de ingresar)' : '');
           var domTrabajado = esFinde && daysByP[f] === 'presente';
           var motivoFinde = esFeriadoCell ? (' · ' + feriadosSet[f] + ' (no cuenta)') : (dow === 0 ? ' · Domingo (no cuenta)' : '');
-          var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esFinde && !domTrabajado ? motivoFinde : '') + notaPend;
-          html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrabajado ? ' dom-trabajado' : '') + (f === posFecha ? ' ag-col-sel' : '') + divCls + '" onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + '</td>';
+          var justifByCF  = justifCache ? (justifCache.byCodigoFecha[p.codigo] || {}) : {};
+          var justifEntry = justifByCF[f];
+          var esJustif    = justifEntry && justifEntry.texto;
+          var jBadge      = esJustif ? '<span style="position:absolute;bottom:1px;right:1px;font-size:5px;font-weight:900;background:rgba(255,255,255,.35);border-radius:2px;padding:0 2px;line-height:1.5;pointer-events:none">J</span>' : '';
+          var ctxMenu     = (est === 'ausente' || est === 'tarde') && !asistLocked
+            ? ' oncontextmenu="event.preventDefault();abrirJustifPopover(\'' + cod + '\',\'' + f + '\',event)"'
+            : '';
+          var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esFinde && !domTrabajado ? motivoFinde : '') + notaPend + (esJustif ? ' · ✓ Justificado' : (est === 'ausente' || est === 'tarde' ? ' · Clic derecho para justificar' : ''));
+          html += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrabajado ? ' dom-trabajado' : '') + (f === posFecha ? ' ag-col-sel' : '') + divCls + '"' + ctxMenu + ' onclick="toggleAsistCell(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + jBadge + '</td>';
         }
       });
       html += '</tr>';
@@ -4619,22 +4652,97 @@ async function sincronizarFaltaDesdeAsistencia(codigo, fecha, estado) {
     if (feriadosSet[fecha]) return; // un feriado nunca genera falta
     var op = (personalData && personalData.serig ? personalData.serig : []).find(function(x) { return x.codigo === codigo; });
     if (!op || !op.id) return;
-    if (estado === 'ausente') {
-      var ex = await db.from('rrhh_faltas').select('id')
+    if (estado === 'ausente' || estado === 'tarde') {
+      var tipoNuevo = estado === 'ausente' ? 'ausencia' : 'tardanza';
+      var ex = await db.from('rrhh_faltas').select('id,tipo')
         .eq('personal_id', op.id).eq('fecha', fecha).eq('origen', 'asistencia_serig').maybeSingle();
-      if (ex.error || ex.data) return;
+      if (ex.error) return;
+      if (ex.data) {
+        if (ex.data.tipo !== tipoNuevo)
+          await db.from('rrhh_faltas').update({ tipo: tipoNuevo }).eq('id', ex.data.id);
+        return;
+      }
       await db.from('rrhh_faltas').insert({
-        personal_id: op.id, fecha: fecha, origen: 'asistencia_serig',
-        notas: 'Falta detectada automáticamente desde Asistencia Mensual (Serigrafía)'
+        personal_id: op.id, fecha: fecha, origen: 'asistencia_serig', tipo: tipoNuevo,
+        notas: tipoNuevo === 'ausencia'
+          ? 'Falta detectada automáticamente desde Asistencia Mensual (Serigrafía)'
+          : 'Llegada tarde detectada automáticamente desde Asistencia Mensual (Serigrafía)'
       });
     } else {
       await db.from('rrhh_faltas').delete()
         .eq('personal_id', op.id).eq('fecha', fecha).eq('origen', 'asistencia_serig')
         .is('justificacion_texto', null).is('justificacion_foto_url', null);
     }
+    justifCache = null; // invalidar badges J tras cualquier cambio
   } catch (e) { console.warn('Sync falta↔asistencia falló (revisa que sql/rrhh_faltas_v1.sql esté corrido):', e); }
 }
 
+function abrirJustifPopover(codigo, fecha, evt) {
+  evt.preventDefault();
+  var existente = document.getElementById('justifPopover');
+  if (existente) existente.remove();
+  var op = (personalData && personalData.serig ? personalData.serig : []).find(function(x){ return x.codigo === codigo; });
+  var nombre = op ? (op.nombre || op.codigo) : codigo;
+  var justifByCF = justifCache ? (justifCache.byCodigoFecha[codigo] || {}) : {};
+  var justif = justifByCF[fecha];
+  var textoActual = justif ? (justif.texto || '') : '';
+  var faltaId = justif ? justif.id : null;
+  var pop = document.createElement('div');
+  pop.id = 'justifPopover';
+  pop.style.cssText = 'position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--serig-m);border-radius:10px;padding:14px 16px;min-width:260px;max-width:340px;box-shadow:0 8px 28px rgba(0,0,0,.22)';
+  var x = Math.min(evt.clientX, window.innerWidth - 360);
+  var y = Math.min(evt.clientY + 8, window.innerHeight - 200);
+  pop.style.left = x + 'px'; pop.style.top = y + 'px';
+  var fechaFmt = fecha.slice(8) + '/' + fecha.slice(5,7) + '/' + fecha.slice(0,4);
+  var codEsc = codigo.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  pop.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">' +
+      '<div><div style="font-size:12px;font-weight:800;color:var(--ink)">' + escHtml(nombre) + '</div>' +
+      '<div style="font-size:10px;color:var(--gray-l);margin-top:1px">' + fechaFmt + '</div></div>' +
+      '<button onclick="document.getElementById(\'justifPopover\').remove()" style="background:none;border:none;font-size:17px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0 2px;margin-left:8px">✕</button>' +
+    '</div>' +
+    '<label style="font-size:10px;font-weight:700;color:var(--gray-l);display:block;margin-bottom:4px">Motivo / justificación</label>' +
+    '<textarea id="justifTexto" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:7px;padding:8px;font-size:12px;resize:vertical;min-height:72px;font-family:inherit;background:var(--bg);color:var(--ink)">' + escHtml(textoActual) + '</textarea>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">' +
+      '<button onclick="document.getElementById(\'justifPopover\').remove()" style="border:1px solid var(--border);background:none;border-radius:7px;padding:6px 14px;font-size:12px;cursor:pointer;color:var(--ink)">Cancelar</button>' +
+      '<button onclick="guardarJustificacion(' + (faltaId !== null ? faltaId : 'null') + ',document.getElementById(\'justifTexto\').value,\'' + codEsc + '\',\'' + fecha + '\')" style="background:var(--serig-m);color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>' +
+    '</div>';
+  document.body.appendChild(pop);
+  setTimeout(function() {
+    document.addEventListener('click', function closeJustif(e) {
+      var p2 = document.getElementById('justifPopover');
+      if (p2 && !p2.contains(e.target)) { p2.remove(); document.removeEventListener('click', closeJustif); }
+    });
+  }, 60);
+  document.getElementById('justifTexto').focus();
+}
+
+async function guardarJustificacion(faltaId, texto, codigo, fecha) {
+  try {
+    var op = (personalData && personalData.serig ? personalData.serig : []).find(function(x){ return x.codigo === codigo; });
+    if (!op || !op.id) { showToast('Operario no encontrado', '#B83232'); return; }
+    var textoVal = texto ? texto.trim() : null;
+    if (faltaId) {
+      var r = await db.from('rrhh_faltas').update({ justificacion_texto: textoVal || null }).eq('id', faltaId);
+      if (r.error) throw r.error;
+    } else {
+      var byPD2 = asistGridCache && asistGridCache.byPersonDay[codigo] ? asistGridCache.byPersonDay[codigo] : {};
+      var estAct = byPD2[fecha] || 'ausente';
+      var r2 = await db.from('rrhh_faltas').insert({
+        personal_id: op.id, fecha: fecha, origen: 'asistencia_serig',
+        tipo: estAct === 'tarde' ? 'tardanza' : 'ausencia',
+        justificacion_texto: textoVal || null,
+        notas: 'Justificación ingresada desde Asistencia Mensual (Serigrafía)'
+      });
+      if (r2.error) throw r2.error;
+    }
+    justifCache = null;
+    var pop3 = document.getElementById('justifPopover');
+    if (pop3) pop3.remove();
+    showToast(textoVal ? '✅ Justificación guardada' : '🗑 Justificación borrada');
+    await renderAsistGrid();
+  } catch(e) { showToast('❌ Error al guardar: ' + e.message, '#B83232'); }
+}
 
 async function exportarAsistGridPDF() {
   if (!asistGridCache) { showToast('Sin datos cargados', '#92400e'); return; }
@@ -4680,6 +4788,9 @@ async function exportarAsistGridPDF() {
       matrizByOpDia[row.operador_codigo][row.fecha] = row.mtx_pos;
     });
   } catch(e) {}
+
+  // Justificaciones del mes para el PDF
+  await cargarJustifMes(mesStr);
 
   function abrevRol(pos) {
     if (pos === null || pos === undefined) return '';
@@ -4826,8 +4937,10 @@ async function exportarAsistGridPDF() {
         var est = daysByP[f];
         if (!est || est === 'pendiente') return;
         var lbl = f.slice(8) + '/' + f.slice(5,7); // 'dd/mm' directo
-        if (est === 'ausente') fAus.push(lbl);
-        if (est === 'tarde')   fTard.push(lbl);
+        var justifFD = (justifCache && justifCache.byCodigoFecha[p.codigo] || {})[f];
+        var justifTxt = justifFD ? (justifFD.texto || '') : '';
+        if (est === 'ausente') fAus.push({lbl: lbl, justif: justifTxt});
+        if (est === 'tarde')   fTard.push({lbl: lbl, justif: justifTxt});
         if (est === 'velada')  fVel.push(lbl);
         if (dow === 0 && (est === 'presente' || est === 'tarde' || est === 'velada')) fDom.push(lbl);
       });
@@ -4857,9 +4970,16 @@ async function exportarAsistGridPDF() {
     var body = !items.length
       ? '<div style="color:#9ca3af;font-size:8px;font-style:italic;padding:4px 0">Ninguno en la quincena</div>'
       : items.map(function(it) {
+          var linesHtml = (it.fechas || []).map(function(fd) {
+            if (typeof fd === 'string') return '<span>' + fd + '</span>';
+            var justifMark = fd.justif
+              ? ' <span style="color:#15803d;font-weight:700">✓</span> <span style="font-style:italic;color:#374151">' + escHtml(fd.justif) + '</span>'
+              : '';
+            return '<span>' + fd.lbl + justifMark + '</span>';
+          });
           return '<div style="margin-bottom:6px">' +
             '<div style="font-weight:700;font-size:8.5px;color:#1e293b">' + escHtml(it.nombre) + '</div>' +
-            '<div style="font-size:7.5px;color:#64748b;padding-left:6px;margin-top:1px">' + it.fechas.join(' — ') + '</div>' +
+            '<div style="font-size:7.5px;color:#64748b;padding-left:6px;margin-top:1px;display:flex;flex-direction:column;gap:1px">' + linesHtml.join('') + '</div>' +
           '</div>';
         }).join('');
     return '<div style="break-inside:avoid">' +
@@ -4877,6 +4997,7 @@ async function exportarAsistGridPDF() {
       '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#475569"></span>Dom / Feriado</span>' +
       '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#e2e8f0"></span>Antes de ingreso / tras baja</span>' +
       '<span style="font-weight:700;color:#22c55e">Fila verde = quincena completa</span>' +
+      '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#dc2626;font-size:5px;color:#fff;text-align:center;line-height:10px">J</span>✓ Justificado</span>' +
     '</div>';
 
   var rolesLeyenda =
