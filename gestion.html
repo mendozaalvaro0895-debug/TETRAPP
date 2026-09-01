@@ -296,6 +296,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <button class="seg-btn"            id="seg-area-tapas"  onclick="setFiltroArea('tapas')">🏷 Tapas</button>
           <button class="seg-btn"            id="seg-area-serig"  onclick="setFiltroArea('serig')">🎨 Serigrafía</button>
           <button class="seg-btn"            id="seg-area-produccion" onclick="setFiltroArea('produccion')">🏭 Producción</button>
+          <button class="seg-btn"            id="seg-area-molino" onclick="setFiltroArea('molino')">⚙️ Molino</button>
+          <button class="seg-btn"            id="seg-area-bodega" onclick="setFiltroArea('bodega')">📦 Bodega</button>
           <input class="fi" id="pBuscar" placeholder="🔍 Buscar nombre o código" oninput="renderPersonalGrid()" style="width:180px">
           <label class="fchk" style="font-size:11px;font-weight:600">
             <input type="checkbox" id="pSoloActivos" checked onchange="renderPersonalGrid()"> Solo activos
@@ -373,6 +375,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
               <option value="tapas">🏷 Tapas</option>
               <option value="serig">🎨 Serigrafía</option>
               <option value="produccion">🏭 Producción</option>
+              <option value="molino">⚙️ Molino</option>
+              <option value="bodega">📦 Bodega</option>
             </select>
           </div>
         </div>
@@ -864,7 +868,7 @@ async function renderKpis() {
 
 function setFiltroArea(area) {
   filtroArea = area;
-  ['todos', 'tapas', 'serig', 'produccion'].forEach(function(a) {
+  ['todos', 'tapas', 'serig', 'produccion', 'molino', 'bodega'].forEach(function(a) {
     document.getElementById('seg-area-' + a).classList.toggle('seg-active', a === area);
   });
   renderPersonalGrid();
@@ -898,8 +902,16 @@ function renderPersonalGrid() {
 var AREA_GRUPOS = [
   { key: 'tapas', label: '🏷 Tapas' },
   { key: 'serig', label: '🎨 Serigrafía' },
-  { key: 'produccion', label: '🏭 Producción' }
+  { key: 'produccion', label: '🏭 Producción' },
+  { key: 'molino', label: '⚙️ Molino' },
+  { key: 'bodega', label: '📦 Bodega' }
 ];
+
+// Color del avatar al CREAR una persona nueva (no se toca en ediciones — ver nota RRHH)
+var AREA_COLOR_DEFAULT = {
+  tapas: '#1A6B5B', serig: '#5A2D9E', produccion: '#B07D2A',
+  molino: '#92400E', bodega: '#0E7490'
+};
 
 var P_TABLE_COLS = 12;
 var gruposColapsados = {}; // { area: true } — colapsado; ausente/false = desplegado (default)
@@ -948,7 +960,7 @@ function buildPersonalRow(p) {
   var rolTxt = p.rol === 'supervisor' ? 'Supervisor' : (p.proceso_hab || 'Operador');
   var turnoTxt = p.area === 'produccion'
     ? (TURNO_PRODUCCION_LBL[p.turno_produccion] || '—')
-    : 'Matutino';
+    : (p.area === 'tapas' || p.area === 'serig') ? 'Matutino' : '—';
   var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-activo' : 'pill-inactivo') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>';
   var lockerChip = p.locker
     ? '<span class="op-mini ok">🗄️ ' + escHtml(p.locker) + '</span>'
@@ -1117,7 +1129,7 @@ async function guardarPersona() {
       r = await db.from('personal').update(payload).eq('id', mpEditId);
     } else {
       payload.codigo = codigo;
-      payload.color_hex = area === 'serig' ? '#5A2D9E' : (area === 'produccion' ? '#B07D2A' : '#1A6B5B');
+      payload.color_hex = AREA_COLOR_DEFAULT[area] || '#1A6B5B';
       r = await db.from('personal').insert(payload);
     }
     if (r.error) throw r.error;

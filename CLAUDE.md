@@ -162,12 +162,16 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   sin duplicar el CRUD que ya existe en tapas.html/serigrafia.html — es la misma tabla,
   los cambios se ven de inmediato en cualquier módulo). SIEMPRE tabla (buildPersonalTable),
   agrupada por área — ya no hay vista de tarjetas (buildPersonalCard se eliminó).
-  Filtros: área (Todos/Tapas/Serigrafía/Producción) · buscador nombre/código · toggle solo activos.
-  `area` de personal ahora acepta también 'produccion' (antes solo 'tapas'/'serig' —
-  produccion.html en sí sigue sin leer la tabla `personal`, es solo para llevar su RRHH aquí).
+  Filtros: área (Todos/Tapas/Serigrafía/Producción/Molino/Bodega) · buscador nombre/código ·
+  toggle solo activos.
+  `area` acepta 'tapas'/'serig'/'produccion'/'molino'/'bodega'. Molino y Bodega TODAVÍA NO
+  tienen módulo propio en la app — este registro de personal es la base para cuando se
+  construyan, ninguna otra página los lee todavía (mismo caso que produccion.html con
+  'produccion': el módulo real llegó después que el registro de personal).
   ⚠️ `personal` tiene un CHECK constraint `personal_area_check` creado manual en el dashboard
   (no versionado en ningún CREATE TABLE) — hay que mantenerlo sincronizado a mano si se agrega
-  otro valor de área nuevo. Ver `sql/personal_area_produccion_v1.sql`.
+  otro valor de área nuevo. Ver `sql/personal_area_produccion_v1.sql` y
+  `sql/personal_area_molino_bodega_v1.sql`.
   Columna `turno_produccion` ('alex'|'gabino', constraint `personal_turno_produccion_check`) —
   SOLO aplica a Producción: el campo "Turno" del modal se muestra/oculta con
   `toggleTurnoWrap()` según el `<select>` de Área (`onchange`), y `guardarPersona()` fuerza
