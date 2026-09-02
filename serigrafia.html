@@ -1648,6 +1648,11 @@ async function verificarCierresPeriodo(itemsSin) {
       var undVerde    = g.items.filter(function(it){ return it.estado==='lista' || tier(it)===2; }).reduce(function(s,it){return s+(it.cant||0);},0);
       var undAmb      = g.items.filter(function(it){ return tier(it)===1 && it.estado!=='lista'; }).reduce(function(s,it){return s+(it.cant||0);},0);
       var undRojo     = g.items.filter(function(it){ return tier(it)===0 && it.estado!=='lista'; }).reduce(function(s,it){return s+(it.cant||0);},0);
+      // Und realmente entregadas de fichas parciales + snapshot individual
+      var undAmbEnt   = g.items.filter(function(it){ return tier(it)===1 && it.estado!=='lista'; })
+        .reduce(function(s,it){ return s+(entregadoMap[it.solId]||0); }, 0);
+      var parcialesSnap = g.items.filter(function(it){ return tier(it)===1 && it.estado!=='lista'; })
+        .map(function(it){ return { codigo: it.solCodigo, cliente: it.cliente||'—', cant: it.cant||0, ent: entregadoMap[it.solId]||0 }; });
 
       // Pedidos (por solId, no por línea) que aún no están 100% completos
       // → se trasladan al período actual para seguir atendiéndose ahí,
@@ -1672,6 +1677,7 @@ async function verificarCierresPeriodo(itemsSin) {
         pct_entregado: pctEnt, n_total: g.items.length,
         n_listos: nListos, n_parciales: nParciales, n_pendientes: nPendientes,
         und_total: totalUnd, und_verde: undVerde, und_ambar: undAmb, und_rojo: undRojo,
+        und_ambar_ent: undAmbEnt, parciales_snap: parcialesSnap,
         area: 'serig'
       }).select().single();
       if (rc.error) throw rc.error;
@@ -5293,24 +5299,44 @@ function exportarBoardPDF(filtroMes) {
       var nRojo  = c.n_pendientes||0;
       var nAmb   = c.n_parciales||0;
       var nVerde = c.n_listos||0;
-      var undTotal = c.und_total||0;
-      var undVerde = c.und_verde||0;
-      var undAmb   = c.und_ambar||0;
-      var undRojo  = c.und_rojo||0;
+      var undTotal   = c.und_total||0;
+      var undVerde   = c.und_verde||0;
+      var undAmbSol  = c.und_ambar||0;                       // und solicitadas en parciales
+      var undAmbEnt  = c.und_ambar_ent != null ? c.und_ambar_ent : undAmbSol; // und entregadas de parciales
+      var undRojo    = c.und_rojo||0;
       var pct = c.pct_entregado!=null ? Math.round(c.pct_entregado) : (undTotal>0?Math.round(undVerde/undTotal*100):0);
-      var undLinea = '<div style="font-size:10px;font-weight:500;color:#6b7280;margin:-4px 0 6px;display:flex;flex-wrap:wrap;align-items:center;gap:8px">' +
-        '<span style="color:#111;font-weight:700">' + undTotal.toLocaleString() + ' und</span>' +
-        (undVerde?'<span style="color:#15803d">✅ '+undVerde.toLocaleString()+' und</span>':'') +
-        (undAmb  ?'<span style="color:#92400e">🟡 '+undAmb.toLocaleString()  +' und</span>':'') +
-        (undRojo ?'<span style="color:#991b1b">🔴 '+undRojo.toLocaleString() +' und</span>':'') +
+      var snap = Array.isArray(c.parciales_snap) ? c.parciales_snap : [];
+
+      // Línea de unidades: 🟡 muestra und entregadas (no solicitadas)
+      var ambLabel = undAmbEnt > 0
+        ? '🟡 ' + undAmbEnt.toLocaleString() + ' und' + (undAmbSol && undAmbSol !== undAmbEnt ? ' <span style="color:#b45309;font-weight:400">(de '+undAmbSol.toLocaleString()+' solic.)</span>' : '')
+        : '';
+      var undLinea = '<div style="font-size:10px;font-weight:500;color:#6b7280;margin:-4px 0 4px;display:flex;flex-wrap:wrap;align-items:center;gap:8px">' +
+        '<span style="color:var(--ink);font-weight:700">' + undTotal.toLocaleString() + ' und</span>' +
+        (undVerde ? '<span style="color:#15803d">✅ '+undVerde.toLocaleString()+' und</span>' : '') +
+        (ambLabel ? '<span style="color:#92400e;font-weight:600">'+ambLabel+'</span>' : '') +
+        (undRojo  ? '<span style="color:#991b1b">🔴 '+undRojo.toLocaleString()+' und</span>' : '') +
         '<span style="margin-left:2px;font-weight:700;color:'+(pct>=100?'#15803d':pct>0?'#92400e':'#9ca3af')+'">'+pct+'% entregado</span>' +
         '</div>';
+
+      // Ghost cards de parciales (clon transparente — registro histórico)
+      var ghostCards = snap.length ? '<div style="margin:4px 0 6px">' + snap.map(function(p) {
+        var pct2 = p.cant > 0 ? Math.round(p.ent/p.cant*100) : 0;
+        return '<div style="opacity:0.6;border:1.5px dashed #d97706;border-radius:7px;padding:4px 8px;margin:2px 0;display:flex;align-items:center;gap:8px;font-size:10px;background:rgba(254,243,199,.35)">' +
+          '<span style="font-weight:800;font-family:var(--mono);color:var(--serig-m);min-width:42px">' + escHtml(p.codigo||'—') + '</span>' +
+          '<span style="color:var(--ink-l);flex:1">' + escHtml(p.cliente||'') + '</span>' +
+          '<span style="color:#92400e;font-weight:600">' + (p.ent||0).toLocaleString() + ' / ' + (p.cant||0).toLocaleString() + ' und</span>' +
+          '<span style="font-size:9px;background:#fef3c7;color:#92400e;border-radius:3px;padding:1px 5px;font-weight:700">' + pct2 + '%</span>' +
+          '</div>';
+      }).join('') + '</div>' : '';
+
       return '<div class="seccion">' +
         '<h3>' + escHtml(c.cliente||'—') + ' <span class="badge-count">'+(c.n_total||0)+' pedidos' +
           (nRojo ?' · 🔴 '+nRojo:'')+(nAmb?' · 🟡 '+nAmb:'')+(nVerde?' · 🟢 '+nVerde:'') +
         '</span></h3>' +
         undLinea +
-        '<p style="font-size:9px;color:#6b7280;font-style:italic;margin:4px 0">Datos del snapshot de cierre — al momento de trasladar al siguiente período</p>' +
+        ghostCards +
+        '<p style="font-size:9px;color:#9ca3af;font-style:italic;margin:2px 0">Snapshot al cierre — fichas parciales trasladadas al período siguiente</p>' +
         '</div>';
     }).join('');
   }
