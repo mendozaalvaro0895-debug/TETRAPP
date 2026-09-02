@@ -671,6 +671,7 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
               <span class="b7-alert-cnt" id="b7AlertCnt">0</span>
               <span id="b7AlertFecha" style="font-size:9px;opacity:.65;white-space:nowrap;font-weight:500;margin-left:2px"></span>
               <button class="b7-alert-btn" onclick="event.stopPropagation();abrirAddInsumoB7()" title="Añadir insumo al catálogo serigrafía">+ Añadir</button>
+              <button class="b7-alert-btn" onclick="event.stopPropagation();refrescarB7(this)" title="Recargar inventario">↻</button>
               <button class="b7-alert-btn" onclick="event.stopPropagation();descargarAlertasB7()" title="Descargar PDF">⬇ PDF</button>
               <span class="b7-alert-chev">▾</span>
             </div>
@@ -7235,6 +7236,12 @@ var b7AlertasData = [];
 var b7TodosData   = [];
 var b7NoSerigData = [];
 var b7AddSkuSel   = null;
+
+async function refrescarB7(btn) {
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+  await cargarAlertasB7();
+  if (btn) { btn.textContent = '↻'; btn.disabled = false; }
+}
 
 async function cargarAlertasB7() {
   try {
