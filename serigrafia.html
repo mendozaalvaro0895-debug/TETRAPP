@@ -6177,6 +6177,12 @@ async function cargarEnvSalido() {
   return envSalidoCache;
 }
 
+async function refrescarInventarioEnvases(btn) {
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+  await cargarInventario();
+  await renderConsolidadoEnvases();
+}
+
 async function renderConsolidadoEnvases() {
   var el = document.getElementById('alertasSlotR');
   if (!el) return;
@@ -6317,6 +6323,7 @@ async function renderConsolidadoEnvases() {
         '<span class="env-hdr-title">Bajo Stock — Envases Base para Serigrafía</span>' +
         '<span class="env-hdr-sub">Fichas activas ' + mesHdr + ' · vs B2</span>' +
         (invFechaB2 ? '<span class="env-hdr-fecha">' + invFechaB2 + '</span>' : '') +
+        '<button onclick="event.stopPropagation();refrescarInventarioEnvases(this)" title="Recargar inventario" style="font-size:13px;background:transparent;border:1px solid #d97706;border-radius:6px;padding:2px 7px;cursor:pointer;color:#92400e;line-height:1">↻</button>' +
         '<button onclick="event.stopPropagation();envPDF()" style="margin-left:auto;font-size:11px;font-weight:700;background:#92400e;color:#fff;border:none;border-radius:7px;padding:4px 12px;cursor:pointer;white-space:nowrap">⬇ PDF</button>' +
         '<span class="env-hdr-chev">▾</span>' +
       '</div>' +
