@@ -298,6 +298,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <button class="seg-btn"            id="seg-area-produccion" onclick="setFiltroArea('produccion')">🏭 Producción</button>
           <button class="seg-btn"            id="seg-area-molino" onclick="setFiltroArea('molino')">⚙️ Molino</button>
           <button class="seg-btn"            id="seg-area-bodega" onclick="setFiltroArea('bodega')">📦 Bodega</button>
+          <button class="seg-btn"            id="seg-area-moldes" onclick="setFiltroArea('moldes')">🔧 Moldes</button>
           <input class="fi" id="pBuscar" placeholder="🔍 Buscar nombre o código" oninput="renderPersonalGrid()" style="width:180px">
           <label class="fchk" style="font-size:11px;font-weight:600">
             <input type="checkbox" id="pSoloActivos" checked onchange="renderPersonalGrid()"> Solo activos
@@ -377,6 +378,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
               <option value="produccion">🏭 Producción</option>
               <option value="molino">⚙️ Molino</option>
               <option value="bodega">📦 Bodega</option>
+              <option value="moldes">🔧 Moldes</option>
             </select>
           </div>
         </div>
@@ -868,7 +870,7 @@ async function renderKpis() {
 
 function setFiltroArea(area) {
   filtroArea = area;
-  ['todos', 'tapas', 'serig', 'produccion', 'molino', 'bodega'].forEach(function(a) {
+  ['todos', 'tapas', 'serig', 'produccion', 'molino', 'bodega', 'moldes'].forEach(function(a) {
     document.getElementById('seg-area-' + a).classList.toggle('seg-active', a === area);
   });
   renderPersonalGrid();
@@ -904,13 +906,14 @@ var AREA_GRUPOS = [
   { key: 'serig', label: '🎨 Serigrafía' },
   { key: 'produccion', label: '🏭 Producción' },
   { key: 'molino', label: '⚙️ Molino' },
-  { key: 'bodega', label: '📦 Bodega' }
+  { key: 'bodega', label: '📦 Bodega' },
+  { key: 'moldes', label: '🔧 Moldes' }
 ];
 
 // Color del avatar al CREAR una persona nueva (no se toca en ediciones — ver nota RRHH)
 var AREA_COLOR_DEFAULT = {
   tapas: '#1A6B5B', serig: '#5A2D9E', produccion: '#B07D2A',
-  molino: '#92400E', bodega: '#0E7490'
+  molino: '#92400E', bodega: '#0E7490', moldes: '#475569'
 };
 
 var P_TABLE_COLS = 12;
