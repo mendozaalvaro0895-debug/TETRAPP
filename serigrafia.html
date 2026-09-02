@@ -5307,10 +5307,12 @@ function exportarBoardPDF(filtroMes) {
       var pct = c.pct_entregado!=null ? Math.round(c.pct_entregado) : (undTotal>0?Math.round(undVerde/undTotal*100):0);
       var snap = Array.isArray(c.parciales_snap) ? c.parciales_snap : [];
 
-      // Línea de unidades: 🟡 muestra und entregadas (no solicitadas)
-      var ambLabel = undAmbEnt > 0
+      // Línea de unidades: 🟡 muestra und entregadas (solo si hubo parciales reales)
+      var ambLabel = (nAmb > 0 && undAmbEnt > 0)
         ? '🟡 ' + undAmbEnt.toLocaleString() + ' und' + (undAmbSol && undAmbSol !== undAmbEnt ? ' <span style="color:#b45309;font-weight:400">(de '+undAmbSol.toLocaleString()+' solic.)</span>' : '')
-        : '';
+        : (nAmb > 0 && undAmbSol > 0)
+          ? '🟡 ' + undAmbSol.toLocaleString() + ' und'
+          : '';
       var undLinea = '<div style="font-size:10px;font-weight:500;color:#6b7280;margin:-4px 0 4px;display:flex;flex-wrap:wrap;align-items:center;gap:8px">' +
         '<span style="color:var(--ink);font-weight:700">' + undTotal.toLocaleString() + ' und</span>' +
         (undVerde ? '<span style="color:#15803d">✅ '+undVerde.toLocaleString()+' und</span>' : '') +
