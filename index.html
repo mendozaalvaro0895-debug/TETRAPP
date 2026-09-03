@@ -304,7 +304,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="ci-drop" id="ciDrop" onclick="document.getElementById('ciFileInput').click()">
           <div class="ci-drop-icon">🖼️📄</div>
           <div class="ci-drop-t">Arrastrá o hacé clic para subir capturas o PDFs</div>
-          <div class="ci-drop-s">Requis de SICAF — imágenes (PNG/JPG) o PDF, uno o varios a la vez · o pegá con Ctrl+V</div>
+          <div class="ci-drop-s">Requis de SICAF — imágenes (PNG/JPG) o PDF, uno o varios a la vez</div>
+        </div>
+        <div style="display:flex;justify-content:center;margin-top:12px">
+          <button type="button" onclick="event.stopPropagation();ciPegarPortapapeles()" style="padding:9px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-weight:600;font-size:13px;cursor:pointer;font-family:var(--font)">📋 Pegar captura del portapapeles</button>
         </div>
         <input type="file" id="ciFileInput" accept="image/*,.pdf" multiple style="display:none" onchange="ciAgregarArchivos(this.files)">
         <div class="ci-files" id="ciFiles"></div>
@@ -479,6 +482,33 @@ function renderCiFiles() {
   }).join('');
 }
 function ciQuitarArchivo(i) { ciArchivos.splice(i, 1); renderCiFiles(); }
+
+/* ── Botón "Pegar captura del portapapeles" (Clipboard API) ────── */
+async function ciPegarPortapapeles() {
+  var status = document.getElementById('ciStatusSubir');
+  if (!navigator.clipboard || !navigator.clipboard.read) {
+    status.textContent = '⚠️ Tu navegador no soporta esto — probá Ctrl+V con el modal abierto';
+    return;
+  }
+  status.innerHTML = '<span class="ci-spin"></span>Leyendo portapapeles…';
+  try {
+    var items = await navigator.clipboard.read();
+    var pegados = [];
+    for (var i = 0; i < items.length; i++) {
+      var tiposImg = items[i].types.filter(function(t) { return t.indexOf('image') === 0; });
+      for (var j = 0; j < tiposImg.length; j++) {
+        var blob = await items[i].getType(tiposImg[j]);
+        var ext = (tiposImg[j].split('/')[1] || 'png').replace('jpeg', 'jpg');
+        pegados.push(new File([blob], 'pegado-' + Date.now() + '-' + i + '.' + ext, { type: tiposImg[j] }));
+      }
+    }
+    if (!pegados.length) { status.textContent = '⚠️ No hay ninguna imagen copiada en el portapapeles'; return; }
+    ciAgregarArchivos(pegados);
+    status.textContent = '✅ ' + pegados.length + ' imagen' + (pegados.length > 1 ? 'es' : '') + ' agregada' + (pegados.length > 1 ? 's' : '') + ' del portapapeles';
+  } catch (e) {
+    status.textContent = '⚠️ No se pudo leer el portapapeles — probá Ctrl+V, o revisá el permiso de "Pegar" del navegador';
+  }
+}
 
 document.addEventListener('paste', function(e) {
   if (!document.getElementById('ciOverlay').classList.contains('open')) return;
