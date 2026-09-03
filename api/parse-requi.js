@@ -21,7 +21,12 @@ const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
 async function esMaster(token) {
   if (!token) return false;
   try {
-    const db = createClient(SUPA_URL, SUPA_KEY);
+    // Con Authorization en los headers globales, las consultas .from(...) viajan
+    // con el JWT del usuario (no el anon) — sin esto, el RLS de `perfiles` las
+    // bloquea silenciosamente y esto siempre da "no autorizado".
+    const db = createClient(SUPA_URL, SUPA_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
     const { data: userData, error: userErr } = await db.auth.getUser(token);
     if (userErr || !userData || !userData.user) return false;
     const { data: perfil, error: perfilErr } = await db
