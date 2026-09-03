@@ -220,7 +220,7 @@ async function resolverSku(db, datos) {
   }
 
   // Varias opciones → devolver lista para que el operador elija
-  return { opciones: conHits.slice(0, 5), nota: '' };
+  return { opciones: conHits.slice(0, 8), nota: '' };
 }
 
 // ── Prompt del sistema ────────────────────────────────────────────

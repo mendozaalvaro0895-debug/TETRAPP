@@ -65,7 +65,7 @@ as $$
   from inv
   where trim(coalesce(p_texto, '')) <> ''
   order by hits desc, length(inv.descripcion) asc
-  limit 5;
+  limit 8;
 $$;
 
 grant execute on function public.bot_buscar_sku(text) to anon;
