@@ -352,6 +352,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="mptab" id="mptab-permisos" onclick="switchMpTab('permisos')">Permisos</div>
       <div class="mptab" id="mptab-faltas" onclick="switchMpTab('faltas')">Faltas</div>
       <div class="mptab" id="mptab-incidentes" onclick="switchMpTab('incidentes')">Incidentes</div>
+      <div class="mptab" id="mptab-bonos" onclick="switchMpTab('bonos')">Sueldos y Bonos</div>
     </div>
 
     <div class="mb">
@@ -624,6 +625,66 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn btn-g btn-sm" onclick="toggleFormIncidente()">Cancelar</button>
             <button class="btn btn-s btn-sm" onclick="guardarIncidente()">Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Sueldos y Bonos ── -->
+      <div class="mp-panel" id="mp-bonos">
+        <div id="bonosList" class="rec-list"></div>
+        <button class="btn btn-g btn-sm" id="btnNuevoBono" onclick="toggleFormBono()">+ Registrar bono</button>
+        <div id="formBono" style="display:none;margin-top:12px;padding:12px;background:var(--bg);border-radius:10px">
+          <div class="fr">
+            <div class="fg">
+              <div class="fl">Rol en la línea *</div>
+              <select class="fs" id="nbRol" style="width:100%" onchange="toggleCamposBono()">
+                <option value="impresion">🖨 Impresión</option>
+                <option value="flameado">🔥 Flameado</option>
+                <option value="recepcion">📦 Recepción</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div class="fg">
+              <div class="fl">Período *</div>
+              <input class="fi" id="nbPeriodo" placeholder="Ej: 2026-08 (mes) o 2026-08-15 (día)" style="width:100%">
+            </div>
+          </div>
+          <div class="fr" id="nbTirosWrap">
+            <div class="fg">
+              <div class="fl" id="nbTirosLbl">Tiros del período</div>
+              <input class="fi" id="nbTiros" type="number" min="0" placeholder="Ej: 10000" style="width:100%">
+            </div>
+            <div class="fg" id="nbBolsasWrap" style="display:none">
+              <div class="fl">Bolsas de empaque confirmadas</div>
+              <input class="fi" id="nbBolsas" type="number" min="0" placeholder="Ej: 4" style="width:100%">
+            </div>
+          </div>
+          <div class="fg full" id="nbMermaWrap" style="display:none">
+            <div class="fl">% Merma reportada por empaque</div>
+            <input class="fi" id="nbMerma" type="number" min="0" step="0.1" placeholder="Ej: 1.5" style="width:100%">
+          </div>
+          <div class="fr">
+            <div class="fg">
+              <label class="fchk">
+                <input type="checkbox" id="nbCumplida"> Cumplió la meta (aplica bono)
+              </label>
+            </div>
+            <div class="fg">
+              <div class="fl">Monto del bono (Q)</div>
+              <input class="fi" id="nbMonto" type="number" min="0" step="0.01" placeholder="Ej: 350.00" style="width:100%">
+            </div>
+          </div>
+          <div class="fg full">
+            <div class="fl">Supervisor que valida</div>
+            <input class="fi" id="nbSupervisor" placeholder="Nombre del supervisor" style="width:100%">
+          </div>
+          <div class="fg full">
+            <div class="fl">Comentario</div>
+            <textarea class="fta" id="nbComentario" placeholder="Detalle, boleta de empaque, evidencia…" style="width:100%"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-g btn-sm" onclick="toggleFormBono()">Cancelar</button>
+            <button class="btn btn-s btn-sm" onclick="guardarBono()">Guardar</button>
           </div>
         </div>
       </div>
@@ -1067,7 +1128,7 @@ function buildPersonalRow(p) {
 var mpEditId = null;
 
 function switchMpTab(tab) {
-  ['gen', 'rrhh', 'capacitaciones', 'permisos', 'faltas', 'incidentes'].forEach(function(t) {
+  ['gen', 'rrhh', 'capacitaciones', 'permisos', 'faltas', 'incidentes', 'bonos'].forEach(function(t) {
     document.getElementById('mptab-' + t).classList.toggle('active', t === tab);
     document.getElementById('mp-' + t).classList.toggle('active', t === tab);
   });
@@ -1102,7 +1163,7 @@ function abrirNuevaPersona() {
   document.getElementById('mpEppFecha').value = '';
   document.getElementById('mpNotasRrhh').value = '';
   document.getElementById('btnEliminarPersona').style.display = 'none';
-  ['capacitaciones', 'permisos', 'faltas', 'incidentes'].forEach(function(t) {
+  ['capacitaciones', 'permisos', 'faltas', 'incidentes', 'bonos'].forEach(function(t) {
     document.getElementById('mptab-' + t).classList.add('disabled');
   });
   switchMpTab('gen');
@@ -1135,17 +1196,19 @@ function abrirPerfil(id) {
   document.getElementById('mpEppFecha').value = p.epp_fecha || '';
   document.getElementById('mpNotasRrhh').value = p.notas_rrhh || '';
   document.getElementById('btnEliminarPersona').style.display = 'inline-block';
-  ['capacitaciones', 'permisos', 'faltas', 'incidentes'].forEach(function(t) {
+  ['capacitaciones', 'permisos', 'faltas', 'incidentes', 'bonos'].forEach(function(t) {
     document.getElementById('mptab-' + t).classList.remove('disabled');
   });
   document.getElementById('formCapacitacion').style.display = 'none';
   document.getElementById('formPermiso').style.display = 'none';
   document.getElementById('formFalta').style.display = 'none';
   document.getElementById('formIncidente').style.display = 'none';
+  document.getElementById('formBono').style.display = 'none';
   switchMpTab('gen');
   document.getElementById('modalPersona').classList.add('open');
   cargarCapacitaciones(p.id);
   cargarResumenProduccion(p.id);
+  cargarBonos(p.id);
   cargarPermisos(p.id);
   faltasMesActual = mesActualStr();
   cargarFaltas(p.id, faltasMesActual);
@@ -1546,6 +1609,107 @@ async function eliminarIncidente(id) {
     var r = await db.from('rrhh_incidentes').delete().eq('id', id);
     if (r.error) throw r.error;
     await cargarIncidentes(mpEditId);
+    showToast('🗑 Eliminado');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// SUELDOS Y BONOS — registro manual, por ahora sin conexión automática
+// a tiros/merma reales (ver nota en CLAUDE.md)
+// ════════════════════════════════════════════════════════════
+var ROL_LINEA_LBL = { impresion: '🖨 Impresión', flameado: '🔥 Flameado', recepcion: '📦 Recepción', otro: 'Otro' };
+
+async function cargarBonos(personalId) {
+  var cont = document.getElementById('bonosList');
+  cont.innerHTML = '<div class="rec-empty">Cargando…</div>';
+  var r = await db.from('rrhh_bonos').select('*').eq('personal_id', personalId).order('periodo', { ascending: false });
+  if (r.error) { cont.innerHTML = '<div class="rec-empty">Error al cargar</div>'; return; }
+  var rows = r.data || [];
+  if (!rows.length) { cont.innerHTML = '<div class="rec-empty">Sin bonos registrados.</div>'; return; }
+  cont.innerHTML = rows.map(buildBonoItem).join('');
+}
+
+function buildBonoItem(b) {
+  var rolLbl = ROL_LINEA_LBL[b.rol_linea] || b.rol_linea;
+  var estadoBadge = b.meta_cumplida
+    ? '<span class="falta-ok">✅ Cumplió' + (b.monto_bono ? ' · Q' + Number(b.monto_bono).toFixed(2) : '') + '</span>'
+    : '<span class="falta-alert">🚫 No cumplió</span>';
+  var detalles = [];
+  if (b.tiros_unidades != null) detalles.push((b.rol_linea === 'flameado' ? 'Unidades' : 'Tiros') + ': ' + Number(b.tiros_unidades).toLocaleString('es-GT'));
+  if (b.bolsas_empaque != null) detalles.push('Bolsas empaque: ' + b.bolsas_empaque);
+  if (b.merma_pct != null) detalles.push('Merma: ' + b.merma_pct + '%');
+  return '<div class="rec-item">' +
+    '<div class="rec-top">' +
+      '<div><div class="rec-tipo">' + escHtml(rolLbl) + ' ' + estadoBadge + '</div>' +
+      '<div class="rec-fecha">' + escHtml(b.periodo) + (b.supervisor ? ' · Valida: ' + escHtml(b.supervisor) : '') + '</div></div>' +
+      '<button class="rec-del" onclick="eliminarBono(' + b.id + ')" title="Eliminar">🗑</button>' +
+    '</div>' +
+    (detalles.length ? '<div class="rec-txt">' + escHtml(detalles.join(' · ')) + '</div>' : '') +
+    (b.comentario ? '<div class="rec-txt">' + escHtml(b.comentario) + '</div>' : '') +
+  '</div>';
+}
+
+function toggleCamposBono() {
+  var rol = document.getElementById('nbRol').value;
+  document.getElementById('nbTirosWrap').style.display = (rol === 'impresion' || rol === 'flameado') ? 'grid' : 'none';
+  document.getElementById('nbTirosLbl').textContent = rol === 'flameado' ? 'Unidades del período' : 'Tiros del período';
+  document.getElementById('nbBolsasWrap').style.display = rol === 'flameado' ? 'flex' : 'none';
+  document.getElementById('nbMermaWrap').style.display = rol === 'recepcion' ? 'flex' : 'none';
+}
+
+function toggleFormBono() {
+  var f = document.getElementById('formBono');
+  var abrir = f.style.display === 'none';
+  f.style.display = abrir ? 'block' : 'none';
+  if (abrir) {
+    document.getElementById('nbRol').value = 'impresion';
+    document.getElementById('nbPeriodo').value = mesActualStr();
+    document.getElementById('nbTiros').value = '';
+    document.getElementById('nbBolsas').value = '';
+    document.getElementById('nbMerma').value = '';
+    document.getElementById('nbCumplida').checked = false;
+    document.getElementById('nbMonto').value = '';
+    document.getElementById('nbSupervisor').value = '';
+    document.getElementById('nbComentario').value = '';
+    toggleCamposBono();
+  }
+}
+
+async function guardarBono() {
+  if (!mpEditId) return;
+  var periodo = (document.getElementById('nbPeriodo').value || '').trim();
+  if (!periodo) { showToast('⚠️ Escribe el período', '#B83232'); return; }
+  var payload = {
+    personal_id: mpEditId,
+    rol_linea: document.getElementById('nbRol').value,
+    periodo: periodo,
+    meta_cumplida: document.getElementById('nbCumplida').checked,
+    monto_bono: document.getElementById('nbMonto').value !== '' ? parseFloat(document.getElementById('nbMonto').value) : null,
+    tiros_unidades: document.getElementById('nbTiros').value !== '' ? parseFloat(document.getElementById('nbTiros').value) : null,
+    bolsas_empaque: document.getElementById('nbBolsas').value !== '' ? parseInt(document.getElementById('nbBolsas').value, 10) : null,
+    merma_pct: document.getElementById('nbMerma').value !== '' ? parseFloat(document.getElementById('nbMerma').value) : null,
+    supervisor: (document.getElementById('nbSupervisor').value || '').trim() || null,
+    comentario: (document.getElementById('nbComentario').value || '').trim() || null
+  };
+  try {
+    var r = await db.from('rrhh_bonos').insert(payload);
+    if (r.error) throw r.error;
+    toggleFormBono();
+    await cargarBonos(mpEditId);
+    showToast('✅ Bono registrado');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+async function eliminarBono(id) {
+  if (!confirm('¿Eliminar este registro de bono?')) return;
+  try {
+    var r = await db.from('rrhh_bonos').delete().eq('id', id);
+    if (r.error) throw r.error;
+    await cargarBonos(mpEditId);
     showToast('🗑 Eliminado');
   } catch (e) {
     showToast('❌ Error: ' + e.message, '#B83232');

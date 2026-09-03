@@ -198,7 +198,7 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   habilidad, con el área entre paréntesis SOLO si es distinta al área de la persona — ej.
   alguien de Tapas certificado para cubrir una máquina de Producción en almuerzo). Clic abre
   el perfil directo en la pestaña Capacitaciones (`abrirPerfilEnCapacitaciones`).
-  Click en fila → modalPersona con 6 sub-tabs:
+  Click en fila → modalPersona con 7 sub-tabs:
     Datos generales (editable: nombre/iniciales/código/área/rol/proceso_hab/teléfono/edad/activo/fechas)
     RRHH           (editable: locker/talla_uniforme/epp_asignado/epp_fecha/notas_rrhh)
     Capacitaciones (historial rrhh_capacitaciones + registrar nueva — área de la habilidad
@@ -213,6 +213,14 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
                      hasta justificar con texto y/o foto; ver sincronización con Asistencia
                      Mensual de serigrafia.html más abajo)
     Incidentes     (historial rrhh_incidentes + registrar nuevo)
+    Sueldos y Bonos (historial rrhh_bonos + registrar nuevo — rol_linea impresion/flameado/
+                     recepcion/otro, cada uno con sus propios campos condicionales via
+                     `toggleCamposBono()`: tiros/unidades, bolsas de empaque (solo flameado),
+                     % merma reportada (solo recepción). Estrategia de incentivos de la línea
+                     de Serigrafía: Impresión Q750/día·10k tiros, Flameado Q350/mes·10k
+                     unidades+4 bolsas, Recepción Q350/mes pierde si merma>2%. Es un registro
+                     MANUAL de la decisión ya tomada — NO se calcula automático desde
+                     registro_tiros_serig ni de ninguna tabla de merma todavía)
 
 ⚠️ Al editar una persona EXISTENTE desde acá, NO se toca color_hex/mtx_rol/mtx_linea —
   esos campos gobiernan la matriz de líneas del board en serigrafia.html y solo se
@@ -284,6 +292,7 @@ Notas críticas:
 12. `sql/produccion_operario_v1.sql` — columna `operador_codigo` en `produccion_diaria` +
     reemplaza el índice único para incluirla. Sin esto, asignar operario en produccion.html
     falla (columna no existe) y "✏️ Máquinas / Operarios" no carga esa columna.
+13. `sql/rrhh_bonos_v1.sql` — tabla `rrhh_bonos` (Sueldos y Bonos en gestion.html → Personal).
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
