@@ -28,6 +28,13 @@ de estilos compartido — se carga en todos los HTML como
 ### Funciones serverless (Vercel) — carpeta `api/`
 Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados).
 - `api/whatsapp.js` — bot WhatsApp (Twilio → Claude → INSERT con **service_role**, salta RLS).
+  Tipos: tiros/flameado/empaque (Serigrafía) + tapas (comanda+tarea, sep/2026). El matching de
+  SKU (`bot_buscar_sku`) y de operario de Tapas (`bot_buscar_operario`) normaliza tildes/plural
+  y filtra a `inventario` facturable de Bodega 2 — ver sql/bot_buscar_sku_v2.sql,
+  sql/bot_sku_palabras_clave_v1.sql (tabla `sku_palabras_clave` para enseñar apodos que no
+  están en la descripción oficial) y sql/bot_tapas_v1.sql. ⚠️ El `bot_buscar_sku` original de
+  sql/bot_rpcs_v1.sql nunca llegó a crearse en producción — verificar que el SQL de arriba sí
+  se corrió (ver lista de SQL pendiente).
   ⚠️ Valida firma `X-Twilio-Signature` (HMAC-SHA1, fail-closed) — sin `TWILIO_AUTH_TOKEN` rechaza TODO POST.
   Env: ANTHROPIC_API_KEY, SUPA_URL, SUPA_SERVICE_KEY, TWILIO_AUTH_TOKEN (obligatorio), TWILIO_WEBHOOK_URL, TETRA_WA_ALLOW.
 - `api/parse-doc.js` — parsea foto de requi con Claude Vision → JSON {requi, fecha, productos[]}.
@@ -320,6 +327,12 @@ Notas críticas:
 13. `sql/rrhh_bonos_v1.sql` — tabla `rrhh_bonos` (Sueldos y Bonos en gestion.html → Personal).
 14. `sql/movimientos_insumos_v1.sql` — tabla `movimientos_insumos` (destino de bodega.html/molino.html).
     Sin esto, ambos módulos cargan pero no pueden registrar ni ver movimientos.
+15. `sql/bot_buscar_sku_v2.sql` — arregla `bot_buscar_sku` (nunca se había creado en producción,
+    ver § Funciones serverless) + tildes/plural + filtro facturable/Bodega 2. Correr ANTES del 16.
+16. `sql/bot_sku_palabras_clave_v1.sql` — tabla `sku_palabras_clave` (apodos entrenables por SKU)
+    + reemplaza `bot_buscar_sku` sumando esos alias a la búsqueda. Autocontenido (no depende del 15).
+17. `sql/bot_tapas_v1.sql` — RPCs `bot_buscar_operario` y `bot_insertar_comanda_tapas` para que
+    api/whatsapp.js registre producción de Tapas (comandas+comanda_tareas) por WhatsApp.
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)

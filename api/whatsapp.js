@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════
-// TETRAPP — Bot WhatsApp de Serigrafía
+// TETRAPP — Bot WhatsApp de Serigrafía y Tapas
 // Endpoint: POST /api/whatsapp
 //
 // VARIABLES DE ENTORNO requeridas en Vercel → Settings → Environment:
@@ -18,8 +18,9 @@
 //                         extra; la firma ya garantiza que el POST viene de Twilio).
 //
 // FLUJO:
-//   Álvaro reenvía mensaje del grupo serigrafía al número sandbox de Twilio
-//   → Twilio hace POST aquí → Claude interpreta → INSERT en Supabase → respuesta TwiML
+//   Álvaro reenvía mensaje del grupo de Serigrafía o de Tapas al número sandbox
+//   de Twilio → Twilio hace POST aquí → Claude interpreta → INSERT en Supabase
+//   → respuesta TwiML
 // ════════════════════════════════════════════════════════════════
 
 const crypto = require('crypto');
@@ -140,7 +141,54 @@ async function insertar(db, tipo, datos, fecha, hora) {
     return true;
   }
 
+  if (tipo === 'tapas') {
+    const r = await db.rpc('bot_insertar_comanda_tapas', {
+      p_fecha:            fecha,
+      p_operario_codigo:  datos.operario_codigo || '',
+      p_operario_nombre:  datos.operario_nombre || datos.operario || '',
+      p_proceso:          datos.proceso,
+      p_cantidad:         Number(datos.cantidad),
+      p_tapa_desc:        datos.descripcion || '',
+      p_tapa_sku:         datos.sku || '',
+      p_metodo:           datos.metodo || 'manual',
+      p_hora:             hora,
+    });
+    if (r.error) throw new Error('tapas: ' + r.error.message);
+    datos.correlativo = r.data || null; // se muestra en la confirmación
+    return true;
+  }
+
   return false; // tipo desconocido
+}
+
+// ── Resolver operario de Tapas desde el nombre (trazabilidad) ────
+// Mismo criterio que resolverSku: si hay un candidato claro, muta
+// datos con operario_codigo/nombre oficiales. Si no, deja el texto
+// libre tal cual (igual tolerancia que ya tiene el campo flameador
+// de Serigrafía) y solo agrega una nota de aviso.
+async function resolverOperario(db, datos) {
+  var texto = (datos.operario_nombre || datos.operario || '').trim();
+  if (!texto || datos.operario_codigo) return { nota: '' };
+
+  var r;
+  try { r = await db.rpc('bot_buscar_operario', { p_texto: texto, p_area: 'tapas' }); }
+  catch(_) { return { nota: '' }; }
+  if (r.error || !r.data) return { nota: '' };
+
+  var conHits = r.data.filter(function(x){ return x.hits > 0; });
+  if (!conHits.length) return { nota: ' · ⚠️ operario no verificado' };
+
+  var toks = texto.toLowerCase().split(/\s+/).filter(function(t){ return t.length >= 2; });
+  var top = conHits[0];
+  var unico = conHits.length === 1 || conHits[1].hits < top.hits;
+
+  if (top.hits >= toks.length && unico) {
+    datos.operario_codigo = top.codigo;
+    datos.operario_nombre = top.nombre;
+    return { nota: '' };
+  }
+
+  return { nota: ' · ⚠️ operario no verificado' };
 }
 
 // ── Resolver SKU desde la descripción (trazabilidad) ──────────────
@@ -177,23 +225,34 @@ async function resolverSku(db, datos) {
 
 // ── Prompt del sistema ────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `Eres el asistente interno de TETRAPP para la planta de Serigrafía de Tetraplastic Guatemala.
-Recibes mensajes de WhatsApp reenviados por Álvaro (supervisor/administrador) desde el grupo de serigrafía.
+const SYSTEM_PROMPT = `Eres el asistente interno de TETRAPP para las plantas de Serigrafía y Tapas de Tetraplastic Guatemala.
+Recibes mensajes de WhatsApp reenviados por Álvaro (supervisor/administrador) desde los grupos de planta.
 Tu trabajo: interpretar el mensaje y extraer datos de producción estructurados.
 
 ━━ TIPOS DE REGISTRO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-① TIROS — lectura del contador de impresión de una línea.
+① TIROS (Serigrafía) — lectura del contador de impresión de una línea.
    Campos: linea_id (1-4), momento, contador (número entero de tiros), descripcion (producto)
    momento válidos: "inicio" · "mediodia" · "fin" · "velada"
    Alias: inicio/arranque=inicio · medio/mediodía=mediodia · cierre/terminar/salida=fin · noche/madrugada=velada
 
-② FLAMEADO — bolsas flameadas para una línea.
+② FLAMEADO (Serigrafía) — bolsas flameadas para una línea.
    Campos: flameador (nombre o código, ej. "S3" o "Marcos"), descripcion (producto), cantidad (entero), para_linea (1-4)
-   Señales: "flameó", "bolsas", "flameadas", "contenido + parte de enfrente"
+   Señales: "flameó", "bolsas", "flameadas", "contenido + parte de enfrente", menciona línea destino (L1-L4)
 
-③ EMPAQUE — producto empacado.
+③ EMPAQUE (Serigrafía) — producto empacado.
    Campos: descripcion (producto), cantidad (entero), operador_codigo (ej. "S5", si se menciona)
+
+④ TAPAS — producción de un operario de la planta de Tapas (una tarea por mensaje).
+   Campos: operario (nombre o código), proceso, descripcion (tapa/producto trabajado), cantidad (entero), metodo
+   proceso válidos: "Armado" · "Banda" · "Liner" · "Encajado" · "Revisado" · "Limpiar pestaña" ·
+     "Apoyo Serigrafía" · "Apoyo Producción" · "Otra tarea: <detalle>"
+   Alias: armó/arme/armado=Armado · banda=Banda · liner=Liner · encajó/encajó cajas/encajado=Encajado ·
+     revisó/revisión=Revisado · pestaña=Limpiar pestaña
+   metodo válidos: "manual" (default) · "maquina_liner" (solo si proceso=Liner Y menciona máquina/Press Top) ·
+     "maquina_armado" (solo si proceso=Armado Y menciona máquina/Press Top)
+   Señales: "armó", "encajó N cajas", "hizo banda de", cualquier producción de Tapas sin vocabulario de ②
+     (bolsas/contenido/línea destino) ni de ① (contador/tiros de línea)
 
 ━━ REGLAS DE INTERPRETACIÓN ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -201,10 +260,13 @@ Tu trabajo: interpretar el mensaje y extraer datos de producción estructurados.
 • Si hay "total X" o "= X", ese X es el número definitivo
 • "contenido" = unidades dentro de la bolsa (tipo flameado)
 • "parte de enfrente / detrás / lado B" = otra zona del mismo proceso (sumar al total)
-• L1/L2/L3/L4 = Línea 1/2/3/4
-• Operadores: S0=Luis Córdova (supervisor), S1-S7=operadores
+• L1/L2/L3/L4 = Línea 1/2/3/4 (solo tipos ① y ②, Serigrafía)
+• Operadores Serigrafía: S0=Luis Córdova (supervisor), S1-S7=operadores
 • Si el mensaje solo menciona un número y un producto sin contexto claro → pide aclaración
 • "tiros" puede referirse al conteo de impresiones de ese turno (flameado NO usa "tiros")
+• "Flameado"/"Impresión" de Tapas (tipo④) vs Serigrafía (tipos ①②): si el mensaje trae bolsas/
+  contenido/línea destino → es Serigrafía; si solo dice "Fulano flameó/imprimió N tapas X" sin esas
+  señales y menciona un operario de Tapas → es tipo④
 • Mensajes de cortesía, OK, gracias, saludos, confirmaciones → ignorar:true
 
 ━━ DATOS CRÍTICOS QUE DEBES TENER ━━━━━━━━━━━━━━━━━━━━━━━━
@@ -212,6 +274,7 @@ Tu trabajo: interpretar el mensaje y extraer datos de producción estructurados.
 - TIROS: línea + momento + contador son OBLIGATORIOS
 - FLAMEADO: descripcion + cantidad son OBLIGATORIOS (para_linea recomendado)
 - EMPAQUE: descripcion + cantidad son OBLIGATORIOS
+- TAPAS: operario + proceso + cantidad son OBLIGATORIOS (descripcion/tapa recomendada, no bloquea)
 
 Si falta un dato crítico, haz UNA sola pregunta concisa.
 Si tienes todo, inserta sin preguntar.
@@ -221,7 +284,7 @@ Si tienes todo, inserta sin preguntar.
 Responde ÚNICAMENTE con JSON válido, sin markdown, sin texto extra:
 
 {
-  "tipo": "tiros" | "flameado" | "empaque" | "desconocido",
+  "tipo": "tiros" | "flameado" | "empaque" | "tapas" | "desconocido",
   "datos": {
     /* campos según el tipo */
   },
@@ -311,7 +374,7 @@ module.exports = async function handler(req, res) {
           await insertar(db, tipo, datos, fecha, hora);
           await clearEstado(db, from).catch(() => {});
           res.setHeader('Content-Type', 'text/xml');
-          res.end(twiml('✅ Registrado sin SKU · ' + fecha));
+          res.end(twiml('✅ Registrado sin SKU · ' + fecha + (datos.correlativo ? ' · ' + datos.correlativo : '')));
         } catch(e) {
           res.setHeader('Content-Type', 'text/xml');
           res.end(twiml('❌ Error BD: ' + e.message));
@@ -329,6 +392,7 @@ module.exports = async function handler(req, res) {
           res.setHeader('Content-Type', 'text/xml');
           res.end(twiml(
             '✅ Registrado · 🔗 ' + datos.sku + ' · ' + datos.descripcion.slice(0, 45)
+              + (datos.correlativo ? ' · ' + datos.correlativo : '')
           ));
         } catch(e) {
           res.setHeader('Content-Type', 'text/xml');
@@ -399,9 +463,19 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // ── Datos completos: resolver SKU e insertar ─────────────────
+    // ── Datos completos: resolver operario/SKU e insertar ─────────
     try {
       const datos = parsed.datos || {};
+
+      // Tapas: resolver el operario contra `personal` antes del SKU
+      // (no bloquea si no hay match claro — mismo criterio tolerante
+      // que ya tiene el campo flameador de Serigrafía)
+      let operarioNota = '';
+      if (parsed.tipo === 'tapas') {
+        const opRes = await resolverOperario(db, datos);
+        operarioNota = opRes.nota || '';
+      }
+
       const skuRes = await resolverSku(db, datos);
 
       // Varias opciones → preguntar al operador sin insertar todavía
@@ -424,7 +498,8 @@ module.exports = async function handler(req, res) {
       await clearEstado(db, from).catch(() => {});
 
       const resp = ok
-        ? '✅ ' + (parsed.mensaje_confirmacion || 'Registro guardado · ' + fecha) + skuRes.nota
+        ? '✅ ' + (parsed.mensaje_confirmacion || 'Registro guardado · ' + fecha) + skuRes.nota + operarioNota
+            + (datos.correlativo ? ' · ' + datos.correlativo : '')
         : '⚠️ Tipo no reconocido: ' + parsed.tipo + '. Escribe "ayuda" para ver los formatos.';
 
       res.setHeader('Content-Type', 'text/xml');
