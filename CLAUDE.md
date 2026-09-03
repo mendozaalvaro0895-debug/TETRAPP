@@ -36,7 +36,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 ### Módulos activos
 | Archivo | Descripción |
 |---|---|
-| `index.html` | Fachada principal — 7 cards de módulo |
+| `index.html` | Fachada principal — 8 cards de módulo |
 | `tapas.html` | Módulo completo Tapas: hub + pedidos + movimientos (salidas/ingresos/rechazos) + personal |
 | `serigrafia.html` | Módulo admin Serigrafía: Inicio (board) + Movimientos + Productividad + Personal |
 | `registro-serigrafia.html` | Formulario móvil rol `operativo_serig`: Flameado / Impresión / Empaque |
@@ -47,8 +47,12 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | `ventas.html` | Ventas y Financiero: Resumen · Productos · Clientes · Rotación · Importar facturación (Excel/CSV cols A-R) · toggle IVA |
 | `produccion.html` | Sopladoras: Ingreso PDF/manual (pdf.js) · Reporte Semanal (pivote máquina×SKU) · Mensual. Asigna máquina Y operario por fila (`personal` area='produccion') |
 | `gestion.html` | Gestión de Personal y Planta (v1, solo Personal construido): tabla unificada tapas+serig+producción sobre la misma tabla `personal` + RRHH (locker/EPP/talla) + permisos/incidentes/faltas. Master-only. |
+| `bodega.html` | Bodega 07 (materias primas e insumos): Inicio (KPIs) · Movimientos (`movimientos_insumos`, área='bodega') · Personal. Existencias siguen viviendo en `inventario.html` (no duplicadas). Destino de los prefijos SICAF `MPI`/`MPS` desde la futura Central de Ingreso. |
+| `molino.html` | Molienda/mezcla/distribución de materia prima a máquina: mismo patrón que bodega.html (Inicio · Movimientos `área='molino'` · Personal). Alcance MVP — no modela todavía fórmulas ni distribución por máquina, ver `.claude/docs/contexto-bot-requis.md`. |
 
-Bodega bloqueado via `<a class="nav-locked">` en toda la navegación.
+Ver `.claude/docs/contexto-bot-requis.md` para el contexto completo del "Bot Cazador de Info"
+(catálogo de prefijos SICAF, reglas de clasificación, mapeo a tablas) — en construcción por fases,
+Bodega/Molino es la Fase de destino funcional; sigue la Central de Ingreso en `index.html`.
 
 ---
 
@@ -262,6 +266,10 @@ Notas críticas:
 - `ventas`: fecha→DATE, RLS master-only escritura; importador reemplaza por rango de fechas (sin duplicar)
 - `bot_estado`: 1 fila por número (`whatsapp_from` UNIQUE)
 - `rechazos`: existe, RLS pendiente (sql/rechazos_rls_fix.sql)
+- `movimientos_insumos`: destino de bodega.html/molino.html (`area`='bodega'|'molino'), separada de
+  `movimientos_materiales` (esa es de tapas/PT) para no forzar campos que no aplican (ej. `solicitud_id`).
+  Lectura abierta a cualquier autenticado (soporta visor), escritura master-only. Ver
+  `.claude/docs/contexto-bot-requis.md` para el mapeo completo de prefijos SICAF → esta tabla.
 
 ### RPCs atómicas
 - `descontar_inventario(p_sku, p_cantidad)` — usar en lugar de select+update manual
@@ -293,6 +301,8 @@ Notas críticas:
     reemplaza el índice único para incluirla. Sin esto, asignar operario en produccion.html
     falla (columna no existe) y "✏️ Máquinas / Operarios" no carga esa columna.
 13. `sql/rrhh_bonos_v1.sql` — tabla `rrhh_bonos` (Sueldos y Bonos en gestion.html → Personal).
+14. `sql/movimientos_insumos_v1.sql` — tabla `movimientos_insumos` (destino de bodega.html/molino.html).
+    Sin esto, ambos módulos cargan pero no pueden registrar ni ver movimientos.
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)

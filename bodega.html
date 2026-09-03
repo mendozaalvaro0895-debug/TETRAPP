@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0C0C0B">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>TETRAPLASTIC — Bodega</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="shared/auth.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css">
+<style>
+:root{
+  --ink:#0C0C0B; --bg:#F7F6F2; --bg2:#F0EDEA; --card:#FFFFFF;
+  --border:#E0DED8; --gray:#6B6B6A; --gray-l:#9A9A98;
+  --green:#16A34A; --green-l:#ECFDF5; --red:#EF4444; --red-l:#FEE2E2; --amber:#D97706; --amber-l:#FFFBEB;
+  --font:'DM Sans',sans-serif; --display:'Playfair Display',serif; --mono:'DM Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh}
+
+.topbar{background:#0C0C0B;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--bodega);flex-wrap:wrap;gap:10px}
+.logo{font-family:var(--display);font-size:18px;font-weight:900;color:#fff}
+.logo span{color:#7ECEC0}
+.logo-wrap{position:relative;cursor:pointer;user-select:none;display:flex;align-items:center}
+.logo-chevron{font-size:10px;color:rgba(255,255,255,.4);margin-left:6px;transition:transform .2s}
+.logo-chevron.open{transform:rotate(180deg);color:#7ECEC0}
+.logo-nav{display:none;position:absolute;top:calc(100% + 12px);left:0;background:#1A1A19;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:6px;min-width:214px;box-shadow:0 8px 28px rgba(0,0,0,.5);z-index:9999}
+.logo-nav.open{display:block}
+.logo-nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,.8);text-decoration:none;font-size:13px;font-weight:600;transition:background .12s}
+.logo-nav a:hover{background:rgba(255,255,255,.09);color:#fff}
+.logo-nav a.nav-active{background:var(--bodega);color:#fff}
+.logo-nav-sep{height:1px;background:rgba(255,255,255,.1);margin:4px 6px}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.user-pill{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:4px 12px;border-radius:20px}
+.uavatar{width:28px;height:28px;border-radius:50%;background:var(--bodega);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff}
+.uname{font-size:12px;color:#fff}
+
+.page{max-width:1400px;margin:0 auto;padding:24px}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px}
+.page-title{font-family:var(--display);font-size:26px;font-weight:700}
+.page-sub{font-size:13px;color:var(--gray);margin-top:2px}
+
+.tabs{display:flex;gap:2px;border-bottom:1.5px solid var(--border);margin-bottom:18px;align-items:center;flex-wrap:wrap}
+.tab{padding:10px 18px;font-size:13px;font-weight:600;font-family:var(--font);color:var(--gray);background:none;border:none;cursor:pointer;position:relative;transition:color .15s}
+.tab:hover{color:var(--bodega)}
+.tab.active{color:var(--bodega)}
+.tab.active::after{content:'';position:absolute;left:0;right:0;bottom:-1.5px;height:2.5px;background:var(--bodega);border-radius:2px}
+.tabs-r{margin-left:auto;display:flex;gap:8px;align-items:center;padding-bottom:6px}
+
+.btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;border:none;transition:all .15s}
+.btn:active{transform:scale(.97)}
+.btn-acc{background:var(--bodega);color:#fff}
+.btn-acc:hover{background:var(--bodega-dark)}
+.btn-ghost{background:var(--card);color:var(--ink);border:1.5px solid var(--border)}
+.btn-ghost:hover{border-color:var(--bodega);color:var(--bodega)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.ctrl-bar{display:flex;align-items:center;gap:10px;background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:16px;flex-wrap:wrap}
+.ctrl-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray)}
+.ctrl-in{padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;font-family:var(--font);font-size:13px;background:var(--card);color:var(--ink)}
+.ctrl-in:focus{outline:none;border-color:var(--bodega)}
+
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.kpi{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:14px 16px}
+.kpi-l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray);margin-bottom:6px}
+.kpi-v{font-size:21px;font-weight:700;font-family:var(--mono);line-height:1.1}
+.kpi-s{font-size:11px;color:var(--gray-l);margin-top:4px}
+
+.tbl-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px}
+.tbl-scroll{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th{position:sticky;top:0;z-index:2;background:var(--bg2);text-align:left;padding:9px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray);border-bottom:1.5px solid var(--border)}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--border)}
+.tbl tbody tr:hover td{background:var(--bodega-xl)}
+.tbl .num{text-align:right;font-family:var(--mono)}
+.empty{text-align:center;color:var(--gray-l);padding:32px;font-style:italic}
+.mov-badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.mov-badge-in{background:var(--green-l);color:#15803D}
+.mov-badge-out{background:var(--amber-l);color:#B45309}
+.area-pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:10.5px;font-weight:700;background:var(--bodega-xl);color:var(--bodega-dark)}
+
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.overlay.open{display:flex}
+.modal{background:var(--card);border-radius:14px;width:100%;max-width:480px;box-shadow:var(--shadow-xl);animation:ds-slideUp .22s ease}
+.mh{padding:18px 22px;border-bottom:1.5px solid var(--border);font-weight:700;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+.mh-x{cursor:pointer;color:var(--gray-l);font-size:20px;line-height:1}
+.mb{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.mf{padding:16px 22px;border-top:1.5px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray)}
+.fld input,.fld select{padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13.5px}
+.fld input:focus,.fld select:focus{outline:none;border-color:var(--bodega)}
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg2 button{padding:9px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-weight:700;font-size:13px;cursor:pointer;font-family:var(--font)}
+.seg2 button.active{background:var(--bodega);border-color:var(--bodega);color:#fff}
+.sku-wrap{position:relative}
+.sku-drop{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;z-index:50}
+.sku-drop.open{display:block}
+.sku-opt{padding:8px 11px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--border)}
+.sku-opt:last-child{border-bottom:none}
+.sku-opt:hover{background:var(--bodega-xl)}
+
+.people-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.p-card{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:14px}
+.p-name{font-weight:700;font-size:13.5px}
+.p-meta{font-size:11.5px;color:var(--gray);margin-top:3px}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0C0C0B;color:#fff;padding:12px 22px;border-radius:12px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 8px 28px rgba(0,0,0,.4);display:none}
+
+@media(max-width:1024px){.kpi-strip{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.topbar{padding:10px 14px}.page{padding:16px}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo-wrap" onclick="document.getElementById('logoNav').classList.toggle('open');document.getElementById('logoChev').classList.toggle('open')">
+    <div class="logo">TETRA<span>PLASTIC</span></div>
+    <div class="logo-chevron" id="logoChev">▾</div>
+    <div class="logo-nav" id="logoNav">
+      <a href="index.html">🏠 Inicio</a>
+      <div class="logo-nav-sep"></div>
+      <a href="tapas.html">🏷 Tapas</a>
+      <a href="serigrafia.html">🎨 Serigrafía</a>
+      <a href="dashboard.html">📊 Dashboard</a>
+      <div class="logo-nav-sep"></div>
+      <a href="produccion.html">🏭 Producción</a>
+      <a href="ventas.html">💼 Ventas</a>
+      <a href="gestion.html">🧑‍💼 Gestión</a>
+      <a href="bodega.html" class="nav-active">📦 Bodega</a>
+      <a href="molino.html">⚙️ Molino</a>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="user-pill"><div class="uavatar">ÁM</div><div class="uname">Álvaro Mendoza</div></div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">📦 Bodega</div>
+      <div class="page-sub">Bodega 07 · Materias primas e insumos</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="inicio" onclick="switchTab('inicio')">Inicio</button>
+    <button class="tab" data-tab="movimientos" onclick="switchTab('movimientos')">Movimientos</button>
+    <button class="tab" data-tab="personal" onclick="switchTab('personal')">Personal</button>
+    <div class="tabs-r">
+      <button class="btn btn-acc" onclick="abrirModalMov()">+ Registrar movimiento</button>
+    </div>
+  </div>
+
+  <!-- ═══ INICIO ═══ -->
+  <div class="view" id="view-inicio">
+    <div class="kpi-strip">
+      <div class="kpi"><div class="kpi-l">Movimientos hoy</div><div class="kpi-v" id="kpi-hoy">—</div></div>
+      <div class="kpi"><div class="kpi-l">Ingresos hoy (und)</div><div class="kpi-v" id="kpi-ing">—</div></div>
+      <div class="kpi"><div class="kpi-l">Salidas hoy (und)</div><div class="kpi-v" id="kpi-sal">—</div></div>
+      <div class="kpi"><div class="kpi-l">Último movimiento</div><div class="kpi-v" id="kpi-ult" style="font-size:14px">—</div></div>
+    </div>
+    <div class="tbl-wrap">
+      <div style="padding:12px 16px;border-bottom:1.5px solid var(--border);font-weight:700;font-size:14px">Últimos movimientos</div>
+      <div class="tbl-scroll" id="tblInicio"></div>
+    </div>
+  </div>
+
+  <!-- ═══ MOVIMIENTOS ═══ -->
+  <div class="view" id="view-movimientos" style="display:none">
+    <div class="ctrl-bar">
+      <span class="ctrl-lbl">Desde</span>
+      <input type="date" class="ctrl-in" id="movDesde" onchange="renderMovimientos()">
+      <span class="ctrl-lbl">Hasta</span>
+      <input type="date" class="ctrl-in" id="movHasta" onchange="renderMovimientos()">
+      <input type="text" class="ctrl-in" id="movBuscar" placeholder="Buscar documento o SKU…" style="flex:1;min-width:160px" oninput="renderMovimientos()">
+    </div>
+    <div class="tbl-wrap">
+      <div class="tbl-scroll" id="tblMovimientos"></div>
+    </div>
+  </div>
+
+  <!-- ═══ PERSONAL ═══ -->
+  <div class="view" id="view-personal" style="display:none">
+    <div style="margin-bottom:14px;font-size:12.5px;color:var(--gray)">
+      Alta y edición completa de personal en <a href="gestion.html" style="color:var(--bodega);font-weight:700">Gestión → Personal</a>.
+    </div>
+    <div class="people-grid" id="peopleGrid"></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL REGISTRAR MOVIMIENTO ═══ -->
+<div class="overlay" id="overlayMov">
+  <div class="modal">
+    <div class="mh"><span>Registrar movimiento</span><span class="mh-x" onclick="cerrarModalMov()">×</span></div>
+    <div class="mb">
+      <div class="seg2">
+        <button type="button" id="segIngreso" onclick="setMovTipo('ingreso')">📦 Ingreso</button>
+        <button type="button" id="segSalida" onclick="setMovTipo('salida')">📤 Salida</button>
+      </div>
+      <div class="fld">
+        <label>N° Documento (ej. MPI 655)</label>
+        <input type="text" id="mvDoc" placeholder="MPI 655">
+      </div>
+      <div class="fld">
+        <label>Fecha</label>
+        <input type="date" id="mvFecha">
+      </div>
+      <div class="fld sku-wrap">
+        <label>SKU / Producto</label>
+        <input type="text" id="mvSku" placeholder="Código o nombre…" autocomplete="off" oninput="mvBuscarSku()" onblur="setTimeout(mvCerrarSku,180)">
+        <div class="sku-drop" id="mvSkuDrop"></div>
+      </div>
+      <div class="fld">
+        <label>Cantidad</label>
+        <input type="number" id="mvCant" min="0" step="1" placeholder="0">
+      </div>
+      <div class="fld">
+        <label>Referencia SICAF (opcional, texto libre)</label>
+        <input type="text" id="mvRef" placeholder="Ej. TMP, SERI, PRODUCCION…">
+      </div>
+      <div class="fld">
+        <label>Observaciones (opcional)</label>
+        <input type="text" id="mvObs" placeholder="Notas adicionales">
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="cerrarModalMov()">Cancelar</button>
+      <button class="btn btn-acc" onclick="guardarMovimiento()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var AREA = 'bodega';
+var movimientosCache = [];
+var inventarioCache = [];
+var mvTipoActual = 'ingreso';
+var mvSkuElegido = null;
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(showToast._tm);
+  showToast._tm = setTimeout(function(){ t.style.display = 'none'; }, 2600);
+}
+
+function switchTab(tab) {
+  ['inicio','movimientos','personal'].forEach(function(t){
+    document.getElementById('view-' + t).style.display = t === tab ? '' : 'none';
+    var btn = document.querySelector('.tab[data-tab="' + t + '"]');
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+  if (tab === 'movimientos') renderMovimientos();
+  if (tab === 'personal') cargarPersonal();
+}
+
+function fechaHoy() {
+  var d = new Date(Date.now() - 6 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+async function cargarInventario() {
+  var r = await db.from('inventario').select('sku,descripcion').order('sku');
+  inventarioCache = r.data || [];
+}
+
+async function cargarMovimientos() {
+  var r = await db.from('movimientos_insumos').select('*').eq('area', AREA).order('fecha', { ascending: false }).order('created_at', { ascending: false });
+  movimientosCache = r.data || [];
+  renderInicio();
+}
+
+function renderInicio() {
+  var hoy = fechaHoy();
+  var deHoy = movimientosCache.filter(function(m){ return m.fecha === hoy; });
+  var ing = deHoy.filter(function(m){ return m.tipo === 'ingreso'; }).reduce(function(s,m){ return s + (m.cantidad||0); }, 0);
+  var sal = deHoy.filter(function(m){ return m.tipo === 'salida'; }).reduce(function(s,m){ return s + (m.cantidad||0); }, 0);
+  document.getElementById('kpi-hoy').textContent = deHoy.length;
+  document.getElementById('kpi-ing').textContent = ing.toLocaleString();
+  document.getElementById('kpi-sal').textContent = sal.toLocaleString();
+  document.getElementById('kpi-ult').textContent = movimientosCache.length ? movimientosCache[0].fecha : '—';
+
+  var recientes = movimientosCache.slice(0, 8);
+  document.getElementById('tblInicio').innerHTML = buildMovTable(recientes);
+}
+
+function renderMovimientos() {
+  var desde = document.getElementById('movDesde').value;
+  var hasta = document.getElementById('movHasta').value;
+  var buscar = (document.getElementById('movBuscar').value || '').toLowerCase();
+  var filtrado = movimientosCache.filter(function(m) {
+    if (desde && m.fecha < desde) return false;
+    if (hasta && m.fecha > hasta) return false;
+    if (buscar) {
+      var hayDoc = (m.num_documento || '').toLowerCase().indexOf(buscar) >= 0;
+      var haySku = (m.sku || '').toLowerCase().indexOf(buscar) >= 0;
+      var hayDesc = (m.descripcion || '').toLowerCase().indexOf(buscar) >= 0;
+      if (!hayDoc && !haySku && !hayDesc) return false;
+    }
+    return true;
+  });
+  document.getElementById('tblMovimientos').innerHTML = buildMovTable(filtrado);
+}
+
+function buildMovRow(m) {
+  var esIng = m.tipo === 'ingreso';
+  return '<tr>'
+    + '<td><span class="mov-badge ' + (esIng ? 'mov-badge-in' : 'mov-badge-out') + '">' + (esIng ? 'INGRESO' : 'SALIDA') + '</span></td>'
+    + '<td>' + escHtml(m.fecha || '—') + '</td>'
+    + '<td style="font-family:var(--mono)">' + escHtml(m.num_documento || '—') + '</td>'
+    + '<td style="font-family:var(--mono)">' + escHtml(m.sku || '—') + '</td>'
+    + '<td>' + escHtml(m.descripcion || '—') + '</td>'
+    + '<td class="num">' + (m.cantidad||0).toLocaleString() + '</td>'
+    + '<td style="color:var(--gray-l)">' + escHtml(m.referencia_sicaf || '—') + '</td>'
+    + '</tr>';
+}
+
+function buildMovTable(rows) {
+  if (!rows.length) return '<div class="empty">📭 No hay movimientos para este período</div>';
+  return '<table class="tbl"><thead><tr>'
+    + '<th></th><th>Fecha</th><th>Documento</th><th>SKU</th><th>Producto</th><th style="text-align:right">Cantidad</th><th>Referencia</th>'
+    + '</tr></thead><tbody>' + rows.map(buildMovRow).join('') + '</tbody></table>';
+}
+
+/* ── Modal registrar movimiento ─────────────────────────────── */
+function abrirModalMov() {
+  document.getElementById('mvDoc').value = '';
+  document.getElementById('mvFecha').value = fechaHoy();
+  document.getElementById('mvSku').value = '';
+  document.getElementById('mvCant').value = '';
+  document.getElementById('mvRef').value = '';
+  document.getElementById('mvObs').value = '';
+  mvSkuElegido = null;
+  setMovTipo('ingreso');
+  document.getElementById('overlayMov').classList.add('open');
+}
+function cerrarModalMov() { document.getElementById('overlayMov').classList.remove('open'); }
+
+function setMovTipo(t) {
+  mvTipoActual = t;
+  document.getElementById('segIngreso').classList.toggle('active', t === 'ingreso');
+  document.getElementById('segSalida').classList.toggle('active', t === 'salida');
+}
+
+function mvBuscarSku() {
+  var q = (document.getElementById('mvSku').value || '').trim().toLowerCase();
+  var drop = document.getElementById('mvSkuDrop');
+  mvSkuElegido = null;
+  if (q.length < 2) { drop.classList.remove('open'); return; }
+  var res = inventarioCache.filter(function(i) {
+    return String(i.sku).toLowerCase().indexOf(q) >= 0 || String(i.descripcion||'').toLowerCase().indexOf(q) >= 0;
+  }).slice(0, 20);
+  if (!res.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = res.map(function(i) {
+    return '<div class="sku-opt" onmousedown="mvElegirSku(\'' + esc(i.sku) + '\')"><b>' + escHtml(i.sku) + '</b> · ' + escHtml((i.descripcion||'').slice(0,50)) + '</div>';
+  }).join('');
+  drop.classList.add('open');
+}
+function esc(s) { return String(s==null?'':s).replace(/'/g, "\\'"); }
+function mvElegirSku(sku) {
+  var item = inventarioCache.find(function(i){ return i.sku === sku; });
+  document.getElementById('mvSku').value = sku + (item ? ' · ' + item.descripcion : '');
+  mvSkuElegido = item || { sku: sku, descripcion: '' };
+  mvCerrarSku();
+}
+function mvCerrarSku() { document.getElementById('mvSkuDrop').classList.remove('open'); }
+
+async function guardarMovimiento() {
+  var doc = document.getElementById('mvDoc').value.trim();
+  var fecha = document.getElementById('mvFecha').value;
+  var cant = parseFloat(document.getElementById('mvCant').value || '0');
+  if (!mvSkuElegido) { showToast('⚠️ Seleccioná un SKU de la lista'); return; }
+  if (!fecha) { showToast('⚠️ La fecha es obligatoria'); return; }
+  if (!cant || cant <= 0) { showToast('⚠️ Cantidad inválida'); return; }
+
+  var payload = {
+    area: AREA, tipo: mvTipoActual, num_documento: doc || null, fecha: fecha,
+    sku: mvSkuElegido.sku, descripcion: mvSkuElegido.descripcion || null, cantidad: cant,
+    referencia_sicaf: document.getElementById('mvRef').value.trim() || null,
+    observaciones: document.getElementById('mvObs').value.trim() || null
+  };
+  var r = await db.from('movimientos_insumos').insert(payload);
+  if (r.error) { showToast('⚠️ Error al guardar: ' + r.error.message); return; }
+  cerrarModalMov();
+  showToast('✅ Movimiento registrado');
+  await cargarMovimientos();
+  renderMovimientos();
+}
+
+/* ── Personal ────────────────────────────────────────────────── */
+async function cargarPersonal() {
+  var r = await db.from('personal').select('*').eq('area', AREA).eq('activo', true).order('nombre');
+  var personas = r.data || [];
+  var grid = document.getElementById('peopleGrid');
+  if (!personas.length) { grid.innerHTML = '<div class="empty">Sin personal activo registrado en esta área todavía</div>'; return; }
+  grid.innerHTML = personas.map(function(p) {
+    return '<div class="p-card"><div class="p-name">' + escHtml(p.nombre || '—') + '</div>'
+      + '<div class="p-meta">Código: ' + escHtml(p.codigo || '—') + '</div>'
+      + '<div class="p-meta">' + escHtml(p.rol || p.proceso_hab || '—') + '</div></div>';
+  }).join('');
+}
+
+/* ── Init ────────────────────────────────────────────────────── */
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.logo-wrap')) {
+    document.getElementById('logoNav').classList.remove('open');
+    document.getElementById('logoChev').classList.remove('open');
+  }
+});
+
+(async function init() {
+  await cargarInventario();
+  await cargarMovimientos();
+})();
+</script>
+</body>
+</html>
