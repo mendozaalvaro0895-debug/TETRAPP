@@ -159,8 +159,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .drop-zone-img-ico{font-size:22px}
 .drop-zone-img-txt{font-size:13px;font-weight:700;color:#1D4ED8}
 .drop-zone-img-sub{font-size:11px;color:#6B6B6A;margin-top:2px}
-.man-row{display:grid;grid-template-columns:1fr 90px 90px 34px;gap:8px;margin-bottom:8px;align-items:center}
-.man-lbls{display:grid;grid-template-columns:1fr 90px 90px 34px;gap:8px;margin-bottom:6px}
+.man-row{display:grid;grid-template-columns:1fr 90px 140px 90px 34px;gap:8px;margin-bottom:8px;align-items:center}
+.man-lbls{display:grid;grid-template-columns:1fr 90px 140px 90px 34px;gap:8px;margin-bottom:6px}
 .man-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray)}
 .man-in{padding:7px 9px;border:1.5px solid var(--border);border-radius:7px;font-family:var(--font);font-size:13px;width:100%;background:var(--card);color:var(--ink)}
 .man-in:focus{outline:none;border-color:var(--prod)}
@@ -382,6 +382,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="man-lbls">
           <div class="man-lbl">Código / Producto</div>
           <div class="man-lbl">Máquina</div>
+          <div class="man-lbl">Operario</div>
           <div class="man-lbl">Cantidad</div>
           <div></div>
         </div>
@@ -548,7 +549,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 <!-- MODAL MÁQUINAS -->
 <div class="overlay" id="modalMaq" onclick="if(event.target.id==='modalMaq')cerrarModalMaq()">
-  <div class="modal" style="max-width:700px">
+  <div class="modal" style="max-width:860px">
     <div class="mh">
       <div class="mh-t" id="maqTit">✏️ Asignar Máquinas</div>
       <button class="mh-x" onclick="cerrarModalMaq()">×</button>
@@ -584,6 +585,16 @@ function familiaExcluida(descFamilia) {
 }
 
 var MAQUINAS = [1,2,3,4,5,6,7,8,9,10,11,12];
+var PERSONAL_PROD = []; // personal.area='produccion' activos — para asignar operario por fila
+
+function buildOperarioOptions(actual) {
+  var opts = '<option value="">— Sin asignar —</option>';
+  PERSONAL_PROD.forEach(function (p) {
+    opts += '<option value="' + esc(p.codigo) + '"' + (actual === p.codigo ? ' selected' : '') + '>' +
+      esc(p.nombre) + '</option>';
+  });
+  return opts;
+}
 var MAQ_TIPO = {1:'S.Simple',2:'S.Simple',3:'S.Simple',4:'S.Simple',5:'S.Simple',
   6:'S.Doble',7:'I.Sopla',8:'S.Doble',9:'S.Doble',10:'I.Sopla'};
 var MAQ_TIPO_FULL = {1:'Sopladora simple',2:'Sopladora simple',3:'Sopladora simple',
@@ -700,6 +711,12 @@ async function cargarInventario() {
     if (d.length < lote) break;
     desde += lote;
   }
+}
+
+async function cargarPersonalProd() {
+  var r = await db.from('personal').select('codigo,nombre').eq('area', 'produccion').eq('activo', true).order('nombre');
+  if (r.error) { PERSONAL_PROD = []; return; }
+  PERSONAL_PROD = r.data || [];
 }
 
 async function cargarPrecios() {
@@ -972,6 +989,7 @@ function abrirPreview(filas, meta, nombre) {
       descripcion: (inv && inv.descripcion) || f.descripcion,
       cantidad: f.cantidad,
       maquina: (inv && inv.maquina_default) || 0,
+      operador: '',
       enCatalogo: !!inv
     };
   });
@@ -1007,6 +1025,7 @@ function buildPrevRow(r, i) {
     '<td style="font-family:var(--mono);font-weight:700">' + esc(r.sku) + alerta + '</td>' +
     '<td style="font-size:11.5px">' + esc((r.descripcion || '').slice(0, 52)) + '</td>' +
     '<td style="text-align:center"><select class="' + cls + '" onchange="setPrevMaq(' + i + ',this.value)">' + opts + '</select></td>' +
+    '<td style="text-align:center"><select class="prev-maq" onchange="setPrevOperario(' + i + ',this.value)">' + buildOperarioOptions(r.operador) + '</select></td>' +
     '<td style="text-align:right;font-family:var(--mono)">' + fmtU(r.cantidad) + '</td>' +
     '</tr>';
 }
@@ -1055,13 +1074,19 @@ function buildPreviewHtml() {
     '<div class="imp-stat"><strong>' + nuevos + '</strong><span>Fuera de catálogo</span></div>' +
     '</div>' +
     '<div class="prev-scroll"><table class="prev-tbl"><thead><tr>' +
-    '<th>Código</th><th>Producto</th><th style="text-align:center">Máquina</th><th style="text-align:right">Cantidad</th>' +
+    '<th>Código</th><th>Producto</th><th style="text-align:center">Máquina</th><th style="text-align:center">Operario</th><th style="text-align:right">Cantidad</th>' +
     '</tr></thead><tbody>' + filasHtml + '</tbody></table></div>';
 }
 
 function setPrevMaq(i, val) {
   leerPrevMeta();
   prevRows[i].maquina = parseInt(val, 10) || 0;
+  repintarPreview();
+}
+
+function setPrevOperario(i, val) {
+  leerPrevMeta();
+  prevRows[i].operador = val || '';
   repintarPreview();
 }
 
@@ -1126,16 +1151,20 @@ async function guardarTurno(fecha, turno, filas, origen, documento) {
     .eq('fecha', fecha).eq('turno', turno).eq('documento', doc);
   if (del.error) throw del.error;
 
-  // consolidar por (maquina, sku) para respetar el índice único
+  // consolidar por (maquina, sku, operador) para respetar el índice único —
+  // el operario entra en la clave para no fusionar en una sola fila la
+  // producción de dos operarios distintos en la misma máquina/sku (ej. el
+  // relevo de almuerzo, si se cargó como fila aparte con su propio operario)
   var agg = {};
   filas.forEach(function (r) {
     if (!r.sku || !(r.cantidad > 0)) return;
-    var k = (r.maquina || 0) + '|' + r.sku;
+    var op = r.operador || '';
+    var k = (r.maquina || 0) + '|' + r.sku + '|' + op;
     if (!agg[k]) {
       agg[k] = {
         fecha: fecha, turno: turno, maquina: r.maquina || 0, sku: r.sku,
         descripcion: r.descripcion || null, cantidad: 0,
-        documento: doc, origen: origen
+        documento: doc, origen: origen, operador_codigo: op
       };
     }
     agg[k].cantidad += r.cantidad;
@@ -1185,6 +1214,7 @@ function addManRow() {
     '<div class="sku-drop" id="manDrop' + id + '"></div>' +
     '</div>' +
     '<select class="man-in" id="manMaq' + id + '">' + opts + '</select>' +
+    '<select class="man-in" id="manOp' + id + '">' + buildOperarioOptions('') + '</select>' +
     '<input class="man-in num" id="manCant' + id + '" type="number" min="0" step="1" placeholder="0">' +
     '<button class="man-del" onclick="delManRow(' + id + ')" title="Quitar fila">×</button>';
   document.getElementById('manRows').appendChild(div);
@@ -1239,10 +1269,12 @@ async function guardarManual() {
     var id = rows[i].id.replace('manRow', '');
     var sku = (document.getElementById('manSku' + id).value || '').trim();
     var maq = parseInt(document.getElementById('manMaq' + id).value, 10) || 0;
+    var opEl = document.getElementById('manOp' + id);
+    var operador = opEl ? (opEl.value || '') : '';
     var cant = numVal(document.getElementById('manCant' + id).value);
     if (!sku && !cant) continue;
     if (!sku || !(cant > 0)) { incompletas.push(sku || '(sin código)'); continue; }
-    filas.push({ sku: sku, descripcion: (INV[sku] && INV[sku].descripcion) || null, cantidad: cant, maquina: maq });
+    filas.push({ sku: sku, descripcion: (INV[sku] && INV[sku].descripcion) || null, cantidad: cant, maquina: maq, operador: operador });
   }
 
   if (incompletas.length) { toast('Revisa estas filas, les falta código o cantidad: ' + incompletas.join(', '), 'err'); return; }
@@ -1321,7 +1353,7 @@ function buildUltRow(t) {
       esc(Object.keys(t.docs).sort().join(', ')) + '</td>' +
     '<td style="white-space:nowrap;display:flex;gap:6px">' +
       '<button class="btn btn-ghost btn-sm" onclick="verSemanaDe(\'' + t.fecha + '\')">Ver semana</button>' +
-      '<button class="btn btn-ghost btn-sm" onclick="abrirModalMaq(\'' + t.fecha + '\',\'' + t.turno + '\')">✏️ Máquinas</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="abrirModalMaq(\'' + t.fecha + '\',\'' + t.turno + '\')">✏️ Máquinas / Operarios</button>' +
       '<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red)" onclick="eliminarTurno(\'' + t.fecha + '\',\'' + t.turno + '\')">🗑️</button>' +
     '</td>' +
     '</tr>';
@@ -1339,12 +1371,12 @@ var maqRows = [];
 
 async function abrirModalMaq(fecha, turno) {
   document.getElementById('maqTit').textContent =
-    '✏️ Máquinas · ' + fecha + ' · ' + (turno === 'dia' ? '☀️ Día' : '🌙 Noche');
+    '✏️ Máquinas / Operarios · ' + fecha + ' · ' + (turno === 'dia' ? '☀️ Día' : '🌙 Noche');
   document.getElementById('maqBody').innerHTML = '<div style="padding:24px;text-align:center;color:var(--gray)">Cargando…</div>';
   document.getElementById('modalMaq').classList.add('open');
 
   var r = await db.from('produccion_diaria')
-    .select('id,sku,descripcion,cantidad,maquina')
+    .select('id,sku,descripcion,cantidad,maquina,operador_codigo')
     .eq('fecha', fecha).eq('turno', turno)
     .order('maquina').order('sku');
   if (r.error) { toast(mensajeError(r.error), 'err'); return; }
@@ -1359,6 +1391,7 @@ function renderModalMaq() {
   }
   var html = '<table class="tbl" style="width:100%"><thead><tr>' +
     '<th>Código</th><th>Producto</th><th class="num">Cantidad</th><th class="ctr" style="min-width:160px">Máquina</th>' +
+    '<th class="ctr" style="min-width:160px">Operario</th>' +
     '</tr></thead><tbody>';
   maqRows.forEach(function (row, i) {
     var desc = row.descripcion || (INV[row.sku] && INV[row.sku].descripcion) || '—';
@@ -1370,6 +1403,8 @@ function renderModalMaq() {
       '<td class="num">' + fmtU(row.cantidad) + '</td>' +
       '<td class="ctr"><select class="ctrl-in" id="maqSel' + i + '" style="padding:5px 8px;font-size:12px;width:100%">' +
         opts + '</select></td>' +
+      '<td class="ctr"><select class="ctrl-in" id="opSel' + i + '" style="padding:5px 8px;font-size:12px;width:100%">' +
+        buildOperarioOptions(row.operador_codigo || '') + '</select></td>' +
       '</tr>';
   });
   html += '</tbody></table>';
@@ -1380,12 +1415,17 @@ async function guardarMaquinas() {
   var cambios = [];
   maqRows.forEach(function (row, i) {
     var nueva = parseInt(document.getElementById('maqSel' + i).value, 10) || 0;
-    if (nueva !== (row.maquina || 0)) cambios.push({ id: row.id, maquina: nueva });
+    var opEl = document.getElementById('opSel' + i);
+    var nuevoOp = opEl ? (opEl.value || '') : '';
+    var cambio = {};
+    if (nueva !== (row.maquina || 0)) cambio.maquina = nueva;
+    if (nuevoOp !== (row.operador_codigo || '')) cambio.operador_codigo = nuevoOp;
+    if (Object.keys(cambio).length) cambios.push({ id: row.id, cambio: cambio });
   });
   if (!cambios.length) { toast('No hay cambios que guardar'); return; }
   try {
     for (var i = 0; i < cambios.length; i++) {
-      var r = await db.from('produccion_diaria').update({ maquina: cambios[i].maquina }).eq('id', cambios[i].id);
+      var r = await db.from('produccion_diaria').update(cambios[i].cambio).eq('id', cambios[i].id);
       if (r.error) throw r.error;
     }
     toast('✅ ' + cambios.length + ' fila(s) actualizadas');
@@ -1819,6 +1859,7 @@ async function init() {
       (/meta_12hrs|maquina_default|precio_ponderado_manual|column/i.test(m)
         ? '\n\nFalta correr sql/produccion_v1.sql en Supabase → SQL Editor.' : ''), 'err');
   }
+  try { await cargarPersonalProd(); } catch (e) { console.warn('No se pudo cargar personal de Producción:', e); }
   try { await cargarPrecios(); } catch (e) { console.warn(e); }
   await cargarUltimos();
 }

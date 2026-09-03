@@ -45,7 +45,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | `dashboard.html` | KPIs ejecutivos globales |
 | `inventario.html` | Gestión de SKUs, existencias, importación Excel |
 | `ventas.html` | Ventas y Financiero: Resumen · Productos · Clientes · Rotación · Importar facturación (Excel/CSV cols A-R) · toggle IVA |
-| `produccion.html` | Sopladoras: Ingreso PDF/manual (pdf.js) · Reporte Semanal (pivote máquina×SKU) · Mensual |
+| `produccion.html` | Sopladoras: Ingreso PDF/manual (pdf.js) · Reporte Semanal (pivote máquina×SKU) · Mensual. Asigna máquina Y operario por fila (`personal` area='produccion') |
 | `gestion.html` | Gestión de Personal y Planta (v1, solo Personal construido): tabla unificada tapas+serig+producción sobre la misma tabla `personal` + RRHH (locker/EPP/talla) + permisos/incidentes/faltas. Master-only. |
 
 Bodega bloqueado via `<a class="nav-locked">` en toda la navegación.
@@ -204,7 +204,10 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
     Capacitaciones (historial rrhh_capacitaciones + registrar nueva — área de la habilidad
                      independiente del área de la persona, estado en_proceso/certificado,
                      comentario del supervisor OBLIGATORIO, foto de respaldo opcional
-                     reusando el bucket `justificaciones` con prefijo `capacitacion-<id>`)
+                     reusando el bucket `justificaciones` con prefijo `capacitacion-<id>`.
+                     Si el área de la persona es 'produccion', arriba de la lista muestra un
+                     resumen en vivo de `produccion_diaria` — unidades totales y por máquina
+                     con `operador_codigo = personal.codigo` — `cargarResumenProduccion()`)
     Permisos       (historial rrhh_permisos + registrar nuevo)
     Faltas         (historial rrhh_faltas con selector de mes, default mes actual — alerta
                      hasta justificar con texto y/o foto; ver sincronización con Asistencia
@@ -230,7 +233,17 @@ Pantallas: `scrTarea(0)` → Impresión / Flameado / Empaque → `scrOk*`.
 Ver descripciones completas: `.claude/docs/schema-tablas.md`
 
 Notas críticas:
-- `produccion_diaria`: llave única incluye `documento` — un turno puede tener varias requis con cantidades que se SUMAN
+- `produccion_diaria`: llave única incluye `documento` — un turno puede tener varias requis con cantidades que se SUMAN.
+  `operador_codigo` (text, default `''`, referencia `personal.codigo` NO `personal.id`) también entra en esa
+  llave única (`ux_prod_fecha_turno_maq_sku_doc_op`) — dos filas del mismo día/turno/máquina/sku/documento con
+  operarios distintos (ej. relevo de almuerzo cargado aparte) quedan separadas en vez de fusionarse.
+  Se asigna por fila en los mismos 3 puntos donde ya se asigna la máquina: preview de PDF (`buildPrevRow`/
+  `setPrevOperario`), captura manual (`addManRow`/`guardarManual`), y el modal post-guardado
+  ("✏️ Máquinas / Operarios" → `abrirModalMaq`/`renderModalMaq`/`guardarMaquinas`). `guardarTurno()` agrupa
+  por `maquina|sku|operador` (antes solo `maquina|sku`). `PERSONAL_PROD` (cargado en `init()` vía
+  `cargarPersonalProd()`, personal activo de area='produccion') alimenta el `<select>` en los 3 sitios
+  vía `buildOperarioOptions()`. gestion.html → Personal → pestaña Capacitaciones lee esta columna para
+  mostrar unidades producidas por operario (ver arriba).
 - `inventario`: +3 cols producción: `meta_12hrs`, `maquina_default`, `precio_ponderado_manual`
 - `personal`: fuente única de supervisores — registro-tapas.html NO los hardcodea. `area` es 1:1
   por persona (solo valores `'tapas'`/`'serig'` — produccion.html no usa esta tabla). +5 cols RRHH
@@ -268,6 +281,9 @@ Notas críticas:
 11. `sql/v_solicitudes_security_invoker_v1.sql` — ⚠️ parcial: `v_solicitudes` confirmado con
     `security_invoker=true`; falta correr la línea de `v_capacidad_hoy` (queda comentada en el
     archivo) si el Security Advisor también la marcó.
+12. `sql/produccion_operario_v1.sql` — columna `operador_codigo` en `produccion_diaria` +
+    reemplaza el índice único para incluirla. Sin esto, asignar operario en produccion.html
+    falla (columna no existe) y "✏️ Máquinas / Operarios" no carga esa columna.
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)

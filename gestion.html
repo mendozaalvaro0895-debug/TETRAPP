@@ -468,6 +468,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
       <!-- ── Capacitaciones ── -->
       <div class="mp-panel" id="mp-capacitaciones">
+        <div id="capacitacionesProdResumen"></div>
         <div id="capacitacionesList" class="rec-list"></div>
         <button class="btn btn-g btn-sm" id="btnNuevaCapacitacion" onclick="toggleFormCapacitacion()">+ Registrar capacitación</button>
         <div id="formCapacitacion" style="display:none;margin-top:12px;padding:12px;background:var(--bg);border-radius:10px">
@@ -1144,6 +1145,7 @@ function abrirPerfil(id) {
   switchMpTab('gen');
   document.getElementById('modalPersona').classList.add('open');
   cargarCapacitaciones(p.id);
+  cargarResumenProduccion(p.id);
   cargarPermisos(p.id);
   faltasMesActual = mesActualStr();
   cargarFaltas(p.id, faltasMesActual);
@@ -1253,6 +1255,42 @@ async function cargarCapacitaciones(personalId) {
   var rows = r.data || [];
   if (!rows.length) { cont.innerHTML = '<div class="rec-empty">Sin capacitaciones registradas.</div>'; return; }
   cont.innerHTML = rows.map(buildCapacitacionItem).join('');
+}
+
+// Resumen de producción real (produccion.html) a nombre de este operario — solo Producción,
+// une por personal.codigo (mismo criterio que operador_codigo en produccion_diaria/asistencia_diaria)
+async function cargarResumenProduccion(personalId) {
+  var cont = document.getElementById('capacitacionesProdResumen');
+  if (!cont) return;
+  var p = personalTodos.find(function(x) { return String(x.id) === String(personalId); });
+  if (!p || p.area !== 'produccion' || !p.codigo) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div class="rec-empty">Cargando producción registrada…</div>';
+  try {
+    var r = await db.from('produccion_diaria').select('maquina,cantidad').eq('operador_codigo', p.codigo);
+    if (r.error) throw r.error;
+    var rows = r.data || [];
+    if (!rows.length) {
+      cont.innerHTML = '<div class="rec-empty">Sin producción registrada todavía a nombre de este operario en Producción.</div>';
+      return;
+    }
+    var total = 0;
+    var porMaquina = {};
+    rows.forEach(function(x) {
+      total += x.cantidad || 0;
+      var m = x.maquina || 0;
+      porMaquina[m] = (porMaquina[m] || 0) + (x.cantidad || 0);
+    });
+    var maquinasTxt = Object.keys(porMaquina).sort(function(a, b) { return a - b; }).map(function(m) {
+      return 'Máquina ' + m + ': ' + Math.round(porMaquina[m]).toLocaleString('es-GT') + ' und';
+    }).join(' · ');
+    cont.innerHTML = '<div style="background:var(--gest-l);border-radius:10px;padding:12px 14px;margin-bottom:14px">' +
+      '<div style="font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--gest-m)">Producción registrada</div>' +
+      '<div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--gest-m);line-height:1.2">' + Math.round(total).toLocaleString('es-GT') + ' und</div>' +
+      '<div style="font-size:10px;color:var(--gray);margin-top:2px">' + escHtml(maquinasTxt) + '</div>' +
+    '</div>';
+  } catch (e) {
+    cont.innerHTML = '<div class="rec-empty">No se pudo cargar producción (¿corriste sql/produccion_operario_v1.sql?)</div>';
+  }
 }
 
 function buildCapacitacionItem(c) {
