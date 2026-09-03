@@ -9,6 +9,7 @@
 <title>TETRAPLASTIC — Sistema Digital de Operaciones</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="shared/auth.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="shared/styles.css">
 <style>
@@ -95,6 +96,54 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .footer-info{padding:32px 24px 48px;max-width:1100px;margin:0 auto;text-align:center;color:var(--gray);font-size:12px}
 .footer-info code{font-family:var(--mono);background:var(--card);padding:2px 6px;border-radius:4px;font-size:11px;border:1px solid var(--border)}
 
+/* ── Central de Ingreso ───────────────────────────────────────── */
+.ci-banner{max-width:1100px;margin:0 auto 8px;padding:0 24px}
+.ci-card{background:linear-gradient(135deg,#0C0C0B,#1A1A19);border-radius:16px;padding:22px 26px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;color:#fff}
+.ci-card-l{display:flex;align-items:center;gap:16px}
+.ci-icon{width:52px;height:52px;border-radius:12px;background:rgba(126,206,192,.15);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.ci-title{font-family:var(--display);font-size:19px;font-weight:700}
+.ci-sub{font-size:12.5px;color:rgba(255,255,255,.6);margin-top:2px}
+.ci-btn{background:#7ECEC0;color:#0C0C0B;border:none;padding:11px 22px;border-radius:9px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;transition:transform .12s}
+.ci-btn:hover{transform:translateY(-1px)}
+
+.ci-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto}
+.ci-overlay.open{display:flex}
+.ci-modal{background:var(--card);border-radius:16px;width:100%;max-width:900px;box-shadow:0 24px 64px rgba(0,0,0,.35)}
+.ci-mh{padding:18px 24px;border-bottom:1.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.ci-mh-title{font-family:var(--display);font-size:19px;font-weight:700}
+.ci-mh-x{cursor:pointer;color:var(--gray-l);font-size:22px;line-height:1}
+.ci-mb{padding:22px 24px;max-height:74vh;overflow-y:auto}
+.ci-mf{padding:16px 24px;border-top:1.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px}
+
+.ci-drop{border:2px dashed var(--border);border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;transition:all .15s}
+.ci-drop:hover,.ci-drop.drag{border-color:var(--teal);background:var(--teal-xl)}
+.ci-drop-icon{font-size:32px;margin-bottom:8px}
+.ci-drop-t{font-size:14px;font-weight:600}
+.ci-drop-s{font-size:12px;color:var(--gray);margin-top:4px}
+.ci-files{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.ci-file-chip{background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;display:flex;align-items:center;gap:8px}
+.ci-file-x{cursor:pointer;color:var(--gray-l);font-weight:700}
+
+.ci-doc{border:1.5px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden}
+.ci-doc-h{background:var(--bg2);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ci-doc-title{font-weight:700;font-size:13.5px;font-family:var(--mono)}
+.ci-doc-meta{font-size:11.5px;color:var(--gray);margin-top:2px}
+.ci-pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.ci-pill-recon{background:#DBEAFE;color:#1E40AF}
+.ci-pill-ajuste{background:#FEF3C7;color:#92400E}
+.ci-pill-mov{background:var(--teal-xl);color:var(--teal)}
+.ci-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.ci-tbl th{text-align:left;padding:8px 12px;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray);border-bottom:1.5px solid var(--border);background:var(--card)}
+.ci-tbl td{padding:7px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.ci-tbl select,.ci-tbl input{padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:var(--font);font-size:11.5px}
+.ci-tbl select:focus,.ci-tbl input:focus{outline:none;border-color:var(--teal)}
+.ci-recon-ok{color:#15803D;font-weight:700;font-size:11.5px}
+.ci-recon-warn{color:#B45309;font-weight:700;font-size:11.5px}
+.ci-row-saved td{opacity:.45}
+.ci-status{font-size:12px;color:var(--gray);min-height:18px;margin-top:10px;text-align:center}
+.ci-spin{display:inline-block;width:13px;height:13px;border:2px solid var(--border);border-top-color:var(--teal);border-radius:50%;animation:ci-spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes ci-spin{to{transform:rotate(360deg)}}
+
 
 /* ── Responsive móvil ─────────────────────────────────────────── */
 @media(max-width:480px){
@@ -115,7 +164,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <a href="tapas.html">🏷 Tapas</a>
       <a href="serigrafia.html">🎨 Serigrafía</a>
       <a href="dashboard.html">📊 Dashboard</a>
-      <div class="logo-nav-sep"></div>
       <div class="logo-nav-sep"></div>
       <a href="produccion.html">🏭 Producción</a>
       <a href="ventas.html">💼 Ventas</a>
@@ -144,6 +192,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   <div class="kpi-badge" id="fugasBadge">📉 Fugas: —</div>
 </div>
 
+<div class="ci-banner">
+  <div class="ci-card">
+    <div class="ci-card-l">
+      <div class="ci-icon">📥</div>
+      <div>
+        <div class="ci-title">Central de Ingreso</div>
+        <div class="ci-sub">Subí las capturas/PDF de requis de SICAF del día — se leen, se clasifican y se reparten a cada módulo</div>
+      </div>
+    </div>
+    <button class="ci-btn" onclick="ciAbrir()">📤 Subir requis del día</button>
+  </div>
+</div>
 
 <div class="areas-grid">
 
@@ -207,7 +267,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="area-arrow">→</div>
     <div class="area-icon bodega">📦</div>
     <div class="area-name">Bodega</div>
-    <div class="area-desc">Bodega 07 · movimientos de materia prima e insumos, personal del área.</div>
+    <div class="area-desc">Catálogo e inventario (Bodega 02·05·07), movimientos de insumos y personal del área.</div>
     <div class="area-status active">● Activo</div>
   </a>
 
@@ -229,6 +289,42 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="area-status active">● Activo</div>
   </a>
 
+</div>
+
+<!-- ═══ CENTRAL DE INGRESO ═══ -->
+<div class="ci-overlay" id="ciOverlay">
+  <div class="ci-modal">
+    <div class="ci-mh">
+      <div class="ci-mh-title">📥 Central de Ingreso</div>
+      <span class="ci-mh-x" onclick="ciCerrar()">×</span>
+    </div>
+    <div class="ci-mb">
+
+      <div id="ciPasoSubir">
+        <div class="ci-drop" id="ciDrop" onclick="document.getElementById('ciFileInput').click()">
+          <div class="ci-drop-icon">🖼️📄</div>
+          <div class="ci-drop-t">Arrastrá o hacé clic para subir capturas o PDFs</div>
+          <div class="ci-drop-s">Requis de SICAF — imágenes (PNG/JPG) o PDF, uno o varios a la vez</div>
+        </div>
+        <input type="file" id="ciFileInput" accept="image/*,.pdf" multiple style="display:none" onchange="ciAgregarArchivos(this.files)">
+        <div class="ci-files" id="ciFiles"></div>
+        <div class="ci-status" id="ciStatusSubir"></div>
+      </div>
+
+      <div id="ciPasoRevision" style="display:none">
+        <div id="ciDocsWrap"></div>
+      </div>
+
+    </div>
+    <div class="ci-mf">
+      <div class="ci-status" id="ciStatusPie" style="margin-top:0"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-ghost" style="padding:9px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-weight:600;font-size:13px;cursor:pointer" onclick="ciCerrar()">Cerrar</button>
+        <button class="ci-btn" id="ciBtnProcesar" onclick="ciProcesar()">Leer con IA</button>
+        <button class="ci-btn" id="ciBtnGuardar" onclick="ciGuardarTodo()" style="display:none">💾 Guardar todo</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="footer-info">
@@ -330,6 +426,349 @@ document.addEventListener('click', function() {
   if (n) n.classList.remove('open');
   if (c) c.classList.remove('open');
 });
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   CENTRAL DE INGRESO — lee requis de SICAF (Claude Vision) y
+   reparte cada línea a su tabla de TETRAPP. Ver reglas completas
+   en .claude/docs/contexto-bot-requis.md
+   ══════════════════════════════════════════════════════════════ */
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+var ciArchivos = [];      // File[] pendientes de procesar
+var ciDocumentos = [];    // documentos extraídos, con líneas y acción por línea
+
+var CI_ACCIONES = [
+  { v: 'tapas_salida',    l: '🏷 Tapas — Salida de bodega' },
+  { v: 'tapas_ingreso',   l: '🏷 Tapas — Ingreso PT' },
+  { v: 'serig_entrega',   l: '🎨 Serigrafía — Registrar entrega' },
+  { v: 'insumo_bodega_in',  l: '📦 Insumos — Ingreso Bodega' },
+  { v: 'insumo_bodega_out', l: '📦 Insumos — Salida Bodega' },
+  { v: 'insumo_molino_in',  l: '⚙️ Insumos — Ingreso Molino' },
+  { v: 'insumo_molino_out', l: '⚙️ Insumos — Salida Molino' },
+  { v: 'ajuste_resta',    l: '📉 Ajuste de inventario (resta)' },
+  { v: 'ajuste_suma',     l: '📈 Ajuste de inventario (suma)' },
+  { v: 'ignorar',         l: '❌ Ignorar esta línea' }
+];
+
+function ciAbrir() {
+  ciArchivos = [];
+  ciDocumentos = [];
+  document.getElementById('ciFiles').innerHTML = '';
+  document.getElementById('ciStatusSubir').textContent = '';
+  document.getElementById('ciStatusPie').textContent = '';
+  document.getElementById('ciPasoSubir').style.display = '';
+  document.getElementById('ciPasoRevision').style.display = 'none';
+  document.getElementById('ciBtnProcesar').style.display = '';
+  document.getElementById('ciBtnGuardar').style.display = 'none';
+  document.getElementById('ciOverlay').classList.add('open');
+}
+function ciCerrar() { document.getElementById('ciOverlay').classList.remove('open'); }
+
+function ciAgregarArchivos(fileList) {
+  for (var i = 0; i < fileList.length; i++) ciArchivos.push(fileList[i]);
+  renderCiFiles();
+}
+function renderCiFiles() {
+  document.getElementById('ciFiles').innerHTML = ciArchivos.map(function(f, i) {
+    return '<div class="ci-file-chip"><span>' + (f.type === 'application/pdf' ? '📄' : '🖼️') + ' ' +
+      escHtml(f.name) + '</span><span class="ci-file-x" onclick="ciQuitarArchivo(' + i + ')">×</span></div>';
+  }).join('');
+}
+function ciQuitarArchivo(i) { ciArchivos.splice(i, 1); renderCiFiles(); }
+
+['dragover', 'dragleave', 'drop'].forEach(function(ev) {
+  document.addEventListener(ev, function(e) {
+    var drop = document.getElementById('ciDrop');
+    if (!drop || !document.getElementById('ciOverlay').classList.contains('open')) return;
+    e.preventDefault();
+    if (ev === 'dragover') drop.classList.add('drag');
+    if (ev === 'dragleave') drop.classList.remove('drag');
+    if (ev === 'drop') {
+      drop.classList.remove('drag');
+      if (e.dataTransfer && e.dataTransfer.files.length) ciAgregarArchivos(e.dataTransfer.files);
+    }
+  });
+});
+
+/* ── Convertir archivo(s) a imágenes base64 (PDF → 1 imagen por página) ── */
+function fileToDataUrl(file) {
+  return new Promise(function(resolve, reject) {
+    var r = new FileReader();
+    r.onload = function() { resolve(r.result); };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+async function fileToImagenes(file) {
+  if (file.type !== 'application/pdf') {
+    var dataUrl = await fileToDataUrl(file);
+    return [{ base64: dataUrl.split(',')[1], mime_type: file.type || 'image/png' }];
+  }
+  var buf = await file.arrayBuffer();
+  var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  var imagenes = [];
+  for (var p = 1; p <= pdf.numPages; p++) {
+    var page = await pdf.getPage(p);
+    var viewport = page.getViewport({ scale: 2 });
+    var canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+    imagenes.push({ base64: canvas.toDataURL('image/png').split(',')[1], mime_type: 'image/png' });
+  }
+  return imagenes;
+}
+
+async function llamarParseRequi(base64, mimeType) {
+  var r = await fetch('/api/parse-requi', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': HEADERS.Authorization },
+    body: JSON.stringify({ image_base64: base64, mime_type: mimeType })
+  });
+  var j = await r.json();
+  if (!r.ok) throw new Error(j.error || 'Error al leer el documento');
+  return j;
+}
+
+/* ── Reglas de clasificación (ver contexto-bot-requis.md) ─────── */
+function ciEsTapa(producto) { return /\b(BASE|TAPA|CONTRATAPA)\b/i.test(producto || ''); }
+function ciEsSerig(producto) { return /SERIGRAFIA|SERIGRAFIADO/i.test(producto || ''); }
+
+function ciSugerirAccion(prefijo, producto) {
+  var p = (prefijo || '').toUpperCase();
+  if (p === 'PRI') return 'reconciliar';
+  if (p === 'PRS') return 'ajuste_resta';
+  if (p === 'DEV') return 'ajuste_suma';
+  if (p === 'TMP' || p === 'PTS') return 'tapas_salida';
+  if (p === 'PTI') return ciEsSerig(producto) ? 'serig_entrega' : (ciEsTapa(producto) ? 'tapas_ingreso' : 'ignorar');
+  if (p === 'MPI') return 'insumo_bodega_in';
+  if (p === 'MPS') return 'insumo_bodega_out';
+  return 'ignorar';
+}
+
+/* ── Paso 1 → 2: procesar archivos con Claude Vision ──────────── */
+async function ciProcesar() {
+  if (!ciArchivos.length) { document.getElementById('ciStatusSubir').textContent = '⚠️ Agregá al menos un archivo'; return; }
+  var btn = document.getElementById('ciBtnProcesar');
+  btn.disabled = true;
+  var status = document.getElementById('ciStatusSubir');
+  var docsNuevos = [];
+  try {
+    for (var i = 0; i < ciArchivos.length; i++) {
+      status.innerHTML = '<span class="ci-spin"></span>Leyendo ' + (i + 1) + ' / ' + ciArchivos.length + ' — ' + escHtml(ciArchivos[i].name) + '…';
+      var imagenes = await fileToImagenes(ciArchivos[i]);
+      for (var p = 0; p < imagenes.length; p++) {
+        var resp = await llamarParseRequi(imagenes[p].base64, imagenes[p].mime_type);
+        (resp.documentos || []).forEach(function(d) {
+          d.lineas = (d.lineas || []).map(function(l) {
+            return { codigo: l.codigo, producto: l.producto, cantidad: l.cantidad || 0,
+              costo_unitario: l.costo_unitario || 0, valor_total: l.valor_total || 0,
+              accion: ciSugerirAccion(d.prefijo, l.producto), cliente: '', guardado: false };
+          });
+          docsNuevos.push(d);
+        });
+      }
+    }
+    ciDocumentos = ciDocumentos.concat(docsNuevos);
+    status.textContent = '';
+    await ciPrecalcularReconciliacion(docsNuevos);
+    document.getElementById('ciPasoSubir').style.display = 'none';
+    document.getElementById('ciPasoRevision').style.display = '';
+    document.getElementById('ciBtnProcesar').style.display = 'none';
+    document.getElementById('ciBtnGuardar').style.display = '';
+    ciRenderDocs();
+  } catch (e) {
+    status.textContent = '⚠️ ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ── Reconciliación de líneas PRI contra produccion_diaria ────── */
+async function ciPrecalcularReconciliacion(docs) {
+  var fechas = {};
+  docs.forEach(function(d) { if (d.prefijo === 'PRI' && d.fecha) fechas[d.fecha] = true; });
+  var fechasArr = Object.keys(fechas);
+  if (!fechasArr.length) return;
+  var mapaPorFecha = {};
+  for (var i = 0; i < fechasArr.length; i++) {
+    var f = fechasArr[i];
+    var r = await db.from('produccion_diaria').select('sku,cantidad').eq('fecha', f);
+    var mapa = {};
+    (r.data || []).forEach(function(row) { mapa[row.sku] = (mapa[row.sku] || 0) + (row.cantidad || 0); });
+    mapaPorFecha[f] = mapa;
+  }
+  docs.forEach(function(d) {
+    if (d.prefijo !== 'PRI' || !d.fecha) return;
+    var mapa = mapaPorFecha[d.fecha] || {};
+    d.lineas.forEach(function(l) {
+      var enSistema = mapa[l.codigo] || 0;
+      l.reconciliacion = { enSistema: enSistema, coincide: enSistema === (l.cantidad || 0) };
+    });
+  });
+}
+
+/* ── Render de la pantalla de revisión ─────────────────────────── */
+function ciRenderDocs() {
+  document.getElementById('ciDocsWrap').innerHTML = ciDocumentos.map(function(d, di) {
+    return ciRenderUnDoc(d, di);
+  }).join('');
+}
+
+function ciRenderUnDoc(d, di) {
+  var esRecon = d.prefijo === 'PRI';
+  var pillClass = esRecon ? 'ci-pill-recon' : (d.prefijo === 'PRS' || d.prefijo === 'DEV' ? 'ci-pill-ajuste' : 'ci-pill-mov');
+  var pillTxt = esRecon ? 'RECONCILIAR' : (d.prefijo === 'PRS' || d.prefijo === 'DEV' ? 'AJUSTE' : 'MOVIMIENTO');
+  var filas = d.lineas.map(function(l, li) { return esRecon ? ciFilaRecon(l) : ciFilaAccion(d, di, l, li); }).join('');
+  var thAccion = esRecon
+    ? '<th style="text-align:right">En sistema</th><th></th>'
+    : '<th>Acción</th><th>Extra</th>';
+  return '<div class="ci-doc">' +
+    '<div class="ci-doc-h"><div>' +
+      '<span class="ci-doc-title">' + escHtml(d.documento || '—') + '</span> ' +
+      '<span class="ci-pill ' + pillClass + '">' + pillTxt + '</span>' +
+      '<div class="ci-doc-meta">Bodega ' + escHtml(d.bodega || '—') + ' · ' + escHtml(d.fecha || '—') +
+        (d.descripcion ? ' · ' + escHtml(d.descripcion) : '') +
+        (d.referencia ? ' · ref: ' + escHtml(d.referencia) : '') + '</div>' +
+    '</div></div>' +
+    '<div style="overflow-x:auto"><table class="ci-tbl"><thead><tr>' +
+      '<th>Código</th><th>Producto</th><th style="text-align:right">Cantidad</th>' + thAccion +
+    '</tr></thead><tbody>' + filas + '</tbody></table></div>' +
+  '</div>';
+}
+
+function ciFilaRecon(l) {
+  var rec = l.reconciliacion || { enSistema: 0, coincide: false };
+  var estado = rec.coincide
+    ? '<span class="ci-recon-ok">✅ coincide</span>'
+    : '<span class="ci-recon-warn">⚠️ revisar</span>';
+  return '<tr><td style="font-family:var(--mono)">' + escHtml(l.codigo || '—') + '</td>' +
+    '<td>' + escHtml((l.producto || '').slice(0, 50)) + '</td>' +
+    '<td style="text-align:right;font-family:var(--mono)">' + (l.cantidad || 0).toLocaleString() + '</td>' +
+    '<td style="text-align:right;font-family:var(--mono)">' + rec.enSistema.toLocaleString() + '</td>' +
+    '<td>' + estado + '</td></tr>';
+}
+
+function ciFilaAccion(d, di, l, li) {
+  var opts = CI_ACCIONES.map(function(a) {
+    return '<option value="' + a.v + '"' + (a.v === l.accion ? ' selected' : '') + '>' + a.l + '</option>';
+  }).join('');
+  var extra = l.accion === 'serig_entrega'
+    ? '<input type="text" placeholder="Cliente…" value="' + escHtml(l.cliente || '') + '" onchange="ciSetCliente(' + di + ',' + li + ',this.value)" style="width:110px">'
+    : '';
+  var rowCls = l.guardado ? ' class="ci-row-saved"' : '';
+  return '<tr' + rowCls + '><td style="font-family:var(--mono)">' + escHtml(l.codigo || '—') + '</td>' +
+    '<td>' + escHtml((l.producto || '').slice(0, 50)) + '</td>' +
+    '<td style="text-align:right;font-family:var(--mono)">' + (l.cantidad || 0).toLocaleString() + '</td>' +
+    '<td><select ' + (l.guardado ? 'disabled' : '') + ' onchange="ciCambiarAccion(' + di + ',' + li + ',this.value)">' + opts + '</select></td>' +
+    '<td>' + extra + '</td></tr>';
+}
+
+function ciCambiarAccion(di, li, valor) {
+  ciDocumentos[di].lineas[li].accion = valor;
+  ciRenderDocs();
+}
+function ciSetCliente(di, li, valor) {
+  ciDocumentos[di].lineas[li].cliente = valor;
+}
+
+/* ── Guardar: reparte cada línea a su tabla según la acción ───── */
+async function ciGuardarTodo() {
+  var btn = document.getElementById('ciBtnGuardar');
+  btn.disabled = true;
+  var status = document.getElementById('ciStatusPie');
+  var ok = 0, err = 0, ignoradas = 0;
+  try {
+    for (var di = 0; di < ciDocumentos.length; di++) {
+      var d = ciDocumentos[di];
+      for (var li = 0; li < d.lineas.length; li++) {
+        var l = d.lineas[li];
+        if (l.guardado) continue;
+        if (l.accion === 'ignorar' || l.accion === 'reconciliar') { ignoradas++; continue; }
+        status.textContent = 'Guardando ' + (ok + err + 1) + '…';
+        try {
+          await ciGuardarLinea(d, l);
+          l.guardado = true;
+          ok++;
+        } catch (e) {
+          console.error('[ciGuardarTodo]', e.message);
+          err++;
+        }
+      }
+    }
+    ciRenderDocs();
+    status.textContent = '✅ ' + ok + ' guardadas' + (err ? ' · ⚠️ ' + err + ' con error' : '') +
+      (ignoradas ? ' · ' + ignoradas + ' sin acción' : '');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function ciGuardarLinea(d, l) {
+  var obs = 'FECHA:' + (d.fecha || '') + ' | ' + (d.descripcion || d.referencia || '');
+
+  if (l.accion === 'tapas_salida' || l.accion === 'tapas_ingreso') {
+    var r1 = await db.from('movimientos_materiales').insert({
+      tipo: l.accion === 'tapas_salida' ? 'salida_bodega' : 'entrada_pt',
+      num_documento: d.documento, sku_original: l.codigo, cantidad: l.cantidad, observaciones: obs
+    });
+    if (r1.error) throw r1.error;
+    return;
+  }
+
+  if (l.accion === 'serig_entrega') {
+    var r2 = await db.from('entregas_serig').insert({
+      requi: d.documento, cliente: l.cliente || '—', cant: l.cantidad, fecha: d.fecha || fechaHoyLocal(),
+      nota: d.descripcion || null, sol_id: null, sol_codigo: '',
+      lineas: [{ cliente: l.cliente || '—', sku: l.codigo, desc: l.producto, cant: l.cantidad, solId: '', solCodigo: '' }]
+    });
+    if (r2.error) throw r2.error;
+    return;
+  }
+
+  if (l.accion.indexOf('insumo_') === 0) {
+    var area = l.accion.indexOf('molino') >= 0 ? 'molino' : 'bodega';
+    var tipo = l.accion.indexOf('_in') >= 0 ? 'ingreso' : 'salida';
+    var r3 = await db.from('movimientos_insumos').insert({
+      area: area, tipo: tipo, prefijo: d.prefijo, num_documento: d.documento, fecha: d.fecha || fechaHoyLocal(),
+      sku: l.codigo, descripcion: l.producto, cantidad: l.cantidad,
+      costo_unitario: l.costo_unitario || null, valor_total: l.valor_total || null,
+      referencia_sicaf: d.referencia || null, observaciones: d.descripcion || null
+    });
+    if (r3.error) throw r3.error;
+    return;
+  }
+
+  if (l.accion === 'ajuste_resta' || l.accion === 'ajuste_suma') {
+    var signo = l.accion === 'ajuste_resta' ? -1 : 1;
+    var delta = signo * (l.cantidad || 0);
+    var enB7 = await db.from('insumos_b7').select('sku,existencia').eq('sku', l.codigo).maybeSingle();
+    if (enB7.data) {
+      var nuevaB7 = (enB7.data.existencia || 0) + delta;
+      var ru1 = await db.from('insumos_b7').update({ existencia: nuevaB7 }).eq('sku', l.codigo);
+      if (ru1.error) throw ru1.error;
+      return;
+    }
+    var enInv = await db.from('inventario').select('sku,existencia').eq('sku', l.codigo).maybeSingle();
+    if (enInv.data) {
+      var nuevaInv = (enInv.data.existencia || 0) + delta;
+      var ru2 = await db.from('inventario').update({ existencia: nuevaInv }).eq('sku', l.codigo);
+      if (ru2.error) throw ru2.error;
+      return;
+    }
+    throw new Error('SKU ' + l.codigo + ' no existe en ningún catálogo — ajustar manualmente');
+  }
+}
+
+function fechaHoyLocal() {
+  var d = new Date(Date.now() - 6 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+}
 </script>
 
 </body>
