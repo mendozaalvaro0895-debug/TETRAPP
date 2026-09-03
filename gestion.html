@@ -653,15 +653,29 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
               <div class="fl" id="nbTirosLbl">Tiros del período</div>
               <input class="fi" id="nbTiros" type="number" min="0" placeholder="Ej: 10000" style="width:100%">
             </div>
+            <div class="fg" id="nbLineaWrap" style="display:none">
+              <div class="fl">Línea</div>
+              <select class="fs" id="nbLinea" style="width:100%">
+                <option value="1">Línea 1</option>
+                <option value="2">Línea 2</option>
+                <option value="3">Línea 3</option>
+                <option value="4">Línea 4</option>
+              </select>
+            </div>
             <div class="fg" id="nbBolsasWrap" style="display:none">
               <div class="fl">Bolsas de empaque confirmadas</div>
               <input class="fi" id="nbBolsas" type="number" min="0" placeholder="Ej: 4" style="width:100%">
             </div>
           </div>
+          <div class="fg full" id="nbTraerWrap" style="display:none">
+            <button class="btn btn-g btn-sm" type="button" id="btnTraerBono" onclick="traerTirosBono()">🔄 Traer del registro de productividad</button>
+          </div>
           <div class="fg full" id="nbMermaWrap" style="display:none">
             <div class="fl">% Merma reportada por empaque</div>
             <input class="fi" id="nbMerma" type="number" min="0" step="0.1" placeholder="Ej: 1.5" style="width:100%">
+            <button class="btn btn-g btn-sm" type="button" id="btnCalcularMerma" onclick="calcularMermaBono()" style="margin-top:6px">🔄 Calcular merma (salidas de envase base vs entregas PT)</button>
           </div>
+          <div class="fg full" id="nbAutoInfo" style="font-size:11px;color:#64748b;display:none"></div>
           <div class="fr">
             <div class="fg">
               <label class="fchk">
@@ -1615,8 +1629,14 @@ async function eliminarIncidente(id) {
 }
 
 // ════════════════════════════════════════════════════════════
-// SUELDOS Y BONOS — registro manual, por ahora sin conexión automática
-// a tiros/merma reales (ver nota en CLAUDE.md)
+// SUELDOS Y BONOS — tiros_unidades (Impresión/Flameado) y merma_pct
+// (Recepción) se pueden traer automáticamente de registro_tiros_serig /
+// movimientos_materiales / entregas_serig (botones 🔄, ver
+// traerTirosBono()/calcularMermaBono() más abajo). Al traer el dato
+// también se PRE-marca "Cumplió la meta" comparando contra el umbral
+// oficial (10,000 / 2%) como sugerencia — sigue siendo un checkbox
+// editable, la decisión final y el monto del bono los confirma el
+// supervisor. Ver CLAUDE.md.
 // ════════════════════════════════════════════════════════════
 var ROL_LINEA_LBL = { impresion: '🖨 Impresión', flameado: '🔥 Flameado', recepcion: '📦 Recepción', otro: 'Otro' };
 
@@ -1652,10 +1672,19 @@ function buildBonoItem(b) {
 
 function toggleCamposBono() {
   var rol = document.getElementById('nbRol').value;
-  document.getElementById('nbTirosWrap').style.display = (rol === 'impresion' || rol === 'flameado') ? 'grid' : 'none';
+  var esTirosRol = (rol === 'impresion' || rol === 'flameado');
+  document.getElementById('nbTirosWrap').style.display = esTirosRol ? 'grid' : 'none';
   document.getElementById('nbTirosLbl').textContent = rol === 'flameado' ? 'Unidades del período' : 'Tiros del período';
+  document.getElementById('nbLineaWrap').style.display = rol === 'flameado' ? 'block' : 'none';
+  if (rol === 'flameado') {
+    var p = personalTodos.find(function(x) { return String(x.id) === String(mpEditId); });
+    if (p && p.mtx_linea) document.getElementById('nbLinea').value = String(p.mtx_linea);
+  }
   document.getElementById('nbBolsasWrap').style.display = rol === 'flameado' ? 'flex' : 'none';
+  document.getElementById('nbTraerWrap').style.display = esTirosRol ? 'block' : 'none';
   document.getElementById('nbMermaWrap').style.display = rol === 'recepcion' ? 'flex' : 'none';
+  document.getElementById('nbAutoInfo').style.display = 'none';
+  document.getElementById('nbAutoInfo').textContent = '';
 }
 
 function toggleFormBono() {
@@ -1666,6 +1695,7 @@ function toggleFormBono() {
     document.getElementById('nbRol').value = 'impresion';
     document.getElementById('nbPeriodo').value = mesActualStr();
     document.getElementById('nbTiros').value = '';
+    document.getElementById('nbLinea').value = '1';
     document.getElementById('nbBolsas').value = '';
     document.getElementById('nbMerma').value = '';
     document.getElementById('nbCumplida').checked = false;
@@ -1673,6 +1703,115 @@ function toggleFormBono() {
     document.getElementById('nbSupervisor').value = '';
     document.getElementById('nbComentario').value = '';
     toggleCamposBono();
+  }
+}
+
+// Período de un bono acepta 'YYYY-MM' (mensual) o 'YYYY-MM-DD' (diario) —
+// se resuelve a un rango de fechas para consultar los registros reales.
+function _rangoPeriodoBono(periodo) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(periodo)) return { desde: periodo, hasta: periodo };
+  if (/^\d{4}-\d{2}$/.test(periodo)) return rangoDelMes(periodo);
+  return null;
+}
+
+// Tiros/unidades de un día = diferencia entre la lectura máxima y mínima del
+// contador ese día (o la lectura misma si solo hay una — el contador arranca
+// en 0 cada día). Igual criterio que renderTrazabilidad() en serigrafia.html.
+function _deltaTirosDia(rows) {
+  if (!rows.length) return 0;
+  var cnts = rows.map(function(r) { return r.contador || 0; });
+  if (cnts.length === 1) return cnts[0] > 0 ? cnts[0] : 0;
+  return Math.max.apply(null, cnts) - Math.min.apply(null, cnts);
+}
+
+async function _sumaTirosPorFecha(query) {
+  var r = await query;
+  if (r.error) throw r.error;
+  var porDia = {};
+  (r.data || []).forEach(function(x) { (porDia[x.fecha] = porDia[x.fecha] || []).push(x); });
+  var total = 0;
+  Object.keys(porDia).forEach(function(f) { total += _deltaTirosDia(porDia[f]); });
+  return total;
+}
+
+// Impresión: tiros del propio operador (registro_tiros_serig.operador_codigo).
+// Flameado: unidades de TODA la línea ese período — "las unidades se empatan
+// con el registro de tiros de la máquina impresora" (misma línea, el flameador
+// alimenta al impresor, no tiene su propio contador).
+async function traerTirosBono() {
+  var rol = document.getElementById('nbRol').value;
+  var periodo = (document.getElementById('nbPeriodo').value || '').trim();
+  var rango = _rangoPeriodoBono(periodo);
+  if (!rango) { showToast('⚠️ El período debe ser un mes (YYYY-MM) o una fecha (YYYY-MM-DD)', '#B83232'); return; }
+  var p = personalTodos.find(function(x) { return String(x.id) === String(mpEditId); });
+  if (!p) return;
+  var btn = document.getElementById('btnTraerBono');
+  var info = document.getElementById('nbAutoInfo');
+  var oldTxt = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Consultando…';
+  try {
+    var total, fuente;
+    if (rol === 'flameado') {
+      var linea = parseInt(document.getElementById('nbLinea').value, 10) || 1;
+      total = await _sumaTirosPorFecha(
+        db.from('registro_tiros_serig').select('contador,fecha').eq('area', 'serig').eq('linea_id', linea)
+          .gte('fecha', rango.desde).lte('fecha', rango.hasta)
+      );
+      fuente = 'Línea ' + linea;
+    } else {
+      if (!p.codigo) { showToast('⚠️ Esta persona no tiene código asignado', '#B83232'); return; }
+      total = await _sumaTirosPorFecha(
+        db.from('registro_tiros_serig').select('contador,fecha').eq('area', 'serig').eq('operador_codigo', p.codigo)
+          .gte('fecha', rango.desde).lte('fecha', rango.hasta)
+      );
+      fuente = p.nombre;
+    }
+    document.getElementById('nbTiros').value = total;
+    document.getElementById('nbCumplida').checked = total >= 10000;
+    info.style.display = 'block';
+    info.textContent = '🔄 ' + total.toLocaleString('es-GT') + ' ' + (rol === 'flameado' ? 'unidades' : 'tiros')
+      + ' · ' + fuente + ' · ' + rango.desde + (rango.desde !== rango.hasta ? ' a ' + rango.hasta : '');
+    showToast(total > 0 ? '✅ Traído de registro_tiros_serig: ' + total.toLocaleString('es-GT') : '⚠️ Sin lecturas para ese período', total > 0 ? '#1A6B5B' : '#D97706');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  } finally {
+    btn.disabled = false; btn.textContent = oldTxt;
+  }
+}
+
+// Merma de Recepción = (salidas de envase base a Serigrafía − entregas de PT) / salidas.
+// Aproximación de extremo a extremo pedida por Álvaro: no aísla en qué etapa se
+// pierde el envase (esa vista más fina ya existe en serigrafia.html → Trazabilidad,
+// Flameado vs PT por pedido) — esta es la cifra global del período para el bono.
+async function calcularMermaBono() {
+  var periodo = (document.getElementById('nbPeriodo').value || '').trim();
+  var rango = _rangoPeriodoBono(periodo);
+  if (!rango) { showToast('⚠️ El período debe ser un mes (YYYY-MM) o una fecha (YYYY-MM-DD)', '#B83232'); return; }
+  var btn = document.getElementById('btnCalcularMerma');
+  var info = document.getElementById('nbAutoInfo');
+  var oldTxt = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Calculando…';
+  try {
+    var rSal = await db.from('movimientos_materiales').select('cantidad')
+      .eq('area', 'serig').eq('tipo', 'salida_bodega')
+      .gte('created_at', rango.desde + 'T00:00:00').lte('created_at', rango.hasta + 'T23:59:59');
+    if (rSal.error) throw rSal.error;
+    var salida = (rSal.data || []).reduce(function(a, m) { return a + (m.cantidad || 0); }, 0);
+    var rPt = await db.from('entregas_serig').select('cant,fecha').gte('fecha', rango.desde).lte('fecha', rango.hasta);
+    if (rPt.error) throw rPt.error;
+    var pt = (rPt.data || []).reduce(function(a, e) { return a + (e.cant || 0); }, 0);
+    var merma = salida > 0 ? Math.round(((salida - pt) / salida) * 1000) / 10 : null;
+    document.getElementById('nbMerma').value = merma != null ? merma : '';
+    document.getElementById('nbCumplida').checked = merma != null && merma <= 2;
+    info.style.display = 'block';
+    info.textContent = merma != null
+      ? '🔄 Salida envase base: ' + salida.toLocaleString('es-GT') + ' · Entregado PT: ' + pt.toLocaleString('es-GT') + ' · Merma: ' + merma + '%'
+      : '⚠️ Sin salidas registradas en ese período';
+    showToast(merma != null ? '✅ Merma calculada: ' + merma + '%' : '⚠️ Sin datos suficientes para calcular', merma != null ? '#1A6B5B' : '#D97706');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  } finally {
+    btn.disabled = false; btn.textContent = oldTxt;
   }
 }
 

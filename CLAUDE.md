@@ -218,12 +218,30 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
     Incidentes     (historial rrhh_incidentes + registrar nuevo)
     Sueldos y Bonos (historial rrhh_bonos + registrar nuevo — rol_linea impresion/flameado/
                      recepcion/otro, cada uno con sus propios campos condicionales via
-                     `toggleCamposBono()`: tiros/unidades, bolsas de empaque (solo flameado),
-                     % merma reportada (solo recepción). Estrategia de incentivos de la línea
-                     de Serigrafía: Impresión Q750/día·10k tiros, Flameado Q350/mes·10k
-                     unidades+4 bolsas, Recepción Q350/mes pierde si merma>2%. Es un registro
-                     MANUAL de la decisión ya tomada — NO se calcula automático desde
-                     registro_tiros_serig ni de ninguna tabla de merma todavía)
+                     `toggleCamposBono()`: tiros/unidades + línea (flameado), bolsas de
+                     empaque (solo flameado), % merma reportada (solo recepción). Estrategia
+                     de incentivos de la línea de Serigrafía: Impresión Q750/día·10k tiros,
+                     Flameado Q350/mes·10k unidades+4 bolsas, Recepción Q350/mes pierde si
+                     merma>2%. `meta_cumplida`/`monto_bono` siguen siendo decisión MANUAL del
+                     supervisor — pero `tiros_unidades` y `merma_pct` tienen botón 🔄 para
+                     traerse solos de datos reales:
+                     · `traerTirosBono()` — Impresión: suma delta diario de
+                       `registro_tiros_serig.contador` (máx-mín por fecha, o la lectura misma
+                       si solo hay una — el contador arranca en 0 cada día, mismo criterio que
+                       `_trazaDelta()` en serigrafia.html) filtrado por `operador_codigo` =
+                       código de la persona. Flameado: mismo cálculo pero filtrado por
+                       `linea_id` (select Línea 1-4, precargado desde `personal.mtx_linea` si
+                       existe) — el flameador no tiene contador propio, sus unidades se
+                       empatan con el contador de la línea completa.
+                     · `calcularMermaBono()` — Recepción: `(salida − PT) / salida`, donde
+                       salida = suma de `movimientos_materiales` (`area='serig'`,
+                       `tipo='salida_bodega'`) y PT = suma de `entregas_serig.cant`, ambas en
+                       el rango del período. Es una cifra global de extremo a extremo (no
+                       aísla en qué etapa se pierde el envase) — la vista más fina por pedido
+                       (Flameado→PT) ya existe en serigrafia.html → Trazabilidad.
+                     Período acepta 'YYYY-MM' (mensual) o 'YYYY-MM-DD' (diario) — ambos botones
+                     resuelven el rango con `_rangoPeriodoBono()`. Al traer el dato se
+                     PRE-marca "Cumplió la meta" contra el umbral oficial, pero sigue editable.)
 
 ⚠️ Al editar una persona EXISTENTE desde acá, NO se toca color_hex/mtx_rol/mtx_linea —
   esos campos gobiernan la matriz de líneas del board en serigrafia.html y solo se

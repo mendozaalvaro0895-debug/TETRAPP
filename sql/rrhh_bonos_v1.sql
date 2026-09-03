@@ -10,10 +10,11 @@
 --   - Recepción: Q350/mes, pierde el derecho si empaque reporta
 --                +2% de merma por mala impresión/tinta corrida
 --
--- Por ahora NO se calcula solo desde registro_tiros_serig ni desde
--- ninguna tabla de merma — es un registro de la DECISIÓN ya tomada,
--- con los números de respaldo como referencia. Automatizarlo contra
--- los datos reales de tiros/merma queda como mejora futura.
+-- tiros_unidades y merma_pct se pueden traer automáticamente desde
+-- gestion.html (botones 🔄 en la pestaña Sueldos y Bonos) leyendo
+-- registro_tiros_serig / movimientos_materiales / entregas_serig — ver
+-- traerTirosBono()/calcularMermaBono() en gestion.html. meta_cumplida
+-- y monto_bono siguen siendo SIEMPRE la decisión manual del supervisor.
 --
 -- Correr COMPLETO en Supabase Dashboard → SQL Editor. Idempotente.
 -- ════════════════════════════════════════════════════════════════
