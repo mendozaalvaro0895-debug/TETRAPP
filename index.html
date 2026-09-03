@@ -445,6 +445,7 @@ var ciArchivos = [];      // File[] pendientes de procesar
 var ciDocumentos = [];    // documentos extraídos, con líneas y acción por línea
 
 var CI_ACCIONES = [
+  { v: 'prod_completar',  l: '🏭 Producción — completar turno' },
   { v: 'tapas_salida',    l: '🏷 Tapas — Salida de bodega' },
   { v: 'tapas_ingreso',   l: '🏷 Tapas — Ingreso PT' },
   { v: 'serig_entrega',   l: '🎨 Serigrafía — Registrar entrega' },
@@ -454,8 +455,15 @@ var CI_ACCIONES = [
   { v: 'insumo_molino_out', l: '⚙️ Insumos — Salida Molino' },
   { v: 'ajuste_resta',    l: '📉 Ajuste de inventario (resta)' },
   { v: 'ajuste_suma',     l: '📈 Ajuste de inventario (suma)' },
+  { v: 'reconciliar',     l: '🔍 Ya está en el sistema (no hacer nada)' },
   { v: 'ignorar',         l: '❌ Ignorar esta línea' }
 ];
+var MAQUINAS_CI = [1,2,3,4,5,6,7,8,9,10,11,12];
+var PERSONAL_PROD_CI = [];
+async function ciCargarPersonalProd() {
+  var r = await db.from('personal').select('codigo,nombre').eq('area', 'produccion').eq('activo', true).order('nombre');
+  PERSONAL_PROD_CI = r.data || [];
+}
 
 function ciAbrir() {
   ciArchivos = [];
@@ -468,6 +476,7 @@ function ciAbrir() {
   document.getElementById('ciBtnProcesar').style.display = '';
   document.getElementById('ciBtnGuardar').style.display = 'none';
   document.getElementById('ciOverlay').classList.add('open');
+  ciCargarPersonalProd();
 }
 function ciCerrar() { document.getElementById('ciOverlay').classList.remove('open'); }
 
@@ -586,9 +595,13 @@ async function llamarParseRequi(base64, mimeType) {
 function ciEsTapa(producto) { return /\b(BASE|TAPA|CONTRATAPA)\b/i.test(producto || ''); }
 function ciEsSerig(producto) { return /SERIGRAFIA|SERIGRAFIADO/i.test(producto || ''); }
 
-function ciSugerirAccion(prefijo, producto) {
+function ciSugerirAccion(prefijo, producto, reconciliacion) {
   var p = (prefijo || '').toUpperCase();
-  if (p === 'PRI') return 'reconciliar';
+  if (p === 'PRI') {
+    if (ciEsTapa(producto)) return 'tapas_ingreso'; // PRI mezcla envases con tapas/bases — ver contexto-bot-requis.md
+    if (reconciliacion && reconciliacion.coincide) return 'reconciliar';
+    return 'prod_completar';
+  }
   if (p === 'PRS') return 'ajuste_resta';
   if (p === 'DEV') return 'ajuste_suma';
   if (p === 'TMP' || p === 'PTS') return 'tapas_salida';
@@ -596,6 +609,13 @@ function ciSugerirAccion(prefijo, producto) {
   if (p === 'MPI') return 'insumo_bodega_in';
   if (p === 'MPS') return 'insumo_bodega_out';
   return 'ignorar';
+}
+
+function ciAdivinarTurno(desc) {
+  var d = (desc || '').toUpperCase();
+  if (d.indexOf('NOCHE') >= 0) return 'noche';
+  if (d.indexOf('DIA') >= 0 || d.indexOf('DÍA') >= 0) return 'dia';
+  return '';
 }
 
 /* ── Paso 1 → 2: procesar archivos con Claude Vision ──────────── */
@@ -615,7 +635,7 @@ async function ciProcesar() {
           d.lineas = (d.lineas || []).map(function(l) {
             return { codigo: l.codigo, producto: l.producto, cantidad: l.cantidad || 0,
               costo_unitario: l.costo_unitario || 0, valor_total: l.valor_total || 0,
-              accion: ciSugerirAccion(d.prefijo, l.producto), cliente: '', guardado: false };
+              accion: null, cliente: '', turno: ciAdivinarTurno(d.descripcion), maquina: '', operador: '', guardado: false };
           });
           docsNuevos.push(d);
         });
@@ -624,6 +644,9 @@ async function ciProcesar() {
     ciDocumentos = ciDocumentos.concat(docsNuevos);
     status.textContent = '';
     await ciPrecalcularReconciliacion(docsNuevos);
+    docsNuevos.forEach(function(d) {
+      d.lineas.forEach(function(l) { l.accion = ciSugerirAccion(d.prefijo, l.producto, l.reconciliacion); });
+    });
     document.getElementById('ciPasoSubir').style.display = 'none';
     document.getElementById('ciPasoRevision').style.display = '';
     document.getElementById('ciBtnProcesar').style.display = 'none';
@@ -668,13 +691,9 @@ function ciRenderDocs() {
 }
 
 function ciRenderUnDoc(d, di) {
-  var esRecon = d.prefijo === 'PRI';
-  var pillClass = esRecon ? 'ci-pill-recon' : (d.prefijo === 'PRS' || d.prefijo === 'DEV' ? 'ci-pill-ajuste' : 'ci-pill-mov');
-  var pillTxt = esRecon ? 'RECONCILIAR' : (d.prefijo === 'PRS' || d.prefijo === 'DEV' ? 'AJUSTE' : 'MOVIMIENTO');
-  var filas = d.lineas.map(function(l, li) { return esRecon ? ciFilaRecon(l) : ciFilaAccion(d, di, l, li); }).join('');
-  var thAccion = esRecon
-    ? '<th style="text-align:right">En sistema</th><th></th>'
-    : '<th>Acción</th><th>Extra</th>';
+  var pillClass = d.prefijo === 'PRI' ? 'ci-pill-mov' : (d.prefijo === 'PRS' || d.prefijo === 'DEV' ? 'ci-pill-ajuste' : 'ci-pill-mov');
+  var pillTxt = d.prefijo === 'PRI' ? 'PRODUCCIÓN' : (d.prefijo === 'PRS' || d.prefijo === 'DEV' ? 'AJUSTE' : 'MOVIMIENTO');
+  var filas = d.lineas.map(function(l, li) { return ciFilaAccion(d, di, l, li); }).join('');
   return '<div class="ci-doc">' +
     '<div class="ci-doc-h"><div>' +
       '<span class="ci-doc-title">' + escHtml(d.documento || '—') + '</span> ' +
@@ -684,30 +703,43 @@ function ciRenderUnDoc(d, di) {
         (d.referencia ? ' · ref: ' + escHtml(d.referencia) : '') + '</div>' +
     '</div></div>' +
     '<div style="overflow-x:auto"><table class="ci-tbl"><thead><tr>' +
-      '<th>Código</th><th>Producto</th><th style="text-align:right">Cantidad</th>' + thAccion +
+      '<th>Código</th><th>Producto</th><th style="text-align:right">Cantidad</th><th>Acción</th><th>Extra</th>' +
     '</tr></thead><tbody>' + filas + '</tbody></table></div>' +
   '</div>';
 }
 
-function ciFilaRecon(l) {
-  var rec = l.reconciliacion || { enSistema: 0, coincide: false };
-  var estado = rec.coincide
-    ? '<span class="ci-recon-ok">✅ coincide</span>'
-    : '<span class="ci-recon-warn">⚠️ revisar</span>';
-  return '<tr><td style="font-family:var(--mono)">' + escHtml(l.codigo || '—') + '</td>' +
-    '<td>' + escHtml((l.producto || '').slice(0, 50)) + '</td>' +
-    '<td style="text-align:right;font-family:var(--mono)">' + (l.cantidad || 0).toLocaleString() + '</td>' +
-    '<td style="text-align:right;font-family:var(--mono)">' + rec.enSistema.toLocaleString() + '</td>' +
-    '<td>' + estado + '</td></tr>';
+function ciExtraProduccion(d, di, li, l) {
+  var maqOpts = '<option value="">Máquina</option>' + MAQUINAS_CI.map(function(m) {
+    return '<option value="' + m + '"' + (String(l.maquina) === String(m) ? ' selected' : '') + '>#' + m + '</option>';
+  }).join('');
+  var opOpts = '<option value="">Operario</option>' + PERSONAL_PROD_CI.map(function(p) {
+    return '<option value="' + esc(p.codigo) + '"' + (l.operador === p.codigo ? ' selected' : '') + '>' + escHtml(p.nombre) + '</option>';
+  }).join('');
+  return '<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">' +
+    '<select onchange="ciSetCampo(' + di + ',' + li + ',\'turno\',this.value)" style="width:76px">' +
+      '<option value="">Turno</option>' +
+      '<option value="dia"' + (l.turno === 'dia' ? ' selected' : '') + '>☀️ Día</option>' +
+      '<option value="noche"' + (l.turno === 'noche' ? ' selected' : '') + '>🌙 Noche</option>' +
+    '</select>' +
+    '<select onchange="ciSetCampo(' + di + ',' + li + ',\'maquina\',this.value)" style="width:78px">' + maqOpts + '</select>' +
+    '<select onchange="ciSetCampo(' + di + ',' + li + ',\'operador\',this.value)" style="width:118px">' + opOpts + '</select>' +
+  '</div>';
 }
 
 function ciFilaAccion(d, di, l, li) {
   var opts = CI_ACCIONES.map(function(a) {
     return '<option value="' + a.v + '"' + (a.v === l.accion ? ' selected' : '') + '>' + a.l + '</option>';
   }).join('');
-  var extra = l.accion === 'serig_entrega'
-    ? '<input type="text" placeholder="Cliente…" value="' + escHtml(l.cliente || '') + '" onchange="ciSetCliente(' + di + ',' + li + ',this.value)" style="width:110px">'
-    : '';
+  var extra = '';
+  if (l.accion === 'serig_entrega') {
+    extra = '<input type="text" placeholder="Cliente…" value="' + escHtml(l.cliente || '') + '" onchange="ciSetCampo(' + di + ',' + li + ',\'cliente\',this.value)" style="width:110px">';
+  } else if (l.accion === 'prod_completar') {
+    extra = ciExtraProduccion(d, di, li, l);
+  } else if (l.reconciliacion) {
+    extra = l.reconciliacion.coincide
+      ? '<span class="ci-recon-ok">✅ ya en sistema (' + l.reconciliacion.enSistema.toLocaleString() + ')</span>'
+      : '<span class="ci-recon-warn">⚠️ en sistema: ' + l.reconciliacion.enSistema.toLocaleString() + '</span>';
+  }
   var rowCls = l.guardado ? ' class="ci-row-saved"' : '';
   return '<tr' + rowCls + '><td style="font-family:var(--mono)">' + escHtml(l.codigo || '—') + '</td>' +
     '<td>' + escHtml((l.producto || '').slice(0, 50)) + '</td>' +
@@ -720,8 +752,8 @@ function ciCambiarAccion(di, li, valor) {
   ciDocumentos[di].lineas[li].accion = valor;
   ciRenderDocs();
 }
-function ciSetCliente(di, li, valor) {
-  ciDocumentos[di].lineas[li].cliente = valor;
+function ciSetCampo(di, li, campo, valor) {
+  ciDocumentos[di].lineas[li][campo] = valor;
 }
 
 /* ── Guardar: reparte cada línea a su tabla según la acción ───── */
@@ -758,6 +790,18 @@ async function ciGuardarTodo() {
 
 async function ciGuardarLinea(d, l) {
   var obs = 'FECHA:' + (d.fecha || '') + ' | ' + (d.descripcion || d.referencia || '');
+
+  if (l.accion === 'prod_completar') {
+    if (!l.turno)   throw new Error('Falta elegir el turno');
+    if (!l.maquina) throw new Error('Falta elegir la máquina');
+    var r0 = await db.from('produccion_diaria').insert({
+      fecha: d.fecha || fechaHoyLocal(), turno: l.turno, maquina: parseInt(l.maquina, 10),
+      sku: l.codigo, descripcion: l.producto || null, cantidad: l.cantidad,
+      documento: d.documento, origen: 'central_ingreso', operador_codigo: l.operador || ''
+    });
+    if (r0.error) throw r0.error;
+    return;
+  }
 
   if (l.accion === 'tapas_salida' || l.accion === 'tapas_ingreso') {
     var r1 = await db.from('movimientos_materiales').insert({
