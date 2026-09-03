@@ -304,7 +304,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="ci-drop" id="ciDrop" onclick="document.getElementById('ciFileInput').click()">
           <div class="ci-drop-icon">🖼️📄</div>
           <div class="ci-drop-t">Arrastrá o hacé clic para subir capturas o PDFs</div>
-          <div class="ci-drop-s">Requis de SICAF — imágenes (PNG/JPG) o PDF, uno o varios a la vez</div>
+          <div class="ci-drop-s">Requis de SICAF — imágenes (PNG/JPG) o PDF, uno o varios a la vez · o pegá con Ctrl+V</div>
         </div>
         <input type="file" id="ciFileInput" accept="image/*,.pdf" multiple style="display:none" onchange="ciAgregarArchivos(this.files)">
         <div class="ci-files" id="ciFiles"></div>
@@ -479,6 +479,23 @@ function renderCiFiles() {
   }).join('');
 }
 function ciQuitarArchivo(i) { ciArchivos.splice(i, 1); renderCiFiles(); }
+
+document.addEventListener('paste', function(e) {
+  if (!document.getElementById('ciOverlay').classList.contains('open')) return;
+  var items = (e.clipboardData || window.clipboardData || {}).items;
+  if (!items) return;
+  var pegados = [];
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') === 0) {
+      var blob = items[i].getAsFile();
+      if (blob) {
+        var ext = (blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+        pegados.push(new File([blob], 'pegado-' + Date.now() + '-' + i + '.' + ext, { type: blob.type }));
+      }
+    }
+  }
+  if (pegados.length) { e.preventDefault(); ciAgregarArchivos(pegados); }
+});
 
 ['dragover', 'dragleave', 'drop'].forEach(function(ev) {
   document.addEventListener(ev, function(e) {
