@@ -43,11 +43,10 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | `comandas.html` | Registro de producción diaria por operario (vista admin) |
 | `registro-tapas.html` | Formulario móvil rol `operativo`: comanda concluida, correlativo CMD-### vía trigger DB |
 | `dashboard.html` | KPIs ejecutivos globales |
-| `inventario.html` | Gestión de SKUs, existencias, importación Excel |
 | `ventas.html` | Ventas y Financiero: Resumen · Productos · Clientes · Rotación · Importar facturación (Excel/CSV cols A-R) · toggle IVA |
 | `produccion.html` | Sopladoras: Ingreso PDF/manual (pdf.js) · Reporte Semanal (pivote máquina×SKU) · Mensual. Asigna máquina Y operario por fila (`personal` area='produccion') |
 | `gestion.html` | Gestión de Personal y Planta (v1, solo Personal construido): tabla unificada tapas+serig+producción sobre la misma tabla `personal` + RRHH (locker/EPP/talla) + permisos/incidentes/faltas. Master-only. |
-| `bodega.html` | Bodega 07 (materias primas e insumos): Inicio (KPIs) · Movimientos (`movimientos_insumos`, área='bodega') · Personal. Existencias siguen viviendo en `inventario.html` (no duplicadas). Destino de los prefijos SICAF `MPI`/`MPS` desde la futura Central de Ingreso. |
+| `bodega.html` | Bodega — Inicio (KPIs) · **Existencias** (ex-`inventario.html`, integrado sep/2026: catálogo Bodega 02/05/07, tablas `inventario`+`insumos_b7`, importación Excel, alertas de bajo stock) · Movimientos (`movimientos_insumos`, área='bodega', destino de los prefijos SICAF `MPI`/`MPS`) · Personal. `inventario.html` ahora es solo un redirect a `bodega.html#existencias` (no borrado, por si hay bookmarks/PWA viejos). |
 | `molino.html` | Molienda/mezcla/distribución de materia prima a máquina: mismo patrón que bodega.html (Inicio · Movimientos `área='molino'` · Personal). Alcance MVP — no modela todavía fórmulas ni distribución por máquina, ver `.claude/docs/contexto-bot-requis.md`. |
 
 Ver `.claude/docs/contexto-bot-requis.md` para el contexto completo del "Bot Cazador de Info"
