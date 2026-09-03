@@ -153,6 +153,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .p-table col.c-inicio{width:106px}
 .p-table col.c-talla{width:68px}
 .p-table col.c-rol{width:150px}
+.p-table col.c-habil{width:170px}
 .p-table col.c-turno{width:100px}
 .p-table col.c-estado{width:86px}
 .p-table col.c-locker{width:150px}
@@ -347,6 +348,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="mp-tabs">
       <div class="mptab active" id="mptab-gen" onclick="switchMpTab('gen')">Datos generales</div>
       <div class="mptab" id="mptab-rrhh" onclick="switchMpTab('rrhh')">RRHH</div>
+      <div class="mptab" id="mptab-capacitaciones" onclick="switchMpTab('capacitaciones')">Capacitaciones</div>
       <div class="mptab" id="mptab-permisos" onclick="switchMpTab('permisos')">Permisos</div>
       <div class="mptab" id="mptab-faltas" onclick="switchMpTab('faltas')">Faltas</div>
       <div class="mptab" id="mptab-incidentes" onclick="switchMpTab('incidentes')">Incidentes</div>
@@ -461,6 +463,56 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="fg full">
           <div class="fl">Notas RRHH</div>
           <textarea class="fta" id="mpNotasRrhh" placeholder="Observaciones generales de RRHH…" style="width:100%"></textarea>
+        </div>
+      </div>
+
+      <!-- ── Capacitaciones ── -->
+      <div class="mp-panel" id="mp-capacitaciones">
+        <div id="capacitacionesList" class="rec-list"></div>
+        <button class="btn btn-g btn-sm" id="btnNuevaCapacitacion" onclick="toggleFormCapacitacion()">+ Registrar capacitación</button>
+        <div id="formCapacitacion" style="display:none;margin-top:12px;padding:12px;background:var(--bg);border-radius:10px">
+          <div class="fr">
+            <div class="fg">
+              <div class="fl">Área de la habilidad *</div>
+              <select class="fs" id="ncArea" style="width:100%">
+                <option value="tapas">🏷 Tapas</option>
+                <option value="serig">🎨 Serigrafía</option>
+                <option value="produccion">🏭 Producción</option>
+                <option value="molino">⚙️ Molino</option>
+                <option value="bodega">📦 Bodega</option>
+                <option value="moldes">🔧 Moldes</option>
+              </select>
+            </div>
+            <div class="fg">
+              <div class="fl">Estado</div>
+              <select class="fs" id="ncEstado" style="width:100%">
+                <option value="en_proceso">🕐 En capacitación</option>
+                <option value="certificado">✅ Certificado</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg full">
+            <div class="fl">Habilidad *</div>
+            <input class="fi" id="ncHabilidad" placeholder="Ej: Cortar tarros, Armado línea 3…" style="width:100%">
+          </div>
+          <div class="fr">
+            <div class="fg">
+              <div class="fl">Fecha</div>
+              <input class="fi" id="ncFecha" type="date" style="width:100%">
+            </div>
+            <div class="fg">
+              <div class="fl">Supervisor que valida</div>
+              <input class="fi" id="ncSupervisor" placeholder="Nombre del supervisor" style="width:100%">
+            </div>
+          </div>
+          <div class="fg full">
+            <div class="fl">Comentario del acompañamiento *</div>
+            <textarea class="fta" id="ncComentario" placeholder="Detalle del acompañamiento a pie de máquina hasta dominar la habilidad…" style="width:100%"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-g btn-sm" onclick="toggleFormCapacitacion()">Cancelar</button>
+            <button class="btn btn-s btn-sm" onclick="guardarCapacitacion()">Guardar</button>
+          </div>
         </div>
       </div>
 
@@ -692,6 +744,7 @@ async function cargarPersonal() {
   if (r.error) { showToast('❌ Error cargando personal: ' + r.error.message, '#B83232'); return; }
   personalTodos = r.data || [];
   await cargarFaltasResumen();
+  await cargarCapacitacionesResumen();
   renderKpis();
   renderPersonalGrid();
   renderLockers();
@@ -916,7 +969,10 @@ var AREA_COLOR_DEFAULT = {
   molino: '#92400E', bodega: '#0E7490', moldes: '#475569'
 };
 
-var P_TABLE_COLS = 12;
+var AREA_LBL_MAP = {};
+AREA_GRUPOS.forEach(function(a) { AREA_LBL_MAP[a.key] = a.label; });
+
+var P_TABLE_COLS = 13;
 var gruposColapsados = {}; // { area: true } — colapsado; ausente/false = desplegado (default)
 
 function toggleGrupoArea(area) {
@@ -936,11 +992,11 @@ function buildGrupoBloque(key, label, grupo) {
 function buildPersonalTable(lista) {
   var html = '<table class="p-table"><colgroup>' +
     '<col class="c-persona"><col class="c-codigo"><col class="c-edad"><col class="c-numero">' +
-    '<col class="c-inicio"><col class="c-talla"><col class="c-rol"><col class="c-turno"><col class="c-estado">' +
+    '<col class="c-inicio"><col class="c-talla"><col class="c-rol"><col class="c-habil"><col class="c-turno"><col class="c-estado">' +
     '<col class="c-locker"><col class="c-faltas"><col class="c-justif">' +
     '</colgroup><thead><tr>' +
     '<th>Persona</th><th>Código</th><th>Edad</th><th>Número</th><th>Fecha de inicio</th><th>Talla</th>' +
-    '<th>Rol / Proceso</th><th>Turno</th><th>Estado</th><th>Locker asignado</th>' +
+    '<th>Rol / Proceso</th><th title="Capacitaciones y certificaciones">Habilidades</th><th>Turno</th><th>Estado</th><th>Locker asignado</th>' +
     '<th title="Solo el mes en curso">Faltas</th><th title="Solo el mes en curso">Justificación</th>' +
     '</tr></thead>';
   var vistos = {};
@@ -979,6 +1035,14 @@ function buildPersonalRow(p) {
       return f.justificada ? '<div class="falta-si">SI</div>' : '<div class="falta-no">NO</div>';
     }).join('');
   }
+  var habilList = CAPACITACIONES_RESUMEN[p.id] || [];
+  var habilCell = !habilList.length
+    ? '<span class="falta-none">—</span>'
+    : habilList.map(function(h) {
+        var icon = h.estado === 'certificado' ? '✅' : '🕐';
+        var areaTag = h.area !== p.area ? ' · ' + (AREA_LBL_MAP[h.area] || h.area) : '';
+        return '<div>' + icon + ' ' + escHtml(h.habilidad) + areaTag + '</div>';
+      }).join('');
   return '<tr class="p-row' + (p.activo ? '' : ' inactivo') + '" onclick="abrirPerfil(\'' + p.id + '\')">' +
     '<td><span class="p-row-avatar" style="background:' + (p.color_hex || '#6B6B6A') + '">' + iniciales + '</span>' + escHtml(p.nombre) + '</td>' +
     '<td style="font-family:var(--mono);font-size:11px">' + escHtml(p.codigo) + '</td>' +
@@ -987,6 +1051,7 @@ function buildPersonalRow(p) {
     '<td>' + (p.fecha_inicio ? escHtml(p.fecha_inicio) : '—') + '</td>' +
     '<td>' + (p.talla_uniforme ? escHtml(p.talla_uniforme) : '—') + '</td>' +
     '<td>' + escHtml(rolTxt) + '</td>' +
+    '<td class="td-multi" onclick="event.stopPropagation();abrirPerfilEnCapacitaciones(\'' + p.id + '\')">' + habilCell + '</td>' +
     '<td>' + escHtml(turnoTxt) + '</td>' +
     '<td>' + estadoBadge + '</td>' +
     '<td>' + lockerChip + '</td>' +
@@ -1001,7 +1066,7 @@ function buildPersonalRow(p) {
 var mpEditId = null;
 
 function switchMpTab(tab) {
-  ['gen', 'rrhh', 'permisos', 'faltas', 'incidentes'].forEach(function(t) {
+  ['gen', 'rrhh', 'capacitaciones', 'permisos', 'faltas', 'incidentes'].forEach(function(t) {
     document.getElementById('mptab-' + t).classList.toggle('active', t === tab);
     document.getElementById('mp-' + t).classList.toggle('active', t === tab);
   });
@@ -1036,7 +1101,7 @@ function abrirNuevaPersona() {
   document.getElementById('mpEppFecha').value = '';
   document.getElementById('mpNotasRrhh').value = '';
   document.getElementById('btnEliminarPersona').style.display = 'none';
-  ['permisos', 'faltas', 'incidentes'].forEach(function(t) {
+  ['capacitaciones', 'permisos', 'faltas', 'incidentes'].forEach(function(t) {
     document.getElementById('mptab-' + t).classList.add('disabled');
   });
   switchMpTab('gen');
@@ -1069,18 +1134,25 @@ function abrirPerfil(id) {
   document.getElementById('mpEppFecha').value = p.epp_fecha || '';
   document.getElementById('mpNotasRrhh').value = p.notas_rrhh || '';
   document.getElementById('btnEliminarPersona').style.display = 'inline-block';
-  ['permisos', 'faltas', 'incidentes'].forEach(function(t) {
+  ['capacitaciones', 'permisos', 'faltas', 'incidentes'].forEach(function(t) {
     document.getElementById('mptab-' + t).classList.remove('disabled');
   });
+  document.getElementById('formCapacitacion').style.display = 'none';
   document.getElementById('formPermiso').style.display = 'none';
   document.getElementById('formFalta').style.display = 'none';
   document.getElementById('formIncidente').style.display = 'none';
   switchMpTab('gen');
   document.getElementById('modalPersona').classList.add('open');
+  cargarCapacitaciones(p.id);
   cargarPermisos(p.id);
   faltasMesActual = mesActualStr();
   cargarFaltas(p.id, faltasMesActual);
   cargarIncidentes(p.id);
+}
+
+function abrirPerfilEnCapacitaciones(id) {
+  abrirPerfil(id);
+  switchMpTab('capacitaciones');
 }
 
 function abrirPerfilEnFaltas(id) {
@@ -1153,6 +1225,136 @@ async function eliminarPersonaActual() {
     cerrarModalPersona();
     await cargarPersonal();
     showToast('🗑 Persona eliminada');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// CAPACITACIONES / HABILIDADES
+// ════════════════════════════════════════════════════════════
+var CAPACITACIONES_RESUMEN = {}; // { personal_id: [ {area, habilidad, estado}, ... ] } — para la columna Habilidades
+
+async function cargarCapacitacionesResumen() {
+  CAPACITACIONES_RESUMEN = {};
+  var r = await db.from('rrhh_capacitaciones').select('personal_id,area,habilidad,estado').order('habilidad');
+  if (r.error) return;
+  (r.data || []).forEach(function(c) {
+    if (!CAPACITACIONES_RESUMEN[c.personal_id]) CAPACITACIONES_RESUMEN[c.personal_id] = [];
+    CAPACITACIONES_RESUMEN[c.personal_id].push(c);
+  });
+}
+
+async function cargarCapacitaciones(personalId) {
+  var cont = document.getElementById('capacitacionesList');
+  cont.innerHTML = '<div class="rec-empty">Cargando…</div>';
+  var r = await db.from('rrhh_capacitaciones').select('*').eq('personal_id', personalId).order('fecha', { ascending: false });
+  if (r.error) { cont.innerHTML = '<div class="rec-empty">Error al cargar</div>'; return; }
+  var rows = r.data || [];
+  if (!rows.length) { cont.innerHTML = '<div class="rec-empty">Sin capacitaciones registradas.</div>'; return; }
+  cont.innerHTML = rows.map(buildCapacitacionItem).join('');
+}
+
+function buildCapacitacionItem(c) {
+  var areaLbl = AREA_LBL_MAP[c.area] || c.area;
+  var estadoBadge = c.estado === 'certificado'
+    ? '<span class="falta-ok">✅ Certificado</span>'
+    : '<span class="pill pill-pendiente">🕐 En capacitación</span>';
+  var fotoBlock = c.foto_url
+    ? '<img class="falta-foto-thumb" src="' + escHtml(c.foto_url) + '" onclick="window.open(\'' + escHtml(c.foto_url) + '\',\'_blank\')">'
+    : '<div style="margin-top:8px;display:flex;align-items:center;gap:8px">' +
+        '<label class="just-foto-btn" for="cap-foto-' + c.id + '">📷 Adjuntar foto de respaldo</label>' +
+        '<input type="file" accept="image/*" id="cap-foto-' + c.id + '" style="display:none" onchange="subirFotoCapacitacion(' + c.id + ', this)">' +
+        '<span id="cap-foto-status-' + c.id + '" style="font-size:10px;color:var(--gray)"></span>' +
+      '</div>';
+  return '<div class="rec-item">' +
+    '<div class="rec-top">' +
+      '<div><div class="rec-tipo">' + escHtml(c.habilidad) + ' ' + estadoBadge + '</div>' +
+      '<div class="rec-fecha">' + escHtml(areaLbl) + ' · ' + c.fecha + (c.supervisor ? ' · Valida: ' + escHtml(c.supervisor) : '') + '</div></div>' +
+      '<button class="rec-del" onclick="eliminarCapacitacion(' + c.id + ')" title="Eliminar">🗑</button>' +
+    '</div>' +
+    (c.comentario ? '<div class="rec-txt">' + escHtml(c.comentario) + '</div>' : '') +
+    fotoBlock +
+  '</div>';
+}
+
+async function subirFotoCapacitacion(capacitacionId, inputEl) {
+  var file = inputEl.files && inputEl.files[0];
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { showToast('⚠️ El archivo debe ser una imagen', '#B83232'); inputEl.value = ''; return; }
+  if (file.size > 6 * 1024 * 1024) { showToast('⚠️ Imagen muy pesada (máx 6MB)', '#B83232'); inputEl.value = ''; return; }
+  var status = document.getElementById('cap-foto-status-' + capacitacionId);
+  if (status) status.textContent = 'Subiendo…';
+  var ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  var path = 'capacitacion-' + capacitacionId + '.' + ext;
+  try {
+    var up = await db.storage.from('justificaciones').upload(path, file, { upsert: true, contentType: file.type });
+    if (up.error) throw up.error;
+    var pub = db.storage.from('justificaciones').getPublicUrl(path);
+    var url = pub.data.publicUrl + '?v=' + new Date().getTime();
+    var upd = await db.from('rrhh_capacitaciones').update({ foto_url: url }).eq('id', capacitacionId);
+    if (upd.error) throw upd.error;
+    await cargarCapacitaciones(mpEditId);
+    showToast('✅ Foto guardada');
+  } catch (e) {
+    if (status) status.textContent = '';
+    showToast('❌ Error al subir la foto: ' + e.message, '#B83232');
+    inputEl.value = '';
+  }
+}
+
+function toggleFormCapacitacion() {
+  var f = document.getElementById('formCapacitacion');
+  var abrir = f.style.display === 'none';
+  f.style.display = abrir ? 'block' : 'none';
+  if (abrir) {
+    var p = personalTodos.find(function(x) { return String(x.id) === String(mpEditId); });
+    document.getElementById('ncArea').value = (p && p.area) || 'tapas';
+    document.getElementById('ncEstado').value = 'en_proceso';
+    document.getElementById('ncHabilidad').value = '';
+    document.getElementById('ncFecha').value = fechaHoy();
+    document.getElementById('ncSupervisor').value = '';
+    document.getElementById('ncComentario').value = '';
+  }
+}
+
+async function guardarCapacitacion() {
+  if (!mpEditId) return;
+  var habilidad  = (document.getElementById('ncHabilidad').value || '').trim();
+  var comentario = (document.getElementById('ncComentario').value || '').trim();
+  if (!habilidad)  { showToast('⚠️ Escribe la habilidad', '#B83232'); return; }
+  if (!comentario) { showToast('⚠️ El comentario del acompañamiento es requerido', '#B83232'); return; }
+  var payload = {
+    personal_id: mpEditId,
+    area: document.getElementById('ncArea').value,
+    habilidad: habilidad,
+    estado: document.getElementById('ncEstado').value,
+    fecha: document.getElementById('ncFecha').value || fechaHoy(),
+    supervisor: (document.getElementById('ncSupervisor').value || '').trim() || null,
+    comentario: comentario
+  };
+  try {
+    var r = await db.from('rrhh_capacitaciones').insert(payload);
+    if (r.error) throw r.error;
+    toggleFormCapacitacion();
+    await cargarCapacitaciones(mpEditId);
+    await cargarCapacitacionesResumen();
+    renderPersonalGrid();
+    showToast('✅ Capacitación registrada');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
+  }
+}
+
+async function eliminarCapacitacion(id) {
+  if (!confirm('¿Eliminar este registro de capacitación?')) return;
+  try {
+    var r = await db.from('rrhh_capacitaciones').delete().eq('id', id);
+    if (r.error) throw r.error;
+    await cargarCapacitaciones(mpEditId);
+    await cargarCapacitacionesResumen();
+    renderPersonalGrid();
+    showToast('🗑 Eliminado');
   } catch (e) {
     showToast('❌ Error: ' + e.message, '#B83232');
   }

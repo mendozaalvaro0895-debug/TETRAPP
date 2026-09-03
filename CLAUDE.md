@@ -194,9 +194,17 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   `cargarFaltasResumen()`, que ya filtra por mes — una falta sin justificar de un mes
   anterior deja de contar/alertar) con su SI/NO de justificación en la misma fila; clic
   en cualquiera de las dos abre el perfil directo en la pestaña Faltas (`abrirPerfilEnFaltas`).
-  Click en fila → modalPersona con 5 sub-tabs:
+  Columna Habilidades: lista cada capacitación (ícono ✅ certificado / 🕐 en proceso +
+  habilidad, con el área entre paréntesis SOLO si es distinta al área de la persona — ej.
+  alguien de Tapas certificado para cubrir una máquina de Producción en almuerzo). Clic abre
+  el perfil directo en la pestaña Capacitaciones (`abrirPerfilEnCapacitaciones`).
+  Click en fila → modalPersona con 6 sub-tabs:
     Datos generales (editable: nombre/iniciales/código/área/rol/proceso_hab/teléfono/edad/activo/fechas)
     RRHH           (editable: locker/talla_uniforme/epp_asignado/epp_fecha/notas_rrhh)
+    Capacitaciones (historial rrhh_capacitaciones + registrar nueva — área de la habilidad
+                     independiente del área de la persona, estado en_proceso/certificado,
+                     comentario del supervisor OBLIGATORIO, foto de respaldo opcional
+                     reusando el bucket `justificaciones` con prefijo `capacitacion-<id>`)
     Permisos       (historial rrhh_permisos + registrar nuevo)
     Faltas         (historial rrhh_faltas con selector de mes, default mes actual — alerta
                      hasta justificar con texto y/o foto; ver sincronización con Asistencia
@@ -253,13 +261,13 @@ Notas críticas:
    fórmula de tinta en Serigrafía, familia/accesorios en Tapas). RLS igual a `sku_recetas` (master).
 8. `sql/operativo_produccion_v1.sql` — rol `operativo_prod` + usuario produccion@tetrapp.app +
    políticas insert/update/delete en produccion_diaria. Correr DESPUÉS del 5 (necesita la tabla).
-9. `sql/personal_area_produccion_v1.sql` — agrega 'produccion' al CHECK constraint
-   `personal_area_check` (creado manual en el dashboard, bloqueaba crear personas de esa
-   área desde gestion.html con "violates check constraint personal_area_check").
-10. `sql/personal_turno_produccion_v1.sql` — columna `turno_produccion` ('alex'|'gabino') para
-    el campo Turno de Producción en gestion.html. `sql/personal_turno_v1.sql` (mismo objetivo,
-    nombre de columna distinto) quedó OBSOLETO — chocaba con una columna `turno` (AM/PM) que
-    ya existía en `personal`; no correrlo.
+9. `sql/personal_area_moldes_v1.sql` — agrega 'moldes' al CHECK constraint `personal_area_check`.
+10. `sql/rrhh_capacitaciones_v1.sql` — tabla `rrhh_capacitaciones` (habilidades/certificaciones,
+    columna Habilidades en gestion.html → Personal) + pestaña Capacitaciones del modal. Reusa
+    el bucket Storage `justificaciones` (ya creado) para la foto de respaldo — sin bucket nuevo.
+11. `sql/v_solicitudes_security_invoker_v1.sql` — ⚠️ parcial: `v_solicitudes` confirmado con
+    `security_invoker=true`; falta correr la línea de `v_capacidad_hoy` (queda comentada en el
+    archivo) si el Security Advisor también la marcó.
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
@@ -271,6 +279,9 @@ Notas críticas:
 - `sql/personal_edad_v1.sql` (27-ago-2026) — columna `edad` (smallint) en `personal`
 - `sql/rrhh_faltas_v1.sql` (27-ago-2026) — tabla `rrhh_faltas` (incluye columna `origen`) + políticas RLS del bucket `justificaciones`
 - `sql/dias_feriados_v1.sql` (27-ago-2026) — tabla `dias_feriados`; bucket Storage `justificaciones` confirmado creado
+- `sql/personal_area_produccion_v1.sql` (28-ago-2026) — agrega 'produccion' al CHECK constraint `personal_area_check`
+- `sql/personal_turno_produccion_v1.sql` (28-ago-2026) — columna `turno_produccion` ('alex'|'gabino') en `personal`
+- `sql/personal_area_molino_bodega_v1.sql` (29-ago-2026) — agrega 'molino'/'bodega' al CHECK constraint `personal_area_check`
 
 ---
 
