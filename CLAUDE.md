@@ -52,7 +52,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | `dashboard.html` | KPIs ejecutivos globales |
 | `ventas.html` | Ventas y Financiero: Resumen · Productos · Clientes · Rotación · Importar facturación (Excel/CSV cols A-R) · toggle IVA |
 | `produccion.html` | Sopladoras: Ingreso PDF/manual (pdf.js) · Reporte Semanal (pivote máquina×SKU) · Mensual. Asigna máquina Y operario por fila (`personal` area='produccion') |
-| `gestion.html` | Gestión de Personal y Planta (v1, solo Personal construido): tabla unificada tapas+serig+producción sobre la misma tabla `personal` + RRHH (locker/EPP/talla) + permisos/incidentes/faltas. Master-only. |
+| `gestion.html` | Gestión de Personal y Planta: tabla unificada tapas+serig+producción+molino+bodega+moldes sobre la misma tabla `personal` + RRHH (locker/EPP/talla) + permisos/incidentes/faltas/capacitaciones/bonos + Lockers + Planta (mejoras_planta, CRUD simple por tarjetas). Master-only. |
 | `bodega.html` | Bodega — Inicio (KPIs) · **Existencias** (ex-`inventario.html`, integrado sep/2026: catálogo Bodega 02/05/07, tablas `inventario`+`insumos_b7`, importación Excel, alertas de bajo stock) · Movimientos (`movimientos_insumos`, área='bodega', destino de los prefijos SICAF `MPI`/`MPS`) · Personal. `inventario.html` ahora es solo un redirect a `bodega.html#existencias` (no borrado, por si hay bookmarks/PWA viejos). |
 | `molino.html` | Molienda/mezcla/distribución de materia prima a máquina: mismo patrón que bodega.html (Inicio · Movimientos `área='molino'` · Personal). Alcance MVP — no modela todavía fórmulas ni distribución por máquina, ver `.claude/docs/contexto-bot-requis.md`. |
 
@@ -149,7 +149,7 @@ Orden dentro de cada desplegable: rojo → amarillo → verde.
 ## gestion.html — Arquitectura de vistas
 
 ```
-Tabs: Personal (activo) · Lockers (activo) · Planta (WIP — tabla mejoras_planta ya existe, vista pendiente)
+Tabs: Personal (activo) · Lockers (activo) · Planta (activo)
 
 view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la disponibilidad se
   calcula en vivo desde `personal.locker` (personas activas) vía `renderLockers()`, ya
@@ -167,6 +167,18 @@ view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la dispo
   `mpLocker` precargado a ese número — el área se sigue eligiendo ahí como siempre, no se
   bypasea ese paso. Botón "Ver perfil completo" dentro
   del modal (solo si hay ocupante) para ir al perfil vía `abrirPerfil`.
+
+view-planta: tarjetas de `mejoras_planta` (CRUD directo, sin ligar a `personal`) — filtros de
+  área/estado + buscador de texto (título/descripción), KPI strip propio (Total/Pendientes/
+  En proceso/Completadas). Clic en una tarjeta o "+ Nueva mejora" abre `modalMejora`
+  (`abrirMejora(id)`/`abrirNuevaMejora()`), mismo patrón de un solo modal reusado para
+  crear/editar que `modalPersona` (`mjEditId` null = alta). Campos: título*, área (General/
+  Producción/Serigrafía/Tapas/Molino/Bodega/Moldes/Oficina — lista libre, NO ligada al
+  `personal_area_check` de la tabla personal), estado (pendiente/en_proceso/completado/
+  cancelado), prioridad, responsable, fecha_inicio/fecha_objetivo/fecha_cierre, descripción,
+  notas. `toggleFechaCierreMejora()` muestra el campo Fecha de cierre solo si el estado es
+  completado/cancelado y la precarga con `fechaHoy()`. Sirve para registrar entregas de
+  mobiliario/equipo a planta (ej. sillas nuevas a Producción) además de mejoras en curso.
 
 view-personal: grid unificado de TODA la tabla personal (área tapas + serig juntas,
   sin duplicar el CRUD que ya existe en tapas.html/serigrafia.html — es la misma tabla,
