@@ -1008,13 +1008,16 @@ function imprimirEtiquetasLockers() {
 
   var labels = numeros.map(function(n) {
     var p = LOCKERS_OCUPACION[n];
-    var color = AREA_COLOR_DEFAULT[p.area] || '#475569';
     var areaLbl = (AREA_LBL_MAP[p.area] || p.area || '—').replace(/^\S+\s/, '');
+    var turnoLbl = (p.area === 'produccion' && p.turno_produccion) ? TURNO_PRODUCCION_LBL[p.turno_produccion] : null;
     return '<div class="etq">' +
-      '<div class="etq-top"><span class="etq-locker">L-' + n + '</span>' +
-        '<span class="etq-area" style="background:' + color + '22;color:' + color + '">' + escHtml(areaLbl) + '</span></div>' +
-      '<div class="etq-nombre">' + escHtml(p.nombre || '') + '</div>' +
-      '<div class="etq-codigo">' + escHtml(p.codigo || '') + '</div>' +
+      '<span class="etq-top">Locker #' + n + '</span>' +
+      '<div class="etq-body">' +
+        '<div class="etq-nombre">' + escHtml(p.nombre || '') + '</div>' +
+        '<div class="etq-div"></div>' +
+        '<div class="etq-area">' + escHtml(areaLbl) + '</div>' +
+        (turnoLbl ? '<div class="etq-turno">' + escHtml(turnoLbl) + '</div>' : '') +
+      '</div>' +
     '</div>';
   }).join('');
 
@@ -1022,14 +1025,16 @@ function imprimirEtiquetasLockers() {
     + '@page{size:letter;margin:12mm}'
     + '*{box-sizing:border-box;margin:0;padding:0;font-family:\'DM Sans\',Arial,sans-serif}'
     + 'body{background:#fff}'
-    + '.hoja{display:grid;grid-template-columns:repeat(3,1fr);gap:6mm}'
-    + '.etq{border:1.5px dashed #B8B6B0;border-radius:10px;padding:8mm 6mm;display:flex;flex-direction:column;gap:5mm;'
-    +   'break-inside:avoid;page-break-inside:avoid;min-height:34mm;justify-content:center}'
-    + '.etq-top{display:flex;justify-content:space-between;align-items:center}'
-    + '.etq-locker{font-family:\'DM Mono\',monospace;font-weight:700;font-size:15px;color:#0C0C0B}'
-    + '.etq-area{font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap}'
-    + '.etq-nombre{font-size:16px;font-weight:700;color:#0C0C0B;line-height:1.25}'
-    + '.etq-codigo{font-family:\'DM Mono\',monospace;font-size:12px;color:#6B6B6A}'
+    + '.hoja{display:grid;grid-template-columns:repeat(2,76mm);gap:6mm;justify-content:start}'
+    + '.etq{width:76mm;min-height:50mm;border:1.5px solid #000;border-radius:6px;padding:5mm 5.5mm;'
+    +   'display:flex;flex-direction:column;break-inside:avoid;page-break-inside:avoid}'
+    + '.etq-top{align-self:flex-start;font-family:\'DM Mono\',monospace;font-size:11px;font-weight:700;'
+    +   'letter-spacing:.4px;color:#000;border:1px solid #000;border-radius:3px;padding:2px 8px}'
+    + '.etq-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:2.5mm;margin-top:2mm}'
+    + '.etq-nombre{font-size:26px;font-weight:800;text-transform:uppercase;color:#000;line-height:1.1}'
+    + '.etq-div{height:1.5px;background:#000;width:100%}'
+    + '.etq-area{font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:#000}'
+    + '.etq-turno{font-size:12px;font-weight:600;color:#404040;margin-top:-1.5mm}'
     + '.no-print{position:fixed;top:10px;right:10px}'
     + '.no-print button{padding:8px 16px;font-size:13px;font-weight:600;border-radius:8px;border:none;background:#4338CA;color:#fff;cursor:pointer}'
     + '@media print{.no-print{display:none}}'
