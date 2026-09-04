@@ -618,6 +618,54 @@ function ciAdivinarTurno(desc) {
   return '';
 }
 
+/* ── SICAF a veces graba el turno con la fecha del día SIGUIENTE al que
+   realmente se trabajó — la "Descripción" es la única pista del día real
+   (ej. "LUNES 31 DIA" con Fecha=01/09). Se intenta corregir, siempre editable. */
+function ciAdivinarFechaDescripcion(descripcion, fechaOriginal) {
+  if (!descripcion || !fechaOriginal) return null;
+  var desc = descripcion.toUpperCase();
+
+  var mFecha = desc.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (mFecha) {
+    var dd = mFecha[1].padStart(2, '0'), mm = mFecha[2].padStart(2, '0');
+    var yyyy = mFecha[3].length === 2 ? '20' + mFecha[3] : mFecha[3];
+    var candFecha = yyyy + '-' + mm + '-' + dd;
+    return candFecha !== fechaOriginal ? candFecha : null;
+  }
+
+  var mDia = desc.match(/\b([0-3]?\d)\b/);
+  if (mDia) {
+    var diaMes = parseInt(mDia[1], 10);
+    if (diaMes >= 1 && diaMes <= 31) {
+      var base = new Date(fechaOriginal + 'T12:00:00');
+      var mes = base.getMonth(), anio = base.getFullYear();
+      // Si el día de la requi es 1-3 y la descripción menciona un día ≥28,
+      // casi seguro se refiere al último día del mes ANTERIOR (el caso "LUNES 31" con Fecha 01/09)
+      if (base.getDate() <= 3 && diaMes >= 28) { mes -= 1; }
+      var candidata = new Date(anio, mes, diaMes, 12);
+      var candStr = candidata.toISOString().slice(0, 10);
+      return candStr !== fechaOriginal ? candStr : null;
+    }
+  }
+  return null;
+}
+
+async function ciCambiarFecha(di, valor) {
+  var d = ciDocumentos[di];
+  d.fecha = valor;
+  if (d.prefijo === 'PRI') {
+    await ciPrecalcularReconciliacion([d]);
+    d.lineas.forEach(function(l) {
+      // Solo re-sugerir si la línea sigue en su default automático —
+      // no pisar una acción que Álvaro ya haya elegido a mano.
+      if (l.accion === 'reconciliar' || l.accion === 'prod_completar') {
+        l.accion = ciSugerirAccion(d.prefijo, l.producto, l.reconciliacion);
+      }
+    });
+  }
+  ciRenderDocs();
+}
+
 /* ── Paso 1 → 2: procesar archivos con Claude Vision ──────────── */
 async function ciProcesar() {
   if (!ciArchivos.length) { document.getElementById('ciStatusSubir').textContent = '⚠️ Agregá al menos un archivo'; return; }
@@ -637,6 +685,10 @@ async function ciProcesar() {
               costo_unitario: l.costo_unitario || 0, valor_total: l.valor_total || 0,
               accion: null, cliente: '', turno: ciAdivinarTurno(d.descripcion), maquina: '', operador: '', guardado: false };
           });
+          if (d.prefijo === 'PRI') {
+            var fechaCorregida = ciAdivinarFechaDescripcion(d.descripcion, d.fecha);
+            if (fechaCorregida) { d.fechaOriginal = d.fecha; d.fecha = fechaCorregida; }
+          }
           docsNuevos.push(d);
         });
       }
@@ -698,7 +750,9 @@ function ciRenderUnDoc(d, di) {
     '<div class="ci-doc-h"><div>' +
       '<span class="ci-doc-title">' + escHtml(d.documento || '—') + '</span> ' +
       '<span class="ci-pill ' + pillClass + '">' + pillTxt + '</span>' +
-      '<div class="ci-doc-meta">Bodega ' + escHtml(d.bodega || '—') + ' · ' + escHtml(d.fecha || '—') +
+      '<div class="ci-doc-meta">Bodega ' + escHtml(d.bodega || '—') + ' · ' +
+        '<input type="date" value="' + escHtml(d.fecha || '') + '" onchange="ciCambiarFecha(' + di + ',this.value)" style="border:1px solid var(--border);border-radius:5px;padding:2px 5px;font-family:var(--mono);font-size:11px;background:var(--card)">' +
+        (d.fechaOriginal ? ' <span style="color:#B45309;font-weight:600">⚠️ el documento decía ' + escHtml(d.fechaOriginal) + '</span>' : '') +
         (d.descripcion ? ' · ' + escHtml(d.descripcion) : '') +
         (d.referencia ? ' · ref: ' + escHtml(d.referencia) : '') + '</div>' +
     '</div></div>' +
