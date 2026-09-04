@@ -324,6 +324,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="ph-title">Lockers</div>
           <div class="ph-sub" id="lockersResumen">—</div>
         </div>
+        <div class="ph-r">
+          <button class="btn btn-g btn-sm" onclick="imprimirEtiquetasLockers()">🖨 Imprimir etiquetas</button>
+        </div>
       </div>
       <div style="flex:1;overflow-y:auto">
         <div id="lockersGrid" class="lockers-grid"></div>
@@ -996,6 +999,52 @@ function renderLockers() {
         extras.map(function(p) { return escHtml(p.nombre) + ' (' + escHtml(p.locker) + ')'; }).join(' · ') +
       '</div>';
   }
+}
+
+// ── Etiquetas imprimibles: Nombre + código + área por locker ocupado ──
+function imprimirEtiquetasLockers() {
+  var numeros = Object.keys(LOCKERS_OCUPACION).map(Number).sort(function(a, b) { return a - b; });
+  if (!numeros.length) { showToast('⚠️ No hay lockers asignados todavía', '#D97706'); return; }
+
+  var labels = numeros.map(function(n) {
+    var p = LOCKERS_OCUPACION[n];
+    var color = AREA_COLOR_DEFAULT[p.area] || '#475569';
+    var areaLbl = (AREA_LBL_MAP[p.area] || p.area || '—').replace(/^\S+\s/, '');
+    return '<div class="etq">' +
+      '<div class="etq-top"><span class="etq-locker">L-' + n + '</span>' +
+        '<span class="etq-area" style="background:' + color + '22;color:' + color + '">' + escHtml(areaLbl) + '</span></div>' +
+      '<div class="etq-nombre">' + escHtml(p.nombre || '') + '</div>' +
+      '<div class="etq-codigo">' + escHtml(p.codigo || '') + '</div>' +
+    '</div>';
+  }).join('');
+
+  var doc = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Etiquetas de Lockers — TETRAPLASTIC</title><style>'
+    + '@page{size:letter;margin:12mm}'
+    + '*{box-sizing:border-box;margin:0;padding:0;font-family:\'DM Sans\',Arial,sans-serif}'
+    + 'body{background:#fff}'
+    + '.hoja{display:grid;grid-template-columns:repeat(3,1fr);gap:6mm}'
+    + '.etq{border:1.5px dashed #B8B6B0;border-radius:10px;padding:8mm 6mm;display:flex;flex-direction:column;gap:5mm;'
+    +   'break-inside:avoid;page-break-inside:avoid;min-height:34mm;justify-content:center}'
+    + '.etq-top{display:flex;justify-content:space-between;align-items:center}'
+    + '.etq-locker{font-family:\'DM Mono\',monospace;font-weight:700;font-size:15px;color:#0C0C0B}'
+    + '.etq-area{font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap}'
+    + '.etq-nombre{font-size:16px;font-weight:700;color:#0C0C0B;line-height:1.25}'
+    + '.etq-codigo{font-family:\'DM Mono\',monospace;font-size:12px;color:#6B6B6A}'
+    + '.no-print{position:fixed;top:10px;right:10px}'
+    + '.no-print button{padding:8px 16px;font-size:13px;font-weight:600;border-radius:8px;border:none;background:#4338CA;color:#fff;cursor:pointer}'
+    + '@media print{.no-print{display:none}}'
+    + '</style></head><body>'
+    + '<div class="no-print"><button onclick="window.print()">🖨 Imprimir</button></div>'
+    + '<div class="hoja">' + labels + '</div>'
+    + '</body></html>';
+
+  var w = window.open('', '_blank');
+  if (!w) { showToast('⚠️ El navegador bloqueó la ventana emergente — habilita pop-ups para este sitio', '#B83232'); return; }
+  w.document.open();
+  w.document.write(doc);
+  w.document.close();
+  w.focus();
+  setTimeout(function() { w.print(); }, 300);
 }
 
 // ── Modal: vincular/reasignar/liberar un locker ──────────────

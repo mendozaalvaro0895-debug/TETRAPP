@@ -167,6 +167,11 @@ view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la dispo
   `mpLocker` precargado a ese número — el área se sigue eligiendo ahí como siempre, no se
   bypasea ese paso. Botón "Ver perfil completo" dentro
   del modal (solo si hay ocupante) para ir al perfil vía `abrirPerfil`.
+  Botón "🖨 Imprimir etiquetas" (`imprimirEtiquetasLockers()`) genera, en una pestaña nueva,
+  una hoja con una ficha por locker OCUPADO (número, nombre, código, área con color de
+  `AREA_COLOR_DEFAULT`) lista para imprimir y pegar en el locker físico — usa
+  `LOCKERS_OCUPACION` ya calculado por `renderLockers()`, sin query nueva. Lockers libres no
+  generan ficha (nada que identificar todavía).
 
 view-planta: tarjetas de `mejoras_planta` (CRUD directo, sin ligar a `personal`) — filtros de
   área/estado + buscador de texto (título/descripción), KPI strip propio (Total/Pendientes/
