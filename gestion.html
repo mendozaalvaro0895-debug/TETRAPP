@@ -221,6 +221,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .badge-canc{background:var(--bg2);color:var(--gray);font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap}
 .rec-item.clickable{cursor:pointer;transition:border-color .15s}
 .rec-item.clickable:hover{border-color:var(--gest-m)}
+
+/* Selección de lockers a imprimir */
+.il-row{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;cursor:pointer}
+.il-row:hover{background:var(--bg)}
+.il-row input[type="checkbox"]{flex-shrink:0;width:15px;height:15px;cursor:pointer;accent-color:var(--gest-m)}
+.il-num{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gray);flex-shrink:0;width:34px}
+.il-nombre{flex:1;font-size:12px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.il-area{font-size:10px;color:var(--gray);flex-shrink:0}
 .just-inline{margin-top:10px;padding:10px;background:var(--bg);border-radius:8px}
 .just-foto-btn{display:inline-block;background:var(--card);border:1.5px dashed var(--border);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;color:var(--gray);cursor:pointer}
 .just-foto-btn:hover{border-color:var(--gest-m);color:var(--gest-m)}
@@ -325,7 +333,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="ph-sub" id="lockersResumen">—</div>
         </div>
         <div class="ph-r">
-          <button class="btn btn-g btn-sm" onclick="imprimirEtiquetasLockers()">🖨 Imprimir etiquetas</button>
+          <button class="btn btn-g btn-sm" onclick="abrirModalImprimirLockers()">🖨 Imprimir etiquetas</button>
         </div>
       </div>
       <div style="flex:1;overflow-y:auto">
@@ -787,6 +795,29 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 </div>
 
+<!-- ══════════════════ MODAL IMPRIMIR ETIQUETAS (selección) ═ -->
+<div class="overlay" id="modalImprimirLockers" onclick="cerrarSiOverlayImprimirLockers(event)">
+  <div class="modal" style="max-width:440px">
+    <div class="mh">
+      <div class="mh-title">Imprimir etiquetas</div>
+      <button class="m-close" onclick="cerrarModalImprimirLockers()">✕</button>
+    </div>
+    <div class="mb" style="padding:20px">
+      <div class="ph-sub" style="margin-bottom:10px">Elegí qué lockers imprimir</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-g btn-xs" onclick="marcarTodosLockersImprimir(true)">Seleccionar todos</button>
+        <button class="btn btn-g btn-xs" onclick="marcarTodosLockersImprimir(false)">Ninguno</button>
+      </div>
+      <div id="ilLista" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:1px"></div>
+    </div>
+    <div class="mf">
+      <div style="font-size:11px;color:var(--gray);margin-right:auto" id="ilContador">0 seleccionados</div>
+      <button class="btn btn-g" onclick="cerrarModalImprimirLockers()">Cancelar</button>
+      <button class="btn btn-s" onclick="confirmarImprimirLockers()">🖨 Imprimir</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════ MODAL MEJORA DE PLANTA ══════════════ -->
 <div class="overlay" id="modalMejora" onclick="cerrarSiOverlayMejora(event)">
   <div class="modal" style="max-width:520px">
@@ -1001,9 +1032,69 @@ function renderLockers() {
   }
 }
 
-// ── Etiquetas imprimibles: Nombre + código + área por locker ocupado ──
-function imprimirEtiquetasLockers() {
+// ── Selección de lockers a imprimir (para no reimprimir todos por un cambio) ──
+var LOCKERS_SEL_IMPRIMIR = {}; // { numero: true }
+
+function abrirModalImprimirLockers() {
   var numeros = Object.keys(LOCKERS_OCUPACION).map(Number).sort(function(a, b) { return a - b; });
+  if (!numeros.length) { showToast('⚠️ No hay lockers asignados todavía', '#D97706'); return; }
+  LOCKERS_SEL_IMPRIMIR = {};
+  renderListaImprimirLockers(numeros);
+  document.getElementById('modalImprimirLockers').classList.add('open');
+}
+
+function renderListaImprimirLockers(numeros) {
+  document.getElementById('ilLista').innerHTML = numeros.map(function(n) {
+    var p = LOCKERS_OCUPACION[n];
+    var areaLbl = (AREA_LBL_MAP[p.area] || p.area || '—').replace(/^\S+\s/, '');
+    var checked = !!LOCKERS_SEL_IMPRIMIR[n];
+    return '<label class="il-row">' +
+      '<input type="checkbox"' + (checked ? ' checked' : '') + ' onchange="toggleSeleccionLocker(' + n + ', this.checked)">' +
+      '<span class="il-num">L-' + n + '</span>' +
+      '<span class="il-nombre">' + escHtml(p.nombre || '') + '</span>' +
+      '<span class="il-area">' + escHtml(areaLbl) + '</span>' +
+    '</label>';
+  }).join('');
+  actualizarContadorImprimir();
+}
+
+function toggleSeleccionLocker(n, val) {
+  if (val) LOCKERS_SEL_IMPRIMIR[n] = true; else delete LOCKERS_SEL_IMPRIMIR[n];
+  actualizarContadorImprimir();
+}
+
+function marcarTodosLockersImprimir(val) {
+  var numeros = Object.keys(LOCKERS_OCUPACION).map(Number).sort(function(a, b) { return a - b; });
+  LOCKERS_SEL_IMPRIMIR = {};
+  if (val) numeros.forEach(function(n) { LOCKERS_SEL_IMPRIMIR[n] = true; });
+  renderListaImprimirLockers(numeros);
+}
+
+function actualizarContadorImprimir() {
+  var count = Object.keys(LOCKERS_SEL_IMPRIMIR).length;
+  document.getElementById('ilContador').textContent = count + (count === 1 ? ' seleccionado' : ' seleccionados');
+}
+
+function cerrarModalImprimirLockers() {
+  document.getElementById('modalImprimirLockers').classList.remove('open');
+}
+
+function cerrarSiOverlayImprimirLockers(ev) {
+  if (ev.target.id === 'modalImprimirLockers') cerrarModalImprimirLockers();
+}
+
+function confirmarImprimirLockers() {
+  var numeros = Object.keys(LOCKERS_SEL_IMPRIMIR).map(Number).sort(function(a, b) { return a - b; });
+  if (!numeros.length) { showToast('⚠️ Seleccioná al menos un locker', '#D97706'); return; }
+  cerrarModalImprimirLockers();
+  imprimirEtiquetasLockers(numeros);
+}
+
+// ── Etiquetas imprimibles: Nombre + área por locker (los que se seleccionaron) ──
+function imprimirEtiquetasLockers(numerosFiltro) {
+  var numeros = (numerosFiltro && numerosFiltro.length)
+    ? numerosFiltro
+    : Object.keys(LOCKERS_OCUPACION).map(Number).sort(function(a, b) { return a - b; });
   if (!numeros.length) { showToast('⚠️ No hay lockers asignados todavía', '#D97706'); return; }
 
   var labels = numeros.map(function(n) {

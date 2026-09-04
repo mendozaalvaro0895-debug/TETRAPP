@@ -167,15 +167,19 @@ view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la dispo
   `mpLocker` precargado a ese número — el área se sigue eligiendo ahí como siempre, no se
   bypasea ese paso. Botón "Ver perfil completo" dentro
   del modal (solo si hay ocupante) para ir al perfil vía `abrirPerfil`.
-  Botón "🖨 Imprimir etiquetas" (`imprimirEtiquetasLockers()`) genera, en una pestaña nueva,
-  una hoja con una ficha por locker OCUPADO lista para imprimir y pegar en el locker físico —
-  usa `LOCKERS_OCUPACION` ya calculado por `renderLockers()`, sin query nueva. Diseño en
-  escala de grises puro (sin color, probado para imprimir bien en blanco y negro): "Locker
-  #N" como chip de referencia arriba, NOMBRE en mayúsculas grande (lo que se lee al pasar),
-  línea divisoria, ÁREA en mayúsculas grande, y "Turno Alex"/"Turno Gabino" en chico SOLO si
-  `area==='produccion'` y tiene `turno_produccion`. Sin código de operador ni ícono por
-  área (se probaron ambos y se descartaron a pedido de Álvaro). Lockers libres no generan
-  ficha (nada que identificar todavía).
+  Botón "🖨 Imprimir etiquetas" (`abrirModalImprimirLockers()`) abre primero un modal de
+  selección (`modalImprimirLockers`, checkboxes sobre `LOCKERS_OCUPACION` — todos
+  DESmarcados por default, con botones "Seleccionar todos"/"Ninguno") para no tener que
+  reimprimir las 86 fichas cada vez que cambia UN locker; "🖨 Imprimir" llama a
+  `imprimirEtiquetasLockers(numeros)` ya solo con los números elegidos (sin argumento
+  imprime todos los ocupados, para llamadas futuras desde otro lado). Genera, en una pestaña
+  nueva, una hoja con una ficha por locker seleccionado lista para imprimir y pegar en el
+  locker físico. Diseño en escala de grises puro (sin color, probado para imprimir bien en
+  blanco y negro): "Locker #N" como chip de referencia arriba, NOMBRE en mayúsculas grande
+  (lo que se lee al pasar), línea divisoria, ÁREA en mayúsculas grande, y "Turno Alex"/"Turno
+  Gabino" en chico SOLO si `area==='produccion'` y tiene `turno_produccion`. Sin código de
+  operador ni ícono por área (se probaron ambos y se descartaron a pedido de Álvaro).
+  Lockers libres no generan ficha (nada que identificar todavía).
 
 view-planta: tarjetas de `mejoras_planta` (CRUD directo, sin ligar a `personal`) — filtros de
   área/estado + buscador de texto (título/descripción), KPI strip propio (Total/Pendientes/
