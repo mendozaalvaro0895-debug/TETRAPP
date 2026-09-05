@@ -5984,8 +5984,17 @@ function entregadoSolInput(val, i) {
     var lbl = escHtml((s.id_display || '') + ' · ' + (s.cliente || ''));
     var sub = escHtml((s.desc || '').slice(0, 40));
     var sid = s.id.replace(/'/g, "\\'");
+    var ent = entregadoDeSolicitud(s.id);
+    var tot = s.cant || 0;
+    var chipClr = ent >= tot && tot > 0 ? '#15803d' : ent > 0 ? '#92400e' : '#6b7280';
+    var chipBg  = ent >= tot && tot > 0 ? '#dcfce7' : ent > 0 ? '#fef3c7' : '#f3f4f6';
+    var chip = tot > 0
+      ? '<span style="font-size:9px;padding:1px 6px;border-radius:4px;font-weight:700;background:'+chipBg+';color:'+chipClr+';white-space:nowrap">'+ent.toLocaleString()+' / '+tot.toLocaleString()+' und</span>'
+      : '';
     return '<div class="sku-item-s" onmousedown="seleccionarEntregadoSol(\'' + sid + '\',' + i + ')">' +
-      '<div class="sku-code-s">' + ico + ' ' + lbl + '</div>' +
+      '<div class="sku-code-s" style="display:flex;align-items:center;gap:6px;justify-content:space-between">' +
+        '<span>' + ico + ' ' + lbl + '</span>' + chip +
+      '</div>' +
       (sub ? '<div class="sku-desc-s">' + sub + '</div>' : '') +
     '</div>';
   }).join('');
