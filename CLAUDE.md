@@ -358,6 +358,10 @@ Notas críticas:
     + reemplaza `bot_buscar_sku` sumando esos alias a la búsqueda. Autocontenido (no depende del 15).
 17. `sql/bot_tapas_v1.sql` — RPCs `bot_buscar_operario` y `bot_insertar_comanda_tapas` para que
     api/whatsapp.js registre producción de Tapas (comandas+comanda_tareas) por WhatsApp.
+18. `sql/supervisor_tapas_v1.sql` — rol `supervisor_tapas` (login propio de la supervisora de
+    Tapas, comparte registro-tapas.html con `operativo`) + política INSERT en comandas/
+    comanda_tareas. Requiere crear antes el usuario `supervisor.tapas@tetrapp.app` (o el correo
+    real que Álvaro prefiera) en Authentication → Users.
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
@@ -384,6 +388,7 @@ Sólido: sin secretos hardcodeados; CSP + HSTS + X-Frame-Options en vercel.json;
 - `operativo` → enjaulado en registro-tapas.html; INSERT solo en comandas/comanda_tareas
 - `operativo_serig` → enjaulado en registro-serigrafia.html; INSERT en registro_tiros_serig, paros_serig, registro_flameado_serig, registro_empaque_serig
 - `operativo_prod` → NO enjaulado: ve TODOS los módulos en lectura (como visor), pero solo escribe en produccion_diaria (registrar turnos). auth.js bloquea escrituras a otras tablas (flag TETRA.esProdEditor + TETRA_PROD_TABLA); RLS lo respalda. Exento de logout por inactividad. NO edita recetas/fichas (solo-master)
+- `supervisor_tapas` → enjaulado en registro-tapas.html (comparte la misma página con `operativo`, no es un módulo nuevo). Piloto (sep/2026) para que la supervisora de Tapas entre con su PROPIO correo, en vez de la cuenta compartida de planta, y cargue la producción del día por su equipo. Mismo alcance de escritura que `operativo` (solo INSERT en comandas/comanda_tareas). Ver `sql/supervisor_tapas_v1.sql`. Próxima área candidata: Serigrafía (sin tocar todavía).
 - La jaula vive en TETRA_PAGINAS_OPERATIVO (auth.js): rol → página permitida
 - TETRA_PAGINAS_MASTER (auth.js): páginas restringidas SOLO a master (ej. `gestion`) — cualquier
   otro rol es redirigido a index.html antes de revelar contenido (dato sensible de RRHH)

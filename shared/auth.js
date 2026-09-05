@@ -12,8 +12,10 @@
 //   - Sesión sin perfil → cierra sesión y redirige (usuario no autorizado)
 //   - Rol visor → banner "Modo Visual" + bloqueo de escrituras en cliente
 //     (la protección REAL es el RLS en Supabase; esto es solo UX)
-//   - Roles operativo/operativo_serig → enjaulados: solo pueden estar en su
-//     formulario de registro; cualquier otra página los redirige ahí
+//   - Roles operativo/operativo_serig/supervisor_tapas → enjaulados: solo
+//     pueden estar en su formulario de registro; cualquier otra página
+//     los redirige ahí (supervisor_tapas comparte registro-tapas.html con
+//     operativo — misma pantalla, entra con su propio correo)
 //   - Rol operativo_prod → NO enjaulado: ve todos los módulos en lectura,
 //     pero solo puede escribir en produccion_diaria (registrar turnos). El
 //     bloqueo de escritura a otras tablas es UX; el RLS es la protección real
@@ -30,8 +32,9 @@ var TETRA = { rol: null, nombre: '', email: null, esVisor: false, esOperativo: f
 // (operativo_prod NO está aquí a propósito: ve todos los módulos; su límite
 //  es de escritura, no de navegación — ver bloqueo de escrituras abajo.)
 var TETRA_PAGINAS_OPERATIVO = {
-  'operativo':       'registro-tapas',
-  'operativo_serig': 'registro-serigrafia'
+  'operativo':         'registro-tapas',
+  'operativo_serig':   'registro-serigrafia',
+  'supervisor_tapas':  'registro-tapas'
 };
 
 // Páginas restringidas SOLO a rol master (datos sensibles de RRHH).
