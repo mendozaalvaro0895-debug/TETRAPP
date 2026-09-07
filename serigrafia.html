@@ -7484,7 +7484,14 @@ function toggleEnvConsolidado(e) {
 function descargarAlertasB7() {
   if (!b7AlertasData.length) return;
   var fecha = new Date().toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  var filas = b7AlertasData.map(function(i) {
+  // Mismo orden que el bloque visual: sin stock → bajo mínimo, luego alfabético
+  var sortedB7 = b7AlertasData.slice().sort(function(a, b) {
+    var ta = (a.existencia || 0) === 0 ? 0 : 1;
+    var tb = (b.existencia || 0) === 0 ? 0 : 1;
+    if (ta !== tb) return ta - tb;
+    return (a.descripcion || '').localeCompare(b.descripcion || '');
+  });
+  var filas = sortedB7.map(function(i) {
     var exist = i.existencia || 0;
     var cero  = exist === 0;
     var existFmt = exist % 1 === 0 ? exist.toLocaleString() : exist.toFixed(2);
