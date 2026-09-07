@@ -1672,6 +1672,18 @@ async function verificarCierresPeriodo(itemsSin) {
         var ru = await db.from('solicitudes').update({ periodo_efectivo: perHoy }).in('id', idsPendientes);
         if (ru.error) throw ru.error;
       }
+      // También migrar fichas activas del mismo cliente/período que estaban en
+      // líneas de producción cuando corrió el cierre (no aparecían en itemsSin)
+      var idsFueraSin = (solicitudes || []).filter(function(s) {
+        return s.cliente_nombre === g.cli &&
+               mesSol(s) === g.key &&
+               ['nueva','proceso','parcial'].indexOf(s.estado) >= 0 &&
+               idsPendientes.indexOf(s.id) < 0;
+      }).map(function(s) { return s.id; });
+      if (idsFueraSin.length) {
+        var rfuera = await db.from('solicitudes').update({ periodo_efectivo: perHoy }).in('id', idsFueraSin);
+        if (rfuera.error) console.warn('migrar fuera de Sin:', rfuera.error);
+      }
       var rc = await db.from('periodo_cierres').insert({
         cliente: g.cli, periodo_key: g.key, periodo_label: g.label,
         pct_entregado: pctEnt, n_total: g.items.length,
