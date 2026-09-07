@@ -840,7 +840,8 @@ async function guardarExist(sku) {
   var isB7 = bodegaFiltro === 'B7';
   var cache = isB7 ? todosLosInsumosB7 : todosLosItems;
   try {
-    var r = await db.from(isB7 ? 'insumos_b7' : 'inventario').update({ existencia: val }).eq('sku', sku);
+    var nowTs = new Date().toISOString();
+    var r = await db.from(isB7 ? 'insumos_b7' : 'inventario').update(isB7 ? { existencia: val, updated_at: nowTs } : { existencia: val }).eq('sku', sku);
     if (r.error) throw r.error;
     var item = cache.find(function(i) { return i.sku === sku; });
     if (item) item.existencia = val;
@@ -1228,8 +1229,9 @@ async function confirmarImportB7() {
 
     for (var i = 0; i < existentes.length; i += PARALLEL) {
       var chunk = existentes.slice(i, i + PARALLEL);
+      var _bTs = new Date().toISOString();
       var results = await Promise.all(chunk.map(function(p) {
-        return db.from('insumos_b7').update({ existencia: p.existencia }).eq('sku', p.sku);
+        return db.from('insumos_b7').update({ existencia: p.existencia, updated_at: _bTs }).eq('sku', p.sku);
       }));
       results.forEach(function(r) { if (r.error) errores++; });
       hecho += chunk.length;
