@@ -6206,6 +6206,14 @@ async function refrescarInventarioEnvases(btn) {
   await renderConsolidadoEnvases();
 }
 
+// Busca un SKU en inventario dando prioridad a Bodega 2 (envases / PT).
+// Fuente ÚNICA para el bloque en pantalla y para su PDF — no duplicar.
+function invB2De(sku) {
+  return inventarioCache.find(function(i){ return i.sku === sku && (!i.bodega || i.bodega === 'B2'); })
+      || inventarioCache.find(function(i){ return i.sku === sku; })
+      || null;
+}
+
 async function renderConsolidadoEnvases() {
   var el = document.getElementById('alertasSlotR');
   if (!el) return;
@@ -6259,8 +6267,7 @@ async function renderConsolidadoEnvases() {
     var total = e.ago + e.back;
     var salido = salidoMap[kb] || 0;
     var neto   = Math.max(total - salido, 0);
-    var inv    = inventarioCache.find(function(i){ return i.sku === kb && (!i.bodega || i.bodega === 'B2'); })
-              || inventarioCache.find(function(i){ return i.sku === kb; });
+    var inv    = invB2De(kb);
     var stock    = inv ? (inv.existencia || 0) : null;
     var faltante = stock === null ? neto : Math.max(neto - stock, 0);
     var desc     = (inv && inv.descripcion) || e.desc || '—';
@@ -6440,27 +6447,31 @@ function envPedDetalle(solId) {
   mostrarDetalle(solId);
 }
 
-function envPDF() {
+async function envPDF() {
   var perHoy = periodoActualKey();
+  var mesPdfHdr = new Date(fechaHoy() + 'T12:00:00').toLocaleString('es-GT', { month:'long', year:'numeric' });
   var ESTADOS_VIVOS = ['nueva','proceso','parcial'];
+  // Mismo criterio que renderConsolidadoEnvases(): período EFECTIVO
+  // (respeta periodo_efectivo) y SOLO fichas del mes en curso.
   var mapa = {};
   solicitudes.forEach(function(s) {
     if (ESTADOS_VIVOS.indexOf(s.estado) < 0) return;
-    var esAgo = periodoDe(s.created_at).key === perHoy;
+    if (mesSol(s) !== perHoy) return;
     (s.lineas || []).forEach(function(l) {
       if ((l.estado || s.estado) === 'lista') return;
       var kb = (l.sku_base || '').trim(); if (!kb) return;
       if (!mapa[kb]) mapa[kb] = { kb: kb, desc: '', ago: 0, back: 0 };
-      var inv = inventarioCache.find(function(i){ return i.sku === kb; });
+      var inv = invB2De(kb);
       mapa[kb].desc = (inv && inv.descripcion) || l.desc_base || '';
-      if (esAgo) mapa[kb].ago  += (l.cant || 0);
-      else       mapa[kb].back += (l.cant || 0);
+      mapa[kb].ago += (l.cant || 0);
     });
   });
-  var salidoMap = envSalidoCache || {};
+  // Recarga si el caché fue invalidado por una salida/rechazo reciente,
+  // igual que la pantalla — leerlo crudo daba "Pedir" inflado.
+  var salidoMap = await cargarEnvSalido();
   var rows = Object.keys(mapa).map(function(kb) {
     var e = mapa[kb], total = e.ago + e.back, salido = salidoMap[kb]||0, neto = Math.max(total-salido,0);
-    var inv = inventarioCache.find(function(i){ return i.sku===kb; });
+    var inv = invB2De(kb);
     var stock = inv ? (inv.existencia||0) : null;
     var faltante = stock===null ? neto : Math.max(neto-stock,0);
     return { kb:kb, desc:e.desc, ago:e.ago, neto:neto, stock:stock, faltante:faltante };
@@ -6496,7 +6507,7 @@ function envPDF() {
     '.alerta{color:#b91c1c;font-weight:800}' +
     '@media print{body{padding:8px}}</style></head><body>' +
     '<h1>📦 Bajo Stock — Envases Base para Serigrafía</h1>' +
-    '<p>Todos los pedidos pendientes · Generado: ' + ahora + ' · Tetraplastic</p>' +
+    '<p>Fichas activas de ' + escHtml(mesPdfHdr) + ' · Generado: ' + ahora + ' · Tetraplastic</p>' +
     '<table><thead><tr>' +
     '<th>SKU</th><th>Descripción</th><th class="r">Este mes</th>' +
     '<th class="r">Neto pend.</th><th class="r">Stock B2</th>' +
@@ -10527,6 +10538,7 @@ async function guardarEditSalida() {
   renderProduccionActual();
   renderBoard();
   refreshKPIs();
+  renderConsolidadoEnvases(); // el caché de salidas se invalidó arriba
 }
 
 function agregarLineaMovS(descVal, skuVal, cantVal) {
@@ -10669,6 +10681,7 @@ async function confirmarMovSerig() {
     renderProduccionActual();
     renderBoard();
     refreshKPIs();
+    renderConsolidadoEnvases(); // el caché de salidas se invalidó arriba
     _refreshDetalleIfOpen(lineas.map(function(l){return l.solId;}).filter(Boolean));
   } catch(e) {
     showToast('❌ Error: ' + e.message, '#B83232');
@@ -10792,6 +10805,7 @@ async function confirmarRechazoSerig() {
     envSalidoCache = null;
   await cargarMovimientosSerig();
     refreshKPIs();
+    renderConsolidadoEnvases(); // el caché de salidas se invalidó arriba
   } catch(e) {
     showToast('❌ Error: ' + e.message, '#B83232');
   } finally {
