@@ -6287,17 +6287,9 @@ async function renderConsolidadoEnvases() {
   var totNeto       = rows.reduce(function(s,r){ return s + r.neto; }, 0);
   var hayCritico    = rows.some(function(r){ return r.stock === 0 && r.faltante > 0; });
 
-  // Fecha última actualización inventario B2
-  var maxInvB2 = null;
-  inventarioCache.forEach(function(i) {
-    if (i.bodega && i.bodega !== 'B2') return;
-    if (i.updated_at && (!maxInvB2 || i.updated_at > maxInvB2)) maxInvB2 = i.updated_at;
-  });
-  var invFechaB2 = '';
-  if (maxInvB2) {
-    var _d = new Date(maxInvB2);
-    invFechaB2 = 'Inv. B2 · ' + String(_d.getDate()).padStart(2,'0') + '/' + String(_d.getMonth()+1).padStart(2,'0') + '/' + _d.getFullYear();
-  }
+  // Fecha = momento de la última recarga (no updated_at del DB)
+  var _nowB2 = new Date();
+  var invFechaB2 = 'Inv. B2 · ' + String(_nowB2.getDate()).padStart(2,'0') + '/' + String(_nowB2.getMonth()+1).padStart(2,'0') + '/' + _nowB2.getFullYear();
 
   function fmtN(n){ return n == null ? '—' : n.toLocaleString(); }
   function estadoBadge(r) {
@@ -7263,13 +7255,11 @@ async function cargarAlertasB7() {
       .order('descripcion', { ascending: true });
     if (r.error || !r.data) return;
 
-    // Fecha de última actualización
-    var maxTs = null;
-    r.data.forEach(function(i) { if (i.updated_at && (!maxTs || i.updated_at > maxTs)) maxTs = i.updated_at; });
+    // Fecha = momento de la última recarga (no updated_at del DB)
     var fechaEl = document.getElementById('b7AlertFecha');
-    if (fechaEl && maxTs) {
-      var d = new Date(maxTs);
-      fechaEl.textContent = 'Inv. B7 · ' + String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+    if (fechaEl) {
+      var _now = new Date();
+      fechaEl.textContent = 'Inv. B7 · ' + String(_now.getDate()).padStart(2,'0') + '/' + String(_now.getMonth()+1).padStart(2,'0') + '/' + _now.getFullYear();
     }
 
     b7TodosData   = r.data;
