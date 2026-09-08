@@ -41,6 +41,14 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
   Foco actual: Tapas es el que se usa activamente (pensado para que los SUPERVISORES —no cada
   operario— le escriban directo, restringidos vía `TETRA_WA_ALLOW`); Serigrafía sigue en el bot
   pero Álvaro la sigue registrando manual por ahora.
+  Comando fijo `"ASISTENCIA DE HOY"` (sep/2026, exacto — no pasa por el prompt de producción):
+  lista personal activo de `area='tapas'`, el supervisor responde en texto libre quién faltó/
+  llegó tarde (prompt aparte, `buildAsistenciaPrompt`, solo hace matching de nombres contra esa
+  lista) → INSERT directo en `rrhh_faltas` (`origen='whatsapp_tapas'`) — sin RPC nueva, ya usa el
+  client `service_role` del propio endpoint. Elegido en vez de `asistencia_diaria` porque esa
+  tabla no tiene ninguna pantalla en Tapas todavía (el board tipo Asistencia Mensual de
+  serigrafia.html queda pendiente de construir); `rrhh_faltas` sí se ve ya en gestion.html →
+  Personal → Faltas, sin pantalla nueva.
   ⚠️ Valida firma `X-Twilio-Signature` (HMAC-SHA1, fail-closed) — sin `TWILIO_AUTH_TOKEN` rechaza TODO POST.
   Env: ANTHROPIC_API_KEY, SUPA_URL, SUPA_SERVICE_KEY, TWILIO_AUTH_TOKEN (obligatorio), TWILIO_WEBHOOK_URL, TETRA_WA_ALLOW.
 - `api/parse-doc.js` — parsea foto de requi con Claude Vision → JSON {requi, fecha, productos[]}.

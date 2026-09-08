@@ -21,6 +21,12 @@
 //   Álvaro reenvía mensaje del grupo de Serigrafía o de Tapas al número sandbox
 //   de Twilio → Twilio hace POST aquí → Claude interpreta → INSERT en Supabase
 //   → respuesta TwiML
+//
+// COMANDO FIJO "ASISTENCIA DE HOY" (exacto, no pasa por Claude para iniciar):
+//   lista el personal activo de área='tapas' → el supervisor responde en texto
+//   libre quién faltó/llegó tarde → Claude solo hace matching de nombres contra
+//   esa lista (prompt aparte, buildAsistenciaPrompt) → INSERT en `rrhh_faltas`
+//   (visible ya en gestion.html → Personal → Faltas, origen='whatsapp_tapas').
 // ════════════════════════════════════════════════════════════════
 
 const crypto = require('crypto');
@@ -158,6 +164,17 @@ async function insertar(db, tipo, datos, fecha, hora) {
     return true;
   }
 
+  if (tipo === 'asistencia') {
+    var novedades = datos.novedades || [];
+    if (!novedades.length) return true; // "todos presentes" — nada que insertar
+    var filas = novedades.map(function(n) {
+      return { personal_id: n.id, fecha: fecha, tipo: n.tipo, origen: 'whatsapp_tapas' };
+    });
+    const r = await db.from('rrhh_faltas').insert(filas);
+    if (r.error) throw new Error('asistencia: ' + r.error.message);
+    return true;
+  }
+
   return false; // tipo desconocido
 }
 
@@ -251,6 +268,13 @@ function resumenTexto(tipo, datos) {
       + (datos.sku ? ' · SKU ' + datos.sku : '')
       + (datos.metodo && datos.metodo !== 'manual' ? ' · máquina' : '');
   }
+  if (tipo === 'asistencia') {
+    var novedades = datos.novedades || [];
+    if (!novedades.length) return 'Todos presentes hoy — nada que registrar';
+    return 'Asistencia de hoy:\n' + novedades.map(function(n) {
+      return '· ' + n.nombre + ' — ' + (n.tipo === 'tardanza' ? 'tardanza' : 'ausencia');
+    }).join('\n');
+  }
   return 'Registro de producción';
 }
 
@@ -328,6 +352,23 @@ Responde ÚNICAMENTE con JSON válido, sin markdown, sin texto extra:
 Si el mensaje debe ignorarse:
 { "ignorar": true }`;
 
+// ── Prompt de Asistencia (comando "ASISTENCIA DE HOY") ────────────
+// Tarea distinta a la de arriba: no clasifica producción, solo hace
+// coincidir nombres de la lista de personal activo contra lo que
+// escribe el supervisor en texto libre.
+function buildAsistenciaPrompt(nombres) {
+  return 'Sos un asistente que interpreta reportes de asistencia de un supervisor de planta.\n' +
+    'Lista de personal ACTIVO hoy:\n' + nombres.map(function(n){ return '- ' + n; }).join('\n') + '\n\n' +
+    'El supervisor te va a decir quién NO está (faltó o llegó tarde). Identificá SOLO nombres que ' +
+    'coincidan con la lista de arriba — si menciona a alguien que no está en la lista, ignoralo.\n\n' +
+    'Responde ÚNICAMENTE con JSON válido, sin markdown:\n' +
+    '{\n' +
+    '  "todos_presentes": true | false,\n' +
+    '  "novedades": [ { "nombre": "<nombre EXACTO tal como aparece en la lista>", "tipo": "ausencia" | "tardanza" } ]\n' +
+    '}\n\n' +
+    'Si el mensaje dice que todos están / sin novedad → todos_presentes:true, novedades:[].';
+}
+
 // ── Handler principal ─────────────────────────────────────────────
 
 module.exports = async function handler(req, res) {
@@ -391,6 +432,103 @@ module.exports = async function handler(req, res) {
     let estadoPrevio = null;
     try { estadoPrevio = await getEstado(db, from); } catch(_) {}
 
+    // ── Comando fijo: iniciar la toma de asistencia de Tapas ──────────
+    if (msgText.trim().toLowerCase() === 'asistencia de hoy') {
+      try {
+        const r = await db.from('personal').select('id,codigo,nombre')
+          .eq('area', 'tapas').eq('activo', true).order('nombre');
+        const roster = r.data || [];
+        if (!roster.length) {
+          res.setHeader('Content-Type', 'text/xml');
+          res.end(twiml('⚠️ No encontré personal activo de Tapas.'));
+          return;
+        }
+        await setEstado(db, from, { pendiente_asistencia: { fecha, roster } });
+        const lista = roster.map(function(p, i){ return (i + 1) + ') ' + p.nombre; }).join('\n');
+        res.setHeader('Content-Type', 'text/xml');
+        res.end(twiml(
+          '📋 Asistencia de hoy — Tapas (' + fecha + ')\n' + lista +
+          '\n\n¿Quién faltó o llegó tarde? Escribí los nombres, o "todos presentes" si nadie faltó.'
+        ));
+      } catch(e) {
+        res.setHeader('Content-Type', 'text/xml');
+        res.end(twiml('❌ Error BD: ' + e.message));
+      }
+      return;
+    }
+
+    // ── ¿El supervisor está reportando la asistencia de hoy? ──────────
+    if (estadoPrevio && estadoPrevio.pendiente_asistencia) {
+      const pend   = estadoPrevio.pendiente_asistencia;
+      const roster = pend.roster || [];
+      const texto  = msgText.trim().toLowerCase();
+
+      if (texto === 'cancelar') {
+        await clearEstado(db, from).catch(() => {});
+        res.setHeader('Content-Type', 'text/xml');
+        res.end(twiml('❌ Cancelado.'));
+        return;
+      }
+
+      if (/todos.*present|sin novedad|nadie falt/.test(texto)) {
+        await clearEstado(db, from).catch(() => {});
+        res.setHeader('Content-Type', 'text/xml');
+        res.end(twiml('✅ Asistencia de hoy: todos presentes. Nada que registrar.'));
+        return;
+      }
+
+      let parsedAsist;
+      try {
+        const aiResp = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 300,
+          system: buildAsistenciaPrompt(roster.map(function(p){ return p.nombre; })),
+          messages: [{ role: 'user', content: msgText }]
+        });
+        const rawText = aiResp.content[0].text.trim()
+          .replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim();
+        parsedAsist = JSON.parse(rawText);
+      } catch(e) {
+        res.setHeader('Content-Type', 'text/xml');
+        res.end(twiml('❌ No entendí, ¿podés reformular quién faltó?'));
+        return;
+      }
+
+      if (parsedAsist.todos_presentes || !parsedAsist.novedades || !parsedAsist.novedades.length) {
+        await clearEstado(db, from).catch(() => {});
+        res.setHeader('Content-Type', 'text/xml');
+        res.end(twiml('✅ Asistencia de hoy: todos presentes. Nada que registrar.'));
+        return;
+      }
+
+      // Vincular cada novedad con su id real de `personal`
+      const novedades = [];
+      parsedAsist.novedades.forEach(function(n) {
+        const match = roster.find(function(p) {
+          return p.nombre.trim().toLowerCase() === (n.nombre || '').trim().toLowerCase();
+        });
+        if (match) {
+          novedades.push({ id: match.id, nombre: match.nombre, tipo: n.tipo === 'tardanza' ? 'tardanza' : 'ausencia' });
+        }
+      });
+
+      if (!novedades.length) {
+        res.setHeader('Content-Type', 'text/xml');
+        res.end(twiml('⚠️ No reconocí esos nombres en la lista de Tapas. ¿Podés escribirlos tal como aparecen en la lista?'));
+        return;
+      }
+
+      const datosAsist = { fecha: pend.fecha, novedades };
+      try {
+        await setEstado(db, from, { pendiente_confirmacion: { tipo: 'asistencia', datos: datosAsist, notas: '' } });
+      } catch(_) {}
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml(
+        '📝 ' + resumenTexto('asistencia', datosAsist) + '\n\n¿Confirmás? Responde *SI* para guardar o *NO* para cancelar.'
+      ));
+      return;
+    }
+
     // ── ¿El operador está confirmando (SI/NO) un registro pendiente? ──
     if (estadoPrevio && estadoPrevio.pendiente_confirmacion) {
       const pend   = estadoPrevio.pendiente_confirmacion;
@@ -405,9 +543,13 @@ module.exports = async function handler(req, res) {
         try {
           const ok = await insertar(db, tipo, datos, fecha, hora);
           await clearEstado(db, from).catch(() => {});
-          const resp = ok
-            ? '✅ Registrado' + notas + (datos.correlativo ? ' · ' + datos.correlativo : '')
-            : '⚠️ Tipo no reconocido: ' + tipo + '. Escribe "ayuda" para ver los formatos.';
+          const resp = !ok
+            ? '⚠️ Tipo no reconocido: ' + tipo + '. Escribe "ayuda" para ver los formatos.'
+            : tipo === 'asistencia'
+              ? '✅ Asistencia registrada:\n' + (datos.novedades || []).map(function(n) {
+                  return '· ' + n.nombre + ' — ' + (n.tipo === 'tardanza' ? 'tardanza' : 'ausencia');
+                }).join('\n')
+              : '✅ Registrado' + notas + (datos.correlativo ? ' · ' + datos.correlativo : '');
           res.setHeader('Content-Type', 'text/xml');
           res.end(twiml(resp));
         } catch(e) {
