@@ -35,6 +35,12 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
   están en la descripción oficial) y sql/bot_tapas_v1.sql. ⚠️ El `bot_buscar_sku` original de
   sql/bot_rpcs_v1.sql nunca llegó a crearse en producción — verificar que el SQL de arriba sí
   se corrió (ver lista de SQL pendiente).
+  Flujo de confirmación (sep/2026): ya NO inserta apenas tiene los datos completos — siempre
+  pasa por `bot_estado.pendiente_confirmacion` (resumen armado por `resumenTexto()`) y espera
+  que el remitente responda SI/NO antes de llamar `insertar()`. Aplica a los 4 tipos por igual.
+  Foco actual: Tapas es el que se usa activamente (pensado para que los SUPERVISORES —no cada
+  operario— le escriban directo, restringidos vía `TETRA_WA_ALLOW`); Serigrafía sigue en el bot
+  pero Álvaro la sigue registrando manual por ahora.
   ⚠️ Valida firma `X-Twilio-Signature` (HMAC-SHA1, fail-closed) — sin `TWILIO_AUTH_TOKEN` rechaza TODO POST.
   Env: ANTHROPIC_API_KEY, SUPA_URL, SUPA_SERVICE_KEY, TWILIO_AUTH_TOKEN (obligatorio), TWILIO_WEBHOOK_URL, TETRA_WA_ALLOW.
 - `api/parse-doc.js` — parsea foto de requi con Claude Vision → JSON {requi, fecha, productos[]}.

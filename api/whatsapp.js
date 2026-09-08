@@ -223,6 +223,37 @@ async function resolverSku(db, datos) {
   return { opciones: conHits.slice(0, 8), nota: '' };
 }
 
+// ── Resumen legible para pedir confirmación antes de guardar ──────
+// Se arma desde `datos` (no desde el texto de Claude) para que sea
+// igual sin importar de qué paso venga: parse inicial, después de
+// elegir SKU de una lista, o después de resolver el operario.
+function resumenTexto(tipo, datos) {
+  if (tipo === 'tiros') {
+    return 'Línea ' + datos.linea_id + ' · ' + datos.momento + ' · contador ' + datos.contador
+      + (datos.descripcion ? ' · ' + datos.descripcion : '')
+      + (datos.sku ? ' · SKU ' + datos.sku : '');
+  }
+  if (tipo === 'flameado') {
+    return (datos.flameador || 'Sin especificar') + ' · ' + (datos.descripcion || '')
+      + ' · ' + datos.cantidad + ' unidades'
+      + (datos.para_linea ? ' · línea ' + datos.para_linea : '')
+      + (datos.sku ? ' · SKU ' + datos.sku : '');
+  }
+  if (tipo === 'empaque') {
+    return (datos.descripcion || '') + ' · ' + datos.cantidad + ' unidades'
+      + (datos.operador_codigo ? ' · ' + datos.operador_codigo : '')
+      + (datos.sku ? ' · SKU ' + datos.sku : '');
+  }
+  if (tipo === 'tapas') {
+    return (datos.operario_nombre || datos.operario || 'Sin especificar') + ' · ' + (datos.proceso || '')
+      + ' · ' + datos.cantidad + ' unidades'
+      + (datos.descripcion ? ' · ' + datos.descripcion : '')
+      + (datos.sku ? ' · SKU ' + datos.sku : '')
+      + (datos.metodo && datos.metodo !== 'manual' ? ' · máquina' : '');
+  }
+  return 'Registro de producción';
+}
+
 // ── Prompt del sistema ────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `Eres el asistente interno de TETRAPP para las plantas de Serigrafía y Tapas de Tetraplastic Guatemala.
@@ -360,6 +391,46 @@ module.exports = async function handler(req, res) {
     let estadoPrevio = null;
     try { estadoPrevio = await getEstado(db, from); } catch(_) {}
 
+    // ── ¿El operador está confirmando (SI/NO) un registro pendiente? ──
+    if (estadoPrevio && estadoPrevio.pendiente_confirmacion) {
+      const pend   = estadoPrevio.pendiente_confirmacion;
+      const tipo   = pend.tipo;
+      const datos  = pend.datos || {};
+      const notas  = pend.notas || '';
+      const texto  = msgText.trim().toLowerCase();
+      const esSi   = /^(si|sí|s|ok|dale|confirmo|correcto)\b/.test(texto);
+      const esNo   = /^(no|n|cancelar|cancela)\b/.test(texto);
+
+      if (esSi) {
+        try {
+          const ok = await insertar(db, tipo, datos, fecha, hora);
+          await clearEstado(db, from).catch(() => {});
+          const resp = ok
+            ? '✅ Registrado' + notas + (datos.correlativo ? ' · ' + datos.correlativo : '')
+            : '⚠️ Tipo no reconocido: ' + tipo + '. Escribe "ayuda" para ver los formatos.';
+          res.setHeader('Content-Type', 'text/xml');
+          res.end(twiml(resp));
+        } catch(e) {
+          res.setHeader('Content-Type', 'text/xml');
+          res.end(twiml('❌ Error BD: ' + e.message));
+        }
+        return;
+      }
+
+      if (esNo) {
+        await clearEstado(db, from).catch(() => {});
+        res.setHeader('Content-Type', 'text/xml');
+        res.end(twiml('❌ Cancelado, no se guardó nada.'));
+        return;
+      }
+
+      res.setHeader('Content-Type', 'text/xml');
+      res.end(twiml(
+        '❓ No entendí. Responde *SI* para guardar o *NO* para cancelar.\n\n📝 ' + resumenTexto(tipo, datos) + notas
+      ));
+      return;
+    }
+
     // ── ¿El operador está eligiendo un SKU de la lista? ──────────
     if (estadoPrevio && estadoPrevio.pendiente_sku) {
       const ops   = estadoPrevio.pendiente_sku.opciones || [];
@@ -368,36 +439,31 @@ module.exports = async function handler(req, res) {
       const sel   = parseInt(msgText.trim());
       const limpiar = msgText.toLowerCase();
 
-      // 0 o "ninguno" → guardar sin SKU
+      // 0 o "ninguno" → confirmar antes de guardar sin SKU
       if (sel === 0 || limpiar.includes('ninguno') || limpiar.includes('sin sku')) {
         try {
-          await insertar(db, tipo, datos, fecha, hora);
-          await clearEstado(db, from).catch(() => {});
-          res.setHeader('Content-Type', 'text/xml');
-          res.end(twiml('✅ Registrado sin SKU · ' + fecha + (datos.correlativo ? ' · ' + datos.correlativo : '')));
-        } catch(e) {
-          res.setHeader('Content-Type', 'text/xml');
-          res.end(twiml('❌ Error BD: ' + e.message));
-        }
+          await setEstado(db, from, { pendiente_confirmacion: { tipo, datos, notas: '' } });
+        } catch(_) {}
+        res.setHeader('Content-Type', 'text/xml');
+        res.end(twiml(
+          '📝 ' + resumenTexto(tipo, datos) + '\n\n¿Confirmás? Responde *SI* para guardar o *NO* para cancelar.'
+        ));
         return;
       }
 
-      // Número válido → vincular SKU seleccionado
+      // Número válido → vincular SKU seleccionado y confirmar antes de guardar
       if (sel >= 1 && sel <= ops.length) {
         datos.sku         = String(ops[sel - 1].sku);
         datos.descripcion = ops[sel - 1].descripcion;
         try {
-          await insertar(db, tipo, datos, fecha, hora);
-          await clearEstado(db, from).catch(() => {});
-          res.setHeader('Content-Type', 'text/xml');
-          res.end(twiml(
-            '✅ Registrado · 🔗 ' + datos.sku + ' · ' + datos.descripcion.slice(0, 45)
-              + (datos.correlativo ? ' · ' + datos.correlativo : '')
-          ));
-        } catch(e) {
-          res.setHeader('Content-Type', 'text/xml');
-          res.end(twiml('❌ Error BD: ' + e.message));
-        }
+          await setEstado(db, from, {
+            pendiente_confirmacion: { tipo, datos, notas: ' · 🔗 SKU ' + datos.sku }
+          });
+        } catch(_) {}
+        res.setHeader('Content-Type', 'text/xml');
+        res.end(twiml(
+          '📝 ' + resumenTexto(tipo, datos) + '\n\n¿Confirmás? Responde *SI* para guardar o *NO* para cancelar.'
+        ));
         return;
       }
 
@@ -463,7 +529,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // ── Datos completos: resolver operario/SKU e insertar ─────────
+    // ── Datos completos: resolver operario/SKU y pedir confirmación ──
     try {
       const datos = parsed.datos || {};
 
@@ -493,17 +559,18 @@ module.exports = async function handler(req, res) {
         return;
       }
 
-      // SKU resuelto (único) o sin coincidencia → insertar directamente
-      const ok = await insertar(db, parsed.tipo, datos, fecha, hora);
-      await clearEstado(db, from).catch(() => {});
-
-      const resp = ok
-        ? '✅ ' + (parsed.mensaje_confirmacion || 'Registro guardado · ' + fecha) + skuRes.nota + operarioNota
-            + (datos.correlativo ? ' · ' + datos.correlativo : '')
-        : '⚠️ Tipo no reconocido: ' + parsed.tipo + '. Escribe "ayuda" para ver los formatos.';
-
+      // SKU y operario resueltos (o sin coincidencia) → pedir confirmación
+      const notas = (skuRes.nota || '') + operarioNota;
+      try {
+        await setEstado(db, from, {
+          pendiente_confirmacion: { tipo: parsed.tipo, datos, notas }
+        });
+      } catch(_) {}
       res.setHeader('Content-Type', 'text/xml');
-      res.end(twiml(resp));
+      res.end(twiml(
+        '📝 ' + resumenTexto(parsed.tipo, datos) + notas
+          + '\n\n¿Confirmás? Responde *SI* para guardar o *NO* para cancelar.'
+      ));
     } catch(e) {
       console.error('[TETRAPP-BOT] Error BD:', e.message);
       res.setHeader('Content-Type', 'text/xml');
