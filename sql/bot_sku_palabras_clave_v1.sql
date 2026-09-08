@@ -51,7 +51,14 @@ create policy delete_master on public.sku_palabras_clave
 revoke all on public.sku_palabras_clave from anon;
 grant select, insert, update, delete on public.sku_palabras_clave to authenticated;
 
--- ── bot_buscar_sku (v3) — igual que v2 + suma hits de alias ───────
+-- ── bot_buscar_sku (v4) — match por PALABRA COMPLETA, no subcadena ─
+-- v3 usaba LIKE '%tok%', que hacía match de "tapa" DENTRO de
+-- "CONTRATAPA" — inflaba por igual a CONTRATAPA/BASE TAPA/TAPA/ENVASE
+-- con tapa y el SKU correcto nunca se distinguía. v4 compara la
+-- palabra completa (con la misma tolerancia a plural de siempre)
+-- contra cada palabra de la descripción, así "tapa" ya NO matchea
+-- "contratapa" pero sigue matcheando "tapa" dentro de "BASE TAPA X"
+-- (son dos palabras separadas, esa sí es la misma pieza).
 create or replace function public.bot_buscar_sku(p_texto text)
 returns table(sku text, descripcion text, hits int)
 language sql
@@ -60,24 +67,28 @@ security definer
 set search_path = public
 as $$
   with toks as (
-    select
-      tok,
-      case when length(tok) > 3 and right(tok, 1) = 's'
-           then left(tok, length(tok) - 1)
-           else tok end as tok_sing
-    from (
-      select unnest(string_to_array(
-        lower(translate(trim(p_texto), 'áéíóúñÁÉÍÓÚÑ', 'aeiounAEIOUN')),
-        ' '
-      )) as tok
-    ) t
-    where length(tok) >= 2
+    select distinct
+      case when length(w) > 3 and right(w, 1) = 's' then left(w, length(w) - 1) else w end as stem
+    from unnest(string_to_array(
+      lower(translate(trim(p_texto), 'áéíóúñÁÉÍÓÚÑ', 'aeiounAEIOUN')),
+      ' '
+    )) as w
+    where length(w) >= 2
   ),
   inv as (
     select
       i.sku::text as sku,
       i.descripcion,
-      lower(translate(i.descripcion, 'áéíóúñÁÉÍÓÚÑ', 'aeiounAEIOUN')) as desc_norm
+      (
+        select array_agg(distinct
+          case when length(w) > 3 and right(w, 1) = 's' then left(w, length(w) - 1) else w end
+        )
+        from unnest(string_to_array(
+          lower(translate(i.descripcion, 'áéíóúñÁÉÍÓÚÑ', 'aeiounAEIOUN')),
+          ' '
+        )) as w
+        where length(w) >= 2
+      ) as desc_stems
     from inventario i
     where i.activo = true
       and coalesce(i.facturable, true) = true
@@ -86,21 +97,26 @@ as $$
   alias as (
     select
       k.sku,
-      lower(translate(k.palabra, 'áéíóúñÁÉÍÓÚÑ', 'aeiounAEIOUN')) as palabra_norm
-    from public.sku_palabras_clave k
+      array_agg(distinct
+        case when length(w) > 3 and right(w, 1) = 's' then left(w, length(w) - 1) else w end
+      ) as alias_stems
+    from public.sku_palabras_clave k,
+      unnest(string_to_array(
+        lower(translate(k.palabra, 'áéíóúñÁÉÍÓÚÑ', 'aeiounAEIOUN')),
+        ' '
+      )) as w
+    where length(w) >= 2
+    group by k.sku
   )
   select
     inv.sku,
     inv.descripcion,
     (
-      (select count(*)::int from toks t
-       where inv.desc_norm like '%' || t.tok || '%'
-          or inv.desc_norm like '%' || t.tok_sing || '%')
+      (select count(*)::int from toks t where t.stem = any(coalesce(inv.desc_stems, array[]::text[])))
       +
       (select count(*)::int from toks t
        join alias a on a.sku = inv.sku
-       where a.palabra_norm like '%' || t.tok || '%'
-          or a.palabra_norm like '%' || t.tok_sing || '%')
+       where t.stem = any(coalesce(a.alias_stems, array[]::text[])))
     ) as hits
   from inv
   where trim(coalesce(p_texto, '')) <> ''
