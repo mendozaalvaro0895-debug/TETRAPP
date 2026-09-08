@@ -433,7 +433,14 @@ module.exports = async function handler(req, res) {
     try { estadoPrevio = await getEstado(db, from); } catch(_) {}
 
     // ── Comando fijo: iniciar la toma de asistencia de Tapas ──────────
-    if (msgText.trim().toLowerCase() === 'asistencia de hoy') {
+    // Tolera variantes ("asistencia hoy", tildes, mayúsculas) sin abrir la
+    // puerta a mensajes de producción que solo mencionen esas palabras.
+    const esComandoAsistencia = /^asistencia( de)? hoy$/.test(
+      msgText.trim().toLowerCase().replace(/[áéíóú]/g, function(c) {
+        return { 'á':'a','é':'e','í':'i','ó':'o','ú':'u' }[c];
+      })
+    );
+    if (esComandoAsistencia) {
       try {
         const r = await db.from('personal').select('id,codigo,nombre')
           .eq('area', 'tapas').eq('activo', true).order('nombre');
