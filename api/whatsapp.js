@@ -469,7 +469,7 @@ module.exports = async function handler(req, res) {
 
       // Entrada inválida → repetir lista
       const lista = ops.map(function(o, i){
-        return (i + 1) + ') ' + o.sku + ' · ' + o.descripcion.slice(0, 40);
+        return (i + 1) + ') ' + o.sku + ' · ' + o.descripcion;
       }).join('\n');
       res.setHeader('Content-Type', 'text/xml');
       res.end(twiml('⚠️ Elegí un número:\n' + lista + '\n0) Sin SKU'));
@@ -547,7 +547,7 @@ module.exports = async function handler(req, res) {
       // Varias opciones → preguntar al operador sin insertar todavía
       if (skuRes.opciones && skuRes.opciones.length) {
         const lista = skuRes.opciones.map(function(o, i){
-          return (i + 1) + ') ' + o.sku + ' · ' + o.descripcion.slice(0, 40);
+          return (i + 1) + ') ' + o.sku + ' · ' + o.descripcion;
         }).join('\n');
         try {
           await setEstado(db, from, {
