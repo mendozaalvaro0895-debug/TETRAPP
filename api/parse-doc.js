@@ -28,7 +28,15 @@ Es un documento de "${tipo === 'ingreso' ? 'Requi / Entrega PT' : 'Salida de Bod
 
 Extraé EXACTAMENTE estos campos:
 • requi: Número de documento principal (campo "Documento" — ej: "PRI2 476", "R-001")
-• fecha: Fecha en formato YYYY-MM-DD (campo "Fecha" — convertí DD/MM/YY → YYYY-MM-DD; año de 2 dígitos: 26 → 2026)
+• fecha: Fecha en formato YYYY-MM-DD (campo "Fecha"). Año de 2 dígitos: 26 → 2026.
+    ⚠️ EL DOCUMENTO USA DÍA/MES/AÑO (formato de Guatemala). El PRIMER número es el DÍA,
+    el SEGUNDO es el MES. NUNCA lo leas como mes/día, aunque ambos sean ≤ 12 y las dos
+    lecturas parezcan válidas — ahí es donde se cometen los errores.
+       01/09/26 → 2026-09-01  (1 de septiembre — NO el 9 de enero)
+       08/01/26 → 2026-01-08  (8 de enero — NO el 1 de agosto)
+       09/05/26 → 2026-05-09  (9 de mayo — NO el 5 de septiembre)
+    Si el primer número es mayor a 12, confirma que es día/mes: 25/07/26 → 2026-07-25.
+    Si la fecha está borrosa o el orden no se puede determinar, ponela en warnings.
 • descripcion: Turno o descripción si aparece (campo "Descripción" — ej: "lunes 1 noche")
 • productos: Array con TODOS los renglones de la tabla. Cada uno:
     – sku: Código numérico (columna "Código")
@@ -46,7 +54,7 @@ Extraé EXACTAMENTE estos campos:
 Respondé SOLO con JSON válido, sin markdown, sin texto adicional:
 {
   "requi": "PRI2 476",
-  "fecha": "2026-06-02",
+  "fecha": "2026-06-25",
   "descripcion": "lunes 1 noche",
   "productos": [
     { "sku": "10008", "desc": "ENVASE TARRO 1.3 40 ONZ NATURAL PVC", "cant": 2850 }
