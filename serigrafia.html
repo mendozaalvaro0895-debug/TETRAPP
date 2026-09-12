@@ -9153,7 +9153,9 @@ async function renderFlameado() {
   if (flamSubActual === 'historial') { renderFlamHistorial(); return; }
 
   var mesStr = (document.getElementById('prodMes') || {}).value || fechaHoy().slice(0,7);
-  var desde  = mesStr + '-01', hasta = mesStr + '-31';
+  // '-31' fijo rompía en meses de 30 o menos días (ej. "2026-09-31" no existe)
+  var añoFl = parseInt(mesStr.slice(0,4)), mesNFl = parseInt(mesStr.slice(5,7));
+  var desde  = mesStr + '-01', hasta = mesStr + '-' + String(new Date(añoFl, mesNFl, 0).getDate()).padStart(2,'0');
 
   var activeTabla = document.getElementById(flamSubActual === 'linea' ? 'flamTabla' : 'flamMetasTabla');
   if (activeTabla) activeTabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando flameado…</div></div>';
@@ -9632,7 +9634,9 @@ async function renderEmpaque() {
   tabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando empaque…</div></div>';
 
   var mesStr = (document.getElementById('prodMes') || {}).value || fechaHoy().slice(0,7);
-  var desde = mesStr + '-01', hasta = mesStr + '-31';
+  // '-31' fijo rompía en meses de 30 o menos días (ej. "2026-09-31" no existe)
+  var añoEm = parseInt(mesStr.slice(0,4)), mesNEm = parseInt(mesStr.slice(5,7));
+  var desde = mesStr + '-01', hasta = mesStr + '-' + String(new Date(añoEm, mesNEm, 0).getDate()).padStart(2,'0');
 
   try {
     var re = await db.from('registro_empaque_serig')
@@ -9693,7 +9697,9 @@ async function renderProductividad() {
 
   var mesStr = (document.getElementById('prodMes') || {}).value || fechaHoy().slice(0,7);
   var desde = mesStr + '-01';
-  var hasta = mesStr + '-31';
+  // '-31' fijo rompía en meses de 30 o menos días (ej. "2026-09-31" no existe)
+  var añoP = parseInt(mesStr.slice(0,4)), mesNP = parseInt(mesStr.slice(5,7));
+  var hasta = mesStr + '-' + String(new Date(añoP, mesNP, 0).getDate()).padStart(2,'0');
 
   var lecturas = [];
   try {
@@ -10906,7 +10912,9 @@ async function renderTrazabilidad() {
   var kpis = document.getElementById('trazaKPIs');
   if (!cont) return;
   var mesStr = (document.getElementById('trazaMes') || {}).value || fechaHoy().slice(0,7);
-  var desde = mesStr + '-01', hasta = mesStr + '-31';
+  // '-31' fijo rompía en meses de 30 o menos días (ej. "2026-09-31" no existe)
+  var añoTz = parseInt(mesStr.slice(0,4)), mesNTz = parseInt(mesStr.slice(5,7));
+  var desde = mesStr + '-01', hasta = mesStr + '-' + String(new Date(añoTz, mesNTz, 0).getDate()).padStart(2,'0');
   cont.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando trazabilidad…</div></div>';
   if (kpis) kpis.innerHTML = '';
   renderClienteAvance();
