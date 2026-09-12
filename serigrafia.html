@@ -9781,6 +9781,10 @@ async function renderProductividad() {
       diasConData++;
       var delta = pfcDelta(datos.registros);
       if (delta !== null) totalTiros += delta;
+      // La velada es un turno nocturno aparte en la misma línea/fecha: su
+      // producción también cuenta al total del mes (el día ya suma a la meta).
+      var vel = prodVeladaDelta(datos);
+      if (vel !== null) totalTiros += vel;
     });
     var metaMes = diasConData * META_TIROS_LINEA;
     var pct = metaMes > 0 ? Math.min(100, Math.round((totalTiros / metaMes) * 100)) : 0;
