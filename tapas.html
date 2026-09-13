@@ -213,12 +213,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 /* ── Vista Inicio (Hub) ────────────────────────────────────── */
 .inicio-wrap{flex:1;overflow-y:auto;padding:20px 24px}
-.inicio-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-.inicio-kpi{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px}
-.inicio-kpi-l{font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--gray)}
-.inicio-kpi-v{font-family:var(--mono);font-size:24px;font-weight:700;line-height:1.2;margin:4px 0 2px}
-.inicio-kpi-s{font-size:10px;color:var(--gray-l)}
 .sub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+.sub-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
 .sub-grid-b{display:grid;grid-template-columns:1fr 2fr;gap:14px}
 .sub-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:18px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
 .sub-card:hover{box-shadow:0 6px 24px rgba(0,0,0,.1);transform:translateY(-2px);border-color:var(--teal-l)}
@@ -243,8 +239,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   .tab{white-space:nowrap;font-size:12px;padding:10px 6px}
   .tabs-r{flex:none;margin-left:auto}
   .inicio-wrap{padding:12px}
-  .inicio-kpi-row{grid-template-columns:repeat(2,1fr)}
   .sub-grid{grid-template-columns:1fr}
+  .sub-grid-2{grid-template-columns:1fr}
   .sub-grid-b{grid-template-columns:1fr}
   .mov-scroll{padding:10px}
   #movTabla{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -333,30 +329,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="view" style="display:flex;flex-direction:column;flex:1;overflow:hidden" id="view-inicio">
       <div class="inicio-wrap">
 
-        <!-- KPIs globales rápidos -->
-        <div class="inicio-kpi-row">
-          <div class="inicio-kpi">
-            <div class="inicio-kpi-l">En proceso</div>
-            <div class="inicio-kpi-v" style="color:var(--teal)" id="ih-proc">—</div>
-            <div class="inicio-kpi-s">solicitudes activas</div>
-          </div>
-          <div class="inicio-kpi">
-            <div class="inicio-kpi-l">Pendientes</div>
-            <div class="inicio-kpi-v" style="color:var(--amber)" id="ih-pend">—</div>
-            <div class="inicio-kpi-s">sin iniciar</div>
-          </div>
-          <div class="inicio-kpi">
-            <div class="inicio-kpi-l">Rechazos hoy</div>
-            <div class="inicio-kpi-v" style="color:var(--red)" id="ih-rech">—</div>
-            <div class="inicio-kpi-s">unidades rechazadas</div>
-          </div>
-          <div class="inicio-kpi">
-            <div class="inicio-kpi-l">Capacidad estimada</div>
-            <div class="inicio-kpi-v" style="color:var(--green)" id="ih-cap">—</div>
-            <div class="inicio-kpi-s">und / hora hoy</div>
-          </div>
-        </div>
-
         <!-- Fila 1: Pedidos · Procesos · Personal -->
         <div class="sub-grid">
 
@@ -396,7 +368,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
 
         <!-- Fila 2: Productividad · Trazabilidad -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="sub-grid-2">
 
           <div class="sub-card" onclick="switchTab('productividad')">
             <div class="sub-card-arrow">→</div>
@@ -1712,12 +1684,6 @@ function renderInicio() {
   var rechSemUnid = rechazosData.filter(function(r){ return r.created_at && r.created_at.slice(0,10)>=hace7; })
                                 .reduce(function(a,r){ return a+(r.cantidad_rechazada||0); }, 0);
 
-  // KPIs top — count-up
-  countUp(document.getElementById('ih-proc'), proc, 700);
-  countUp(document.getElementById('ih-pend'), pend, 700);
-  countUp(document.getElementById('ih-rech'), rechHoyUnid, 700);
-  var capEl = document.getElementById('ih-cap'); if (capEl) capEl.textContent = '—';
-
   // Sub-card stats — count-up
   countUp(document.getElementById('icard-proc'),     proc,        600);
   countUp(document.getElementById('icard-pend'),     pend,        600);
@@ -1728,9 +1694,7 @@ function renderInicio() {
     var el=document.getElementById(id); if(el) el.textContent='—';
   });
 
-  // Stagger: KPI cells → luego sub-cards
-  staggerEls('#view-inicio .inicio-kpi', 0);
-  staggerEls('#view-inicio .sub-card',   80);
+  staggerEls('#view-inicio .sub-card', 0);
 }
 
 // ══ RECHAZOS ════════════════════════════════════════════════
