@@ -263,6 +263,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ag-cell.finde.dom-trabajado{background:#22c55e!important;color:#fff!important}
 .ag-row-full .ag-td-name{color:#14532d;font-weight:700}
 
+/* Producción mensual (Productividad · Requis de Ingreso PT) */
+.prod-mens-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.prod-mens-hdr{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.prod-mens-hdr span:first-child{font-size:12px;font-weight:800;color:var(--ink)}
+.prod-mens-chart{padding:10px 14px 8px}
+.prod-bar{width:100%;border-radius:3px 3px 0 0;transition:height .3s;background:var(--teal)}
+.prod-mens-total{display:flex;gap:16px;padding:6px 14px 10px;border-top:1px solid var(--border);margin-top:4px}
+.prod-stat{display:flex;flex-direction:column}
+.prod-stat-val{font-size:16px;font-weight:800;color:var(--ink)}
+.prod-stat-lbl{font-size:10px;color:var(--gray-l);font-weight:500}
+
 
 /* ── Responsive móvil — complementa shared/styles.css ────────── */
 @media(max-width:768px){
@@ -477,6 +488,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
 
       <div class="mov-scroll">
+        <div id="prodMensualTapas"></div>
         <div id="prodTabla"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>
       </div>
     </div><!-- /view-productividad -->
@@ -3065,6 +3077,379 @@ async function cargarProductividad() {
     console.error('cargarProductividad:', e);
     if (tabla) tabla.innerHTML = '<div class="empty">❌ No se pudo cargar la productividad del mes.</div>';
   }
+  renderProdMensualTapas();
+}
+
+// ── Producción mensual: barras diarias de Ingreso PT (Requis) ───
+// Mismo mecanismo que renderProdMensual (serigrafia.html: Acumulado,
+// Comparar, navegación ◀▶) pero sobre movimientos_materiales
+// (tipo='entrada_pt') en vez de entregas_serig — Tapas no tiene esa tabla,
+// y el registro de "requi de ingreso PT" en Tapas ES movimientos_materiales.
+// Sin gradiente rojo/ámbar/verde por meta diaria (PROD_META_DIA de
+// serigrafia.html es un número específico de esa área, sin equivalente
+// confirmado en Tapas) — barras en un solo color (teal).
+var prodMesNavTapas         = null;  // null = mes actual
+var prodVistaLineaTapas     = false; // true = línea acumulada, false = barras
+var prodCompararActivoTapas = false;
+var prodEntradasPTCache     = { desde: null, hasta: null, data: [] };
+
+async function asegurarProdEntradasPT(desde, hasta) {
+  if (prodEntradasPTCache.desde && desde >= prodEntradasPTCache.desde && hasta <= prodEntradasPTCache.hasta) return;
+  var nDesde = prodEntradasPTCache.desde && prodEntradasPTCache.desde < desde ? prodEntradasPTCache.desde : desde;
+  var nHasta = prodEntradasPTCache.hasta && prodEntradasPTCache.hasta > hasta ? prodEntradasPTCache.hasta : hasta;
+  try {
+    var res = await db.from('movimientos_materiales')
+      .select('sku_original, cantidad, num_documento, observaciones, created_at')
+      .eq('tipo', 'entrada_pt')
+      .gte('created_at', nDesde + 'T00:00:00')
+      .lte('created_at', nHasta + 'T23:59:59');
+    if (res.error) throw res.error;
+    prodEntradasPTCache = { desde: nDesde, hasta: nHasta, data: res.data || [] };
+  } catch(e) { console.error('asegurarProdEntradasPT:', e); }
+}
+
+function navegarProdMesTapas(delta) {
+  var hoy = fechaHoy();
+  var base = prodMesNavTapas || hoy.slice(0, 7);
+  var anio = parseInt(base.slice(0, 4), 10), mesN = parseInt(base.slice(5, 7), 10);
+  var d = new Date(anio, mesN - 1 + delta, 1);
+  var nuevo = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  if (nuevo > hoy.slice(0, 7)) return;
+  prodMesNavTapas = (nuevo === hoy.slice(0, 7)) ? null : nuevo;
+  renderProdMensualTapas();
+}
+
+function toggleProdVistaLineaTapas() {
+  prodVistaLineaTapas = !prodVistaLineaTapas;
+  renderProdMensualTapas();
+}
+
+function toggleProdCompararTapas() {
+  prodCompararActivoTapas = !prodCompararActivoTapas;
+  renderProdMensualTapas();
+}
+
+function verDetalleProdDiaTapas(fecha, event) {
+  if (event) event.stopPropagation();
+  var movs = prodEntradasPTCache.data.filter(function(m) {
+    return (parseFechaDoc(m.observaciones) || formatFecha(m.created_at)) === fecha;
+  });
+  var fechaLabel = new Date(fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'long', day: 'numeric', month: 'long' });
+  fechaLabel = fechaLabel.charAt(0).toUpperCase() + fechaLabel.slice(1);
+  var total = movs.reduce(function(s, m) { return s + (m.cantidad || 0); }, 0);
+
+  var html = !movs.length
+    ? '<div style="font-size:12px;color:var(--gray-l);font-style:italic;padding:6px 0">Sin ingresos de PT registrados</div>'
+    : movs.map(function(m) {
+        return '<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
+          + '<span style="font-family:var(--mono);font-size:9px;color:var(--teal);flex-shrink:0;padding-top:2px">' + escHtml(m.sku_original || '—') + '</span>'
+          + '<span style="font-size:11px;color:var(--ink);flex:1;line-height:1.3">' + escHtml(getSkuDesc(m.sku_original)) + (m.num_documento ? ' · Doc ' + escHtml(m.num_documento) : '') + '</span>'
+          + '<span style="font-size:11px;font-weight:700;color:var(--ink);flex-shrink:0;white-space:nowrap">' + (m.cantidad || 0).toLocaleString() + ' und</span>'
+        + '</div>';
+      }).join('');
+
+  var existente = document.getElementById('prodDiaPopupTapas');
+  if (existente) existente.remove();
+  var pop = document.createElement('div');
+  pop.id = 'prodDiaPopupTapas';
+  pop.style.cssText = 'position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--teal);border-radius:10px;padding:14px 16px;min-width:260px;max-width:340px;max-height:320px;overflow-y:auto;box-shadow:0 8px 28px rgba(0,0,0,.22)';
+  var evt = event && event.native ? event.native : event;
+  var x = evt ? Math.min(evt.clientX, window.innerWidth - 360) : window.innerWidth / 2 - 170;
+  var y = evt ? Math.min(evt.clientY + 8, window.innerHeight - 340) : window.innerHeight / 2 - 160;
+  pop.style.left = Math.max(8, x) + 'px'; pop.style.top = Math.max(8, y) + 'px';
+  pop.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+    + '<div><div style="font-size:12px;font-weight:800;color:var(--ink)">' + escHtml(fechaLabel) + '</div>'
+    + '<div style="font-size:10px;color:var(--gray-l);margin-top:1px">' + total.toLocaleString() + ' und totales</div></div>'
+    + '<button onclick="document.getElementById(\'prodDiaPopupTapas\').remove()" style="background:none;border:none;font-size:17px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0 2px;margin-left:8px">✕</button>'
+    + '</div>' + html;
+  document.body.appendChild(pop);
+  setTimeout(function() {
+    document.addEventListener('click', function closeProdDia(e) {
+      var p2 = document.getElementById('prodDiaPopupTapas');
+      if (p2 && !p2.contains(e.target)) { p2.remove(); document.removeEventListener('click', closeProdDia); }
+    });
+  }, 60);
+}
+
+function _buildLineaAcumSvgTapas(opts) {
+  var SVG_W = 700, SVG_H = 210;
+  var PAD_L = 58, PAD_R = 12, PAD_T = 22, PAD_B = 34;
+  var PW = SVG_W - PAD_L - PAD_R;
+  var PH = SVG_H - PAD_T - PAD_B;
+
+  var N = opts.dias;
+  var NP = opts.diasPrev || 0;
+  var maxN = NP ? Math.max(N, NP) : N;
+
+  var cumAct = [], runA = 0;
+  for (var da = 1; da <= N; da++) {
+    var keyA = opts.ym + '-' + String(da).padStart(2, '0');
+    if (keyA <= opts.todayStr) runA += (opts.porFecha[keyA] || 0);
+    cumAct.push(runA);
+  }
+  var cumPrev = [];
+  if (opts.prevYm) {
+    var runP = 0;
+    for (var dp = 1; dp <= NP; dp++) {
+      runP += (opts.porFechaPrev[opts.prevYm + '-' + String(dp).padStart(2, '0')] || 0);
+      cumPrev.push(runP);
+    }
+  }
+  var maxCum = Math.max(cumAct.length ? cumAct[cumAct.length - 1] : 0, cumPrev.length ? cumPrev[cumPrev.length - 1] : 0, 1);
+  var xFn = function(d) { return maxN <= 1 ? PAD_L + PW / 2 : PAD_L + ((d - 1) / (maxN - 1)) * PW; };
+  var yFn = function(v) { return PAD_T + PH - (v / maxCum) * PH; };
+  var todayDay = opts.ym === opts.todayStr.slice(0, 7) ? parseInt(opts.todayStr.slice(8), 10) : N;
+  var sliceLen = Math.min(todayDay, N);
+
+  var svg = '<svg viewBox="0 0 ' + SVG_W + ' ' + SVG_H + '" width="100%" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible">';
+  [0, 0.25, 0.5, 0.75, 1].forEach(function(t) {
+    var gy = yFn(t * maxCum);
+    var gv = Math.round(t * maxCum);
+    var gl = gv >= 10000 ? Math.round(gv / 1000) + 'k' : gv >= 1000 ? (gv / 1000).toFixed(1) + 'k' : gv;
+    svg += '<line x1="' + PAD_L + '" y1="' + gy.toFixed(1) + '" x2="' + (PAD_L + PW) + '" y2="' + gy.toFixed(1) + '" stroke="var(--border)" stroke-width="' + (t === 0 ? '1.5' : '0.6') + '"' + (t > 0 ? ' stroke-dasharray="3,4"' : '') + '/>';
+    svg += '<text x="' + (PAD_L - 6) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end" font-size="8" fill="var(--gray-l)">' + gl + '</text>';
+  });
+  for (var dlbl = 1; dlbl <= maxN; dlbl++) {
+    if (dlbl === 1 || dlbl % 5 === 0 || dlbl === maxN) {
+      var lx = xFn(dlbl);
+      var baseY = PAD_T + PH;
+      svg += '<line x1="' + lx.toFixed(1) + '" y1="' + baseY + '" x2="' + lx.toFixed(1) + '" y2="' + (baseY + 4) + '" stroke="var(--border)" stroke-width="1"/>';
+      svg += '<text x="' + lx.toFixed(1) + '" y="' + (baseY + 14) + '" text-anchor="middle" font-size="8" fill="var(--gray-l)">' + dlbl + '</text>';
+    }
+  }
+  if (opts.prevYm && opts.prevLabel) {
+    var cumPrevTotal = cumPrev.length ? cumPrev[cumPrev.length - 1] : 0;
+    var cumActTotal = sliceLen > 0 ? cumAct[sliceLen - 1] : 0;
+    svg += '<line x1="' + PAD_L + '" y1="10" x2="' + (PAD_L + 18) + '" y2="10" stroke="#94a3b8" stroke-width="2" stroke-dasharray="5,3"/>';
+    svg += '<text x="' + (PAD_L + 24) + '" y="14" font-size="9" fill="#94a3b8">' + opts.prevLabel + ' — ' + cumPrevTotal.toLocaleString() + ' und</text>';
+    svg += '<line x1="' + (PAD_L + 230) + '" y1="10" x2="' + (PAD_L + 248) + '" y2="10" stroke="var(--teal)" stroke-width="2.5"/>';
+    svg += '<text x="' + (PAD_L + 254) + '" y="14" font-size="9" fill="var(--teal)">' + opts.mesLabel + ' — ' + cumActTotal.toLocaleString() + ' und</text>';
+  }
+  if (cumPrev.length) {
+    var ptsPrev = cumPrev.map(function(v, i) { return xFn(i + 1).toFixed(1) + ',' + yFn(v).toFixed(1); }).join(' ');
+    svg += '<polyline points="' + ptsPrev + '" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-dasharray="5,3" opacity="0.85"/>';
+    cumPrev.forEach(function(v, i) {
+      var d2 = i + 1;
+      var dv = opts.porFechaPrev[opts.prevYm + '-' + String(d2).padStart(2, '0')] || 0;
+      if (dv > 0 || d2 === NP) {
+        svg += '<circle cx="' + xFn(d2).toFixed(1) + '" cy="' + yFn(v).toFixed(1) + '" r="2.5" fill="#94a3b8" stroke="var(--card)" stroke-width="1"><title>Día ' + d2 + ' (' + (opts.prevLabel || '') + '): +' + dv.toLocaleString() + ' | Acum: ' + v.toLocaleString() + '</title></circle>';
+      }
+    });
+  }
+  if (sliceLen > 0) {
+    var cumSlice = cumAct.slice(0, sliceLen);
+    var x1act = xFn(1), xLastAct = xFn(sliceLen), baseYp = PAD_T + PH;
+    var areaD = 'M' + x1act.toFixed(1) + ',' + baseYp.toFixed(1);
+    cumSlice.forEach(function(v, i) { areaD += ' L' + xFn(i + 1).toFixed(1) + ',' + yFn(v).toFixed(1); });
+    areaD += ' L' + xLastAct.toFixed(1) + ',' + baseYp.toFixed(1) + ' Z';
+    svg += '<path d="' + areaD + '" fill="var(--teal)" opacity="0.08"/>';
+    var ptsAct = cumSlice.map(function(v, i) { return xFn(i + 1).toFixed(1) + ',' + yFn(v).toFixed(1); }).join(' ');
+    svg += '<polyline points="' + ptsAct + '" fill="none" stroke="var(--teal)" stroke-width="2.5" stroke-linejoin="round"/>';
+    cumSlice.forEach(function(v, i) {
+      var d3 = i + 1;
+      var key3 = opts.ym + '-' + String(d3).padStart(2, '0');
+      var dv3 = opts.porFecha[key3] || 0;
+      if (dv3 > 0 || d3 === sliceLen) {
+        var r3 = d3 === sliceLen ? '4' : '3';
+        svg += '<circle cx="' + xFn(d3).toFixed(1) + '" cy="' + yFn(v).toFixed(1) + '" r="' + r3 + '" fill="var(--teal)" stroke="var(--card)" stroke-width="1.5"><title>Día ' + d3 + ': +' + dv3.toLocaleString() + ' und | Acum: ' + v.toLocaleString() + '</title></circle>';
+      }
+    });
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+async function renderProdMensualTapas() {
+  var cont = document.getElementById('prodMensualTapas');
+  if (!cont) return;
+
+  var hoy = fechaHoy();
+  var selMes = prodMesNavTapas || hoy.slice(0, 7);
+  var anio = parseInt(selMes.slice(0, 4), 10), mes = parseInt(selMes.slice(5, 7), 10) - 1;
+  var diasMes = new Date(anio, mes + 1, 0).getDate();
+  var mesStr = new Date(anio, mes, 1).toLocaleString('es-GT', { month: 'long', year: 'numeric' });
+  var esMesActual = selMes === hoy.slice(0, 7);
+
+  var startD = new Date(anio, mes, 1 - 5);
+  var startStr = fmtISOTapas(startD);
+  var endD = new Date(anio, mes, diasMes + 5);
+  var endStr0 = fmtISOTapas(endD);
+  var endStr = endStr0 > hoy ? hoy : endStr0;
+
+  var prevDt = new Date(anio, mes - 1, 1);
+  var prevA = prevDt.getFullYear(), prevM = prevDt.getMonth();
+  var diasPrev = new Date(prevA, prevM + 1, 0).getDate();
+  var prevYM = prevA + '-' + String(prevM + 1).padStart(2, '0');
+  var prevLabel = prevDt.toLocaleString('es-GT', { month: 'long', year: 'numeric' });
+  var prevStartStr = fmtISOTapas(new Date(prevA, prevM, 1 - 5));
+
+  var fetchDesde = prodCompararActivoTapas ? prevStartStr : startStr;
+  await asegurarProdEntradasPT(fetchDesde, endStr);
+  // el DOM pudo cambiar de vista mientras esperábamos la consulta
+  cont = document.getElementById('prodMensualTapas');
+  if (!cont) return;
+
+  var porFecha = {};
+  prodEntradasPTCache.data.forEach(function(m) {
+    var f = parseFechaDoc(m.observaciones) || formatFecha(m.created_at);
+    porFecha[f] = (porFecha[f] || 0) + (m.cantidad || 0);
+  });
+
+  var dias = [];
+  var dIt = new Date(startStr + 'T12:00:00');
+  var finDRange = new Date(endStr + 'T12:00:00');
+  while (dIt <= finDRange) {
+    dias.push(fmtISOTapas(dIt));
+    dIt.setDate(dIt.getDate() + 1);
+  }
+
+  var totalMes = 0, diasConProd = 0;
+  dias.forEach(function(f) {
+    if (f.slice(0, 7) === selMes && porFecha[f]) { totalMes += porFecha[f]; diasConProd++; }
+  });
+  var promDia = diasConProd ? Math.round(totalMes / diasConProd) : 0;
+  var maxVal = Math.max.apply(null, dias.map(function(f) { return porFecha[f] || 0; }).concat([1]));
+
+  var ABREV = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  var cols = '';
+  var prevMLbl = null;
+  dias.forEach(function(f) {
+    var curM = f.slice(0, 7);
+    if (prevMLbl !== null && curM !== prevMLbl) {
+      var mNm = new Date(f + 'T12:00:00').toLocaleString('es-GT', { month: 'short' }).replace('.', '').toUpperCase();
+      cols += '<div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:16px;padding:0 2px">'
+        + '<div style="flex:1;width:1.5px;background:var(--teal);opacity:.5;border-radius:1px;max-height:50px"></div>'
+        + '<div style="font-size:7px;font-weight:800;color:var(--teal);letter-spacing:.4px;white-space:nowrap;margin-top:2px;line-height:1.2">' + mNm + '</div>'
+      + '</div>';
+    }
+    prevMLbl = curM;
+    var esFuturo = f > hoy;
+    var val = esFuturo ? 0 : (porFecha[f] || 0);
+    var px = esFuturo ? 2 : (val ? Math.max(Math.round((val / maxVal) * 180), 5) : 2);
+    var numDia = parseInt(f.slice(8), 10);
+    var dow = new Date(f + 'T12:00:00').getDay();
+    var esDom = dow === 0;
+    var abbr = ABREV[dow];
+    var esHoy = f === hoy;
+    var barColor = esFuturo ? 'var(--border)' : (esDom && !val ? 'var(--bg2)' : (val > 0 ? 'var(--teal)' : 'var(--border)'));
+    var bStyle = esFuturo ? ';opacity:.25' : (esDom ? ';opacity:.5' : '');
+    if (esHoy) bStyle += ';outline:1px dashed var(--teal);outline-offset:1px;border-radius:3px 3px 0 0';
+    var tip = !esFuturo && val ? ' title="' + f + ': ' + val.toLocaleString() + ' und"' : '';
+    var clickProd = (!esFuturo && val) ? ' onclick="verDetalleProdDiaTapas(\'' + f + '\',event)"' : '';
+    var colStyle = 'flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end'
+      + (!esFuturo && val ? ';cursor:pointer' : '') + (esDom ? ';background:rgba(0,0,0,.04);border-radius:3px' : '');
+    var lblClr = esDom ? 'var(--amber)' : 'var(--gray-l)';
+    cols += '<div' + clickProd + ' style="' + colStyle + '"' + tip + '>'
+      + '<div class="prod-bar" style="height:' + px + 'px;background:' + barColor + bStyle + '"></div>'
+      + '<div style="height:26px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;margin-top:2px;overflow:hidden;' + (esFuturo ? 'opacity:.3' : '') + '">'
+      +   '<div style="font-size:7px;line-height:1.25;color:' + lblClr + '">' + numDia + '</div>'
+      +   '<div style="font-size:6px;line-height:1.25;font-weight:' + (esDom ? '800' : '400') + ';color:' + lblClr + '">' + abbr + '</div>'
+      + '</div>'
+    + '</div>';
+  });
+
+  var btnBase = 'border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;white-space:nowrap';
+  var btnAcumStyle = btnBase + ';border:1px solid ' + (prodVistaLineaTapas ? 'var(--teal)' : 'var(--border)') + ';font-weight:' + (prodVistaLineaTapas ? '700' : '400') + ';color:' + (prodVistaLineaTapas ? 'var(--teal)' : 'var(--ink)') + ';background:' + (prodVistaLineaTapas ? 'var(--teal-xl)' : 'none');
+  var btnCmpStyle = btnBase + ';border:1px solid ' + (prodCompararActivoTapas ? 'var(--teal)' : 'var(--border)') + ';font-weight:' + (prodCompararActivoTapas ? '700' : '400') + ';color:' + (prodCompararActivoTapas ? 'var(--teal)' : 'var(--ink)') + ';background:' + (prodCompararActivoTapas ? 'var(--teal-xl)' : 'none');
+
+  var chartHtml;
+  if (prodCompararActivoTapas) {
+    var porFechaPrev = {};
+    Object.keys(porFecha).forEach(function(f) {
+      if (f.slice(0, 7) === prevYM) porFechaPrev[f] = porFecha[f];
+    });
+    var maxDias2 = Math.max(diasMes, diasPrev);
+    var maxValC = 1;
+    for (var dd = 1; dd <= maxDias2; dd++) {
+      var faC = selMes + '-' + String(dd).padStart(2, '0');
+      var fpC = prevYM + '-' + String(dd).padStart(2, '0');
+      if (porFecha[faC]) maxValC = Math.max(maxValC, porFecha[faC]);
+      if (porFechaPrev[fpC]) maxValC = Math.max(maxValC, porFechaPrev[fpC]);
+    }
+    var totalPrev = 0, diasConPrev = 0;
+    for (var ddp = 1; ddp <= diasPrev; ddp++) {
+      var fp2 = prevYM + '-' + String(ddp).padStart(2, '0');
+      if (porFechaPrev[fp2]) { totalPrev += porFechaPrev[fp2]; diasConPrev++; }
+    }
+    var promPrev = diasConPrev ? Math.round(totalPrev / diasConPrev) : 0;
+
+    var cmpBar = function(ym, dd2, val, gray) {
+      var dateStr = ym + '-' + String(dd2).padStart(2, '0');
+      var dow = new Date(dateStr + 'T12:00:00').getDay();
+      var isDom = dow === 0;
+      var abbr2 = ABREV[dow];
+      var px = val ? Math.max(Math.round((val / maxValC) * 160), 5) : 2;
+      var bg = gray ? (val ? '#94a3b8' : 'var(--border)') : (val > 0 ? 'var(--teal)' : 'var(--border)');
+      var clr2 = isDom ? 'var(--amber)' : (gray ? '#94a3b8' : 'var(--gray-l)');
+      return '<div style="flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end' + (isDom ? ';background:rgba(0,0,0,.04);border-radius:3px' : '') + '">'
+        + '<div style="width:100%;height:' + px + 'px;background:' + bg + ';border-radius:3px 3px 0 0;opacity:' + (isDom ? '.5' : gray ? '.85' : '1') + '"></div>'
+        + '<div style="height:26px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:2px">'
+        +   '<div style="font-size:7px;line-height:1.25;color:' + clr2 + '">' + dd2 + '</div>'
+        +   '<div style="font-size:6px;line-height:1.25;font-weight:' + (isDom ? '800' : '400') + ';color:' + clr2 + '">' + abbr2 + '</div>'
+        + '</div>'
+      + '</div>';
+    };
+    var rowLabel = function(lbl, tot, prom, clr) {
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 14px 3px">'
+        + '<span style="font-size:10px;font-weight:700;color:' + clr + ';text-transform:capitalize">' + lbl + '</span>'
+        + '<div style="display:flex;gap:14px">'
+        +   '<span style="font-size:10px;font-weight:700;color:' + clr + '">' + tot.toLocaleString() + ' und</span>'
+        +   '<span style="font-size:10px;color:var(--gray-l)">' + prom.toLocaleString() + ' und/día</span>'
+        + '</div>'
+      + '</div>';
+    };
+    var barsPrev = '';
+    for (var ddv = 1; ddv <= diasPrev; ddv++) barsPrev += cmpBar(prevYM, ddv, porFechaPrev[prevYM + '-' + String(ddv).padStart(2, '0')] || 0, true);
+    var barsAct = '';
+    for (var dda = 1; dda <= diasMes; dda++) {
+      var faAct = selMes + '-' + String(dda).padStart(2, '0');
+      barsAct += cmpBar(selMes, dda, faAct <= hoy ? (porFecha[faAct] || 0) : 0, false);
+    }
+
+    if (prodVistaLineaTapas) {
+      chartHtml = '<div style="padding:8px 14px">' + _buildLineaAcumSvgTapas({
+        ym: selMes, dias: diasMes, porFecha: porFecha, todayStr: hoy, mesLabel: mesStr,
+        prevYm: prevYM, diasPrev: diasPrev, porFechaPrev: porFechaPrev, prevLabel: prevLabel
+      }) + '</div>';
+    } else {
+      chartHtml = rowLabel(prevLabel, totalPrev, promPrev, '#64748b')
+        + '<div style="overflow-x:auto;scrollbar-width:thin;padding:0 14px 4px">'
+        +   '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:max-content">' + barsPrev + '</div>'
+        + '</div>'
+        + '<div style="margin:2px 14px 4px;border-top:2px solid var(--border)"></div>'
+        + rowLabel(mesStr, totalMes, promDia, 'var(--teal)')
+        + '<div style="overflow-x:auto;scrollbar-width:thin;padding:0 14px 4px">'
+        +   '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:max-content">' + barsAct + '</div>'
+        + '</div>';
+    }
+  } else {
+    if (prodVistaLineaTapas) {
+      chartHtml = '<div style="padding:8px 14px">' + _buildLineaAcumSvgTapas({ ym: selMes, dias: diasMes, porFecha: porFecha, todayStr: hoy, mesLabel: mesStr }) + '</div>';
+    } else {
+      chartHtml = '<div style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px;max-width:715px">'
+        + '<div style="display:flex;align-items:flex-end;gap:3px;min-height:210px;width:max-content">' + cols + '</div>'
+      + '</div>';
+    }
+  }
+
+  cont.innerHTML = '<div class="prod-mens-wrap">'
+    + '<div class="prod-mens-hdr">'
+    +   '<span>📦 Producción mensual — Ingreso PT</span>'
+    +   '<div style="display:flex;align-items:center;gap:6px">'
+    +     '<button onclick="toggleProdVistaLineaTapas()" style="' + btnAcumStyle + '" title="Acumulado día a día">📈 Acumulado</button>'
+    +     '<button onclick="toggleProdCompararTapas()" style="' + btnCmpStyle + '" title="Comparar con mes anterior">📊 Comparar</button>'
+    +     '<button class="asist-nav-arr" onclick="navegarProdMesTapas(-1)" title="Mes anterior">‹</button>'
+    +     '<span style="font-size:11px;font-weight:700;color:var(--ink);text-transform:capitalize;min-width:110px;text-align:center">' + mesStr + '</span>'
+    +     '<button class="asist-nav-arr"' + (esMesActual ? ' disabled' : '') + ' onclick="navegarProdMesTapas(1)" title="Mes siguiente">›</button>'
+    +   '</div>'
+    + '</div>'
+    + chartHtml
+    + '<div class="prod-mens-total">'
+    +   '<div class="prod-stat"><span class="prod-stat-val">' + totalMes.toLocaleString() + '</span><span class="prod-stat-lbl">Und este mes</span></div>'
+    +   '<div class="prod-stat"><span class="prod-stat-val">' + promDia.toLocaleString() + '</span><span class="prod-stat-lbl">Promedio und/día</span></div>'
+    +   '<div class="prod-stat"><span class="prod-stat-val">' + diasConProd + '</span><span class="prod-stat-lbl">Días con ingreso</span></div>'
+    + '</div>'
+    + '</div>';
 }
 
 function prodPorOperario() {

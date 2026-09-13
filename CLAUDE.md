@@ -159,6 +159,22 @@ view-productividad  Mensual (prodMes) sobre comandas+comanda_tareas, solo tareas
   und ÷ horas_efectivas devuelve siempre la meta (100% artificial). Por eso la vista por
   proceso muestra volumen y meta, no und/hora real: la comanda no reparte el turno por proceso.
   metaDeProceso(nombre) normaliza tildes ('Impresión' → clave 'impresion' = 1500, no default).
+  Arriba de la tabla, "📦 Producción mensual — Ingreso PT" (prodMensualTapas): barras diarias
+  sobre movimientos_materiales (tipo='entrada_pt') — equivalente de renderProdMensual en
+  serigrafia.html, pero esa usa entregas_serig (tabla propia de Serigrafía que Tapas no
+  tiene); en Tapas "requi de ingreso PT" ES movimientos_materiales, agrupado por
+  parseFechaDoc(observaciones) || created_at igual que Trazabilidad. Mismos controles que
+  Serigrafía: 📈 Acumulado (toggleProdVistaLineaTapas, línea SVG acumulada —
+  _buildLineaAcumSvgTapas), 📊 Comparar (toggleProdCompararTapas, mes anterior alineado
+  debajo/detrás), navegación de mes ◀▶ (navegarProdMesTapas, independiente del selector
+  `prodMes` de la tabla operario/proceso). Clic en una barra abre el detalle del día
+  (verDetalleProdDiaTapas: SKU + descripción + documento + cantidad, desde
+  movimientos_materiales — más simple que el popup de Serigrafía porque ahí sí existen
+  líneas de requi con cliente/SKUs detallados, aquí no). ⚠️ SIN gradiente rojo/ámbar/verde
+  por meta diaria (PROD_META_DIA=30000 en serigrafia.html es un número específico de esa
+  área, sin equivalente confirmado en Tapas) — barras en un solo color (teal). Caché propio
+  (prodEntradasPTCache, ventana dinámica por mes ± comparar) independiente del prodComandas
+  de la tabla de abajo.
 view-trazabilidad  Mensual (trazaMes): cascada por pedido Salida bodega → Ingreso PT →
   Pérdidas → Fuga neta, agrupando movimientos_materiales por solicitud_id. Los movimientos
   sin solicitud_id caen en un bucket "— Sin vincular —" para que los totales cuadren.
