@@ -1850,8 +1850,10 @@ function renderAsistGridTapas() {
 
   var byPD = asistCacheTapas.byPersonDay;
 
+  // Sin filtro de rol: la asistencia (a diferencia del termómetro de
+  // producción) sí aplica al supervisor — también tiene que marcarse.
   var ops = (personalData && personalData.tapas ? personalData.tapas : [])
-    .filter(function(p) { return p.activo && p.rol !== 'supervisor'; })
+    .filter(function(p) { return p.activo; })
     .sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
 
   var mesNombre = new Date(anio, mesN - 1, 1).toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
@@ -2128,8 +2130,10 @@ async function exportarAsistGridPDFTapas() {
 
   await cargarJustifMesTapas(mesStr);
 
+  // Sin filtro de rol, igual que en la grilla en vivo — el supervisor sí
+  // lleva asistencia.
   var ops = (personalData && personalData.tapas ? personalData.tapas : [])
-    .filter(function(p) { return p.activo && p.rol !== 'supervisor'; })
+    .filter(function(p) { return p.activo; })
     .sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
 
   var mesNombre = new Date(anio, mesN - 1, 1).toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
