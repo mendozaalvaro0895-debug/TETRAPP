@@ -92,11 +92,11 @@ Orden de pestañas (mismo que serigrafia.html + Pedidos como 7ma):
 'rechazos' es ALIAS → switchTab('movimientos') + setMovVista('rechazos')
 
 view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigrafia.html"):
-  SOLO 2 secciones apiladas en .inicio-dos-col (flex-direction:column; ya no lado a lado —
+  3 secciones apiladas en .inicio-dos-col (flex-direction:column; ya no lado a lado —
   Asistencia truncaba nombres a mitad de pantalla), SIN tarjetas de navegación — esa
-  navegación vive únicamente en las pestañas de arriba. Ambas envueltas en la misma clase
+  navegación vive únicamente en las pestañas de arriba. Las 3 envueltas en la misma clase
   .inicio-sec (ya no hay distinción izq/der).
-  Arriba — "📋 Asistencia Mensual": grid mensual sobre `asistencia_diaria` (area='tapas',
+  1) "📋 Asistencia Mensual": grid mensual sobre `asistencia_diaria` (area='tapas',
     turno='dia'), MISMO mecanismo que serigrafia.html salvo: sin roster diario de roles/
     líneas (no aplica a Tapas), sin agrupación "Prestados". Comparte con serigrafia.html:
     navegación de mes (navegarMesAsistTapas),
@@ -131,7 +131,7 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
     consulta a asistencia_diaria se amplía ±5 días fuera del mes para traer esos datos
     (ya no usa el helper compartido `rangoMes()`, calcula el rango manual con
     `fmtISOTapas()` para no afectar Productividad/Trazabilidad que sí lo usan).
-  Abajo — "👥 Personal y Roles" (termómetro, NO es el tablero drag-drop de serigrafia.html
+  2) "👥 Personal y Roles" (termómetro, NO es el tablero drag-drop de serigrafia.html
     a propósito — Tapas no tiene ese concepto de rol/línea): barra horizontal por operario
     activo (rol≠supervisor) con las unidades Terminada del MES ACTUAL desde comandas+
     comanda_tareas. 100% de la barra = el operario con más unidades ese mes (relativo, no
@@ -142,6 +142,14 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
     termComandas — la query de cargarTermometro ahora también trae `proceso`), ordenado
     de mayor a menor unidades para ver de un vistazo en qué proceso tiene más experiencia
     cada operario (quién arma más, quién tiene más horas de flameado/impresión, etc.).
+  3) "📦 Producción mensual — Ingreso PT": CLON del mismo gráfico de la pestaña
+    Productividad (mismo renderProdMensualTapas, mismo mecanismo Acumulado/Comparar/
+    navegación ◀▶ — ver detalle completo en view-productividad más abajo), en el
+    contenedor `prodMensualTapasInicio`. Cada clon tiene su propio estado (mes navegado,
+    Acumulado, Comparar) en `prodMensualInst.inicio` / `prodMensualInst.productividad` —
+    cambiar de mes o togglear Acumulado en uno NO afecta al otro. `prodEntradasPTCache`
+    (los datos crudos) SÍ es compartido entre ambos para no duplicar la consulta cuando
+    los dos miran el mismo rango de fechas.
   dias_feriados es GLOBAL (sin columna area) — Tapas y Serigrafía comparten la misma tabla,
   sin necesidad de migración. asistencia_diaria si necesitó sql/asistencia_area_tapas_v1.sql
   (fix defensivo del CHECK constraint de `area`, mismo patrón que personal_area_check).
@@ -159,15 +167,19 @@ view-productividad  Mensual (prodMes) sobre comandas+comanda_tareas, solo tareas
   und ÷ horas_efectivas devuelve siempre la meta (100% artificial). Por eso la vista por
   proceso muestra volumen y meta, no und/hora real: la comanda no reparte el turno por proceso.
   metaDeProceso(nombre) normaliza tildes ('Impresión' → clave 'impresion' = 1500, no default).
-  Arriba de la tabla, "📦 Producción mensual — Ingreso PT" (prodMensualTapas): barras diarias
-  sobre movimientos_materiales (tipo='entrada_pt') — equivalente de renderProdMensual en
+  Arriba de la tabla, "📦 Producción mensual — Ingreso PT" (renderProdMensualTapas,
+  instancia 'productividad', contenedor `prodMensualTapas`): barras diarias sobre
+  movimientos_materiales (tipo='entrada_pt') — equivalente de renderProdMensual en
   serigrafia.html, pero esa usa entregas_serig (tabla propia de Serigrafía que Tapas no
   tiene); en Tapas "requi de ingreso PT" ES movimientos_materiales, agrupado por
-  parseFechaDoc(observaciones) || created_at igual que Trazabilidad. Mismos controles que
-  Serigrafía: 📈 Acumulado (toggleProdVistaLineaTapas, línea SVG acumulada —
-  _buildLineaAcumSvgTapas), 📊 Comparar (toggleProdCompararTapas, mes anterior alineado
-  debajo/detrás), navegación de mes ◀▶ (navegarProdMesTapas, independiente del selector
-  `prodMes` de la tabla operario/proceso). Clic en una barra abre el detalle del día
+  parseFechaDoc(observaciones) || created_at igual que Trazabilidad. CLONADO también en
+  view-inicio (instancia 'inicio', contenedor `prodMensualTapasInicio`) — mismo gráfico,
+  estado independiente por instancia vía `prodMensualInst[inst]` (ver view-inicio arriba).
+  Mismos controles que Serigrafía: 📈 Acumulado (toggleProdVistaLineaTapas(inst), línea SVG
+  acumulada — _buildLineaAcumSvgTapas), 📊 Comparar (toggleProdCompararTapas(inst), mes
+  anterior alineado debajo/detrás), navegación de mes ◀▶ (navegarProdMesTapas(inst),
+  independiente del selector `prodMes` de la tabla operario/proceso). Clic en una barra
+  abre el detalle del día
   (verDetalleProdDiaTapas: SKU + descripción + documento + cantidad, desde
   movimientos_materiales — más simple que el popup de Serigrafía porque ahí sí existen
   líneas de requi con cliente/SKUs detallados, aquí no). ⚠️ SIN gradiente rojo/ámbar/verde

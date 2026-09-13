@@ -374,6 +374,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="inicio-sec">
             <div id="termometroWrap"></div>
           </div>
+          <div class="inicio-sec">
+            <div id="prodMensualTapasInicio"></div>
+          </div>
         </div>
       </div>
     </div><!-- /view-inicio -->
@@ -1581,7 +1584,7 @@ function switchTab(tab) {
 
   if (tab === 'personal')       renderPersonal();
   if (tab === 'movimientos')    cargarMovimientos();
-  if (tab === 'inicio')         { cargarTermometro(); cargarAsistenciaTapas(); }
+  if (tab === 'inicio')         { cargarTermometro(); cargarAsistenciaTapas(); renderProdMensualTapas('inicio'); }
   if (tab === 'productividad')  cargarProductividad();
   if (tab === 'trazabilidad')   cargarTrazabilidad();
 }
@@ -3077,7 +3080,7 @@ async function cargarProductividad() {
     console.error('cargarProductividad:', e);
     if (tabla) tabla.innerHTML = '<div class="empty">❌ No se pudo cargar la productividad del mes.</div>';
   }
-  renderProdMensualTapas();
+  renderProdMensualTapas('productividad');
 }
 
 // ── Producción mensual: barras diarias de Ingreso PT (Requis) ───
@@ -3088,10 +3091,18 @@ async function cargarProductividad() {
 // Sin gradiente rojo/ámbar/verde por meta diaria (PROD_META_DIA de
 // serigrafia.html es un número específico de esa área, sin equivalente
 // confirmado en Tapas) — barras en un solo color (teal).
-var prodMesNavTapas         = null;  // null = mes actual
-var prodVistaLineaTapas     = false; // true = línea acumulada, false = barras
-var prodCompararActivoTapas = false;
-var prodEntradasPTCache     = { desde: null, hasta: null, data: [] };
+//
+// Se muestra clonado en 2 lugares (Inicio + pestaña Productividad), cada
+// uno con su propia navegación de mes y toggles Acumulado/Comparar — por
+// eso el estado vive en un mapa por instancia en vez de variables planas.
+// prodEntradasPTCache SÍ es compartido entre ambas instancias (es solo un
+// caché de datos, no estado de UI) para no duplicar la misma consulta si
+// las dos están mirando el mismo rango de fechas.
+var prodMensualInst = {
+  productividad: { contId: 'prodMensualTapas',        mesNav: null, vistaLinea: false, compararActivo: false },
+  inicio:        { contId: 'prodMensualTapasInicio',  mesNav: null, vistaLinea: false, compararActivo: false }
+};
+var prodEntradasPTCache = { desde: null, hasta: null, data: [] };
 
 async function asegurarProdEntradasPT(desde, hasta) {
   if (prodEntradasPTCache.desde && desde >= prodEntradasPTCache.desde && hasta <= prodEntradasPTCache.hasta) return;
@@ -3108,25 +3119,31 @@ async function asegurarProdEntradasPT(desde, hasta) {
   } catch(e) { console.error('asegurarProdEntradasPT:', e); }
 }
 
-function navegarProdMesTapas(delta) {
+function navegarProdMesTapas(inst, delta) {
+  var st = prodMensualInst[inst];
+  if (!st) return;
   var hoy = fechaHoy();
-  var base = prodMesNavTapas || hoy.slice(0, 7);
+  var base = st.mesNav || hoy.slice(0, 7);
   var anio = parseInt(base.slice(0, 4), 10), mesN = parseInt(base.slice(5, 7), 10);
   var d = new Date(anio, mesN - 1 + delta, 1);
   var nuevo = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   if (nuevo > hoy.slice(0, 7)) return;
-  prodMesNavTapas = (nuevo === hoy.slice(0, 7)) ? null : nuevo;
-  renderProdMensualTapas();
+  st.mesNav = (nuevo === hoy.slice(0, 7)) ? null : nuevo;
+  renderProdMensualTapas(inst);
 }
 
-function toggleProdVistaLineaTapas() {
-  prodVistaLineaTapas = !prodVistaLineaTapas;
-  renderProdMensualTapas();
+function toggleProdVistaLineaTapas(inst) {
+  var st = prodMensualInst[inst];
+  if (!st) return;
+  st.vistaLinea = !st.vistaLinea;
+  renderProdMensualTapas(inst);
 }
 
-function toggleProdCompararTapas() {
-  prodCompararActivoTapas = !prodCompararActivoTapas;
-  renderProdMensualTapas();
+function toggleProdCompararTapas(inst) {
+  var st = prodMensualInst[inst];
+  if (!st) return;
+  st.compararActivo = !st.compararActivo;
+  renderProdMensualTapas(inst);
 }
 
 function verDetalleProdDiaTapas(fecha, event) {
@@ -3259,12 +3276,14 @@ function _buildLineaAcumSvgTapas(opts) {
   return svg;
 }
 
-async function renderProdMensualTapas() {
-  var cont = document.getElementById('prodMensualTapas');
+async function renderProdMensualTapas(inst) {
+  var st = prodMensualInst[inst];
+  if (!st) return;
+  var cont = document.getElementById(st.contId);
   if (!cont) return;
 
   var hoy = fechaHoy();
-  var selMes = prodMesNavTapas || hoy.slice(0, 7);
+  var selMes = st.mesNav || hoy.slice(0, 7);
   var anio = parseInt(selMes.slice(0, 4), 10), mes = parseInt(selMes.slice(5, 7), 10) - 1;
   var diasMes = new Date(anio, mes + 1, 0).getDate();
   var mesStr = new Date(anio, mes, 1).toLocaleString('es-GT', { month: 'long', year: 'numeric' });
@@ -3283,10 +3302,10 @@ async function renderProdMensualTapas() {
   var prevLabel = prevDt.toLocaleString('es-GT', { month: 'long', year: 'numeric' });
   var prevStartStr = fmtISOTapas(new Date(prevA, prevM, 1 - 5));
 
-  var fetchDesde = prodCompararActivoTapas ? prevStartStr : startStr;
+  var fetchDesde = st.compararActivo ? prevStartStr : startStr;
   await asegurarProdEntradasPT(fetchDesde, endStr);
   // el DOM pudo cambiar de vista mientras esperábamos la consulta
-  cont = document.getElementById('prodMensualTapas');
+  cont = document.getElementById(st.contId);
   if (!cont) return;
 
   var porFecha = {};
@@ -3349,11 +3368,11 @@ async function renderProdMensualTapas() {
   });
 
   var btnBase = 'border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;white-space:nowrap';
-  var btnAcumStyle = btnBase + ';border:1px solid ' + (prodVistaLineaTapas ? 'var(--teal)' : 'var(--border)') + ';font-weight:' + (prodVistaLineaTapas ? '700' : '400') + ';color:' + (prodVistaLineaTapas ? 'var(--teal)' : 'var(--ink)') + ';background:' + (prodVistaLineaTapas ? 'var(--teal-xl)' : 'none');
-  var btnCmpStyle = btnBase + ';border:1px solid ' + (prodCompararActivoTapas ? 'var(--teal)' : 'var(--border)') + ';font-weight:' + (prodCompararActivoTapas ? '700' : '400') + ';color:' + (prodCompararActivoTapas ? 'var(--teal)' : 'var(--ink)') + ';background:' + (prodCompararActivoTapas ? 'var(--teal-xl)' : 'none');
+  var btnAcumStyle = btnBase + ';border:1px solid ' + (st.vistaLinea ? 'var(--teal)' : 'var(--border)') + ';font-weight:' + (st.vistaLinea ? '700' : '400') + ';color:' + (st.vistaLinea ? 'var(--teal)' : 'var(--ink)') + ';background:' + (st.vistaLinea ? 'var(--teal-xl)' : 'none');
+  var btnCmpStyle = btnBase + ';border:1px solid ' + (st.compararActivo ? 'var(--teal)' : 'var(--border)') + ';font-weight:' + (st.compararActivo ? '700' : '400') + ';color:' + (st.compararActivo ? 'var(--teal)' : 'var(--ink)') + ';background:' + (st.compararActivo ? 'var(--teal-xl)' : 'none');
 
   var chartHtml;
-  if (prodCompararActivoTapas) {
+  if (st.compararActivo) {
     var porFechaPrev = {};
     Object.keys(porFecha).forEach(function(f) {
       if (f.slice(0, 7) === prevYM) porFechaPrev[f] = porFecha[f];
@@ -3406,7 +3425,7 @@ async function renderProdMensualTapas() {
       barsAct += cmpBar(selMes, dda, faAct <= hoy ? (porFecha[faAct] || 0) : 0, false);
     }
 
-    if (prodVistaLineaTapas) {
+    if (st.vistaLinea) {
       chartHtml = '<div style="padding:8px 14px">' + _buildLineaAcumSvgTapas({
         ym: selMes, dias: diasMes, porFecha: porFecha, todayStr: hoy, mesLabel: mesStr,
         prevYm: prevYM, diasPrev: diasPrev, porFechaPrev: porFechaPrev, prevLabel: prevLabel
@@ -3423,7 +3442,7 @@ async function renderProdMensualTapas() {
         + '</div>';
     }
   } else {
-    if (prodVistaLineaTapas) {
+    if (st.vistaLinea) {
       chartHtml = '<div style="padding:8px 14px">' + _buildLineaAcumSvgTapas({ ym: selMes, dias: diasMes, porFecha: porFecha, todayStr: hoy, mesLabel: mesStr }) + '</div>';
     } else {
       chartHtml = '<div style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px;max-width:715px">'
@@ -3436,11 +3455,11 @@ async function renderProdMensualTapas() {
     + '<div class="prod-mens-hdr">'
     +   '<span>📦 Producción mensual — Ingreso PT</span>'
     +   '<div style="display:flex;align-items:center;gap:6px">'
-    +     '<button onclick="toggleProdVistaLineaTapas()" style="' + btnAcumStyle + '" title="Acumulado día a día">📈 Acumulado</button>'
-    +     '<button onclick="toggleProdCompararTapas()" style="' + btnCmpStyle + '" title="Comparar con mes anterior">📊 Comparar</button>'
-    +     '<button class="asist-nav-arr" onclick="navegarProdMesTapas(-1)" title="Mes anterior">‹</button>'
+    +     '<button onclick="toggleProdVistaLineaTapas(\'' + inst + '\')" style="' + btnAcumStyle + '" title="Acumulado día a día">📈 Acumulado</button>'
+    +     '<button onclick="toggleProdCompararTapas(\'' + inst + '\')" style="' + btnCmpStyle + '" title="Comparar con mes anterior">📊 Comparar</button>'
+    +     '<button class="asist-nav-arr" onclick="navegarProdMesTapas(\'' + inst + '\',-1)" title="Mes anterior">‹</button>'
     +     '<span style="font-size:11px;font-weight:700;color:var(--ink);text-transform:capitalize;min-width:110px;text-align:center">' + mesStr + '</span>'
-    +     '<button class="asist-nav-arr"' + (esMesActual ? ' disabled' : '') + ' onclick="navegarProdMesTapas(1)" title="Mes siguiente">›</button>'
+    +     '<button class="asist-nav-arr"' + (esMesActual ? ' disabled' : '') + ' onclick="navegarProdMesTapas(\'' + inst + '\',1)" title="Mes siguiente">›</button>'
     +   '</div>'
     + '</div>'
     + chartHtml
