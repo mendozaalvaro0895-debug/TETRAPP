@@ -239,6 +239,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ag-th{position:sticky;top:0;background:var(--card);z-index:2;padding:4px 2px;text-align:center;font-size:9px;font-weight:700;color:var(--gray-l);border-bottom:1.5px solid var(--border);min-width:26px;width:26px}
 .ag-th.hoy{color:var(--teal);font-weight:900}
 .ag-th.finde{background:#64748b;color:#fff}
+.ag-th-margen{background:#FFFBEB;color:#92400E}
+.ag-th-margen.finde{background:#64748b;color:#fff}
+.ag-divider-th{border-right:3px solid #D97706!important}
+.ag-divider-cell{border-right:3px solid #D97706!important}
 .ag-th-dow{display:block;font-size:7px;font-weight:600;letter-spacing:.2px;opacity:.75;margin-top:1px}
 .ag-th-name{position:sticky;left:0;z-index:3;min-width:120px;text-align:left;padding:4px 10px;background:var(--card);border-right:1.5px solid var(--border)}
 .ag-td-name{position:sticky;left:0;z-index:1;background:var(--bg);padding:5px 10px;font-size:11px;font-weight:600;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1.5px solid var(--border);min-width:120px}
@@ -1661,14 +1665,22 @@ function renderTermometro() {
 
 // ══ INICIO — ASISTENCIA MENSUAL ══════════════════════════════
 // Tabla compartida asistencia_diaria (area='tapas'), igual patrón que
-// Serigrafía pero sin el roster diario de roles/líneas (no aplica a Tapas)
-// ni los días de cola del mes anterior (ese ajuste es específico del corte
-// de nómina de Serigrafía). dias_feriados es GLOBAL — mismo feriado para
-// toda la empresa, sin filtro de área.
+// Serigrafía pero sin el roster diario de roles/líneas (no aplica a Tapas).
+// dias_feriados es GLOBAL — mismo feriado para toda la empresa, sin filtro
+// de área.
 var asistMesTapas    = null; // 'YYYY-MM' o null = mes actual
 var asistCacheTapas  = null; // { _mes, byPersonDay }
 var asistLockedTapas = true; // bloqueada por defecto, evita clics accidentales
 var feriadosSet      = {};   // { 'YYYY-MM-DD': descripcion }
+
+// Días de cola por corte de nómina: se muestran ADEMÁS del mes en curso,
+// tanto antes (cola del mes anterior) como después (arranque del siguiente),
+// para no perder de vista asistencia que cae justo en el borde del corte.
+var ASIST_MARGEN_TAPAS = 5;
+
+function fmtISOTapas(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 
 async function cargarFeriados() {
   try {
@@ -1727,12 +1739,14 @@ async function cargarAsistenciaTapas() {
   if (asistCacheTapas && asistCacheTapas._mes === mesStr) { renderAsistGridTapas(); return; }
   var wrap = document.getElementById('asistGridTapas');
   if (wrap) wrap.innerHTML = '<div class="asist-grid-wrap"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>';
-  var r = rangoMes(mesStr);
+  var anio = parseInt(mesStr.slice(0, 4), 10), mesN = parseInt(mesStr.slice(5, 7), 10);
+  var desdeD = new Date(anio, mesN - 1, 1); desdeD.setDate(desdeD.getDate() - ASIST_MARGEN_TAPAS);
+  var hastaD = new Date(anio, mesN, 0);     hastaD.setDate(hastaD.getDate() + ASIST_MARGEN_TAPAS);
   try {
     var res = await db.from('asistencia_diaria')
       .select('fecha,operador_codigo,estado')
       .eq('area', 'tapas').eq('turno', 'dia')
-      .gte('fecha', r.desde).lte('fecha', r.hasta);
+      .gte('fecha', fmtISOTapas(desdeD)).lte('fecha', fmtISOTapas(hastaD));
     if (res.error) throw res.error;
     var byPD = {};
     (res.data || []).forEach(function(row) {
@@ -1759,9 +1773,26 @@ function renderAsistGridTapas() {
   var hoy = fechaHoy();
   var mesStr = asistCacheTapas._mes;
   var anio = parseInt(mesStr.slice(0, 4), 10), mesN = parseInt(mesStr.slice(5, 7), 10);
-  var diasMes = new Date(anio, mesN, 0).getDate();
-  var dias = [];
-  for (var dd = 1; dd <= diasMes; dd++) dias.push(mesStr + '-' + String(dd).padStart(2, '0'));
+  var diasMesN = new Date(anio, mesN, 0).getDate();
+
+  var diasMesActual = [];
+  for (var dd = 1; dd <= diasMesN; dd++) diasMesActual.push(mesStr + '-' + String(dd).padStart(2, '0'));
+
+  var diasAntes = [];
+  for (var ka = ASIST_MARGEN_TAPAS; ka >= 1; ka--) {
+    var da = new Date(anio, mesN - 1, 1); da.setDate(da.getDate() - ka);
+    diasAntes.push(fmtISOTapas(da));
+  }
+  var diasDespues = [];
+  for (var kd = 1; kd <= ASIST_MARGEN_TAPAS; kd++) {
+    var dd2 = new Date(anio, mesN - 1, diasMesN); dd2.setDate(dd2.getDate() + kd);
+    diasDespues.push(fmtISOTapas(dd2));
+  }
+  var dias = diasAntes.concat(diasMesActual).concat(diasDespues);
+  var primerDiaMes = diasMesActual[0];
+  var ultimoDiaMes = diasMesActual[diasMesActual.length - 1];
+  var ultimoDiaAntes = diasAntes[diasAntes.length - 1];
+
   var byPD = asistCacheTapas.byPersonDay;
 
   var ops = (personalData && personalData.tapas ? personalData.tapas : [])
@@ -1772,21 +1803,28 @@ function renderAsistGridTapas() {
   var hoyMes = hoy.slice(0, 7);
 
   var DOW_ABBR = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  var MESES_ABBR = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
   var thDays = dias.map(function(f) {
     var dn = parseInt(f.slice(8), 10);
     var dow = new Date(f + 'T12:00:00').getDay();
     var esFeriado = !!feriadosSet[f];
-    var cls = 'ag-th' + ((dow === 0 || esFeriado) ? ' finde' : '') + (f === hoy ? ' hoy' : '');
+    var esMargen = f < primerDiaMes || f > ultimoDiaMes;
+    var esDivider = f === ultimoDiaAntes || f === ultimoDiaMes;
+    var cls = 'ag-th' + ((dow === 0 || esFeriado) ? ' finde' : '') + (f === hoy ? ' hoy' : '')
+      + (esMargen ? ' ag-th-margen' : '') + (esDivider ? ' ag-divider-th' : '');
     var tit = esFeriado ? (feriadosSet[f] + ' · clic derecho para quitar feriado') : 'Clic derecho para marcar feriado';
-    return '<th class="' + cls + '" oncontextmenu="event.preventDefault();toggleFeriado(\'' + f + '\')" title="' + tit + '">' + dn + '<span class="ag-th-dow">' + DOW_ABBR[dow] + '</span></th>';
+    var subLbl = esMargen ? MESES_ABBR[parseInt(f.slice(5, 7), 10) - 1] : DOW_ABBR[dow];
+    return '<th class="' + cls + '" oncontextmenu="event.preventDefault();toggleFeriado(\'' + f + '\')" title="' + tit + '">' + dn + '<span class="ag-th-dow">' + subLbl + '</span></th>';
   }).join('');
 
   // Sin registro explícito = "pendiente" (gris) SIEMPRE, sea hoy o un día pasado —
   // ya no se asume "presente" por default; solo cuenta lo que se marcó a propósito.
+  // La racha verde ("fila completa") solo mira el mes en curso — la cola de días
+  // antes/después (corte de nómina) no cuenta para ese cálculo.
   function buildRow(p) {
     var daysByP = byPD[p.codigo] || {};
     var isFullGreen = true;
-    dias.forEach(function(f) {
+    diasMesActual.forEach(function(f) {
       if (f > hoy) return;
       var dow = new Date(f + 'T12:00:00').getDay();
       if (dow === 0 || feriadosSet[f]) return;
@@ -1802,8 +1840,9 @@ function renderAsistGridTapas() {
       var dow = new Date(f + 'T12:00:00').getDay();
       var esFeriado = !!feriadosSet[f];
       var esFinde = dow === 0 || esFeriado;
+      var divCls = (f === ultimoDiaAntes || f === ultimoDiaMes) ? ' ag-divider-cell' : '';
       if (esFuturo) {
-        row += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + '"></td>';
+        row += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + divCls + '"></td>';
       } else {
         var est = daysByP[f] || (esFinde ? 'finde' : 'pendiente');
         var lbl = est === 'ausente' ? '✗' : est === 'tarde' ? '!' : est === 'velada' ? '🌙' : '';
@@ -1818,7 +1857,7 @@ function renderAsistGridTapas() {
           : '';
         var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esFinde && !domTrab ? motivo : '')
           + (esJustif ? ' · ✓ Justificado' : (est === 'ausente' || est === 'tarde' ? ' · Clic derecho para justificar' : ''));
-        row += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrab ? ' dom-trabajado' : '') + '" onclick="toggleAsistCellTapas(\'' + cod + '\',\'' + f + '\')"' + ctxMenu + ' title="' + tit + '">' + lbl + jBadge + '</td>';
+        row += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrab ? ' dom-trabajado' : '') + divCls + '" onclick="toggleAsistCellTapas(\'' + cod + '\',\'' + f + '\')"' + ctxMenu + ' title="' + tit + '">' + lbl + jBadge + '</td>';
       }
     });
     row += '</tr>';
@@ -1849,7 +1888,7 @@ function renderAsistGridTapas() {
     +   legendItemAsist('#ede9fe', '#ddd6fe', 'Velada (🌙)')
     +   legendItemAsist('#cbd5e1', '#94a3b8', 'Pendiente')
     +   legendItemAsist('#eef2f7', '#cbd5e1', 'Domingo / Feriado')
-    +   '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Clic derecho en el día para feriado · Clic derecho en ausente/tarde para justificar (marca "J") · Fila verde = asistencia completa del mes</span>'
+    +   '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Clic derecho en el día para feriado · Clic derecho en ausente/tarde para justificar (marca "J") · Días en ámbar = cola del mes anterior/siguiente (corte de nómina) · Fila verde = asistencia completa del mes</span>'
     + '</div>'
     + '</div>';
 }

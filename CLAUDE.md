@@ -98,9 +98,8 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
   .inicio-sec (ya no hay distinción izq/der).
   Arriba — "📋 Asistencia Mensual": grid mensual sobre `asistencia_diaria` (area='tapas',
     turno='dia'), MISMO mecanismo que serigrafia.html salvo: sin roster diario de roles/
-    líneas (no aplica a Tapas), sin días de cola del mes anterior (ajuste de nómina
-    específico de Serigrafía, no confirmado para Tapas), sin agrupación "Prestados", sin
-    export a PDF. Comparte con serigrafia.html: navegación de mes (navegarMesAsistTapas),
+    líneas (no aplica a Tapas), sin agrupación "Prestados", sin export a PDF. Comparte con
+    serigrafia.html: navegación de mes (navegarMesAsistTapas),
     ciclo de estados por celda (toggleAsistCellTapas: pendiente→presente→ausente→tarde→
     velada→vacío en días hábiles; finde→presente→vacío en domingo/feriado — CADA CLIC
     GUARDA DE INMEDIATO en asistencia_diaria, no hay botón Guardar porque no hace falta),
@@ -118,6 +117,14 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
     lo que se marcó a propósito (afecta también la racha verde: un día sin marcar la
     rompe, salvo hoy que sigue "en curso"). Encabezado de cada día muestra además el
     día de la semana en chico (Lun/Mar/Mié…) bajo el número.
+  ⚠️ Días de cola por corte de nómina (ASIST_MARGEN_TAPAS=5): se muestran 5 días ANTES
+    del 1ro y 5 días DESPUÉS del último del mes en curso (tinte ámbar .ag-th-margen +
+    borde divisor .ag-divider-th/-cell en cada borde) — a diferencia de serigrafia.html,
+    que solo agrega cola ANTES (ASIST_DIAS_ANTERIOR, por su propio corte del 25; no se
+    tocó ese archivo). La racha verde SOLO mira diasMesActual, la cola no cuenta. La
+    consulta a asistencia_diaria se amplía ±5 días fuera del mes para traer esos datos
+    (ya no usa el helper compartido `rangoMes()`, calcula el rango manual con
+    `fmtISOTapas()` para no afectar Productividad/Trazabilidad que sí lo usan).
   Abajo — "👥 Personal y Roles" (termómetro, NO es el tablero drag-drop de serigrafia.html
     a propósito — Tapas no tiene ese concepto de rol/línea): barra horizontal por operario
     activo (rol≠supervisor) con las unidades Terminada del MES ACTUAL desde comandas+
