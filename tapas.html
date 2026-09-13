@@ -1845,7 +1845,7 @@ function renderAsistGridTapas() {
     });
     var cod = p.codigo.replace(/'/g, "\\'");
     var row = '<tr class="ag-row' + (isFullGreen ? ' ag-row-full' : '') + '">';
-    row += '<td class="ag-td-name">' + escHtml(p.nombre || p.codigo) + '</td>';
+    row += '<td class="ag-td-name">' + escHtml(p.nombre || p.codigo) + (isFullGreen ? ' ⭐' : '') + '</td>';
     dias.forEach(function(f) {
       var esFuturo = f > hoy;
       var dow = new Date(f + 'T12:00:00').getDay();
@@ -1901,7 +1901,7 @@ function renderAsistGridTapas() {
     +   legendItemAsist('#ede9fe', '#ddd6fe', 'Velada (🌙)')
     +   legendItemAsist('#cbd5e1', '#94a3b8', 'Pendiente')
     +   legendItemAsist('#eef2f7', '#cbd5e1', 'Domingo / Feriado')
-    +   '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Clic derecho en el día para feriado · Clic derecho en ausente/tarde para justificar (marca "J") · Días en ámbar = cola del mes anterior/siguiente (corte de nómina) · Fila verde = asistencia completa del mes</span>'
+    +   '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Clic derecho en el día para feriado · Clic derecho en ausente/tarde para justificar (marca "J") · Días en ámbar = cola del mes anterior/siguiente (corte de nómina) · Nombre en verde ⭐ = asistencia completa del mes</span>'
     + '</div>'
     + '</div>';
 }
@@ -2118,7 +2118,7 @@ async function exportarAsistGridPDFTapas() {
       var nameBg = isFullGreen ? '#22c55e' : '#fff';
       var nameClr = isFullGreen ? '#fff' : '#111';
       html += '<tr>';
-      html += '<td style="background:' + nameBg + ';color:' + nameClr + ';font-size:8px;font-weight:' + (isFullGreen ? '700' : '600') + ';padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + '</td>';
+      html += '<td style="background:' + nameBg + ';color:' + nameClr + ';font-size:8px;font-weight:' + (isFullGreen ? '700' : '600') + ';padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + (isFullGreen ? ' ⭐' : '') + '</td>';
       dias.forEach(function(f) {
         var dow = new Date(f + 'T12:00:00').getDay();
         var esFin = dow === 0 || !!feriadosSet[f];
@@ -2201,7 +2201,7 @@ async function exportarAsistGridPDFTapas() {
     + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#cbd5e1"></span>Pendiente</span>'
     + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#475569"></span>Dom / Feriado</span>'
     + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#fffbeb;border:1px solid #92400e"></span>Cola corte de nómina</span>'
-    + '<span style="font-weight:700;color:#22c55e">Fila verde = mes completo</span>'
+    + '<span style="font-weight:700;color:#22c55e">Nombre en verde ⭐ = mes completo</span>'
     + '<span>✓ = justificado</span>'
   + '</div>';
 
