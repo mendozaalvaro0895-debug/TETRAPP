@@ -60,14 +60,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 /* APP LAYOUT */
 .app{display:flex;height:calc(100vh - 56px);overflow:hidden}
 
-/* SIDENAV */
-.sidenav{width:56px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:8px}
-.sn-btn{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:all .15s;color:var(--gray);position:relative}
-.sn-btn:hover{background:var(--teal-xl);color:var(--teal)}
-.sn-btn.active{background:var(--teal);color:#fff}
-.sn-div{width:32px;height:1px;background:var(--border);margin:8px 0}
-.sn-badge{position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--red);border-radius:50%}
-
 /* MAIN */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 
@@ -303,33 +295,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 <div class="app">
 
-<div class="sidenav">
-  <div class="sn-btn active" id="sn-inicio" title="Inicio" onclick="switchTab('inicio')">🏠</div>
-  <div class="sn-btn" id="sn-pedidos" title="Pedidos" onclick="switchTab('tapas')">📋</div>
-  <div class="sn-btn" id="sn-movimientos" title="Movimientos (Entradas · Salidas)" onclick="switchTab('movimientos')">⚙️</div>
-  <div class="sn-btn" id="sn-rechazos" title="Rechazos" onclick="switchTab('rechazos')">⛔</div><!-- alias → movimientos+rechazos -->
-  <div class="sn-div"></div>
-  <div class="sn-btn" id="sn-personal" title="Personal" onclick="switchTab('personal')">👥</div>
-  <div class="sn-btn" title="Dashboard" onclick="window.location.href='dashboard.html'">📊</div>
-  <div style="flex:1"></div>
-  <div class="sn-btn" title="Alertas">🔔<div class="sn-badge"></div></div>
-</div>
-
 <div class="main">
 
   <div class="tabs">
     <div class="tab active" id="tab-inicio" onclick="switchTab('inicio')">🏠 Inicio</div>
+    <div class="tab" id="tab-movimientos" onclick="switchTab('movimientos')">
+      ⬇⬆ Movimientos
+      <span class="tbadge" id="cnt-movimientos">—</span>
+    </div>
+    <div class="tab" id="tab-productividad" onclick="switchTab('productividad')">📈 Productividad</div>
+    <div class="tab" id="tab-trazabilidad" onclick="switchTab('trazabilidad')">🔗 Trazabilidad</div>
+    <div class="tab" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
+    <div class="tab" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
     <div class="tab" id="tab-tapas" onclick="switchTab('tapas')">
       <div class="tdot" style="background:var(--teal)"></div>
       Pedidos
       <span class="tbadge tb-teal" id="cnt-tapas">0</span>
     </div>
-    <div class="tab" id="tab-movimientos" onclick="switchTab('movimientos')">
-      ⚙️ Movimientos
-      <span class="tbadge" id="cnt-movimientos">—</span>
-    </div>
-    <div class="tab t-dash" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
-    <div class="tab t-personal" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
     <div class="tabs-r">
       <button class="btn btn-t btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>
       <a href="comandas.html" class="btn btn-g btn-sm" style="text-decoration:none">📋 Comandas</a>
@@ -413,7 +395,26 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
         </div>
 
-        <!-- Fila 2: Rechazos · Dashboard -->
+        <!-- Fila 2: Productividad · Trazabilidad -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+
+          <div class="sub-card" onclick="switchTab('productividad')">
+            <div class="sub-card-arrow">→</div>
+            <div class="sub-card-icon procesos">📈</div>
+            <div class="sub-card-title">Productividad</div>
+            <div class="sub-card-desc">Unidades por operario y por proceso contra la meta oficial: und/hora real del turno y porcentaje de cumplimiento del mes.</div>
+          </div>
+
+          <div class="sub-card" onclick="switchTab('trazabilidad')">
+            <div class="sub-card-arrow">→</div>
+            <div class="sub-card-icon pedidos">🔗</div>
+            <div class="sub-card-title">Trazabilidad</div>
+            <div class="sub-card-desc">Cascada mensual por pedido: cuánto salió de bodega, cuánto volvió como producto terminado y dónde quedó la fuga.</div>
+          </div>
+
+        </div>
+
+        <!-- Fila 3: Rechazos · Dashboard -->
         <div class="sub-grid-b">
 
           <div class="sub-card" onclick="switchTab('rechazos')">
@@ -527,6 +528,60 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
 
     </div><!-- /view-movimientos -->
+
+    <!-- ════ PRODUCTIVIDAD VIEW ═════════════════════════════════ -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-productividad">
+      <div class="ph" style="flex-shrink:0;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="ph-title">Productividad · Tapas</div>
+          <div class="ph-sub" id="prodSubLbl">Por operario · unidades reales vs meta del turno</div>
+        </div>
+        <div style="display:inline-flex;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;padding:3px;gap:2px;align-self:center">
+          <button id="pseg-operario" class="seg-btn seg-active" onclick="setProdVista('operario')">👤 Por operario</button>
+          <button id="pseg-proceso"  class="seg-btn"            onclick="setProdVista('proceso')">🔧 Por proceso</button>
+        </div>
+        <div class="ph-r" style="gap:6px;align-items:center;margin-left:auto">
+          <button class="btn btn-g btn-sm" onclick="cargarProductividad()" title="Actualizar">🔄 Actualizar</button>
+          <input class="fi" type="month" id="prodMes" style="font-size:12px;padding:6px 10px" onchange="cargarProductividad()">
+        </div>
+      </div>
+
+      <div class="kpi-strip" style="flex-shrink:0">
+        <div class="kpi"><div class="kpi-l">Unidades PT</div><div class="kpi-v" id="pkpi-und" style="color:var(--teal)">—</div><div class="kpi-s">terminadas en el mes</div></div>
+        <div class="kpi"><div class="kpi-l">Operarios</div><div class="kpi-v" id="pkpi-ops">—</div><div class="kpi-s">con registro</div></div>
+        <div class="kpi"><div class="kpi-l">Und/hora real</div><div class="kpi-v" id="pkpi-uh" style="color:var(--green)">—</div><div class="kpi-s">promedio del área</div></div>
+        <div class="kpi"><div class="kpi-l">Cumplimiento</div><div class="kpi-v" id="pkpi-cump" style="color:var(--amber)">—</div><div class="kpi-s">horas meta / horas turno</div></div>
+      </div>
+
+      <div class="mov-scroll">
+        <div id="prodTabla"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>
+      </div>
+    </div><!-- /view-productividad -->
+
+    <!-- ════ TRAZABILIDAD VIEW ══════════════════════════════════ -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-trazabilidad">
+      <div class="ph" style="flex-shrink:0;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="ph-title">Trazabilidad · Tapas</div>
+          <div class="ph-sub">Cascada por pedido: Salida de bodega → Ingreso PT → Pérdidas → Fuga neta</div>
+        </div>
+        <div class="ph-r" style="gap:6px;align-items:center;margin-left:auto">
+          <button class="btn btn-g btn-sm" onclick="cargarTrazabilidad()" title="Actualizar">🔄 Actualizar</button>
+          <input class="fi" type="month" id="trazaMes" style="font-size:12px;padding:6px 10px" onchange="cargarTrazabilidad()">
+        </div>
+      </div>
+
+      <div class="kpi-strip" style="flex-shrink:0">
+        <div class="kpi"><div class="kpi-l">Salida de bodega</div><div class="kpi-v" id="tkpi-sal" style="color:var(--amber)">—</div><div class="kpi-s">material entregado a planta</div></div>
+        <div class="kpi"><div class="kpi-l">Ingreso PT</div><div class="kpi-v" id="tkpi-ing" style="color:var(--green)">—</div><div class="kpi-s">producto terminado</div></div>
+        <div class="kpi"><div class="kpi-l">Pérdidas</div><div class="kpi-v" id="tkpi-per" style="color:var(--red)">—</div><div class="kpi-s">registradas</div></div>
+        <div class="kpi"><div class="kpi-l">Fuga neta</div><div class="kpi-v" id="tkpi-fug">—</div><div class="kpi-s" id="tkpi-fug-s">salida − PT − pérdidas</div></div>
+      </div>
+
+      <div class="mov-scroll">
+        <div id="trazaTabla"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>
+      </div>
+    </div><!-- /view-trazabilidad -->
 
     <!-- PERSONAL VIEW -->
     <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-personal">
@@ -1057,7 +1112,7 @@ async function refreshKPIs() {
   
   // Cargar fugas del día
   try {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = fechaHoy();
     const { data: fugasHoy } = await db
       .from('movimientos_materiales')
       .select('cantidad, tipo')
@@ -1079,7 +1134,7 @@ async function refreshKPIs() {
 
 async function cargarKPIComandas() {
   try {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = fechaHoy();
     const { data } = await db.from('comandas').select('total_unidades, operario_id').eq('fecha', hoy);
     if (!data) return;
     const totalUnd = data.reduce((s,c) => s + (c.total_unidades||0), 0);
@@ -1594,16 +1649,20 @@ function switchTab(tab) {
   }
 
   var viewMap = {
-    inicio:       'view-inicio',
-    tapas:        'view-tapas',
-    movimientos:  'view-movimientos',
-    personal:     'view-personal'
+    inicio:        'view-inicio',
+    tapas:         'view-tapas',
+    movimientos:   'view-movimientos',
+    productividad: 'view-productividad',
+    trazabilidad:  'view-trazabilidad',
+    personal:      'view-personal'
   };
   var tabMap = {
-    inicio:       'tab-inicio',
-    tapas:        'tab-tapas',
-    movimientos:  'tab-movimientos',
-    personal:     'tab-personal'
+    inicio:        'tab-inicio',
+    tapas:         'tab-tapas',
+    movimientos:   'tab-movimientos',
+    productividad: 'tab-productividad',
+    trazabilidad:  'tab-trazabilidad',
+    personal:      'tab-personal'
   };
 
   var viewId = viewMap[tab];
@@ -1615,9 +1674,11 @@ function switchTab(tab) {
   }
   if (tabId)  document.getElementById(tabId).classList.add('active');
 
-  if (tab === 'personal')     renderPersonal();
-  if (tab === 'movimientos')  cargarMovimientos();
-  if (tab === 'inicio')       renderInicio();
+  if (tab === 'personal')       renderPersonal();
+  if (tab === 'movimientos')    cargarMovimientos();
+  if (tab === 'inicio')         renderInicio();
+  if (tab === 'productividad')  cargarProductividad();
+  if (tab === 'trazabilidad')   cargarTrazabilidad();
 }
 
 function renderPersonal() {
@@ -1644,10 +1705,10 @@ function renderInicio() {
   var pend = solicitudes.filter(function(s){ return s.estado === 'nueva' || s.estado === 'programada'; }).length;
   var ops  = personalData && personalData.tapas ? personalData.tapas.filter(function(p){ return p.activo; }).length : 0;
 
-  var hoyStr = new Date().toISOString().split('T')[0];
+  var hoyStr = fechaHoy();
   var rechHoy    = rechazosData.filter(function(r){ return r.created_at && r.created_at.startsWith(hoyStr); });
   var rechHoyUnid = rechHoy.reduce(function(a,r){ return a+(r.cantidad_rechazada||0); }, 0);
-  var hace7 = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];
+  var hace7 = new Date(Date.now() - (7*24 + 6)*60*60*1000).toISOString().slice(0,10);
   var rechSemUnid = rechazosData.filter(function(r){ return r.created_at && r.created_at.slice(0,10)>=hace7; })
                                 .reduce(function(a,r){ return a+(r.cantidad_rechazada||0); }, 0);
 
@@ -1939,11 +2000,12 @@ async function init() {
   }
   
   // Fechas por defecto para filtros (mes actual)
-  const hoy = new Date();
-  const primerDia = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-01';
-  const hoyStr    = hoy.toISOString().split('T')[0];
+  const hoyStr    = fechaHoy();
+  const primerDia = hoyStr.slice(0, 8) + '01';
   var elD=document.getElementById('movDesde'); if(elD) elD.value=primerDia;
   var elH=document.getElementById('movHasta'); if(elH) elH.value=hoyStr;
+  var elPM=document.getElementById('prodMes');  if(elPM) elPM.value=hoyStr.slice(0, 7);
+  var elTM=document.getElementById('trazaMes'); if(elTM) elTM.value=hoyStr.slice(0, 7);
 
   // Cargar datos
   await cargarInventario();
@@ -2185,7 +2247,7 @@ function abrirModalMov(tipo) {
 
   // Reset
   ['movNumDoc','movSku','movDesc','movCant','movObs'].forEach(function(id){ document.getElementById(id).value = ''; });
-  document.getElementById('movFecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('movFecha').value = fechaHoy();
   cerrarSkuDrop();
 
   // Solicitudes dropdown
@@ -2282,9 +2344,313 @@ async function confirmarMov() {
   }
 }
 
+// ══ HELPERS DE FECHA Y METAS ════════════════════════════════
+// Guatemala es UTC-6: toISOString() directo devuelve el día siguiente
+// después de las 18:00 locales (regla #8 de CLAUDE.md).
+function fechaHoy() {
+  var d = new Date(Date.now() - 6 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+function rangoMes(ym) {
+  if (!ym) ym = fechaHoy().slice(0, 7);
+  var y = parseInt(ym.slice(0, 4), 10);
+  var m = parseInt(ym.slice(5, 7), 10);
+  var ultimo = new Date(y, m, 0).getDate();
+  return { desde: ym + '-01', hasta: ym + '-' + String(ultimo).padStart(2, '0') };
+}
+
+// Meta oficial por proceso, tolerante a tildes y mayúsculas: el proceso llega
+// desde comanda_tareas como 'Impresión' y la clave de METAS es 'impresion'.
+function metaDeProceso(nombre) {
+  if (!nombre) return META_DEFAULT;
+  var p = String(nombre).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (METAS[p] !== undefined) return METAS[p];
+  for (var k in METAS) {
+    if (k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') === p) return METAS[k];
+  }
+  return META_DEFAULT;
+}
+
+function colorCumplimiento(pct) {
+  if (pct >= 100) return 'var(--green)';
+  if (pct >= 80)  return 'var(--amber)';
+  return 'var(--red)';
+}
+
+function setTxt(id, v, color) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = v;
+  if (color) el.style.color = color;
+}
+
+// ══ PRODUCTIVIDAD ═══════════════════════════════════════════
+var prodComandas    = [];
+var prodVistaActual = 'operario';
+
+function setProdVista(v) {
+  prodVistaActual = v;
+  var a = document.getElementById('pseg-operario');
+  var b = document.getElementById('pseg-proceso');
+  if (a) a.classList.toggle('seg-active', v === 'operario');
+  if (b) b.classList.toggle('seg-active', v === 'proceso');
+  var lbl = document.getElementById('prodSubLbl');
+  if (lbl) lbl.textContent = v === 'operario'
+    ? 'Por operario · unidades reales vs meta del turno'
+    : 'Por proceso · volumen del mes contra la meta oficial';
+  renderProductividad();
+}
+
+// Horas REALES del turno (cierre − inicio). Es el único tiempo medido:
+// horas_efectivas se calculó dividiendo entre la meta, así que compararlas
+// contra sí mismas daría siempre 100%.
+function horasTurno(c) {
+  if (!c.hora_inicio || !c.hora_cierre) return 0;
+  var a = String(c.hora_inicio).split(':');
+  var b = String(c.hora_cierre).split(':');
+  var min = (parseInt(b[0], 10) * 60 + parseInt(b[1], 10)) - (parseInt(a[0], 10) * 60 + parseInt(a[1], 10));
+  return min > 0 ? min / 60 : 0;
+}
+
+async function cargarProductividad() {
+  var tabla = document.getElementById('prodTabla');
+  if (tabla) tabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando…</div></div>';
+  var r = rangoMes((document.getElementById('prodMes') || {}).value);
+  try {
+    var res = await db.from('comandas')
+      .select('id, fecha, operario_id, operario_nombre, hora_inicio, hora_cierre, comanda_tareas(proceso, cantidad, unidades_completadas, estado, horas_efectivas)')
+      .gte('fecha', r.desde).lte('fecha', r.hasta)
+      .order('fecha', { ascending: false });
+    if (res.error) throw res.error;
+    prodComandas = res.data || [];
+    renderProductividad();
+  } catch(e) {
+    console.error('cargarProductividad:', e);
+    if (tabla) tabla.innerHTML = '<div class="empty">❌ No se pudo cargar la productividad del mes.</div>';
+  }
+}
+
+function prodPorOperario() {
+  var map = {};
+  prodComandas.forEach(function(c) {
+    var k = c.operario_id || '—';
+    if (!map[k]) map[k] = { codigo: k, nombre: c.operario_nombre || k, dias: 0, tareas: 0, und: 0, hTurno: 0, hMeta: 0 };
+    var o = map[k];
+    o.dias++;
+    o.hTurno += horasTurno(c);
+    (c.comanda_tareas || []).forEach(function(t) {
+      if (t.estado !== 'Terminada') return;
+      o.tareas++;
+      o.und   += (t.unidades_completadas || t.cantidad || 0);
+      o.hMeta += (t.horas_efectivas || 0);
+    });
+  });
+  return Object.keys(map).map(function(k) { return map[k]; })
+    .sort(function(a, b) { return b.und - a.und; });
+}
+
+function prodPorProceso() {
+  var map = {};
+  prodComandas.forEach(function(c) {
+    (c.comanda_tareas || []).forEach(function(t) {
+      if (t.estado !== 'Terminada') return;
+      var k = t.proceso || 'Otra tarea';
+      if (!map[k]) map[k] = { proceso: k, tareas: 0, und: 0, hMeta: 0 };
+      map[k].tareas++;
+      map[k].und   += (t.unidades_completadas || t.cantidad || 0);
+      map[k].hMeta += (t.horas_efectivas || 0);
+    });
+  });
+  return Object.keys(map).map(function(k) { return map[k]; })
+    .sort(function(a, b) { return b.und - a.und; });
+}
+
+function buildProdOperarioRow(o) {
+  var uh   = o.hTurno > 0 ? Math.round(o.und / o.hTurno) : 0;
+  var cump = o.hTurno > 0 ? Math.round((o.hMeta / o.hTurno) * 100) : 0;
+  var col  = colorCumplimiento(cump);
+  return '<tr>'
+    + '<td><strong>' + escHtml(o.nombre) + '</strong>'
+    + '<div style="font-size:10px;color:var(--gray)">' + escHtml(o.codigo) + '</div></td>'
+    + '<td style="text-align:right">' + o.dias + '</td>'
+    + '<td style="text-align:right">' + o.tareas + '</td>'
+    + '<td class="mov-cant">' + o.und.toLocaleString() + '</td>'
+    + '<td style="text-align:right;font-family:var(--mono)">' + o.hTurno.toFixed(1) + ' h</td>'
+    + '<td style="text-align:right;font-family:var(--mono);font-weight:700">' + (o.hTurno > 0 ? uh.toLocaleString() : '—') + '</td>'
+    + '<td style="text-align:right;font-family:var(--mono);color:var(--gray)">' + o.hMeta.toFixed(1) + ' h</td>'
+    + '<td style="text-align:right;font-weight:700;color:' + col + '">' + (o.hTurno > 0 ? cump + '%' : '—') + '</td>'
+    + '</tr>';
+}
+
+function buildProdProcesoRow(p, total) {
+  var meta  = metaDeProceso(p.proceso);
+  var share = total > 0 ? Math.round((p.und / total) * 100) : 0;
+  return '<tr>'
+    + '<td><strong>' + escHtml(p.proceso) + '</strong></td>'
+    + '<td style="text-align:right">' + p.tareas + '</td>'
+    + '<td class="mov-cant">' + p.und.toLocaleString() + '</td>'
+    + '<td style="text-align:right">' + share + '%</td>'
+    + '<td style="text-align:right;font-family:var(--mono)">' + meta.toLocaleString() + '</td>'
+    + '<td style="text-align:right;font-family:var(--mono);color:var(--gray)">' + p.hMeta.toFixed(1) + ' h</td>'
+    + '</tr>';
+}
+
+function renderProductividad() {
+  var tabla = document.getElementById('prodTabla');
+  if (!tabla) return;
+
+  var ops      = prodPorOperario();
+  var totalUnd = ops.reduce(function(s, o) { return s + o.und;    }, 0);
+  var tTurno   = ops.reduce(function(s, o) { return s + o.hTurno; }, 0);
+  var tMeta    = ops.reduce(function(s, o) { return s + o.hMeta;  }, 0);
+  var uhProm   = tTurno > 0 ? Math.round(totalUnd / tTurno) : 0;
+  var cumpGlob = tTurno > 0 ? Math.round((tMeta / tTurno) * 100) : 0;
+
+  setTxt('pkpi-und',  totalUnd.toLocaleString());
+  setTxt('pkpi-ops',  String(ops.length));
+  setTxt('pkpi-uh',   tTurno > 0 ? uhProm.toLocaleString() : '—');
+  setTxt('pkpi-cump', tTurno > 0 ? cumpGlob + '%' : '—', tTurno > 0 ? colorCumplimiento(cumpGlob) : '');
+
+  if (!prodComandas.length) {
+    tabla.innerHTML = '<div class="empty">📭 No hay comandas registradas en este mes</div>';
+    return;
+  }
+
+  if (prodVistaActual === 'operario') {
+    tabla.innerHTML = '<table class="mov-table">'
+      + '<thead><tr><th>Operario</th><th style="text-align:right">Días</th>'
+      + '<th style="text-align:right">Tareas</th><th style="text-align:right">Unidades</th>'
+      + '<th style="text-align:right">Horas turno</th><th style="text-align:right">Und/hora real</th>'
+      + '<th style="text-align:right">Horas meta</th><th style="text-align:right">Cumplimiento</th>'
+      + '</tr></thead><tbody>' + ops.map(buildProdOperarioRow).join('') + '</tbody></table>'
+      + '<div style="font-size:11px;color:var(--gray);padding:10px 2px;line-height:1.6">'
+      + 'Horas turno = hora de cierre − hora de inicio de cada comanda. Horas meta = lo que esas unidades '
+      + 'debían tomar según la meta oficial del proceso. Cumplimiento = horas meta ÷ horas turno.</div>';
+  } else {
+    var procs = prodPorProceso();
+    tabla.innerHTML = '<table class="mov-table">'
+      + '<thead><tr><th>Proceso</th><th style="text-align:right">Tareas</th>'
+      + '<th style="text-align:right">Unidades</th><th style="text-align:right">% del total</th>'
+      + '<th style="text-align:right">Meta und/h</th><th style="text-align:right">Horas meta</th>'
+      + '</tr></thead><tbody>'
+      + procs.map(function(p) { return buildProdProcesoRow(p, totalUnd); }).join('')
+      + '</tbody></table>'
+      + '<div style="font-size:11px;color:var(--gray);padding:10px 2px;line-height:1.6">'
+      + 'La comanda no reparte el turno por proceso, así que aquí no se puede medir und/hora real por proceso: '
+      + 'se muestra el volumen y la meta oficial. La eficiencia medida está en la vista por operario.</div>';
+  }
+}
+
+// ══ TRAZABILIDAD ════════════════════════════════════════════
+var trazaMovs = [];
+
+async function cargarTrazabilidad() {
+  var tabla = document.getElementById('trazaTabla');
+  if (tabla) tabla.innerHTML = '<div class="loading"><div class="spinner"></div><div>Cargando…</div></div>';
+  var r = rangoMes((document.getElementById('trazaMes') || {}).value);
+
+  // Ventana amplia de created_at porque la fecha que manda es la del documento
+  // (prefijo FECHA: en observaciones): una requi de este mes pudo capturarse
+  // semanas después. El recorte exacto se hace en trazaAgrupar().
+  var desdeQ = new Date(r.desde + 'T00:00:00');
+  desdeQ.setDate(desdeQ.getDate() - 60);
+  var hastaQ = new Date(r.hasta + 'T00:00:00');
+  hastaQ.setDate(hastaQ.getDate() + 60);
+
+  try {
+    var res = await db.from('movimientos_materiales')
+      .select('solicitud_id, sku_original, cantidad, tipo, num_documento, observaciones, created_at')
+      .gte('created_at', desdeQ.toISOString())
+      .lte('created_at', hastaQ.toISOString());
+    if (res.error) throw res.error;
+    trazaMovs = res.data || [];
+    renderTrazabilidad();
+  } catch(e) {
+    console.error('cargarTrazabilidad:', e);
+    if (tabla) tabla.innerHTML = '<div class="empty">❌ No se pudo cargar la trazabilidad del mes.</div>';
+  }
+}
+
+function trazaAgrupar() {
+  var r = rangoMes((document.getElementById('trazaMes') || {}).value);
+  var map = {};
+  trazaMovs.forEach(function(m) {
+    var f = parseFechaDoc(m.observaciones) || formatFecha(m.created_at);
+    if (f < r.desde || f > r.hasta) return;
+    var k = m.solicitud_id || '__sin__';
+    if (!map[k]) map[k] = { key: k, salidas: 0, entradas: 0, perdidas: 0, movs: 0 };
+    var g = map[k];
+    g.movs++;
+    if      (m.tipo === 'salida_bodega') g.salidas  += (m.cantidad || 0);
+    else if (m.tipo === 'entrada_pt')    g.entradas += (m.cantidad || 0);
+    else if (m.tipo === 'perdida')       g.perdidas += (m.cantidad || 0);
+  });
+  return Object.keys(map).map(function(k) {
+    var g = map[k];
+    g.fuga = g.salidas - g.entradas - g.perdidas;
+    if (g.key === '__sin__') {
+      g.pedido  = '— Sin vincular —';
+      g.cliente = 'Movimientos sin pedido asignado';
+    } else {
+      var sol = solicitudes.find(function(s) { return s.dbId === g.key; });
+      g.pedido  = sol ? (sol.id_display || String(g.key).slice(0, 8)) : String(g.key).slice(0, 8);
+      g.cliente = sol ? sol.cliente : '—';
+    }
+    return g;
+  }).sort(function(a, b) { return b.salidas - a.salidas; });
+}
+
+function buildTrazaRow(g) {
+  var pct     = g.salidas > 0 ? Math.round((g.fuga / g.salidas) * 100) : 0;
+  var colFuga = g.fuga > 0 ? 'var(--red)' : 'var(--green)';
+  return '<tr>'
+    + '<td><strong>' + escHtml(g.pedido) + '</strong>'
+    + '<div style="font-size:10px;color:var(--gray)">' + escHtml(g.cliente) + '</div></td>'
+    + '<td style="text-align:right">' + g.movs + '</td>'
+    + '<td style="text-align:right;font-family:var(--mono);font-weight:700;color:var(--amber)">' + g.salidas.toLocaleString() + '</td>'
+    + '<td style="text-align:right;font-family:var(--mono);font-weight:700;color:var(--green)">' + g.entradas.toLocaleString() + '</td>'
+    + '<td style="text-align:right;font-family:var(--mono);color:var(--red)">' + g.perdidas.toLocaleString() + '</td>'
+    + '<td style="text-align:right;font-family:var(--mono);font-weight:700;color:' + colFuga + '">' + g.fuga.toLocaleString() + '</td>'
+    + '<td style="text-align:right;color:' + colFuga + '">' + (g.salidas > 0 ? pct + '%' : '—') + '</td>'
+    + '</tr>';
+}
+
+function renderTrazabilidad() {
+  var tabla = document.getElementById('trazaTabla');
+  if (!tabla) return;
+  var grupos = trazaAgrupar();
+
+  var tSal  = grupos.reduce(function(s, g) { return s + g.salidas;  }, 0);
+  var tIng  = grupos.reduce(function(s, g) { return s + g.entradas; }, 0);
+  var tPer  = grupos.reduce(function(s, g) { return s + g.perdidas; }, 0);
+  var tFuga = tSal - tIng - tPer;
+
+  setTxt('tkpi-sal', tSal.toLocaleString());
+  setTxt('tkpi-ing', tIng.toLocaleString());
+  setTxt('tkpi-per', tPer.toLocaleString());
+  setTxt('tkpi-fug', tFuga.toLocaleString(), tFuga > 0 ? 'var(--red)' : 'var(--green)');
+  setTxt('tkpi-fug-s', tSal > 0 ? Math.round((tFuga / tSal) * 100) + '% de lo que salió' : 'salida − PT − pérdidas');
+
+  if (!grupos.length) {
+    tabla.innerHTML = '<div class="empty">📭 No hay movimientos registrados en este mes</div>';
+    return;
+  }
+
+  tabla.innerHTML = '<table class="mov-table">'
+    + '<thead><tr><th>Pedido</th><th style="text-align:right">Movs</th>'
+    + '<th style="text-align:right">Salida bodega</th><th style="text-align:right">Ingreso PT</th>'
+    + '<th style="text-align:right">Pérdidas</th><th style="text-align:right">Fuga</th>'
+    + '<th style="text-align:right">% fuga</th>'
+    + '</tr></thead><tbody>' + grupos.map(buildTrazaRow).join('') + '</tbody></table>'
+    + '<div style="font-size:11px;color:var(--gray);padding:10px 2px;line-height:1.6">'
+    + 'Fuga = salida de bodega − ingreso de PT − pérdidas registradas. Un pedido con producción todavía en curso '
+    + 'muestra fuga alta por diferencia de tiempo, no necesariamente por material perdido.</div>';
+}
+
 // ── BADGE INVENTARIO ────────────────────────────────────────
 (function() {
-  var hoy = new Date().toISOString().split('T')[0];
+  var hoy = fechaHoy();
   var d = JSON.parse(localStorage.getItem('tetra_inv_' + hoy) || '{"count":0}');
   var c = d.count || 0;
   if (c < 2) {

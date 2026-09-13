@@ -58,7 +58,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | Archivo | Descripción |
 |---|---|
 | `index.html` | Fachada principal — 8 cards de módulo |
-| `tapas.html` | Módulo completo Tapas: hub + pedidos + movimientos (salidas/ingresos/rechazos) + personal |
+| `tapas.html` | Módulo completo Tapas: hub + movimientos (salidas/ingresos/rechazos) + productividad + trazabilidad + personal + pedidos |
 | `serigrafia.html` | Módulo admin Serigrafía: Inicio (board) + Movimientos + Productividad + Personal |
 | `registro-serigrafia.html` | Formulario móvil rol `operativo_serig`: Flameado / Impresión / Empaque |
 | `comandas.html` | Registro de producción diaria por operario (vista admin) |
@@ -85,16 +85,33 @@ Regla: cargar `shared/styles.css` ANTES del `<style>` propio en todo HTML.
 ## tapas.html — Arquitectura de vistas
 
 ```
-switchTab(tab) controla qué view se muestra.
+switchTab(tab) controla qué view se muestra. SIN sidenav (se eliminó sep/2026 para
+igualar a serigrafia.html) — la navegación es solo la barra de pestañas.
+Orden de pestañas (mismo que serigrafia.html + Pedidos como 7ma):
+  Inicio · Movimientos · Productividad · Trazabilidad · Personal · Dashboard(link) · Pedidos
 'rechazos' es ALIAS → switchTab('movimientos') + setMovVista('rechazos')
 
-view-inicio      HUB default: 4 KPIs + 5 sub-cards (Pedidos/Procesos/Personal/Rechazos/Dashboard)
-view-tapas       Solicitudes — split pane: lista + detalle
+view-inicio      HUB default: 4 KPIs + 7 sub-cards
+                 (Pedidos/Procesos/Personal · Productividad/Trazabilidad · Rechazos/Dashboard)
+view-tapas       Solicitudes — split pane: lista + detalle  (pestaña "Pedidos")
 view-movimientos Segmented control de 3:
   [📤 Salidas de Bodega] [📦 Ingresos PT] [⛔ Rechazos]
   Comparten: movDesde/movHasta, movBuscar, kpi-strip (mkpi-v1..v4), movTabla
   setMovVista('salida'|'ingreso'|'rechazos') actualiza todo
   movRegistrar() delega a abrirModalMov() o abrirModalRechazo()
+view-productividad  Mensual (prodMes) sobre comandas+comanda_tareas, solo tareas 'Terminada'.
+  setProdVista('operario'|'proceso'). Por operario es la ÚNICA vista con eficiencia medida:
+  horas turno = hora_cierre − hora_inicio (tiempo real) vs horas meta = Σ horas_efectivas
+  (lo que debió tomar según meta); cumplimiento = horas meta ÷ horas turno.
+  ⚠️ NO usar horas_efectivas como "tiempo real": se calculó dividiendo entre la meta, así que
+  und ÷ horas_efectivas devuelve siempre la meta (100% artificial). Por eso la vista por
+  proceso muestra volumen y meta, no und/hora real: la comanda no reparte el turno por proceso.
+  metaDeProceso(nombre) normaliza tildes ('Impresión' → clave 'impresion' = 1500, no default).
+view-trazabilidad  Mensual (trazaMes): cascada por pedido Salida bodega → Ingreso PT →
+  Pérdidas → Fuga neta, agrupando movimientos_materiales por solicitud_id. Los movimientos
+  sin solicitud_id caen en un bucket "— Sin vincular —" para que los totales cuadren.
+  Filtra por fecha del DOCUMENTO (prefijo FECHA: en observaciones, vía parseFechaDoc) y no
+  por created_at: por eso la query pide una ventana de ±60 días y recorta client-side.
 view-personal    Grid de operadores
 ```
 
