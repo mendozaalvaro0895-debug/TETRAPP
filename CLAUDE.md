@@ -98,12 +98,18 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
   .inicio-sec (ya no hay distinción izq/der).
   Arriba — "📋 Asistencia Mensual": grid mensual sobre `asistencia_diaria` (area='tapas',
     turno='dia'), MISMO mecanismo que serigrafia.html salvo: sin roster diario de roles/
-    líneas (no aplica a Tapas), sin agrupación "Prestados", sin export a PDF. Comparte con
-    serigrafia.html: navegación de mes (navegarMesAsistTapas),
+    líneas (no aplica a Tapas), sin agrupación "Prestados". Comparte con serigrafia.html:
+    navegación de mes (navegarMesAsistTapas),
     ciclo de estados por celda (toggleAsistCellTapas: pendiente→presente→ausente→tarde→
     velada→vacío en días hábiles; finde→presente→vacío en domingo/feriado — CADA CLIC
-    GUARDA DE INMEDIATO en asistencia_diaria, no hay botón Guardar porque no hace falta),
-    candado asistLockedTapas (bloqueada por default), sincronización con rrhh_faltas
+    GUARDA DE INMEDIATO en asistencia_diaria), candado asistLockedTapas (bloqueada por
+    default), botón "💾 Guardar" (guardarAsistenciaTapas: bloquea + confirma — no hay nada
+    "pendiente" que commitear, ya se guardó por clic; a diferencia de serigrafia.html, cuyo
+    Guardar sí hace algo real: el tablero de roles/líneas que Tapas no tiene), exportación
+    a PDF (exportarAsistGridPDFTapas: mismo mecanismo — tabla HTML standalone en pestaña
+    nueva + window.print() — recortado sin matriz de roles por celda ni quincenas de
+    nómina, ver bloque de arriba; SÍ incluye la cola de 5 días antes/después), sincronización
+    con rrhh_faltas
     (sincronizarFaltaDesdeAsistenciaTapas, origen='asistencia_tapas' — distinto de
     'asistencia_serig' para no mezclar proveniencia), racha verde de fila completa,
     feriados vía toggleFeriado (clic derecho en el día — dias_feriados es GLOBAL, Tapas

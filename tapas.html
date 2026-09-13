@@ -1720,6 +1720,17 @@ function toggleAsistLockTapas() {
   renderAsistGridTapas();
 }
 
+// "Guardar": cada clic en una celda ya escribe en asistencia_diaria al
+// instante — no hay estado pendiente que confirmar. Este botón existe por
+// paridad visual con serigrafia.html (ahí sí guarda algo aparte: el tablero
+// de roles/líneas, que Tapas no tiene); aquí su acción útil es bloquear la
+// tabla y confirmarle al supervisor que ya quedó todo guardado.
+function guardarAsistenciaTapas() {
+  asistLockedTapas = true;
+  renderAsistGridTapas();
+  showToast('✅ Asistencia guardada');
+}
+
 function navegarMesAsistTapas(delta) {
   var hoy = fechaHoy();
   var mesActual = asistMesTapas || hoy.slice(0, 7);
@@ -1876,6 +1887,8 @@ function renderAsistGridTapas() {
     +     '<span style="font-size:11px;font-weight:600;color:var(--ink);text-transform:capitalize;min-width:120px;text-align:center">' + mesNombre + '</span>'
     +     '<button class="asist-nav-arr"' + mesNextAttr + ' onclick="navegarMesAsistTapas(1)" title="Mes siguiente">›</button>'
     +     '<button class="btn btn-g btn-xs" onclick="toggleAsistLockTapas()" style="white-space:nowrap' + lockClr + '">' + lockTxt + '</button>'
+    +     '<button class="btn btn-t btn-xs" onclick="guardarAsistenciaTapas()" style="white-space:nowrap">💾 Guardar</button>'
+    +     '<button class="btn btn-g btn-xs" onclick="exportarAsistGridPDFTapas()" style="white-space:nowrap">⬇ PDF</button>'
     +   '</div>'
     + '</div>'
     + '<div class="asist-grid-scroll"><table class="asist-grid-table"><thead><tr>'
@@ -2037,6 +2050,197 @@ async function guardarJustificacionTapas(faltaId, texto, codigo, fecha) {
     showToast(textoVal || fotoUrl ? '✅ Justificación guardada' : '🗑 Justificación borrada');
     await renderAsistGridTapas();
   } catch(e) { showToast('❌ Error al guardar: ' + e.message, '#B83232'); }
+}
+
+// ── Exportar a PDF ────────────────────────────────────────────
+// Mismo mecanismo que exportarAsistGridPDF (serigrafia.html): tabla HTML
+// standalone en una pestaña nueva + window.print(). Recorta lo que Tapas
+// no tiene (matriz de roles por celda, agrupación "Prestados", quincenas
+// de nómina — no confirmado que Tapas divida el mes así) e incluye la
+// cola de días antes/después que sí construimos para Tapas.
+async function exportarAsistGridPDFTapas() {
+  if (!asistCacheTapas) { showToast('Sin datos cargados', '#B87200'); return; }
+  var byPD = asistCacheTapas.byPersonDay;
+  var mesStr = asistCacheTapas._mes;
+  var anio = parseInt(mesStr.slice(0, 4), 10), mesN = parseInt(mesStr.slice(5, 7), 10);
+  var hoy = fechaHoy();
+  var diasMesN = new Date(anio, mesN, 0).getDate();
+
+  var diasMesActual = [];
+  for (var dd = 1; dd <= diasMesN; dd++) diasMesActual.push(mesStr + '-' + String(dd).padStart(2, '0'));
+  var diasAntes = [];
+  for (var ka = ASIST_MARGEN_TAPAS; ka >= 1; ka--) {
+    var da = new Date(anio, mesN - 1, 1); da.setDate(da.getDate() - ka);
+    diasAntes.push(fmtISOTapas(da));
+  }
+  var diasDespues = [];
+  for (var kd = 1; kd <= ASIST_MARGEN_TAPAS; kd++) {
+    var dd2 = new Date(anio, mesN - 1, diasMesN); dd2.setDate(dd2.getDate() + kd);
+    diasDespues.push(fmtISOTapas(dd2));
+  }
+  var dias = diasAntes.concat(diasMesActual).concat(diasDespues);
+  var margenSet = {};
+  diasAntes.concat(diasDespues).forEach(function(f) { margenSet[f] = true; });
+
+  await cargarJustifMesTapas(mesStr);
+
+  var ops = (personalData && personalData.tapas ? personalData.tapas : [])
+    .filter(function(p) { return p.activo && p.rol !== 'supervisor'; })
+    .sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
+
+  var mesNombre = new Date(anio, mesN - 1, 1).toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+  var MESES_ABBR_PDF = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+
+  function thDiasArrTapas() {
+    return dias.map(function(f) {
+      var dow = new Date(f + 'T12:00:00').getDay();
+      var esFin = dow === 0 || !!feriadosSet[f];
+      var esMargen = !!margenSet[f];
+      var bg = esMargen ? '#fffbeb' : esFin ? '#e2e8f0' : f === hoy ? '#dbeafe' : '#f8fafc';
+      var lbl = esMargen
+        ? parseInt(f.slice(8), 10) + '<div style="font-size:5.5px;font-weight:800;color:#92400e">' + MESES_ABBR_PDF[parseInt(f.slice(5, 7), 10) - 1] + '</div>'
+        : parseInt(f.slice(8), 10);
+      return '<th style="background:' + bg + ';width:18px;min-width:18px;font-size:7px;font-weight:700;text-align:center;padding:3px 0;border:1px solid #cbd5e1">' + lbl + '</th>';
+    }).join('');
+  }
+
+  function buildPersonaRowsArrTapas() {
+    var html = '';
+    ops.forEach(function(p) {
+      var daysByP = byPD[p.codigo] || {};
+      var isFullGreen = diasMesActual.every(function(f) {
+        if (f > hoy) return true;
+        var dow = new Date(f + 'T12:00:00').getDay();
+        if (dow === 0 || feriadosSet[f]) return true;
+        if (f === hoy && !daysByP[f]) return true;
+        return daysByP[f] === 'presente';
+      });
+      var nameBg = isFullGreen ? '#22c55e' : '#fff';
+      var nameClr = isFullGreen ? '#fff' : '#111';
+      html += '<tr>';
+      html += '<td style="background:' + nameBg + ';color:' + nameClr + ';font-size:8px;font-weight:' + (isFullGreen ? '700' : '600') + ';padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + '</td>';
+      dias.forEach(function(f) {
+        var dow = new Date(f + 'T12:00:00').getDay();
+        var esFin = dow === 0 || !!feriadosSet[f];
+        var esFuturo = f > hoy;
+        var esPendiente = f === hoy && !daysByP[f];
+        var est = esFuturo ? '' : (esPendiente ? 'pendiente' : (daysByP[f] || (esFin ? 'finde' : 'pendiente')));
+        var domTrab = esFin && est === 'presente';
+        var bg = esFuturo ? '#f8fafc'
+          : (esFin && !domTrab) ? '#475569'
+          : est === 'pendiente' ? '#cbd5e1'
+          : est === 'ausente' ? '#dc2626'
+          : est === 'tarde' ? '#d97706'
+          : est === 'velada' ? '#7c3aed'
+          : est === 'presente' ? '#22c55e'
+          : '#f8fafc';
+        var lbl = est === 'ausente' ? '&#10007;' : est === 'tarde' ? '!' : est === 'velada' ? '&#9790;' : '';
+        html += '<td style="background:' + bg + ';color:#fff;font-size:7px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
+      });
+      html += '</tr>';
+    });
+    return html;
+  }
+
+  function buildResumenTapas() {
+    var resAus = [], resTard = [], resVel = [], resDom = [];
+    ops.forEach(function(p) {
+      var daysByP = byPD[p.codigo] || {};
+      var fAus = [], fTard = [], fVel = [], fDom = [];
+      dias.forEach(function(f) {
+        if (f > hoy) return;
+        var dow = new Date(f + 'T12:00:00').getDay();
+        var est = daysByP[f];
+        if (!est) return;
+        var lbl = f.slice(8) + '/' + f.slice(5, 7);
+        var justifByCF = justifCacheTapas ? (justifCacheTapas.byCodigoFecha[p.codigo] || {}) : {};
+        var justifTxt = justifByCF[f] ? (justifByCF[f].texto || '') : '';
+        if (est === 'ausente') fAus.push({ lbl: lbl, justif: justifTxt });
+        if (est === 'tarde') fTard.push({ lbl: lbl, justif: justifTxt });
+        if (est === 'velada') fVel.push(lbl);
+        if (dow === 0 && (est === 'presente' || est === 'tarde' || est === 'velada')) fDom.push(lbl);
+      });
+      var nom = p.nombre || p.codigo;
+      if (fAus.length) resAus.push({ nombre: nom, fechas: fAus });
+      if (fTard.length) resTard.push({ nombre: nom, fechas: fTard });
+      if (fVel.length) resVel.push({ nombre: nom, fechas: fVel });
+      if (fDom.length) resDom.push({ nombre: nom, fechas: fDom });
+    });
+    return { resAus: resAus, resTard: resTard, resVel: resVel, resDom: resDom };
+  }
+
+  function buildResumenBloqueTapas(titulo, items, colorHdr) {
+    var total = items.reduce(function(s, it) { return s + (it.fechas ? it.fechas.length : 0); }, 0);
+    var hdrTxt = titulo + (total ? ' (' + total + ')' : '');
+    var body = !items.length
+      ? '<div style="color:#9ca3af;font-size:8px;font-style:italic;padding:4px 0">Ninguno en el mes</div>'
+      : items.map(function(it) {
+          var linesHtml = (it.fechas || []).map(function(fd) {
+            if (typeof fd === 'string') return '<span>' + fd + '</span>';
+            var justifMark = fd.justif
+              ? ' <span style="color:#15803d;font-weight:700">✓</span> <span style="font-style:italic;color:#374151">' + escHtml(fd.justif) + '</span>'
+              : '';
+            return '<span>' + fd.lbl + justifMark + '</span>';
+          });
+          return '<div style="margin-bottom:6px">'
+            + '<div style="font-weight:700;font-size:8.5px;color:#1e293b">' + escHtml(it.nombre) + '</div>'
+            + '<div style="font-size:7.5px;color:#64748b;padding-left:6px;margin-top:1px;display:flex;flex-direction:column;gap:1px">' + linesHtml.join('') + '</div>'
+          + '</div>';
+        }).join('');
+    return '<div style="break-inside:avoid">'
+      + '<div style="background:' + colorHdr + ';color:#fff;font-size:8px;font-weight:800;padding:5px 9px;border-radius:4px 4px 0 0;letter-spacing:.3px">' + hdrTxt + '</div>'
+      + '<div style="border:1.5px solid ' + colorHdr + ';border-top:none;padding:8px 9px;border-radius:0 0 4px 4px;min-height:32px">' + body + '</div>'
+    + '</div>';
+  }
+
+  var leyendaHtmlTapas = '<div style="display:flex;gap:12px;margin-top:8px;font-size:7.5px;color:#475569;flex-wrap:wrap">'
+    + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#22c55e"></span>Presente</span>'
+    + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#dc2626;font-size:6px;color:#fff;text-align:center;line-height:10px">✗</span>Ausente</span>'
+    + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#d97706;font-size:6px;color:#fff;text-align:center;line-height:10px">!</span>Tarde</span>'
+    + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#7c3aed;font-size:6px;color:#fff;text-align:center;line-height:10px">☾</span>Velada</span>'
+    + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#cbd5e1"></span>Pendiente</span>'
+    + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#475569"></span>Dom / Feriado</span>'
+    + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#fffbeb;border:1px solid #92400e"></span>Cola corte de nómina</span>'
+    + '<span style="font-weight:700;color:#22c55e">Fila verde = mes completo</span>'
+    + '<span>✓ = justificado</span>'
+  + '</div>';
+
+  var genFecha = new Date().toLocaleDateString('es-GT');
+
+  var htmlPdf = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+    + '<title>Asistencia ' + mesNombre + '</title>'
+    + '<style>'
+    +   '@page{size:A4 landscape;margin:10mm}'
+    +   'body{font-family:Arial,sans-serif;margin:0;padding:0}'
+    +   '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +   'table{border-collapse:collapse;width:100%}'
+    +   'h2{margin:0 0 4px;font-size:13px;color:#1e293b}'
+    +   'p{margin:0 0 8px;font-size:9px;color:#64748b}'
+    + '</style></head><body>'
+    + '<h2>Tetraplastic · Tapas — Asistencia Mensual</h2>'
+    + '<p style="text-transform:capitalize">' + mesNombre + ' &nbsp;·&nbsp; incluye ' + ASIST_MARGEN_TAPAS + ' días antes/después por corte de nómina &nbsp;·&nbsp; Generado: ' + genFecha + '</p>'
+    + '<table><thead><tr>'
+    +   '<th style="background:#f8fafc;font-size:8px;font-weight:700;text-align:left;padding:3px 6px;border:1px solid #cbd5e1;min-width:110px">Operario</th>'
+    +   thDiasArrTapas()
+    + '</tr></thead><tbody>' + buildPersonaRowsArrTapas() + '</tbody></table>'
+    + leyendaHtmlTapas;
+
+  var resTapas = buildResumenTapas();
+  htmlPdf += '<div style="margin-top:18px;page-break-inside:avoid">'
+    + '<div style="font-size:10px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">Resumen del mes</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">'
+    +   buildResumenBloqueTapas('⛔ Inasistencias', resTapas.resAus, '#ef4444')
+    +   buildResumenBloqueTapas('⏰ Llegadas tarde', resTapas.resTard, '#f59e0b')
+    +   buildResumenBloqueTapas('🌙 Veladas', resTapas.resVel, '#7c3aed')
+    +   buildResumenBloqueTapas('📅 Domingos trab.', resTapas.resDom, '#0ea5e9')
+    + '</div>'
+  + '</div>';
+
+  htmlPdf += '<script>window.onload=function(){window.print();}<\/script></body></html>';
+
+  var w = window.open('', '_blank');
+  if (w) { w.document.write(htmlPdf); w.document.close(); }
+  else showToast('Activa las ventanas emergentes para exportar', '#B87200');
 }
 
 async function toggleAsistCellTapas(codigo, fecha) {
