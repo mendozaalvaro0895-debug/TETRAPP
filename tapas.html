@@ -221,12 +221,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .mtx-hdr-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--teal)}
 .mtx-hdr-sub{font-size:11px;color:var(--gray-l)}
-.term-row{display:grid;grid-template-columns:100px 1fr auto;align-items:center;gap:10px;padding:7px 0}
-.term-row+.term-row{border-top:1px solid var(--bg)}
-.term-nombre{font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.term-row{display:grid;grid-template-columns:190px 1fr auto;align-items:center;gap:10px;padding:9px 6px;cursor:pointer;border-radius:8px;border-top:1px solid var(--bg);transition:background .12s}
+.term-row:hover{background:var(--bg)}
+.term-row-open{background:var(--teal-xl)}
+.term-nombre{font-size:12px;font-weight:600;color:var(--ink);line-height:1.3}
 .term-bar-wrap{background:var(--bg);border-radius:20px;height:14px;overflow:hidden}
 .term-bar{background:var(--teal);height:100%;border-radius:20px;transition:width .5s ease}
 .term-val{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--teal);white-space:nowrap;text-align:right;min-width:72px}
+.term-detalle{padding:2px 6px 10px 200px;display:flex;flex-direction:column;gap:4px}
+.term-detalle-row{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--gray);max-width:280px}
+.term-detalle-row span:last-child{font-family:var(--mono);font-weight:700;color:var(--teal)}
+.term-detalle-vacio{font-size:11px;color:var(--gray-l);font-style:italic}
 
 /* Asistencia Mensual */
 .asist-grid-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
@@ -1589,6 +1594,8 @@ function renderPersonal() {
 
 // ══ INICIO — PERSONAL Y ROLES (termómetro) ══════════════════
 var termComandas = [];
+var termProcesosPorOperario = {}; // { codigo: { proceso: unidades } } — para el desglose al hacer clic
+var termExpandidoCodigo = null;   // codigo del operario con el desglose abierto, o null
 
 // Agrupa comandas+comanda_tareas por operario. Reutilizado por Productividad
 // (prodPorOperario) y por el termómetro de Inicio — misma lógica, dos
@@ -1612,13 +1619,30 @@ function agruparComandasPorOperario(comandas) {
     .sort(function(a, b) { return b.und - a.und; });
 }
 
+// Mismas comandas del termómetro, pero desglosadas por proceso — para saber
+// de un vistazo en qué proceso tiene más experiencia cada operario (quién
+// arma más, quién tiene más horas de flameado/impresión, etc.)
+function agruparPorOperarioYProceso(comandas) {
+  var map = {};
+  comandas.forEach(function(c) {
+    var k = c.operario_id || '—';
+    if (!map[k]) map[k] = {};
+    (c.comanda_tareas || []).forEach(function(t) {
+      if (t.estado !== 'Terminada') return;
+      var proc = t.proceso || 'Otra tarea';
+      map[k][proc] = (map[k][proc] || 0) + (t.unidades_completadas || t.cantidad || 0);
+    });
+  });
+  return map;
+}
+
 async function cargarTermometro() {
   var wrap = document.getElementById('termometroWrap');
   if (wrap) wrap.innerHTML = '<div class="mtx-wrap"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>';
   var r = rangoMes();
   try {
     var res = await db.from('comandas')
-      .select('operario_id, operario_nombre, comanda_tareas(cantidad, unidades_completadas, estado)')
+      .select('operario_id, operario_nombre, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
       .gte('fecha', r.desde).lte('fecha', r.hasta);
     if (res.error) throw res.error;
     termComandas = res.data || [];
@@ -1626,16 +1650,36 @@ async function cargarTermometro() {
     console.error('cargarTermometro:', e);
     termComandas = [];
   }
+  termProcesosPorOperario = agruparPorOperarioYProceso(termComandas);
   renderTermometro();
+}
+
+function toggleTermDetalle(codigo) {
+  termExpandidoCodigo = (termExpandidoCodigo === codigo) ? null : codigo;
+  renderTermometro();
+}
+
+function buildTermDetalleRow(proceso, und) {
+  return '<div class="term-detalle-row"><span>' + escHtml(proceso) + '</span><span>' + und.toLocaleString() + ' und</span></div>';
 }
 
 function buildTermometroRow(o, maxUnd) {
   var pct = maxUnd > 0 ? Math.round((o.und / maxUnd) * 100) : 0;
-  return '<div class="term-row">'
+  var abierto = termExpandidoCodigo === o.codigo;
+  var codEsc = o.codigo.replace(/'/g, "\\'");
+  var html = '<div class="term-row' + (abierto ? ' term-row-open' : '') + '" onclick="toggleTermDetalle(\'' + codEsc + '\')">'
     + '<div class="term-nombre">' + escHtml(o.nombre) + '</div>'
     + '<div class="term-bar-wrap"><div class="term-bar" style="width:' + pct + '%"></div></div>'
     + '<div class="term-val">' + o.und.toLocaleString() + ' und</div>'
     + '</div>';
+  if (abierto) {
+    var procs = termProcesosPorOperario[o.codigo] || {};
+    var procKeys = Object.keys(procs).sort(function(a, b) { return procs[b] - procs[a]; });
+    html += '<div class="term-detalle">' + (procKeys.length
+      ? procKeys.map(function(p) { return buildTermDetalleRow(p, procs[p]); }).join('')
+      : '<div class="term-detalle-vacio">Sin tareas registradas este mes</div>') + '</div>';
+  }
+  return html;
 }
 
 function renderTermometro() {
@@ -1655,7 +1699,7 @@ function renderTermometro() {
 
   var html = '<div class="mtx-wrap">'
     + '<div class="mtx-hdr"><span class="mtx-hdr-title">👥 Personal y Roles</span>'
-    + '<span class="mtx-hdr-sub">Producción de ' + mesNombre + ' por operario</span></div>';
+    + '<span class="mtx-hdr-sub">Producción de ' + mesNombre + ' por operario · clic en un nombre para ver el desglose por proceso</span></div>';
   html += ops.length
     ? ops.map(function(o) { return buildTermometroRow(o, maxUnd); }).join('')
     : '<div class="empty">📭 No hay operarios activos en Tapas</div>';

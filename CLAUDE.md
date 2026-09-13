@@ -136,7 +136,12 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
     activo (rol≠supervisor) con las unidades Terminada del MES ACTUAL desde comandas+
     comanda_tareas. 100% de la barra = el operario con más unidades ese mes (relativo, no
     meta fija) — agruparComandasPorOperario() es compartida con Productividad (prodPorOperario
-    ahora es un wrapper de una línea sobre ella, ver regla #3).
+    ahora es un wrapper de una línea sobre ella, ver regla #3). Nombre completo, sin truncar
+    (columna de 190px). Clic en la fila (toggleTermDetalle) despliega el desglose por
+    proceso del MISMO total del mes (agruparPorOperarioYProceso, sobre el mismo
+    termComandas — la query de cargarTermometro ahora también trae `proceso`), ordenado
+    de mayor a menor unidades para ver de un vistazo en qué proceso tiene más experiencia
+    cada operario (quién arma más, quién tiene más horas de flameado/impresión, etc.).
   dias_feriados es GLOBAL (sin columna area) — Tapas y Serigrafía comparten la misma tabla,
   sin necesidad de migración. asistencia_diaria si necesitó sql/asistencia_area_tapas_v1.sql
   (fix defensivo del CHECK constraint de `area`, mismo patrón que personal_area_check).
