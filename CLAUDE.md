@@ -58,7 +58,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | Archivo | Descripción |
 |---|---|
 | `index.html` | Fachada principal — 8 cards de módulo |
-| `tapas.html` | Módulo completo Tapas: hub + movimientos (salidas/ingresos/rechazos) + productividad + trazabilidad + personal + pedidos |
+| `tapas.html` | Módulo completo Tapas: hub (Personal y Roles + Asistencia Mensual) + movimientos (salidas/ingresos/rechazos) + productividad + trazabilidad + personal + pedidos |
 | `serigrafia.html` | Módulo admin Serigrafía: Inicio (board) + Movimientos + Productividad + Personal |
 | `registro-serigrafia.html` | Formulario móvil rol `operativo_serig`: Flameado / Impresión / Empaque |
 | `comandas.html` | Registro de producción diaria por operario (vista admin) |
@@ -91,8 +91,28 @@ Orden de pestañas (mismo que serigrafia.html + Pedidos como 7ma):
   Inicio · Movimientos · Productividad · Trazabilidad · Personal · Dashboard(link) · Pedidos
 'rechazos' es ALIAS → switchTab('movimientos') + setMovVista('rechazos')
 
-view-inicio      HUB default: 4 KPIs + 7 sub-cards
-                 (Pedidos/Procesos/Personal · Productividad/Trazabilidad · Rechazos/Dashboard)
+view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigrafia.html"):
+  SOLO 2 secciones en layout .inicio-dos-col (mismo patrón de serigrafia.html), SIN tarjetas
+  de navegación — esa navegación vive únicamente en las pestañas de arriba.
+  Izquierda — "👥 Personal y Roles" (termómetro, NO es el tablero drag-drop de serigrafia.html
+    a propósito — Tapas no tiene ese concepto de rol/línea): barra horizontal por operario
+    activo (rol≠supervisor) con las unidades Terminada del MES ACTUAL desde comandas+
+    comanda_tareas. 100% de la barra = el operario con más unidades ese mes (relativo, no
+    meta fija) — agruparComandasPorOperario() es compartida con Productividad (prodPorOperario
+    ahora es un wrapper de una línea sobre ella, ver regla #3).
+  Derecha — "📋 Asistencia Mensual": grid mensual sobre `asistencia_diaria` (area='tapas',
+    turno='dia'), mismo mecanismo que serigrafia.html pero SIN: roster diario de roles/líneas
+    (no aplica), días de cola del mes anterior (ajuste de nómina específico de Serigrafía, no
+    confirmado para Tapas), agrupación "Prestados", popover de justificación con foto, export
+    a PDF. SÍ tiene: navegación de mes (navegarMesAsistTapas), ciclo de estados por celda
+    (toggleAsistCellTapas: pendiente→presente→ausente→tarde→velada→vacío en días hábiles;
+    finde→presente→vacío en domingo/feriado), candado asistLockedTapas (bloqueada por
+    default), sincronización con rrhh_faltas (sincronizarFaltaDesdeAsistenciaTapas,
+    origen='asistencia_tapas' — distinto de 'asistencia_serig' para no mezclar proveniencia),
+    racha verde de fila completa, y feriados vía toggleFeriado (clic derecho en el día).
+  dias_feriados es GLOBAL (sin columna area) — Tapas y Serigrafía comparten la misma tabla,
+  sin necesidad de migración. asistencia_diaria si necesitó sql/asistencia_area_tapas_v1.sql
+  (fix defensivo del CHECK constraint de `area`, mismo patrón que personal_area_check).
 view-tapas       Solicitudes — split pane: lista + detalle  (pestaña "Pedidos")
 view-movimientos Segmented control de 3:
   [📤 Salidas de Bodega] [📦 Ingresos PT] [⛔ Rechazos]
@@ -350,6 +370,11 @@ Notas críticas:
   `movimientos_materiales` (esa es de tapas/PT) para no forzar campos que no aplican (ej. `solicitud_id`).
   Lectura abierta a cualquier autenticado (soporta visor), escritura master-only. Ver
   `.claude/docs/contexto-bot-requis.md` para el mapeo completo de prefijos SICAF → esta tabla.
+- `asistencia_diaria`: llave única (`fecha`,`operador_codigo`,`area`,`turno`) vía upsert onConflict.
+  `area` ahora acepta 'tapas' además de 'serig' (sql/asistencia_area_tapas_v1.sql, sep/2026) — Tapas
+  la usa desde view-inicio de tapas.html, con `turno` siempre 'dia' (sin turno noche en Tapas).
+- `dias_feriados`: GLOBAL, sin columna `area` — un feriado aplica a toda la empresa por igual,
+  Tapas y Serigrafía leen/escriben la misma tabla sin distinción.
 
 ### RPCs atómicas
 - `descontar_inventario(p_sku, p_cantidad)` — usar en lugar de select+update manual
@@ -393,6 +418,9 @@ Notas críticas:
     comandas/comanda_tareas. REPROPÓSITA `tapas@tetrapp.app` (rol pasa de `operativo` a
     `supervisor_tapas`) — no crea cuenta nueva. Antes de correrlo, restablecer la contraseña
     de esa cuenta en Authentication → Users y dársela solo a Yenifer.
+19. `sql/asistencia_area_tapas_v1.sql` — permite area='tapas' en `asistencia_diaria` (fix
+    defensivo del CHECK constraint, igual patrón que personal_area_*). Sin esto, la Asistencia
+    Mensual de Tapas (view-inicio) puede fallar al guardar con "violates check constraint".
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)

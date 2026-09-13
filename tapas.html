@@ -213,24 +213,46 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 /* ── Vista Inicio (Hub) ────────────────────────────────────── */
 .inicio-wrap{flex:1;overflow-y:auto;padding:20px 24px}
-.sub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
-.sub-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-.sub-grid-b{display:grid;grid-template-columns:1fr 2fr;gap:14px}
-.sub-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:18px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
-.sub-card:hover{box-shadow:0 6px 24px rgba(0,0,0,.1);transform:translateY(-2px);border-color:var(--teal-l)}
-.sub-card-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:12px}
-.sub-card-icon.pedidos{background:var(--teal-xl);color:var(--teal)}
-.sub-card-icon.procesos{background:#FFF3D6;color:#B07D2A}
-.sub-card-icon.personal{background:#EFF6FF;color:#1D4ED8}
-.sub-card-icon.rechazos{background:var(--red-l);color:var(--red)}
-.sub-card-icon.sdash{background:#ECFDF5;color:#065F46}
-.sub-card-title{font-family:var(--display);font-size:16px;font-weight:700;margin-bottom:6px}
-.sub-card-desc{font-size:11px;color:var(--gray);line-height:1.55;margin-bottom:12px}
-.sub-card-stats{display:flex;gap:16px;padding-top:10px;border-top:1px solid var(--border)}
-.sub-stat strong{display:block;font-family:var(--mono);font-size:18px;font-weight:700}
-.sub-stat span{font-size:10px;color:var(--gray)}
-.sub-card-arrow{position:absolute;top:16px;right:16px;color:var(--gray-l);font-size:18px;transition:all .15s}
-.sub-card:hover .sub-card-arrow{color:var(--teal);transform:translateX(3px)}
+.inicio-dos-col{display:flex;gap:16px;align-items:flex-start}
+.inicio-col-izq{flex:1 1 0;min-width:0}
+.inicio-col-der{flex:1 1 0;min-width:0}
+
+/* Personal y Roles — termómetro de producción */
+.mtx-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px}
+.mtx-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.mtx-hdr-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--teal)}
+.mtx-hdr-sub{font-size:11px;color:var(--gray-l)}
+.term-row{display:grid;grid-template-columns:100px 1fr auto;align-items:center;gap:10px;padding:7px 0}
+.term-row+.term-row{border-top:1px solid var(--bg)}
+.term-nombre{font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.term-bar-wrap{background:var(--bg);border-radius:20px;height:14px;overflow:hidden}
+.term-bar{background:var(--teal);height:100%;border-radius:20px;transition:width .5s ease}
+.term-val{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--teal);white-space:nowrap;text-align:right;min-width:72px}
+
+/* Asistencia Mensual */
+.asist-grid-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden}
+.asist-grid-hdr{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.asist-grid-scroll{overflow-x:auto;scrollbar-width:thin}
+.asist-grid-table{border-collapse:collapse;width:max-content;min-width:100%}
+.asist-nav-arr{background:none;border:1px solid var(--border);border-radius:5px;width:24px;height:22px;font-size:15px;line-height:1;cursor:pointer;color:var(--teal);display:flex;align-items:center;justify-content:center;padding:0}
+.asist-nav-arr:hover:not([disabled]){background:var(--teal-xl)}
+.asist-nav-arr[disabled]{opacity:.35;cursor:default}
+.ag-th{position:sticky;top:0;background:var(--card);z-index:2;padding:4px 2px;text-align:center;font-size:9px;font-weight:700;color:var(--gray-l);border-bottom:1.5px solid var(--border);min-width:26px;width:26px}
+.ag-th.hoy{color:var(--teal);font-weight:900}
+.ag-th.finde{background:#64748b;color:#fff}
+.ag-th-name{position:sticky;left:0;z-index:3;min-width:120px;text-align:left;padding:4px 10px;background:var(--card);border-right:1.5px solid var(--border)}
+.ag-td-name{position:sticky;left:0;z-index:1;background:var(--bg);padding:5px 10px;font-size:11px;font-weight:600;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1.5px solid var(--border);min-width:120px}
+.ag-cell{width:26px;min-width:26px;height:26px;text-align:center;vertical-align:middle;cursor:pointer;border:1px solid rgba(0,0,0,.06);font-size:9px;font-weight:700;user-select:none}
+.ag-cell:hover{opacity:.7}
+.ag-cell.presente{background:#22c55e;color:#fff}
+.ag-cell.ausente{background:#dc2626;color:#fff}
+.ag-cell.tarde{background:#d97706;color:#fff}
+.ag-cell.velada{background:#7c3aed;color:#fff}
+.ag-cell.futuro{background:#f8fafc;cursor:default;color:transparent}
+.ag-cell.pendiente{background:#cbd5e1;color:#64748b}
+.ag-cell.finde{background:#475569!important;color:#fff!important}
+.ag-cell.finde.dom-trabajado{background:#22c55e!important;color:#fff!important}
+.ag-row-full .ag-td-name{color:#14532d;font-weight:700}
 
 
 /* ── Responsive móvil — complementa shared/styles.css ────────── */
@@ -239,9 +261,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   .tab{white-space:nowrap;font-size:12px;padding:10px 6px}
   .tabs-r{flex:none;margin-left:auto}
   .inicio-wrap{padding:12px}
-  .sub-grid{grid-template-columns:1fr}
-  .sub-grid-2{grid-template-columns:1fr}
-  .sub-grid-b{grid-template-columns:1fr}
+  .inicio-dos-col{flex-direction:column}
   .mov-scroll{padding:10px}
   #movTabla{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .mov-table{min-width:640px}
@@ -328,91 +348,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <!-- ════ INICIO HUB VIEW ════════════════════════════════════ -->
     <div class="view" style="display:flex;flex-direction:column;flex:1;overflow:hidden" id="view-inicio">
       <div class="inicio-wrap">
-
-        <!-- Fila 1: Pedidos · Procesos · Personal -->
-        <div class="sub-grid">
-
-          <div class="sub-card" onclick="switchTab('tapas')">
-            <div class="sub-card-arrow">→</div>
-            <div class="sub-card-icon pedidos">📋</div>
-            <div class="sub-card-title">Pedidos</div>
-            <div class="sub-card-desc">Solicitudes de producción activas, programadas y entregadas por cliente y referencia.</div>
-            <div class="sub-card-stats">
-              <div class="sub-stat"><strong id="icard-proc" style="color:var(--teal)">—</strong><span>En proceso</span></div>
-              <div class="sub-stat"><strong id="icard-pend" style="color:var(--amber)">—</strong><span>Pendientes</span></div>
-            </div>
+        <div class="inicio-dos-col">
+          <div class="inicio-col-izq">
+            <div id="termometroWrap"></div>
           </div>
-
-          <div class="sub-card" onclick="switchTab('movimientos')">
-            <div class="sub-card-arrow">→</div>
-            <div class="sub-card-icon procesos">⚙️</div>
-            <div class="sub-card-title">Procesos</div>
-            <div class="sub-card-desc">Salidas de bodega, ingresos de producto terminado y comandas de trabajo diarias.</div>
-            <div class="sub-card-stats">
-              <div class="sub-stat"><strong id="icard-sal" style="color:var(--amber)">—</strong><span>Salidas</span></div>
-              <div class="sub-stat"><strong id="icard-ing" style="color:var(--green)">—</strong><span>Ingresos PT</span></div>
-              <div class="sub-stat"><strong id="icard-cmd" style="color:var(--teal)">—</strong><span>Und PT hoy</span></div>
-            </div>
+          <div class="inicio-col-der">
+            <div id="asistGridTapas"></div>
           </div>
-
-          <div class="sub-card" onclick="switchTab('personal')">
-            <div class="sub-card-arrow">→</div>
-            <div class="sub-card-icon personal">👥</div>
-            <div class="sub-card-title">Personal</div>
-            <div class="sub-card-desc">Operadores activos, asignaciones por proceso y control de asistencia del turno.</div>
-            <div class="sub-card-stats">
-              <div class="sub-stat"><strong id="icard-ops" style="color:var(--teal)">—</strong><span>Operadores</span></div>
-            </div>
-          </div>
-
         </div>
-
-        <!-- Fila 2: Productividad · Trazabilidad -->
-        <div class="sub-grid-2">
-
-          <div class="sub-card" onclick="switchTab('productividad')">
-            <div class="sub-card-arrow">→</div>
-            <div class="sub-card-icon procesos">📈</div>
-            <div class="sub-card-title">Productividad</div>
-            <div class="sub-card-desc">Unidades por operario y por proceso contra la meta oficial: und/hora real del turno y porcentaje de cumplimiento del mes.</div>
-          </div>
-
-          <div class="sub-card" onclick="switchTab('trazabilidad')">
-            <div class="sub-card-arrow">→</div>
-            <div class="sub-card-icon pedidos">🔗</div>
-            <div class="sub-card-title">Trazabilidad</div>
-            <div class="sub-card-desc">Cascada mensual por pedido: cuánto salió de bodega, cuánto volvió como producto terminado y dónde quedó la fuga.</div>
-          </div>
-
-        </div>
-
-        <!-- Fila 3: Rechazos · Dashboard -->
-        <div class="sub-grid-b">
-
-          <div class="sub-card" onclick="switchTab('rechazos')">
-            <div class="sub-card-arrow">→</div>
-            <div class="sub-card-icon rechazos">⛔</div>
-            <div class="sub-card-title">Rechazos</div>
-            <div class="sub-card-desc">Registro de lotes y unidades rechazadas. Trazabilidad de tiempo y material perdido durante selección.</div>
-            <div class="sub-card-stats">
-              <div class="sub-stat"><strong id="icard-rech-hoy" style="color:var(--red)">—</strong><span>Hoy</span></div>
-              <div class="sub-stat"><strong id="icard-rech-sem" style="color:var(--amber)">—</strong><span>Esta semana</span></div>
-            </div>
-          </div>
-
-          <div class="sub-card" onclick="window.location.href='dashboard.html'">
-            <div class="sub-card-arrow">→</div>
-            <div class="sub-card-icon sdash">📊</div>
-            <div class="sub-card-title">Dashboard</div>
-            <div class="sub-card-desc">KPIs ejecutivos de todo el área de Tapas: eficiencia por proceso, ranking de operarios y producción acumulada.</div>
-            <div class="sub-card-stats">
-              <div class="sub-stat"><strong id="icard-cmd2" style="color:var(--teal)">—</strong><span>Und PT hoy</span></div>
-              <div class="sub-stat"><strong id="icard-fugas" style="color:var(--red)">—</strong><span>Fugas hoy</span></div>
-            </div>
-          </div>
-
-        </div>
-
       </div>
     </div><!-- /view-inicio -->
 
@@ -1556,36 +1499,6 @@ async function guardar() {
 
 // ══ ANIMACIÓN — helpers ═════════════════════════════════════
 
-function countUp(el, target, duration) {
-  if (!el) return;
-  var n = parseInt(target, 10);
-  if (isNaN(n) || n === 0) { el.textContent = isNaN(n) ? (target || '0') : '0'; return; }
-  var t0 = null;
-  function step(ts) {
-    if (!t0) t0 = ts;
-    var p = Math.min((ts - t0) / (duration || 600), 1);
-    var e = 1 - Math.pow(1 - p, 3); // ease-out cubic
-    el.textContent = Math.round(e * n).toLocaleString();
-    if (p < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
-function staggerEls(selector, baseDelay) {
-  var els = document.querySelectorAll(selector);
-  els.forEach(function(el, i) {
-    el.style.opacity    = '0';
-    el.style.transform  = 'translateY(14px)';
-    el.style.transition = '';
-    var delay = (baseDelay || 0) + i * 65;
-    setTimeout(function() {
-      el.style.transition = 'opacity 340ms cubic-bezier(0.16,1,0.3,1), transform 340ms cubic-bezier(0.16,1,0.3,1)';
-      el.style.opacity    = '1';
-      el.style.transform  = 'translateY(0)';
-    }, delay);
-  });
-}
-
 function animShake(el) {
   if (!el) return;
   el.classList.remove('anim-shake');
@@ -1648,7 +1561,7 @@ function switchTab(tab) {
 
   if (tab === 'personal')       renderPersonal();
   if (tab === 'movimientos')    cargarMovimientos();
-  if (tab === 'inicio')         renderInicio();
+  if (tab === 'inicio')         { cargarTermometro(); cargarAsistenciaTapas(); }
   if (tab === 'productividad')  cargarProductividad();
   if (tab === 'trazabilidad')   cargarTrazabilidad();
 }
@@ -1671,30 +1584,342 @@ function renderPersonal() {
   `;
 }
 
-// ══ INICIO HUB ══════════════════════════════════════════════
-function renderInicio() {
-  var proc = solicitudes.filter(function(s){ return s.estado === 'proceso'; }).length;
-  var pend = solicitudes.filter(function(s){ return s.estado === 'nueva' || s.estado === 'programada'; }).length;
-  var ops  = personalData && personalData.tapas ? personalData.tapas.filter(function(p){ return p.activo; }).length : 0;
+// ══ INICIO — PERSONAL Y ROLES (termómetro) ══════════════════
+var termComandas = [];
 
-  var hoyStr = fechaHoy();
-  var rechHoy    = rechazosData.filter(function(r){ return r.created_at && r.created_at.startsWith(hoyStr); });
-  var rechHoyUnid = rechHoy.reduce(function(a,r){ return a+(r.cantidad_rechazada||0); }, 0);
-  var hace7 = new Date(Date.now() - (7*24 + 6)*60*60*1000).toISOString().slice(0,10);
-  var rechSemUnid = rechazosData.filter(function(r){ return r.created_at && r.created_at.slice(0,10)>=hace7; })
-                                .reduce(function(a,r){ return a+(r.cantidad_rechazada||0); }, 0);
-
-  // Sub-card stats — count-up
-  countUp(document.getElementById('icard-proc'),     proc,        600);
-  countUp(document.getElementById('icard-pend'),     pend,        600);
-  countUp(document.getElementById('icard-ops'),      ops,         600);
-  countUp(document.getElementById('icard-rech-hoy'), rechHoyUnid, 600);
-  countUp(document.getElementById('icard-rech-sem'), rechSemUnid, 600);
-  ['icard-sal','icard-ing','icard-cmd','icard-cmd2','icard-fugas'].forEach(function(id){
-    var el=document.getElementById(id); if(el) el.textContent='—';
+// Agrupa comandas+comanda_tareas por operario. Reutilizado por Productividad
+// (prodPorOperario) y por el termómetro de Inicio — misma lógica, dos
+// consumidores con su propio arreglo de comandas cada uno.
+function agruparComandasPorOperario(comandas) {
+  var map = {};
+  comandas.forEach(function(c) {
+    var k = c.operario_id || '—';
+    if (!map[k]) map[k] = { codigo: k, nombre: c.operario_nombre || k, dias: 0, tareas: 0, und: 0, hTurno: 0, hMeta: 0 };
+    var o = map[k];
+    o.dias++;
+    o.hTurno += horasTurno(c);
+    (c.comanda_tareas || []).forEach(function(t) {
+      if (t.estado !== 'Terminada') return;
+      o.tareas++;
+      o.und   += (t.unidades_completadas || t.cantidad || 0);
+      o.hMeta += (t.horas_efectivas || 0);
+    });
   });
+  return Object.keys(map).map(function(k) { return map[k]; })
+    .sort(function(a, b) { return b.und - a.und; });
+}
 
-  staggerEls('#view-inicio .sub-card', 0);
+async function cargarTermometro() {
+  var wrap = document.getElementById('termometroWrap');
+  if (wrap) wrap.innerHTML = '<div class="mtx-wrap"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>';
+  var r = rangoMes();
+  try {
+    var res = await db.from('comandas')
+      .select('operario_id, operario_nombre, comanda_tareas(cantidad, unidades_completadas, estado)')
+      .gte('fecha', r.desde).lte('fecha', r.hasta);
+    if (res.error) throw res.error;
+    termComandas = res.data || [];
+  } catch(e) {
+    console.error('cargarTermometro:', e);
+    termComandas = [];
+  }
+  renderTermometro();
+}
+
+function buildTermometroRow(o, maxUnd) {
+  var pct = maxUnd > 0 ? Math.round((o.und / maxUnd) * 100) : 0;
+  return '<div class="term-row">'
+    + '<div class="term-nombre">' + escHtml(o.nombre) + '</div>'
+    + '<div class="term-bar-wrap"><div class="term-bar" style="width:' + pct + '%"></div></div>'
+    + '<div class="term-val">' + o.und.toLocaleString() + ' und</div>'
+    + '</div>';
+}
+
+function renderTermometro() {
+  var wrap = document.getElementById('termometroWrap');
+  if (!wrap) return;
+
+  var byCodigo = {};
+  agruparComandasPorOperario(termComandas).forEach(function(o) { byCodigo[o.codigo] = o.und; });
+
+  var ops = (personalData && personalData.tapas ? personalData.tapas : [])
+    .filter(function(p) { return p.activo && p.rol !== 'supervisor'; })
+    .map(function(p) { return { codigo: p.codigo, nombre: p.nombre, und: byCodigo[p.codigo] || 0 }; })
+    .sort(function(a, b) { return b.und - a.und; });
+
+  var maxUnd = ops.length ? ops[0].und : 0;
+  var mesNombre = new Date(fechaHoy() + 'T12:00:00').toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+
+  var html = '<div class="mtx-wrap">'
+    + '<div class="mtx-hdr"><span class="mtx-hdr-title">👥 Personal y Roles</span>'
+    + '<span class="mtx-hdr-sub">Producción de ' + mesNombre + ' por operario</span></div>';
+  html += ops.length
+    ? ops.map(function(o) { return buildTermometroRow(o, maxUnd); }).join('')
+    : '<div class="empty">📭 No hay operarios activos en Tapas</div>';
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+// ══ INICIO — ASISTENCIA MENSUAL ══════════════════════════════
+// Tabla compartida asistencia_diaria (area='tapas'), igual patrón que
+// Serigrafía pero sin el roster diario de roles/líneas (no aplica a Tapas)
+// ni los días de cola del mes anterior (ese ajuste es específico del corte
+// de nómina de Serigrafía). dias_feriados es GLOBAL — mismo feriado para
+// toda la empresa, sin filtro de área.
+var asistMesTapas    = null; // 'YYYY-MM' o null = mes actual
+var asistCacheTapas  = null; // { _mes, byPersonDay }
+var asistLockedTapas = true; // bloqueada por defecto, evita clics accidentales
+var feriadosSet      = {};   // { 'YYYY-MM-DD': descripcion }
+
+async function cargarFeriados() {
+  try {
+    var r = await db.from('dias_feriados').select('fecha,descripcion');
+    if (r.error) throw r.error;
+    feriadosSet = {};
+    (r.data || []).forEach(function(f) { feriadosSet[f.fecha] = f.descripcion || 'Feriado'; });
+  } catch(e) { feriadosSet = {}; }
+}
+
+async function toggleFeriado(fecha) {
+  if (asistLockedTapas) { showToast('🔒 Desbloquea la tabla de asistencia para marcar feriados', '#B87200'); return; }
+  var esFeriadoActual = !!feriadosSet[fecha];
+  if (esFeriadoActual) {
+    if (!confirm('¿Quitar ' + fecha + ' como feriado?')) return;
+    try {
+      var r = await db.from('dias_feriados').delete().eq('fecha', fecha);
+      if (r.error) throw r.error;
+      delete feriadosSet[fecha];
+      showToast('✅ Feriado quitado');
+    } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); return; }
+  } else {
+    var desc = prompt('Descripción del feriado en ' + fecha + ' (opcional):', '');
+    if (desc === null) return;
+    try {
+      var r2 = await db.from('dias_feriados').upsert({ fecha: fecha, descripcion: desc || null });
+      if (r2.error) throw r2.error;
+      feriadosSet[fecha] = desc || 'Feriado';
+      showToast('✅ Marcado como feriado');
+    } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); return; }
+  }
+  renderAsistGridTapas();
+}
+
+function toggleAsistLockTapas() {
+  asistLockedTapas = !asistLockedTapas;
+  renderAsistGridTapas();
+}
+
+function navegarMesAsistTapas(delta) {
+  var hoy = fechaHoy();
+  var mesActual = asistMesTapas || hoy.slice(0, 7);
+  var anio = parseInt(mesActual.slice(0, 4), 10), m = parseInt(mesActual.slice(5, 7), 10);
+  var d = new Date(anio, m - 1 + delta, 1);
+  var nuevoMes = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  if (nuevoMes > hoy.slice(0, 7)) return; // no navegar a meses futuros
+  asistMesTapas = nuevoMes;
+  asistCacheTapas = null;
+  cargarAsistenciaTapas();
+}
+
+async function cargarAsistenciaTapas() {
+  var hoy = fechaHoy();
+  var mesStr = asistMesTapas || hoy.slice(0, 7);
+  if (asistCacheTapas && asistCacheTapas._mes === mesStr) { renderAsistGridTapas(); return; }
+  var wrap = document.getElementById('asistGridTapas');
+  if (wrap) wrap.innerHTML = '<div class="asist-grid-wrap"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>';
+  var r = rangoMes(mesStr);
+  try {
+    var res = await db.from('asistencia_diaria')
+      .select('fecha,operador_codigo,estado')
+      .eq('area', 'tapas').eq('turno', 'dia')
+      .gte('fecha', r.desde).lte('fecha', r.hasta);
+    if (res.error) throw res.error;
+    var byPD = {};
+    (res.data || []).forEach(function(row) {
+      if (!byPD[row.operador_codigo]) byPD[row.operador_codigo] = {};
+      byPD[row.operador_codigo][row.fecha] = row.estado;
+    });
+    asistCacheTapas = { _mes: mesStr, byPersonDay: byPD };
+  } catch(e) {
+    console.error('cargarAsistenciaTapas:', e);
+    asistCacheTapas = { _mes: mesStr, byPersonDay: {} };
+  }
+  renderAsistGridTapas();
+}
+
+function legendItemAsist(bg, border, label) {
+  return '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)">'
+    + '<span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:' + bg + ';border:1px solid ' + border + '"></span>' + label + '</span>';
+}
+
+function renderAsistGridTapas() {
+  var wrap = document.getElementById('asistGridTapas');
+  if (!wrap || !asistCacheTapas) return;
+
+  var hoy = fechaHoy();
+  var mesStr = asistCacheTapas._mes;
+  var anio = parseInt(mesStr.slice(0, 4), 10), mesN = parseInt(mesStr.slice(5, 7), 10);
+  var diasMes = new Date(anio, mesN, 0).getDate();
+  var dias = [];
+  for (var dd = 1; dd <= diasMes; dd++) dias.push(mesStr + '-' + String(dd).padStart(2, '0'));
+  var byPD = asistCacheTapas.byPersonDay;
+
+  var ops = (personalData && personalData.tapas ? personalData.tapas : [])
+    .filter(function(p) { return p.activo && p.rol !== 'supervisor'; })
+    .sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
+
+  var mesNombre = new Date(anio, mesN - 1, 1).toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+  var hoyMes = hoy.slice(0, 7);
+
+  var thDays = dias.map(function(f) {
+    var dn = parseInt(f.slice(8), 10);
+    var dow = new Date(f + 'T12:00:00').getDay();
+    var esFeriado = !!feriadosSet[f];
+    var cls = 'ag-th' + ((dow === 0 || esFeriado) ? ' finde' : '') + (f === hoy ? ' hoy' : '');
+    var tit = esFeriado ? (feriadosSet[f] + ' · clic derecho para quitar feriado') : 'Clic derecho para marcar feriado';
+    return '<th class="' + cls + '" oncontextmenu="event.preventDefault();toggleFeriado(\'' + f + '\')" title="' + tit + '">' + dn + '</th>';
+  }).join('');
+
+  function buildRow(p) {
+    var daysByP = byPD[p.codigo] || {};
+    var isFullGreen = true;
+    dias.forEach(function(f) {
+      if (f > hoy) return;
+      var dow = new Date(f + 'T12:00:00').getDay();
+      if (dow === 0 || feriadosSet[f]) return;
+      if (f === hoy && !daysByP[f]) return;
+      var est = daysByP[f] || 'presente';
+      if (est === 'ausente') isFullGreen = false;
+    });
+    var cod = p.codigo.replace(/'/g, "\\'");
+    var row = '<tr class="ag-row' + (isFullGreen ? ' ag-row-full' : '') + '">';
+    row += '<td class="ag-td-name">' + escHtml(p.nombre || p.codigo) + '</td>';
+    dias.forEach(function(f) {
+      var esFuturo = f > hoy;
+      var dow = new Date(f + 'T12:00:00').getDay();
+      var esFeriado = !!feriadosSet[f];
+      var esFinde = dow === 0 || esFeriado;
+      if (esFuturo) {
+        row += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + '"></td>';
+      } else {
+        var esPendiente = f === hoy && !daysByP[f];
+        var est = esPendiente ? 'pendiente' : (daysByP[f] || (esFinde ? 'finde' : 'presente'));
+        var lbl = est === 'ausente' ? '✗' : est === 'tarde' ? '!' : est === 'velada' ? '🌙' : '';
+        var domTrab = esFinde && daysByP[f] === 'presente';
+        var motivo = esFeriado ? (' · ' + feriadosSet[f]) : (dow === 0 ? ' · Domingo' : '');
+        var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esFinde && !domTrab ? motivo : '');
+        row += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrab ? ' dom-trabajado' : '') + '" onclick="toggleAsistCellTapas(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + '</td>';
+      }
+    });
+    row += '</tr>';
+    return row;
+  }
+
+  var lockTxt = asistLockedTapas ? '🔒 Bloqueada' : '🔓 Editable';
+  var lockClr = asistLockedTapas ? '' : ';color:var(--teal);border-color:var(--teal)';
+  var mesNextAttr = mesStr >= hoyMes ? ' disabled' : '';
+
+  wrap.innerHTML = '<div class="asist-grid-wrap">'
+    + '<div class="asist-grid-hdr">'
+    +   '<span style="font-size:12px;font-weight:800;color:var(--ink)">📋 Asistencia Mensual</span>'
+    +   '<div style="display:flex;align-items:center;gap:8px">'
+    +     '<button class="asist-nav-arr" onclick="navegarMesAsistTapas(-1)" title="Mes anterior">‹</button>'
+    +     '<span style="font-size:11px;font-weight:600;color:var(--ink);text-transform:capitalize;min-width:120px;text-align:center">' + mesNombre + '</span>'
+    +     '<button class="asist-nav-arr"' + mesNextAttr + ' onclick="navegarMesAsistTapas(1)" title="Mes siguiente">›</button>'
+    +     '<button class="btn btn-g btn-xs" onclick="toggleAsistLockTapas()" style="white-space:nowrap' + lockClr + '">' + lockTxt + '</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="asist-grid-scroll"><table class="asist-grid-table"><thead><tr>'
+    +   '<th class="ag-th ag-th-name">Operario</th>' + thDays
+    + '</tr></thead><tbody>' + ops.map(buildRow).join('') + '</tbody></table></div>'
+    + '<div style="display:flex;gap:12px;padding:6px 14px;border-top:1px solid var(--border);flex-wrap:wrap">'
+    +   legendItemAsist('#dcfce7', '#86efac', 'Presente')
+    +   legendItemAsist('#fee2e2', '#fca5a5', 'Ausente (✗)')
+    +   legendItemAsist('#fef3c7', '#fde68a', 'Tarde (!)')
+    +   legendItemAsist('#ede9fe', '#ddd6fe', 'Velada (🌙)')
+    +   legendItemAsist('#cbd5e1', '#94a3b8', 'Pendiente')
+    +   legendItemAsist('#eef2f7', '#cbd5e1', 'Domingo / Feriado')
+    +   '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Clic derecho en el día para feriado · Fila verde = asistencia completa del mes</span>'
+    + '</div>'
+    + '</div>';
+}
+
+async function toggleAsistCellTapas(codigo, fecha) {
+  if (asistLockedTapas || !asistCacheTapas) return;
+  var byPD = asistCacheTapas.byPersonDay;
+  var curRaw = byPD[codigo] && byPD[codigo][fecha];
+  var hoy = fechaHoy();
+  var esDomingo = new Date(fecha + 'T12:00:00').getDay() === 0;
+  var esFeriado = !!feriadosSet[fecha];
+  var cur = curRaw !== undefined ? curRaw : (fecha === hoy ? 'pendiente' : ((esDomingo || esFeriado) ? 'finde' : 'presente'));
+
+  var next;
+  if (esDomingo || esFeriado) {
+    next = cur === 'presente' ? null : 'presente';
+  } else {
+    next = cur === 'pendiente' ? 'presente'
+         : cur === 'presente'  ? 'ausente'
+         : cur === 'ausente'   ? 'tarde'
+         : cur === 'tarde'     ? 'velada'
+         : null;
+  }
+
+  if (!byPD[codigo]) byPD[codigo] = {};
+  if (next === null) delete byPD[codigo][fecha];
+  else byPD[codigo][fecha] = next;
+  renderAsistGridTapas();
+
+  try {
+    var r;
+    if (next === null) {
+      r = await db.from('asistencia_diaria').delete()
+        .eq('fecha', fecha).eq('operador_codigo', codigo).eq('area', 'tapas').eq('turno', 'dia');
+    } else {
+      var op = (personalData && personalData.tapas ? personalData.tapas : []).find(function(x) { return x.codigo === codigo; });
+      r = await db.from('asistencia_diaria').upsert({
+        fecha: fecha, operador_codigo: codigo, operador_nombre: op ? op.nombre : codigo,
+        area: 'tapas', turno: 'dia', estado: next, updated_at: new Date().toISOString()
+      }, { onConflict: 'fecha,operador_codigo,area,turno' });
+    }
+    if (r.error) throw r.error;
+    sincronizarFaltaDesdeAsistenciaTapas(codigo, fecha, next);
+  } catch(e) {
+    if (curRaw === undefined) delete byPD[codigo][fecha];
+    else byPD[codigo][fecha] = curRaw;
+    renderAsistGridTapas();
+    showToast('❌ Error al guardar asistencia', '#B83232');
+  }
+}
+
+// Espejo de sincronizarFaltaDesdeAsistencia (serigrafia.html) pero para
+// Tapas: origen='asistencia_tapas' y personalData.tapas. No bloquea el
+// flujo de asistencia si rrhh_faltas no está corrida (best-effort).
+async function sincronizarFaltaDesdeAsistenciaTapas(codigo, fecha, estado) {
+  try {
+    if (feriadosSet[fecha]) return; // un feriado nunca genera falta
+    var op = (personalData && personalData.tapas ? personalData.tapas : []).find(function(x) { return x.codigo === codigo; });
+    if (!op || !op.id) return;
+    if (estado === 'ausente' || estado === 'tarde') {
+      var tipoNuevo = estado === 'ausente' ? 'ausencia' : 'tardanza';
+      var ex = await db.from('rrhh_faltas').select('id,tipo')
+        .eq('personal_id', op.id).eq('fecha', fecha).eq('origen', 'asistencia_tapas').maybeSingle();
+      if (ex.error) return;
+      if (ex.data) {
+        if (ex.data.tipo !== tipoNuevo) await db.from('rrhh_faltas').update({ tipo: tipoNuevo }).eq('id', ex.data.id);
+        return;
+      }
+      await db.from('rrhh_faltas').insert({
+        personal_id: op.id, fecha: fecha, origen: 'asistencia_tapas', tipo: tipoNuevo,
+        notas: tipoNuevo === 'ausencia'
+          ? 'Falta detectada automáticamente desde Asistencia Mensual (Tapas)'
+          : 'Llegada tarde detectada automáticamente desde Asistencia Mensual (Tapas)'
+      });
+    } else {
+      await db.from('rrhh_faltas').delete()
+        .eq('personal_id', op.id).eq('fecha', fecha).eq('origen', 'asistencia_tapas')
+        .is('justificacion_texto', null).is('justificacion_foto_url', null);
+    }
+  } catch(e) { console.warn('Sync falta↔asistencia (Tapas) falló (revisa que sql/rrhh_faltas_v1.sql esté corrido):', e); }
 }
 
 // ══ RECHAZOS ════════════════════════════════════════════════
@@ -1922,7 +2147,6 @@ async function confirmarRechazo() {
       cerrarModalRechazo();
       showToast('✅ Rechazo registrado correctamente');
       await cargarRechazos();
-      renderInicio();
       switchTab('rechazos'); // lleva a movimientos → segmento rechazos
     }
   } catch(e) {
@@ -1974,6 +2198,7 @@ async function init() {
   // Cargar datos
   await cargarInventario();
   await cargarPersonal();
+  await cargarFeriados();
   await cargarSolicitudes();
   await cargarRechazos();
 
@@ -2396,22 +2621,7 @@ async function cargarProductividad() {
 }
 
 function prodPorOperario() {
-  var map = {};
-  prodComandas.forEach(function(c) {
-    var k = c.operario_id || '—';
-    if (!map[k]) map[k] = { codigo: k, nombre: c.operario_nombre || k, dias: 0, tareas: 0, und: 0, hTurno: 0, hMeta: 0 };
-    var o = map[k];
-    o.dias++;
-    o.hTurno += horasTurno(c);
-    (c.comanda_tareas || []).forEach(function(t) {
-      if (t.estado !== 'Terminada') return;
-      o.tareas++;
-      o.und   += (t.unidades_completadas || t.cantidad || 0);
-      o.hMeta += (t.horas_efectivas || 0);
-    });
-  });
-  return Object.keys(map).map(function(k) { return map[k]; })
-    .sort(function(a, b) { return b.und - a.und; });
+  return agruparComandasPorOperario(prodComandas);
 }
 
 function prodPorProceso() {
