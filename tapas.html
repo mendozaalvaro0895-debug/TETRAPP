@@ -239,9 +239,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ag-th{position:sticky;top:0;background:var(--card);z-index:2;padding:4px 2px;text-align:center;font-size:9px;font-weight:700;color:var(--gray-l);border-bottom:1.5px solid var(--border);min-width:26px;width:26px}
 .ag-th.hoy{color:var(--teal);font-weight:900}
 .ag-th.finde{background:#64748b;color:#fff}
+.ag-th-dow{display:block;font-size:7px;font-weight:600;letter-spacing:.2px;opacity:.75;margin-top:1px}
 .ag-th-name{position:sticky;left:0;z-index:3;min-width:120px;text-align:left;padding:4px 10px;background:var(--card);border-right:1.5px solid var(--border)}
 .ag-td-name{position:sticky;left:0;z-index:1;background:var(--bg);padding:5px 10px;font-size:11px;font-weight:600;white-space:nowrap;border-bottom:1px solid var(--border);border-right:1.5px solid var(--border);min-width:120px}
-.ag-cell{width:26px;min-width:26px;height:26px;text-align:center;vertical-align:middle;cursor:pointer;border:1px solid rgba(0,0,0,.06);font-size:9px;font-weight:700;user-select:none}
+.ag-cell{width:26px;min-width:26px;height:26px;text-align:center;vertical-align:middle;cursor:pointer;border:1px solid rgba(0,0,0,.06);font-size:9px;font-weight:700;user-select:none;position:relative}
 .ag-cell:hover{opacity:.7}
 .ag-cell.presente{background:#22c55e;color:#fff}
 .ag-cell.ausente{background:#dc2626;color:#fff}
@@ -1722,6 +1723,7 @@ function navegarMesAsistTapas(delta) {
 async function cargarAsistenciaTapas() {
   var hoy = fechaHoy();
   var mesStr = asistMesTapas || hoy.slice(0, 7);
+  await cargarJustifMesTapas(mesStr);
   if (asistCacheTapas && asistCacheTapas._mes === mesStr) { renderAsistGridTapas(); return; }
   var wrap = document.getElementById('asistGridTapas');
   if (wrap) wrap.innerHTML = '<div class="asist-grid-wrap"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>';
@@ -1769,15 +1771,18 @@ function renderAsistGridTapas() {
   var mesNombre = new Date(anio, mesN - 1, 1).toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
   var hoyMes = hoy.slice(0, 7);
 
+  var DOW_ABBR = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   var thDays = dias.map(function(f) {
     var dn = parseInt(f.slice(8), 10);
     var dow = new Date(f + 'T12:00:00').getDay();
     var esFeriado = !!feriadosSet[f];
     var cls = 'ag-th' + ((dow === 0 || esFeriado) ? ' finde' : '') + (f === hoy ? ' hoy' : '');
     var tit = esFeriado ? (feriadosSet[f] + ' · clic derecho para quitar feriado') : 'Clic derecho para marcar feriado';
-    return '<th class="' + cls + '" oncontextmenu="event.preventDefault();toggleFeriado(\'' + f + '\')" title="' + tit + '">' + dn + '</th>';
+    return '<th class="' + cls + '" oncontextmenu="event.preventDefault();toggleFeriado(\'' + f + '\')" title="' + tit + '">' + dn + '<span class="ag-th-dow">' + DOW_ABBR[dow] + '</span></th>';
   }).join('');
 
+  // Sin registro explícito = "pendiente" (gris) SIEMPRE, sea hoy o un día pasado —
+  // ya no se asume "presente" por default; solo cuenta lo que se marcó a propósito.
   function buildRow(p) {
     var daysByP = byPD[p.codigo] || {};
     var isFullGreen = true;
@@ -1785,9 +1790,9 @@ function renderAsistGridTapas() {
       if (f > hoy) return;
       var dow = new Date(f + 'T12:00:00').getDay();
       if (dow === 0 || feriadosSet[f]) return;
-      if (f === hoy && !daysByP[f]) return;
-      var est = daysByP[f] || 'presente';
-      if (est === 'ausente') isFullGreen = false;
+      var est = daysByP[f];
+      if (f === hoy && !est) return; // hoy sin marcar aún no rompe la racha
+      if (!est || est === 'ausente') isFullGreen = false;
     });
     var cod = p.codigo.replace(/'/g, "\\'");
     var row = '<tr class="ag-row' + (isFullGreen ? ' ag-row-full' : '') + '">';
@@ -1800,13 +1805,20 @@ function renderAsistGridTapas() {
       if (esFuturo) {
         row += '<td class="ag-cell futuro' + (esFinde ? ' finde' : '') + '"></td>';
       } else {
-        var esPendiente = f === hoy && !daysByP[f];
-        var est = esPendiente ? 'pendiente' : (daysByP[f] || (esFinde ? 'finde' : 'presente'));
+        var est = daysByP[f] || (esFinde ? 'finde' : 'pendiente');
         var lbl = est === 'ausente' ? '✗' : est === 'tarde' ? '!' : est === 'velada' ? '🌙' : '';
         var domTrab = esFinde && daysByP[f] === 'presente';
         var motivo = esFeriado ? (' · ' + feriadosSet[f]) : (dow === 0 ? ' · Domingo' : '');
-        var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esFinde && !domTrab ? motivo : '');
-        row += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrab ? ' dom-trabajado' : '') + '" onclick="toggleAsistCellTapas(\'' + cod + '\',\'' + f + '\')" title="' + tit + '">' + lbl + '</td>';
+        var justifByCF = justifCacheTapas ? (justifCacheTapas.byCodigoFecha[p.codigo] || {}) : {};
+        var justifEntry = justifByCF[f];
+        var esJustif = justifEntry && (justifEntry.texto || justifEntry.fotoUrl);
+        var jBadge = esJustif ? '<span style="position:absolute;bottom:1px;right:1px;font-size:5px;font-weight:900;background:rgba(255,255,255,.35);border-radius:2px;padding:0 2px;line-height:1.5;pointer-events:none">J</span>' : '';
+        var ctxMenu = (est === 'ausente' || est === 'tarde') && !asistLockedTapas
+          ? ' oncontextmenu="event.preventDefault();abrirJustifPopoverTapas(\'' + cod + '\',\'' + f + '\',event)"'
+          : '';
+        var tit = escHtml(p.nombre || p.codigo) + ' · ' + f + (esFinde && !domTrab ? motivo : '')
+          + (esJustif ? ' · ✓ Justificado' : (est === 'ausente' || est === 'tarde' ? ' · Clic derecho para justificar' : ''));
+        row += '<td class="ag-cell ' + est + (esFinde ? ' finde' : '') + (domTrab ? ' dom-trabajado' : '') + '" onclick="toggleAsistCellTapas(\'' + cod + '\',\'' + f + '\')"' + ctxMenu + ' title="' + tit + '">' + lbl + jBadge + '</td>';
       }
     });
     row += '</tr>';
@@ -1837,19 +1849,164 @@ function renderAsistGridTapas() {
     +   legendItemAsist('#ede9fe', '#ddd6fe', 'Velada (🌙)')
     +   legendItemAsist('#cbd5e1', '#94a3b8', 'Pendiente')
     +   legendItemAsist('#eef2f7', '#cbd5e1', 'Domingo / Feriado')
-    +   '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Clic derecho en el día para feriado · Fila verde = asistencia completa del mes</span>'
+    +   '<span style="font-size:10px;color:var(--gray-l)">· Clic en celda para cambiar · Clic derecho en el día para feriado · Clic derecho en ausente/tarde para justificar (marca "J") · Fila verde = asistencia completa del mes</span>'
     + '</div>'
     + '</div>';
+}
+
+// ── Justificación de ausencias/tardanzas (clic derecho) ─────────
+// Mismo mecanismo que serigrafia.html (abrirJustifPopover/guardarJustificacion):
+// reusa la tabla rrhh_faltas y el bucket Storage `justificaciones`, con
+// origen='asistencia_tapas' y personalData.tapas en vez de .serig.
+var justifCacheTapas = null; // { _mes, byCodigoFecha: { codigo: { fecha: {id, texto, fotoUrl, tipo} } } }
+
+async function cargarJustifMesTapas(mesStr) {
+  if (justifCacheTapas && justifCacheTapas._mes === mesStr) return;
+  justifCacheTapas = { _mes: mesStr, byCodigoFecha: {} };
+  try {
+    var anio = parseInt(mesStr.slice(0, 4), 10), mesN = parseInt(mesStr.slice(5, 7), 10);
+    var fin = mesStr + '-' + String(new Date(anio, mesN, 0).getDate()).padStart(2, '0');
+    var rj = await db.from('rrhh_faltas')
+      .select('id,personal_id,fecha,justificacion_texto,justificacion_foto_url,tipo')
+      .eq('origen', 'asistencia_tapas')
+      .gte('fecha', mesStr + '-01').lte('fecha', fin);
+    if (rj.error || !rj.data) return;
+    var idToCod = {};
+    (personalData && personalData.tapas ? personalData.tapas : []).forEach(function(op) { if (op.id) idToCod[op.id] = op.codigo; });
+    rj.data.forEach(function(row) {
+      var cod = idToCod[row.personal_id];
+      if (!cod) return;
+      if (!justifCacheTapas.byCodigoFecha[cod]) justifCacheTapas.byCodigoFecha[cod] = {};
+      justifCacheTapas.byCodigoFecha[cod][row.fecha] = { id: row.id, texto: row.justificacion_texto || '', fotoUrl: row.justificacion_foto_url || '', tipo: row.tipo || 'ausencia' };
+    });
+  } catch(e) { /* tabla no disponible aún */ }
+}
+
+function abrirJustifPopoverTapas(codigo, fecha, evt) {
+  evt.preventDefault();
+  var existente = document.getElementById('justifPopover');
+  if (existente) existente.remove();
+  var op = (personalData && personalData.tapas ? personalData.tapas : []).find(function(x) { return x.codigo === codigo; });
+  var nombre = op ? (op.nombre || op.codigo) : codigo;
+  var justifByCF = justifCacheTapas ? (justifCacheTapas.byCodigoFecha[codigo] || {}) : {};
+  var justif = justifByCF[fecha];
+  var textoActual = justif ? (justif.texto || '') : '';
+  var fotoActual  = justif ? (justif.fotoUrl || '') : '';
+  var faltaId = justif ? justif.id : null;
+  var pop = document.createElement('div');
+  pop.id = 'justifPopover';
+  pop.style.cssText = 'position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--teal);border-radius:10px;padding:14px 16px;min-width:280px;max-width:360px;box-shadow:0 8px 28px rgba(0,0,0,.22)';
+  var x = Math.min(evt.clientX, window.innerWidth - 380);
+  var y = Math.min(evt.clientY + 8, window.innerHeight - 280);
+  pop.style.left = x + 'px'; pop.style.top = y + 'px';
+  var fechaFmt = fecha.slice(8) + '/' + fecha.slice(5, 7) + '/' + fecha.slice(0, 4);
+  var codEsc = codigo.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  var fotoPreviewHtml = fotoActual
+    ? '<div id="justifFotoPreview" style="margin-bottom:8px;position:relative">'
+      + '<img src="' + escHtml(fotoActual) + '" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">'
+      + '<button onclick="_justifBorrarFotoTapas()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>'
+      + '</div>'
+    : '<div id="justifFotoPreview" style="display:none;margin-bottom:8px"></div>';
+  pop.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'
+    + '<div><div style="font-size:12px;font-weight:800;color:var(--ink)">' + escHtml(nombre) + '</div>'
+    + '<div style="font-size:10px;color:var(--gray-l);margin-top:1px">' + fechaFmt + '</div></div>'
+    + '<button onclick="document.getElementById(\'justifPopover\').remove()" style="background:none;border:none;font-size:17px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0 2px;margin-left:8px">✕</button>'
+    + '</div>'
+    + '<label style="font-size:10px;font-weight:700;color:var(--gray-l);display:block;margin-bottom:4px">Motivo / justificación</label>'
+    + '<textarea id="justifTexto" style="width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:7px;padding:8px;font-size:12px;resize:vertical;min-height:64px;font-family:inherit;background:var(--bg);color:var(--ink);margin-bottom:8px">' + escHtml(textoActual) + '</textarea>'
+    + fotoPreviewHtml
+    + '<input id="justifFotoInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="_justifPreviewFotoTapas(this)">'
+    + '<button onclick="document.getElementById(\'justifFotoInput\').click()" style="width:100%;border:1.5px dashed var(--border);background:var(--bg);border-radius:7px;padding:7px;font-size:11px;cursor:pointer;color:var(--gray-l);margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:6px"><span style="font-size:15px">📷</span> Agregar / reemplazar foto</button>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end">'
+    +   '<button onclick="document.getElementById(\'justifPopover\').remove()" style="border:1px solid var(--border);background:none;border-radius:7px;padding:6px 14px;font-size:12px;cursor:pointer;color:var(--ink)">Cancelar</button>'
+    +   '<button onclick="guardarJustificacionTapas(' + (faltaId !== null ? faltaId : 'null') + ',document.getElementById(\'justifTexto\').value,\'' + codEsc + '\',\'' + fecha + '\')" style="background:var(--teal);color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">Guardar</button>'
+    + '</div>';
+  document.body.appendChild(pop);
+  setTimeout(function() {
+    document.addEventListener('click', function closeJustif(e) {
+      var p2 = document.getElementById('justifPopover');
+      if (p2 && !p2.contains(e.target)) { p2.remove(); document.removeEventListener('click', closeJustif); }
+    });
+  }, 60);
+  document.getElementById('justifTexto').focus();
+}
+
+function _justifPreviewFotoTapas(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var prev = document.getElementById('justifFotoPreview');
+  if (!prev) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    prev.style.display = 'block';
+    prev.innerHTML = '<div style="position:relative">'
+      + '<img src="' + e.target.result + '" style="width:100%;max-height:120px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">'
+      + '<button onclick="_justifBorrarFotoTapas()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>'
+      + '</div>';
+  };
+  reader.readAsDataURL(file);
+}
+
+function _justifBorrarFotoTapas() {
+  var prev = document.getElementById('justifFotoPreview');
+  if (prev) { prev.style.display = 'none'; prev.innerHTML = ''; }
+  var inp = document.getElementById('justifFotoInput');
+  if (inp) inp.value = '';
+  var pop = document.getElementById('justifPopover');
+  if (pop) pop.dataset.borrarFoto = '1';
+}
+
+async function guardarJustificacionTapas(faltaId, texto, codigo, fecha) {
+  try {
+    var op = (personalData && personalData.tapas ? personalData.tapas : []).find(function(x) { return x.codigo === codigo; });
+    if (!op || !op.id) { showToast('Operario no encontrado', '#B83232'); return; }
+    var textoVal = texto ? texto.trim() : null;
+    var pop3 = document.getElementById('justifPopover');
+    var borrarFoto = pop3 && pop3.dataset.borrarFoto === '1';
+    var fotoFile = document.getElementById('justifFotoInput') && document.getElementById('justifFotoInput').files && document.getElementById('justifFotoInput').files[0];
+
+    var fotoUrl = undefined; // undefined = sin cambio en DB
+    if (fotoFile) {
+      showToast('⬆️ Subiendo foto…');
+      var storagePath = 'faltas/' + op.id + '/' + fecha + '.jpg';
+      var ru = await db.storage.from('justificaciones').upload(storagePath, fotoFile, { upsert: true, contentType: fotoFile.type });
+      if (ru.error) throw new Error('Storage: ' + ru.error.message);
+      var pubData = db.storage.from('justificaciones').getPublicUrl(storagePath);
+      fotoUrl = pubData.data.publicUrl;
+    } else if (borrarFoto) {
+      fotoUrl = null;
+    }
+
+    var payload = { justificacion_texto: textoVal || null };
+    if (fotoUrl !== undefined) payload.justificacion_foto_url = fotoUrl;
+
+    if (faltaId) {
+      var r = await db.from('rrhh_faltas').update(payload).eq('id', faltaId);
+      if (r.error) throw r.error;
+    } else {
+      var byPD2 = asistCacheTapas && asistCacheTapas.byPersonDay[codigo] ? asistCacheTapas.byPersonDay[codigo] : {};
+      var estAct = byPD2[fecha] || 'ausente';
+      var r2 = await db.from('rrhh_faltas').insert(Object.assign({
+        personal_id: op.id, fecha: fecha, origen: 'asistencia_tapas',
+        tipo: estAct === 'tarde' ? 'tardanza' : 'ausencia',
+        notas: 'Justificación ingresada desde Asistencia Mensual (Tapas)'
+      }, payload));
+      if (r2.error) throw r2.error;
+    }
+    justifCacheTapas = null;
+    if (pop3) pop3.remove();
+    showToast(textoVal || fotoUrl ? '✅ Justificación guardada' : '🗑 Justificación borrada');
+    await renderAsistGridTapas();
+  } catch(e) { showToast('❌ Error al guardar: ' + e.message, '#B83232'); }
 }
 
 async function toggleAsistCellTapas(codigo, fecha) {
   if (asistLockedTapas || !asistCacheTapas) return;
   var byPD = asistCacheTapas.byPersonDay;
   var curRaw = byPD[codigo] && byPD[codigo][fecha];
-  var hoy = fechaHoy();
   var esDomingo = new Date(fecha + 'T12:00:00').getDay() === 0;
   var esFeriado = !!feriadosSet[fecha];
-  var cur = curRaw !== undefined ? curRaw : (fecha === hoy ? 'pendiente' : ((esDomingo || esFeriado) ? 'finde' : 'presente'));
+  var cur = curRaw !== undefined ? curRaw : ((esDomingo || esFeriado) ? 'finde' : 'pendiente');
 
   var next;
   if (esDomingo || esFeriado) {
@@ -1917,6 +2074,7 @@ async function sincronizarFaltaDesdeAsistenciaTapas(codigo, fecha, estado) {
         .eq('personal_id', op.id).eq('fecha', fecha).eq('origen', 'asistencia_tapas')
         .is('justificacion_texto', null).is('justificacion_foto_url', null);
     }
+    justifCacheTapas = null; // invalidar badges J tras cualquier cambio
   } catch(e) { console.warn('Sync falta↔asistencia (Tapas) falló (revisa que sql/rrhh_faltas_v1.sql esté corrido):', e); }
 }
 

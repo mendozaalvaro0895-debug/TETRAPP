@@ -92,24 +92,38 @@ Orden de pestañas (mismo que serigrafia.html + Pedidos como 7ma):
 'rechazos' es ALIAS → switchTab('movimientos') + setMovVista('rechazos')
 
 view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigrafia.html"):
-  SOLO 2 secciones en layout .inicio-dos-col (mismo patrón de serigrafia.html), SIN tarjetas
-  de navegación — esa navegación vive únicamente en las pestañas de arriba.
-  Izquierda — "👥 Personal y Roles" (termómetro, NO es el tablero drag-drop de serigrafia.html
+  SOLO 2 secciones apiladas en .inicio-dos-col (flex-direction:column; ya no lado a lado —
+  Asistencia truncaba nombres a mitad de pantalla), SIN tarjetas de navegación — esa
+  navegación vive únicamente en las pestañas de arriba. Ambas envueltas en la misma clase
+  .inicio-sec (ya no hay distinción izq/der).
+  Arriba — "📋 Asistencia Mensual": grid mensual sobre `asistencia_diaria` (area='tapas',
+    turno='dia'), MISMO mecanismo que serigrafia.html salvo: sin roster diario de roles/
+    líneas (no aplica a Tapas), sin días de cola del mes anterior (ajuste de nómina
+    específico de Serigrafía, no confirmado para Tapas), sin agrupación "Prestados", sin
+    export a PDF. Comparte con serigrafia.html: navegación de mes (navegarMesAsistTapas),
+    ciclo de estados por celda (toggleAsistCellTapas: pendiente→presente→ausente→tarde→
+    velada→vacío en días hábiles; finde→presente→vacío en domingo/feriado — CADA CLIC
+    GUARDA DE INMEDIATO en asistencia_diaria, no hay botón Guardar porque no hace falta),
+    candado asistLockedTapas (bloqueada por default), sincronización con rrhh_faltas
+    (sincronizarFaltaDesdeAsistenciaTapas, origen='asistencia_tapas' — distinto de
+    'asistencia_serig' para no mezclar proveniencia), racha verde de fila completa,
+    feriados vía toggleFeriado (clic derecho en el día — dias_feriados es GLOBAL, Tapas
+    y Serigrafía comparten la misma fila sin distinción de área), y justificación de
+    ausente/tarde por clic derecho (abrirJustifPopoverTapas/guardarJustificacionTapas,
+    con foto opcional al bucket Storage `justificaciones`, prefijo 'faltas/<personal_id>/
+    <fecha>.jpg' — mismo bucket que usa gestion.html para Capacitaciones, sin colisión
+    porque personal_id es único entre áreas). ⚠️ Sin registro explícito, la celda SIEMPRE
+    muestra "pendiente" (gris) — a propósito distinto de serigrafia.html, que asume
+    "presente" por default en días pasados sin marcar; aquí no se asume nada, solo cuenta
+    lo que se marcó a propósito (afecta también la racha verde: un día sin marcar la
+    rompe, salvo hoy que sigue "en curso"). Encabezado de cada día muestra además el
+    día de la semana en chico (Lun/Mar/Mié…) bajo el número.
+  Abajo — "👥 Personal y Roles" (termómetro, NO es el tablero drag-drop de serigrafia.html
     a propósito — Tapas no tiene ese concepto de rol/línea): barra horizontal por operario
     activo (rol≠supervisor) con las unidades Terminada del MES ACTUAL desde comandas+
     comanda_tareas. 100% de la barra = el operario con más unidades ese mes (relativo, no
     meta fija) — agruparComandasPorOperario() es compartida con Productividad (prodPorOperario
     ahora es un wrapper de una línea sobre ella, ver regla #3).
-  Derecha — "📋 Asistencia Mensual": grid mensual sobre `asistencia_diaria` (area='tapas',
-    turno='dia'), mismo mecanismo que serigrafia.html pero SIN: roster diario de roles/líneas
-    (no aplica), días de cola del mes anterior (ajuste de nómina específico de Serigrafía, no
-    confirmado para Tapas), agrupación "Prestados", popover de justificación con foto, export
-    a PDF. SÍ tiene: navegación de mes (navegarMesAsistTapas), ciclo de estados por celda
-    (toggleAsistCellTapas: pendiente→presente→ausente→tarde→velada→vacío en días hábiles;
-    finde→presente→vacío en domingo/feriado), candado asistLockedTapas (bloqueada por
-    default), sincronización con rrhh_faltas (sincronizarFaltaDesdeAsistenciaTapas,
-    origen='asistencia_tapas' — distinto de 'asistencia_serig' para no mezclar proveniencia),
-    racha verde de fila completa, y feriados vía toggleFeriado (clic derecho en el día).
   dias_feriados es GLOBAL (sin columna area) — Tapas y Serigrafía comparten la misma tabla,
   sin necesidad de migración. asistencia_diaria si necesitó sql/asistencia_area_tapas_v1.sql
   (fix defensivo del CHECK constraint de `area`, mismo patrón que personal_area_check).
