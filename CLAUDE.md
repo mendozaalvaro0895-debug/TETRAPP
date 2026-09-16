@@ -286,9 +286,14 @@ view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la dispo
   (el resto — para poder imprimir una ficha "VACÍO" y pegarla de referencia visual en los
   lockers libres). "🖨 Imprimir" llama a `imprimirEtiquetasLockers(numeros)` ya solo con los
   números elegidos (sin argumento imprime todos los ocupados, para llamadas futuras desde
-  otro lado). Genera, en una pestaña nueva, una hoja con una ficha por locker seleccionado
-  lista para imprimir y pegar en el locker físico — si el número no tiene ocupante, la
-  ficha muestra solo "VACÍO" centrado (sin área/turno). Diseño en escala de grises puro
+  otro lado). Cada fila tiene además un `<input>` de texto (no solo un `<span>`) con el
+  nombre que dirá esa etiqueta — precargado con `p.nombre` (o "VACÍO" en Disponibles) pero
+  editable ahí mismo antes de imprimir (`editarNombreImprimir()` guarda en
+  `LOCKERS_NOMBRE_IMPRIMIR{numero:texto}`, capa efímera que NO toca `personal.nombre` en la
+  base — solo cambia qué dice el papel impreso). Genera, en una pestaña nueva, una hoja con
+  una ficha por locker seleccionado lista para imprimir y pegar en el locker físico — si el
+  número no tiene ocupante, la ficha muestra solo "VACÍO" (o el texto editado) centrado
+  (sin área/turno). Diseño en escala de grises puro
   (sin color, probado para imprimir bien en blanco y negro): "Locker #N" como chip de
   referencia arriba, NOMBRE en mayúsculas grande (lo que se lee al pasar), línea divisoria,
   ÁREA en mayúsculas grande, y "Turno Alex"/"Turno Gabino" en chico SOLO si

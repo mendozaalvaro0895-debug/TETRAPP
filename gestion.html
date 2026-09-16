@@ -229,6 +229,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .il-row input[type="checkbox"]{flex-shrink:0;width:15px;height:15px;cursor:pointer;accent-color:var(--gest-m)}
 .il-num{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gray);flex-shrink:0;width:34px}
 .il-nombre{flex:1;font-size:12px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.il-nombre-input{flex:1;min-width:0;font-family:var(--font);font-size:12px;font-weight:600;color:var(--ink);
+  border:1px solid transparent;background:transparent;border-radius:4px;padding:3px 6px}
+.il-nombre-input:hover{border-color:var(--border)}
+.il-nombre-input:focus{border-color:var(--gest-m);background:var(--card);outline:none}
 .il-area{font-size:10px;color:var(--gray);flex-shrink:0}
 .just-inline{margin-top:10px;padding:10px;background:var(--bg);border-radius:8px}
 .just-foto-btn{display:inline-block;background:var(--card);border:1.5px dashed var(--border);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;color:var(--gray);cursor:pointer}
@@ -1034,10 +1038,12 @@ function renderLockers() {
 }
 
 // ── Selección de lockers a imprimir (para no reimprimir todos por un cambio) ──
-var LOCKERS_SEL_IMPRIMIR = {}; // { numero: true }
+var LOCKERS_SEL_IMPRIMIR = {};    // { numero: true }
+var LOCKERS_NOMBRE_IMPRIMIR = {}; // { numero: texto editado para la etiqueta (opcional) }
 
 function abrirModalImprimirLockers() {
   LOCKERS_SEL_IMPRIMIR = {};
+  LOCKERS_NOMBRE_IMPRIMIR = {};
   renderListaImprimirLockers();
   document.getElementById('modalImprimirLockers').classList.add('open');
 }
@@ -1058,21 +1064,29 @@ function buildFilaImprimirOcupado(n) {
   var p = LOCKERS_OCUPACION[n];
   var areaLbl = (AREA_LBL_MAP[p.area] || p.area || '—').replace(/^\S+\s/, '');
   var checked = !!LOCKERS_SEL_IMPRIMIR[n];
+  var nombreVal = (LOCKERS_NOMBRE_IMPRIMIR[n] != null) ? LOCKERS_NOMBRE_IMPRIMIR[n] : (p.nombre || '');
   return '<label class="il-row">' +
     '<input type="checkbox"' + (checked ? ' checked' : '') + ' onchange="toggleSeleccionLocker(' + n + ', this.checked)">' +
     '<span class="il-num">L-' + n + '</span>' +
-    '<span class="il-nombre">' + escHtml(p.nombre || '') + '</span>' +
+    '<input class="il-nombre-input" value="' + escHtml(nombreVal) + '" title="Texto que dirá la etiqueta"' +
+      ' oninput="editarNombreImprimir(' + n + ', this.value)" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">' +
     '<span class="il-area">' + escHtml(areaLbl) + '</span>' +
   '</label>';
 }
 
 function buildFilaImprimirLibre(n) {
   var checked = !!LOCKERS_SEL_IMPRIMIR[n];
+  var nombreVal = (LOCKERS_NOMBRE_IMPRIMIR[n] != null) ? LOCKERS_NOMBRE_IMPRIMIR[n] : 'VACÍO';
   return '<label class="il-row">' +
     '<input type="checkbox"' + (checked ? ' checked' : '') + ' onchange="toggleSeleccionLocker(' + n + ', this.checked)">' +
     '<span class="il-num">L-' + n + '</span>' +
-    '<span class="il-nombre" style="color:var(--gray-l);font-style:italic">Disponible</span>' +
+    '<input class="il-nombre-input" value="' + escHtml(nombreVal) + '" title="Texto que dirá la etiqueta"' +
+      ' oninput="editarNombreImprimir(' + n + ', this.value)" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">' +
   '</label>';
+}
+
+function editarNombreImprimir(n, val) {
+  LOCKERS_NOMBRE_IMPRIMIR[n] = val;
 }
 
 function toggleSeleccionLocker(n, val) {
@@ -1115,18 +1129,21 @@ function imprimirEtiquetasLockers(numerosFiltro) {
 
   var labels = numeros.map(function(n) {
     var p = LOCKERS_OCUPACION[n];
+    var override = LOCKERS_NOMBRE_IMPRIMIR[n];
     if (!p) {
+      var textoVacio = (override != null && override.trim() !== '') ? override : 'VACÍO';
       return '<div class="etq">' +
         '<span class="etq-top">Locker #' + n + '</span>' +
-        '<div class="etq-body etq-body-vacio"><div class="etq-nombre">VACÍO</div></div>' +
+        '<div class="etq-body etq-body-vacio"><div class="etq-nombre">' + escHtml(textoVacio) + '</div></div>' +
       '</div>';
     }
+    var nombreTexto = (override != null && override.trim() !== '') ? override : (p.nombre || '');
     var areaLbl = (AREA_LBL_MAP[p.area] || p.area || '—').replace(/^\S+\s/, '');
     var turnoLbl = (p.area === 'produccion' && p.turno_produccion) ? TURNO_PRODUCCION_LBL[p.turno_produccion] : null;
     return '<div class="etq">' +
       '<span class="etq-top">Locker #' + n + '</span>' +
       '<div class="etq-body">' +
-        '<div class="etq-nombre">' + escHtml(p.nombre || '') + '</div>' +
+        '<div class="etq-nombre">' + escHtml(nombreTexto) + '</div>' +
         '<div class="etq-div"></div>' +
         '<div class="etq-area">' + escHtml(areaLbl) + '</div>' +
         (turnoLbl ? '<div class="etq-turno">' + escHtml(turnoLbl) + '</div>' : '') +
