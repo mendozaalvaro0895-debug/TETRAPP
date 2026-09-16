@@ -278,6 +278,14 @@ view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la dispo
   `mpLocker` precargado a ese número — el área se sigue eligiendo ahí como siempre, no se
   bypasea ese paso. Botón "Ver perfil completo" dentro
   del modal (solo si hay ocupante) para ir al perfil vía `abrirPerfil`.
+  Botón "📋 Ver listado" (`verListadoLockers()`) abre, en pestaña nueva, una tabla tipo Excel
+  con los 1..`LOCKERS_TOTAL` (Locker/Estado/Nombre/Código/Área/Turno, ocupados en negro y
+  disponibles atenuados) para visualizar de un vistazo qué está libre — incluye botón
+  "⬇️ Descargar Excel (CSV)" (arma el CSV en el scope de gestion.html con comillas dobladas
+  por campo — sin depender de ninguna librería — y lo pasa al popup ya serializado con
+  `JSON.stringify(csvText).replace(/</g,'\\u003c')`, para que un nombre con "</script>" o "<"
+  no pueda romper el `<script>` inline del popup) y "🖨 Imprimir". Mismo patrón de ventana
+  nueva + `document.write()` que las etiquetas de abajo, sin tocar la BD.
   Botón "🖨 Imprimir etiquetas" (`abrirModalImprimirLockers()`) abre primero un modal de
   selección (`modalImprimirLockers`, checkboxes — todos DESmarcados por default, con
   botones "Seleccionar todos"/"Ninguno") para no tener que reimprimir todo el lote cada vez

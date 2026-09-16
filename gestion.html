@@ -338,6 +338,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="ph-sub" id="lockersResumen">—</div>
         </div>
         <div class="ph-r">
+          <button class="btn btn-g btn-sm" onclick="verListadoLockers()">📋 Ver listado</button>
           <button class="btn btn-g btn-sm" onclick="abrirModalImprimirLockers()">🖨 Imprimir etiquetas</button>
         </div>
       </div>
@@ -1035,6 +1036,82 @@ function renderLockers() {
         extras.map(function(p) { return escHtml(p.nombre) + ' (' + escHtml(p.locker) + ')'; }).join(' · ') +
       '</div>';
   }
+}
+
+// ── Listado tipo Excel: los 86 lockers, ocupado/disponible, con descarga CSV ──
+function verListadoLockers() {
+  var filas = [];
+  for (var i = 1; i <= LOCKERS_TOTAL; i++) {
+    var p = LOCKERS_OCUPACION[i];
+    if (p) {
+      var areaLbl = (AREA_LBL_MAP[p.area] || p.area || '—').replace(/^\S+\s/, '');
+      var turnoLbl = (p.area === 'produccion' && p.turno_produccion) ? (TURNO_PRODUCCION_LBL[p.turno_produccion] || '') : '';
+      filas.push({ n: i, estado: 'Ocupado', nombre: p.nombre || '', codigo: p.codigo || '', area: areaLbl, turno: turnoLbl });
+    } else {
+      filas.push({ n: i, estado: 'Disponible', nombre: '', codigo: '', area: '', turno: '' });
+    }
+  }
+  var ocupados = filas.filter(function(f) { return f.estado === 'Ocupado'; }).length;
+
+  var csvHeader = ['Locker', 'Estado', 'Nombre', 'Codigo', 'Area', 'Turno'];
+  var csvFilas = filas.map(function(f) { return ['L-' + f.n, f.estado, f.nombre, f.codigo, f.area, f.turno]; });
+  var csvText = [csvHeader].concat(csvFilas).map(function(row) {
+    return row.map(function(v) { return '"' + String(v).split('"').join('""') + '"'; }).join(',');
+  }).join('\r\n');
+  var csvJs = JSON.stringify(csvText).replace(/</g, '\\u003c');
+
+  var trs = filas.map(function(f) {
+    var esOcup = f.estado === 'Ocupado';
+    return '<tr class="' + (esOcup ? 'tr-ocup' : 'tr-libre') + '">' +
+      '<td class="c-num">L-' + f.n + '</td>' +
+      '<td><span class="badge ' + (esOcup ? 'b-ocup' : 'b-libre') + '">' + f.estado + '</span></td>' +
+      '<td>' + escHtml(f.nombre) + '</td>' +
+      '<td class="c-mono">' + escHtml(f.codigo) + '</td>' +
+      '<td>' + escHtml(f.area) + '</td>' +
+      '<td>' + escHtml(f.turno) + '</td>' +
+    '</tr>';
+  }).join('');
+
+  var doc = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Listado de Lockers — TETRAPLASTIC</title><style>'
+    + '*{box-sizing:border-box;margin:0;padding:0;font-family:\'DM Sans\',Arial,sans-serif}'
+    + 'body{background:#fff;padding:26px}'
+    + 'h1{font-size:18px;color:#0C0C0B;margin-bottom:4px}'
+    + '.sub{font-size:12px;color:#6B6B6A;margin-bottom:16px}'
+    + '.acciones{display:flex;gap:8px;margin-bottom:16px}'
+    + '.acciones button{padding:8px 16px;font-size:13px;font-weight:600;border-radius:8px;border:none;background:#4338CA;color:#fff;cursor:pointer}'
+    + '.acciones button.sec{background:#fff;border:1.5px solid #4338CA;color:#4338CA}'
+    + 'table{border-collapse:collapse;width:100%;max-width:780px}'
+    + 'th{background:#0C0C0B;color:#fff;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;position:sticky;top:0}'
+    + 'td{padding:7px 10px;font-size:13px;border-bottom:1px solid #E0DED8;color:#0C0C0B}'
+    + 'tr.tr-libre td{color:#A8A6A0}'
+    + '.c-num,.c-mono{font-family:\'DM Mono\',monospace}'
+    + '.c-num{font-weight:700}'
+    + '.badge{font-size:9.5px;font-weight:800;padding:2px 9px;border-radius:20px;white-space:nowrap}'
+    + '.b-ocup{background:#DCFCE7;color:#166534}'
+    + '.b-libre{background:#F1F0ED;color:#A8A6A0}'
+    + '@media print{.acciones{display:none}}'
+    + '</style></head><body>'
+    + '<h1>Listado de Lockers — TETRAPLASTIC</h1>'
+    + '<div class="sub">' + ocupados + ' ocupados · ' + (LOCKERS_TOTAL - ocupados) + ' disponibles de ' + LOCKERS_TOTAL + '</div>'
+    + '<div class="acciones"><button onclick="descargarCSV()">⬇️ Descargar Excel (CSV)</button><button class="sec" onclick="window.print()">🖨 Imprimir</button></div>'
+    + '<table><thead><tr><th>Locker</th><th>Estado</th><th>Nombre</th><th>Código</th><th>Área</th><th>Turno</th></tr></thead><tbody>' + trs + '</tbody></table>'
+    + '<script>var CSV_TEXT=' + csvJs + ';'
+    + 'function descargarCSV(){'
+    +   'var blob=new Blob(["\\uFEFF"+CSV_TEXT],{type:"text/csv;charset=utf-8;"});'
+    +   'var url=URL.createObjectURL(blob);'
+    +   'var a=document.createElement("a");a.href=url;a.download="lockers_tetraplastic.csv";'
+    +   'document.body.appendChild(a);a.click();document.body.removeChild(a);'
+    +   'setTimeout(function(){URL.revokeObjectURL(url);},1000);'
+    + '}'
+    + '<' + '/script>'
+    + '</body></html>';
+
+  var w = window.open('', '_blank');
+  if (!w) { showToast('⚠️ El navegador bloqueó la ventana emergente — habilita pop-ups para este sitio', '#B83232'); return; }
+  w.document.open();
+  w.document.write(doc);
+  w.document.close();
+  w.focus();
 }
 
 // ── Selección de lockers a imprimir (para no reimprimir todos por un cambio) ──
