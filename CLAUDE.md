@@ -497,8 +497,20 @@ Notas críticas:
 19. `sql/asistencia_area_tapas_v1.sql` — permite area='tapas' en `asistencia_diaria` (fix
     defensivo del CHECK constraint, igual patrón que personal_area_*). Sin esto, la Asistencia
     Mensual de Tapas (view-inicio) puede fallar al guardar con "violates check constraint".
+20. `sql/fix_duplicados_karen_blandina_v1.sql` — desactiva las filas duplicadas de Karen
+    Hernández y Blandina Solares en `personal` (quedaron con 2 filas cada una, codigo distinto,
+    probablemente por crear "+ Nueva persona" desde un locker vacío en vez de encontrarlas con
+    el buscador — ver nota abajo). Traslada el Locker L-13 a la ficha correcta de Blandina.
 
-### SQL ya corridos (solo si necesitas re-correr)
+### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
+`personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
+para la misma persona (no un simple typo de UI) — confirmado con Karen Hernández y Blandina
+Solares (sep/2026): cada una terminó con una fila en Tapas y otra en Serigrafía. Causa más
+probable: `nuevaPersonaDesdeLocker()` en gestion.html (Lockers → clic en un locker vacío →
+"+ Nueva persona") crea SIEMPRE una persona nueva — si quien lo usa no confirma primero con
+`filtrarPersonasLocker()` que la persona no existe ya (con otra área/código), queda duplicada.
+Antes de usar "+ Nueva persona" desde un locker, buscar primero por nombre en el cuadro de
+autocompletar del locker; si aparece, usar `seleccionarPersonaLocker()` en vez de crear otra.
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
 - `sql/fix_rls_serig_v2.sql` — reparó registro_tiros_serig RLS + columna hora + CHECK velada
 - `sql/solicitudes_parcial_constraint.sql` (19-ago-2026) — CHECK de estado en `solicitudes`
