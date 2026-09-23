@@ -77,7 +77,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sem-nav{display:flex;gap:4px}
 .sem-btn{width:30px;height:30px;border-radius:7px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-size:14px;color:var(--gray);display:flex;align-items:center;justify-content:center}
 .sem-btn:hover{border-color:var(--prod);color:var(--prod)}
-.sem-rango{font-size:13px;font-weight:700;color:var(--prod);white-space:nowrap}
+.sem-rango-wrap{flex:1;text-align:center;min-width:140px}
+.sem-rango{font-size:19px;font-weight:800;color:var(--prod);white-space:nowrap}
 
 /* KPI */
 .kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
@@ -442,8 +443,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <button class="sem-btn" onclick="moverSemana(-7)" title="Semana anterior">‹</button>
           <button class="sem-btn" onclick="moverSemana(7)" title="Semana siguiente">›</button>
         </div>
-        <span class="sem-rango" id="semRango">—</span>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+        <div class="sem-rango-wrap"><span class="sem-rango" id="semRango">—</span></div>
+        <div style="display:flex;align-items:center;gap:10px">
           <span class="ctrl-lbl">Precio</span>
           <select class="ctrl-in" id="precioVentana" onchange="recargarPrecios()">
             <option value="3">Últimos 3 meses</option>
@@ -520,7 +521,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <button class="sem-btn" onclick="moverMes(-1)" title="Mes anterior">‹</button>
           <button class="sem-btn" onclick="moverMes(1)" title="Mes siguiente">›</button>
         </div>
-        <span class="sem-rango" id="mesLabel">—</span>
+        <div class="sem-rango-wrap"><span class="sem-rango" id="mesLabel">—</span></div>
       </div>
 
       <div id="mesVacio" class="empty-mod" style="display:none">
