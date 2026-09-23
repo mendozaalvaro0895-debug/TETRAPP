@@ -392,18 +392,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   <!-- ══════════ VIEW INICIO ══════════ -->
   <div id="view-inicio">
     <div class="iv-tabs">
-      <button class="iv-btn active" id="ivBtn-dia" onclick="switchInicioVista('dia')">📅 Día</button>
+      <button class="iv-btn" id="ivBtn-dia" onclick="switchInicioVista('dia')">📅 Día</button>
       <button class="iv-btn" id="ivBtn-semana" onclick="switchInicioVista('semana')">📊 Semana</button>
-      <button class="iv-btn" id="ivBtn-mes" onclick="switchInicioVista('mes')">🗓️ Mes</button>
+      <button class="iv-btn active" id="ivBtn-mes" onclick="switchInicioVista('mes')">🗓️ Mes</button>
     </div>
 
     <!-- ── Sub-vista: Día ── -->
-    <div id="inicio-vista-dia">
+    <div id="inicio-vista-dia" style="display:none">
       <div style="background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:16px">
         <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap">
           <div>
             <div class="ctrl-lbl">Fecha</div>
-            <input type="date" class="ctrl-in" id="inicioFecha" onchange="renderInicio()">
+            <input type="date" class="ctrl-in" id="inicioFecha" onchange="INICIO_FECHA=this.value;renderInicio()">
           </div>
           <button class="sem-btn" onclick="cambiarFechaInicio(-1)" title="Día anterior">◀</button>
           <button class="sem-btn" onclick="cambiarFechaInicio(1)" title="Día siguiente">▶</button>
@@ -419,7 +419,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
       <div class="ctrl-bar">
         <span class="ctrl-lbl">Semana desde</span>
-        <input type="date" class="ctrl-in" id="semInicio" onchange="renderSemanal()">
+        <input type="date" class="ctrl-in" id="semInicio" onchange="INICIO_FECHA=lunesDe(this.value);renderSemanal()">
         <div class="sem-nav">
           <button class="sem-btn" onclick="moverSemana(-7)" title="Semana anterior">‹</button>
           <button class="sem-btn" onclick="moverSemana(7)" title="Semana siguiente">›</button>
@@ -487,11 +487,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     </div>
 
     <!-- ── Sub-vista: Mes ── -->
-    <div id="inicio-vista-mes" style="display:none">
+    <div id="inicio-vista-mes">
 
       <div class="ctrl-bar">
         <span class="ctrl-lbl">Mes</span>
-        <input type="month" class="ctrl-in" id="mesSelInput" onchange="renderMensual()">
+        <input type="month" class="ctrl-in" id="mesSelInput" onchange="INICIO_FECHA=this.value+'-01';renderMensual()">
         <div class="sem-nav">
           <button class="sem-btn" onclick="moverMes(-1)" title="Mes anterior">‹</button>
           <button class="sem-btn" onclick="moverMes(1)" title="Mes siguiente">›</button>
@@ -761,16 +761,26 @@ function switchTab(tab) {
   if (tab === 'recetario' && !RECETARIO_CARGADO) cargarRecetario();
 }
 
-var INICIO_VISTA = 'dia';
+var INICIO_VISTA = 'mes';
+var INICIO_FECHA = fechaHoy(); // fecha compartida entre Día/Semana/Mes — cada vista la deriva a su granularidad
 function switchInicioVista(vista) {
   INICIO_VISTA = vista;
   ['dia', 'semana', 'mes'].forEach(function (v) {
     document.getElementById('inicio-vista-' + v).style.display = v === vista ? 'block' : 'none';
     document.getElementById('ivBtn-' + v).classList.toggle('active', v === vista);
   });
-  if (vista === 'dia') renderInicio();
-  if (vista === 'semana') renderSemanal();
-  if (vista === 'mes') renderMensual();
+  if (vista === 'dia') {
+    document.getElementById('inicioFecha').value = INICIO_FECHA;
+    renderInicio();
+  }
+  if (vista === 'semana') {
+    document.getElementById('semInicio').value = lunesDe(INICIO_FECHA);
+    renderSemanal();
+  }
+  if (vista === 'mes') {
+    document.getElementById('mesSelInput').value = INICIO_FECHA.slice(0, 7);
+    renderMensual();
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -778,11 +788,13 @@ function switchInicioVista(vista) {
    ══════════════════════════════════════════════════════════════ */
 function irHoyInicio() {
   document.getElementById('inicioFecha').value = fechaHoy();
+  INICIO_FECHA = fechaHoy();
   renderInicio();
 }
 function cambiarFechaInicio(n) {
   var el = document.getElementById('inicioFecha');
   el.value = addDias(el.value || fechaHoy(), n);
+  INICIO_FECHA = el.value;
   renderInicio();
 }
 
@@ -1712,6 +1724,7 @@ async function eliminarTurno(fecha, turno) {
 function moverSemana(n) {
   var el = document.getElementById('semInicio');
   el.value = addDias(el.value || fechaHoy(), n);
+  INICIO_FECHA = lunesDe(el.value);
   renderSemanal();
 }
 
@@ -1933,6 +1946,7 @@ function moverMes(n) {
   var ym = input.value || fechaHoy().slice(0, 7);
   var d = new Date(parseInt(ym.slice(0, 4), 10), parseInt(ym.slice(5, 7), 10) - 1 + n, 1);
   input.value = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+  INICIO_FECHA = input.value + '-01';
   renderMensual();
 }
 
@@ -1941,6 +1955,7 @@ async function irUltimoMesConDatos() {
     var r = await db.from('produccion_diaria').select('fecha').order('fecha', { ascending: false }).limit(1);
     if (r.error || !r.data || !r.data.length) { toast('No hay producción cargada todavía', 'err'); return; }
     document.getElementById('mesSelInput').value = r.data[0].fecha.slice(0, 7);
+    INICIO_FECHA = r.data[0].fecha.slice(0, 7) + '-01';
     renderMensual();
   } catch (e) { toast('Error al buscar: ' + e.message, 'err'); }
 }
@@ -2096,8 +2111,6 @@ function buildResumenMesHtml(mesLabel) {
    ══════════════════════════════════════════════════════════════ */
 async function init() {
   document.getElementById('manFecha').value = fechaHoy();
-  document.getElementById('semInicio').value = lunesDe(fechaHoy());
-  document.getElementById('mesSelInput').value = fechaHoy().slice(0, 7);
   addManRow(); addManRow(); addManRow();
 
   try {
@@ -2111,8 +2124,7 @@ async function init() {
   try { await cargarPersonalProd(); } catch (e) { console.warn('No se pudo cargar personal de Producción:', e); }
   try { await cargarPrecios(); } catch (e) { console.warn(e); }
   await cargarUltimos();
-  document.getElementById('inicioFecha').value = fechaHoy();
-  renderInicio();
+  switchInicioVista(INICIO_VISTA);
 }
 
 /* ══════════════════════════════════════════════════════════════
