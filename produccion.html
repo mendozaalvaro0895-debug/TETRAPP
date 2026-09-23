@@ -164,6 +164,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .maq-card-detalle{display:none;margin-top:8px;padding-top:10px;border-top:1px dashed var(--border)}
 .maq-card-detalle.open{display:block}
 .maq-det-hdr,.maq-det-row{display:grid;grid-template-columns:68px 1fr 1.5fr 52px 92px;gap:6px;align-items:center}
+.maq-det-hdr-sem,.maq-det-row-sem{grid-template-columns:52px 1fr 1.5fr 50px 88px 46px}
 .maq-det-hdr{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-l);padding-bottom:4px;border-bottom:1px solid var(--bg2)}
 .maq-det-row{font-size:11.5px;padding:5px 0;border-bottom:1px solid var(--bg2)}
 .maq-det-row:last-child{border-bottom:none}
@@ -1003,24 +1004,77 @@ function renderSemFichasGrid() {
     MAQUINAS.map(function (m) { return buildMaquinaCardSemanaHtml(m, porMaquina[m]); }).join('');
 }
 
+// Agrupa el historial (filas turno a turno) de una máquina en totales por día,
+// con SKU principal, operarios y eficiencia diaria propia — base tanto para el
+// promedio semanal de la ficha como para las filas de su tabla de detalle.
+function agruparHistorialPorDia(historial) {
+  var porDia = {};
+  historial.forEach(function (f) {
+    if (!porDia[f.fecha]) porDia[f.fecha] = { fecha: f.fecha, total: 0, skus: {}, operarios: {}, turnos: {} };
+    var d = porDia[f.fecha];
+    d.total += f.cantidad;
+    if (!d.skus[f.sku]) d.skus[f.sku] = { cantidad: 0, descripcion: f.descripcion };
+    d.skus[f.sku].cantidad += f.cantidad;
+    if (f.operador) d.operarios[f.operador] = true;
+    if (f.turno) d.turnos[f.turno] = true;
+  });
+  return Object.keys(porDia).map(function (k) {
+    var d = porDia[k];
+    var skusOrden = Object.keys(d.skus).map(function (s) {
+      return { sku: s, cantidad: d.skus[s].cantidad, descripcion: d.skus[s].descripcion };
+    }).sort(function (a, b) { return b.cantidad - a.cantidad; });
+    var principal = skusOrden[0];
+    var turnosDia = Object.keys(d.turnos).length;
+    var meta = numVal(INV[principal.sku] && INV[principal.sku].meta_12hrs);
+    var ef = (meta > 0 && turnosDia > 0) ? d.total / (meta * turnosDia) : null;
+    return {
+      fecha: d.fecha, total: d.total, principal: principal, otros: skusOrden.length - 1,
+      operarios: Object.keys(d.operarios), turnosDia: turnosDia, ef: ef
+    };
+  }).sort(function (a, b) { return b.fecha.localeCompare(a.fecha); });
+}
+
+function buildMaqDetalleSemanaHtml(m, historial) {
+  var dias = agruparHistorialPorDia(historial);
+  if (!dias.length) {
+    return '<div class="maq-card-detalle" id="maq-detalle-' + m + 's">' +
+      '<div style="font-size:11px;color:var(--gray-l);padding:6px 0">Sin producción registrada esta semana.</div>' +
+    '</div>';
+  }
+  var rowsHtml = dias.map(function (d) {
+    var efTxt = '—', efCls = 'ef-na';
+    if (d.ef !== null) {
+      efTxt = (d.ef * 100).toFixed(0) + '%';
+      efCls = d.ef >= 0.85 ? 'ef-alta' : (d.ef >= 0.6 ? 'ef-media' : 'ef-baja');
+    }
+    var operariosTxt = d.operarios.map(operarioNombre).join(', ');
+    return '<div class="maq-det-row maq-det-row-sem">' +
+      '<span>' + diaCorta(d.fecha) + '</span>' +
+      '<span>' + esc(d.principal.sku) + (d.otros > 0 ? ' <span class="maq-card-sku-mas">+' + d.otros + '</span>' : '') + '</span>' +
+      '<span class="maq-det-desc" title="' + esc(d.principal.descripcion) + '">' + esc(d.principal.descripcion) + '</span>' +
+      '<span class="maq-det-cant">' + fmtU(d.total) + '</span>' +
+      '<span class="maq-det-op" title="' + esc(operariosTxt) + '">' + esc(operariosTxt || '—') + '</span>' +
+      '<span class="ef-pill ' + efCls + '" style="justify-self:center">' + efTxt + '</span>' +
+    '</div>';
+  }).join('');
+  return '<div class="maq-card-detalle" id="maq-detalle-' + m + 's">' +
+    '<div class="maq-det-hdr maq-det-hdr-sem"><span>Fecha</span><span>SKU</span><span>Producto</span><span>Cant.</span><span>Operario</span><span>Efic.</span></div>' +
+    rowsHtml +
+    '<div class="maq-det-meta">Eficiencia diaria = unidades del día ÷ (meta del SKU principal × turnos trabajados ese día). La eficiencia de la ficha es el promedio de los días con meta definida.</div>' +
+  '</div>';
+}
+
 function buildMaquinaCardSemanaHtml(m, datos) {
   var tipo = MAQ_TIPO_FULL[m];
   var historial = (datos && datos.historial) || [];
-  var detOpts = { sufijo: 's', periodo: 'esta semana', periodoMeta: 'esta semana', criterioMeta: 'de la semana' };
 
   if (!datos || !datos.total) {
-    var detalleVacio = historial.length
-      ? '<button class="maq-det-toggle" onclick="toggleMaqDetalle(' + m + ',\'s\')">Ver detalle de la semana ' +
-          '<span class="maq-chev" id="maq-chev-' + m + 's">▾</span></button>' +
-        buildMaqDetalleHtml(m, historial, null, detOpts)
-      : '';
     return '<div class="maq-card vacia">' +
       buildMaquinaImgHtml(m) +
       '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span></div>' +
       '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
       '<div class="maq-card-und" style="margin-top:16px">Sin actividad</div>' +
       '<div class="maq-card-und-lbl">esta semana</div>' +
-      detalleVacio +
       '</div>';
   }
 
@@ -1031,8 +1085,9 @@ function buildMaquinaCardSemanaHtml(m, datos) {
   var otros = skusOrden.length - 1;
 
   var turnosTrabajados = Object.keys(datos.celdas).length;
-  var meta = numVal(INV[principal.sku] && INV[principal.sku].meta_12hrs);
-  var ef = (meta > 0 && turnosTrabajados > 0) ? datos.total / (meta * turnosTrabajados) : null;
+  var diasList = agruparHistorialPorDia(historial);
+  var efsValidos = diasList.map(function (d) { return d.ef; }).filter(function (e) { return e !== null; });
+  var ef = efsValidos.length ? efsValidos.reduce(function (a, b) { return a + b; }, 0) / efsValidos.length : null;
 
   var efPill = '', barColor = 'var(--gray-l)', barPct = 0;
   if (ef !== null) {
@@ -1058,7 +1113,7 @@ function buildMaquinaCardSemanaHtml(m, datos) {
       '<span title="' + esc(operarios.join(', ')) + '">' + esc(operarios.join(', ') || '—') + '</span></div>' +
     '<button class="maq-det-toggle" onclick="toggleMaqDetalle(' + m + ',\'s\')">Ver detalle de la semana ' +
       '<span class="maq-chev" id="maq-chev-' + m + 's">▾</span></button>' +
-    buildMaqDetalleHtml(m, historial, meta, detOpts) +
+    buildMaqDetalleSemanaHtml(m, historial) +
   '</div>';
 }
 
