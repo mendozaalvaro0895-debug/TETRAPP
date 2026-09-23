@@ -159,7 +159,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .maq-chev.open{transform:rotate(180deg)}
 .maq-card-detalle{display:none;margin-top:8px;padding-top:10px;border-top:1px dashed var(--border)}
 .maq-card-detalle.open{display:block}
-.maq-det-hdr,.maq-det-row{display:grid;grid-template-columns:52px 1fr 1.5fr 52px 92px;gap:6px;align-items:center}
+.maq-det-hdr,.maq-det-row{display:grid;grid-template-columns:68px 1fr 1.5fr 52px 92px;gap:6px;align-items:center}
 .maq-det-hdr{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-l);padding-bottom:4px;border-bottom:1px solid var(--bg2)}
 .maq-det-row{font-size:11.5px;padding:5px 0;border-bottom:1px solid var(--bg2)}
 .maq-det-row:last-child{border-bottom:none}
@@ -689,7 +689,10 @@ function fechaCorta(iso) {
   var d = dObj(iso);
   return ('0' + d.getDate()).slice(-2) + ' ' + MESES_C[d.getMonth()];
 }
-function diaCorta(iso) { return DIAS_CORTO[dObj(iso).getDay()]; }
+function diaCorta(iso) {
+  var d = dObj(iso);
+  return DIAS_CORTO[d.getDay()] + ' ' + ('0' + d.getDate()).slice(-2);
+}
 function fechaLarga(iso) {
   var d = dObj(iso);
   return ('0' + d.getDate()).slice(-2) + ' ' + MESES_C[d.getMonth()] + ' ' + d.getFullYear();
