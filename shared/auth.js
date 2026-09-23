@@ -46,7 +46,7 @@ var TETRA_PROD_TABLA = 'produccion_diaria';
 // Tablas adicionales que operativo_prod puede escribir: Recetario completo (RLS también
 // lo permite, ver sql/sku_recetario_operativo_prod_v1.sql) — el personal de Producción
 // captura ahí la ficha técnica (Material/Colorante/Peso/Ciclo) desde su propia pantalla.
-var TETRA_PROD_TABLAS_EXTRA = ['sku_recetas', 'sku_receta_partes', 'sku_especificaciones'];
+var TETRA_PROD_TABLAS_EXTRA = ['sku_recetas', 'sku_receta_partes', 'sku_especificaciones', 'moldes'];
 
 // ── Escape universal anti-XSS para texto dinámico en innerHTML ──
 // (serigrafia.html tiene su propia copia equivalente; misma firma)
