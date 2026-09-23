@@ -2364,6 +2364,52 @@ async function init() {
   try { await cargarPrecios(); } catch (e) { console.warn(e); }
   await cargarUltimos();
   switchInicioVista(INICIO_VISTA);
+  prodSuscribirRealtime();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TIEMPO REAL — los cambios de cualquier usuario/equipo se ven en vivo
+   ══════════════════════════════════════════════════════════════ */
+// Qué pestaña de arriba está visible ahora mismo (Inicio/Ingreso/Recetario).
+function prodPestanaActiva() {
+  if (document.getElementById('view-inicio').style.display !== 'none') return 'inicio';
+  if (document.getElementById('view-ingreso').style.display !== 'none') return 'ingreso';
+  if (document.getElementById('view-recetario').style.display !== 'none') return 'recetario';
+  return null;
+}
+
+// Refresco completo (incluye Recetario) — solo se dispara en un punto de quiebre
+// natural (volver a la pestaña/ventana), nunca a mitad de tecleo.
+function prodRefrescarVistaActiva() {
+  var v = prodPestanaActiva();
+  if (v === 'inicio') switchInicioVista(INICIO_VISTA);
+  if (v === 'ingreso') cargarUltimos();
+  if (v === 'recetario' && RECETARIO_CARGADO) cargarRecetario();
+}
+window.addEventListener('focus', prodRefrescarVistaActiva);
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') prodRefrescarVistaActiva();
+});
+
+// Refresco en vivo por Realtime — solo Inicio/Ingreso (pantallas de solo lectura).
+// Recetario queda fuera a propósito: reconstruye las tarjetas con innerHTML y
+// borraría cualquier campo que alguien esté escribiendo en ese momento.
+var _prodRtChan = null, _prodRtTimer = null;
+function prodRealtimeThrottle() {
+  clearTimeout(_prodRtTimer);
+  _prodRtTimer = setTimeout(function () {
+    var v = prodPestanaActiva();
+    if (v === 'inicio') switchInicioVista(INICIO_VISTA);
+    if (v === 'ingreso') cargarUltimos();
+  }, 700);
+}
+function prodSuscribirRealtime() {
+  if (_prodRtChan || typeof db.channel !== 'function') return;
+  try {
+    _prodRtChan = db.channel('prod-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'produccion_diaria' }, prodRealtimeThrottle)
+      .subscribe();
+  } catch (e) { console.warn('Realtime producción no disponible:', e); }
 }
 
 /* ══════════════════════════════════════════════════════════════
