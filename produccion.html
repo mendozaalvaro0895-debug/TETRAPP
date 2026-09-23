@@ -136,6 +136,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .maq-card{background:var(--card);border:2px solid var(--border);border-radius:12px;padding:14px 16px}
 .maq-card.activa{border-color:var(--prod-l)}
 .maq-card.vacia{opacity:.55}
+.maq-card-img{display:block;max-width:100%;height:76px;object-fit:contain;margin:0 auto 8px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.15))}
+.maq-card.vacia .maq-card-img{opacity:.45}
 .maq-card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
 .maq-card-num{font-family:var(--mono);font-weight:800;font-size:19px;color:var(--prod-d)}
 .maq-card-tipo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray)}
@@ -782,10 +784,16 @@ async function renderInicio() {
     (fecha === fechaHoy() ? 'Hoy, ' : '') + fechaLarga(fecha) + ' · ' + fmtU(totalDia) + ' unidades en planta';
 }
 
+function buildMaquinaImgHtml(m) {
+  return '<img class="maq-card-img" src="img/maquinas/maq' + m + '.png" alt=""' +
+    ' onerror="this.style.display=\'none\'">';
+}
+
 function buildMaquinaCardHtml(m, datos) {
   var tipo = MAQ_TIPO_FULL[m];
   if (!datos || !datos.total) {
     return '<div class="maq-card vacia">' +
+      buildMaquinaImgHtml(m) +
       '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span></div>' +
       '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
       '<div class="maq-card-und" style="margin-top:16px">Sin actividad</div>' +
@@ -819,6 +827,7 @@ function buildMaquinaCardHtml(m, datos) {
   var turnoTxt = turnosArr.map(function (t) { return t === 'dia' ? '☀️ Día' : '🌙 Noche'; }).join(' · ');
 
   return '<div class="maq-card activa">' +
+    buildMaquinaImgHtml(m) +
     '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span>' + efPill + '</div>' +
     '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
     '<div class="maq-card-sku">' + esc(principal.sku) +
