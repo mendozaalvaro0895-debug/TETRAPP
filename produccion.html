@@ -162,6 +162,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .maq-chev{display:inline-block;transition:transform .2s;font-size:9px}
 .maq-chev.open{transform:rotate(180deg)}
 .maq-card-detalle{display:none;margin-top:8px;padding-top:10px;border-top:1px dashed var(--border)}
+.maq-det-rows-scroll{max-height:280px;overflow-y:auto}
 .maq-card-detalle.open{display:block}
 .maq-det-hdr,.maq-det-row{display:grid;grid-template-columns:68px 1fr 1.5fr 52px 92px;gap:6px;align-items:center}
 .maq-det-hdr-sem,.maq-det-row-sem{grid-template-columns:52px 1fr 1.5fr 50px 88px 46px}
@@ -392,6 +393,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
   <!-- ══════════ VIEW INICIO ══════════ -->
   <div id="view-inicio">
+    <div class="iv-tabs" id="modoTabs">
+      <button class="iv-btn active" id="modoBtn-fichas" onclick="switchInicioModo('fichas')">🃏 Fichas</button>
+      <button class="iv-btn" id="modoBtn-tabla" onclick="switchInicioModo('tabla')">📋 Tabla</button>
+    </div>
     <div class="iv-tabs">
       <button class="iv-btn" id="ivBtn-dia" onclick="switchInicioVista('dia')">📅 Día</button>
       <button class="iv-btn" id="ivBtn-semana" onclick="switchInicioVista('semana')">📊 Semana</button>
@@ -412,7 +417,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div id="inicioResumenTxt" style="margin-left:auto;font-size:12px;color:var(--gray)"></div>
         </div>
       </div>
-      <div class="inicio-grid" id="inicioGrid"></div>
+      <div id="diaFichas">
+        <div class="inicio-grid" id="inicioGrid"></div>
+      </div>
+      <div id="diaTabla" class="empty-mod" style="display:none">
+        <div class="empty-ico">📅</div>
+        <div class="empty-t">La vista de tabla no aplica a un solo día</div>
+        <div class="empty-s">Cambia a Semana o Mes para ver el reporte tipo tabla, o usa 🃏 Fichas para ver el día actual por máquina.</div>
+      </div>
     </div>
 
     <!-- ── Sub-vista: Semana ── -->
@@ -445,37 +457,32 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
 
       <div id="semContent" style="display:none">
-        <div class="kpi-strip">
-          <div class="kpi">
-            <div class="kpi-l">Producción de la semana</div>
-            <div class="kpi-v" id="kpiUnid">—</div>
-            <div class="kpi-s" id="kpiUnidSub">—</div>
+        <div id="semTabla" style="display:none">
+          <div class="kpi-strip">
+            <div class="kpi">
+              <div class="kpi-l">Producción de la semana</div>
+              <div class="kpi-v" id="kpiUnid">—</div>
+              <div class="kpi-s" id="kpiUnidSub">—</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-l">Eficiencia global</div>
+              <div class="kpi-v" id="kpiEf">—</div>
+              <div class="kpi-s" id="kpiEfSub">producción ÷ meta × turnos</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-l">Venta potencial</div>
+              <div class="kpi-v" id="kpiPot">—</div>
+              <div class="kpi-s" id="kpiPotSub">—</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-l">Facturado esa semana</div>
+              <div class="kpi-v" id="kpiFact">—</div>
+              <div class="kpi-s" id="kpiFactSub">—</div>
+            </div>
           </div>
-          <div class="kpi">
-            <div class="kpi-l">Eficiencia global</div>
-            <div class="kpi-v" id="kpiEf">—</div>
-            <div class="kpi-s" id="kpiEfSub">producción ÷ meta × turnos</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">Venta potencial</div>
-            <div class="kpi-v" id="kpiPot">—</div>
-            <div class="kpi-s" id="kpiPotSub">—</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">Facturado esa semana</div>
-            <div class="kpi-v" id="kpiFact">—</div>
-            <div class="kpi-s" id="kpiFactSub">—</div>
-          </div>
-        </div>
 
-        <div id="avisoPrecios"></div>
+          <div id="avisoPrecios"></div>
 
-        <div class="iv-tabs" style="margin-bottom:14px">
-          <button class="iv-btn active" id="semVistaBtn-tabla" onclick="switchSemVista('tabla')">📋 Tabla</button>
-          <button class="iv-btn" id="semVistaBtn-fichas" onclick="switchSemVista('fichas')">🃏 Fichas</button>
-        </div>
-
-        <div id="semTabla">
           <div class="tbl-wrap">
             <div class="tbl-head">
               <div>
@@ -492,7 +499,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
         </div>
 
-        <div id="semFichas" style="display:none">
+        <div id="semFichas">
           <div class="inicio-grid" id="semFichasGrid"></div>
         </div>
       </div>
@@ -519,8 +526,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
 
       <div id="mesContent" style="display:none">
-        <div id="mesSemanasWrap"></div>
-        <div id="mesResumen"></div>
+        <div id="mesTabla" style="display:none">
+          <div id="mesSemanasWrap"></div>
+          <div id="mesResumen"></div>
+        </div>
+        <div id="mesFichas">
+          <div class="inicio-grid" id="mesFichasGrid"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -775,6 +787,7 @@ function switchTab(tab) {
 
 var INICIO_VISTA = 'mes';
 var INICIO_FECHA = fechaHoy(); // fecha compartida entre Día/Semana/Mes — cada vista la deriva a su granularidad
+var INICIO_MODO = 'fichas';   // 🃏 fichas por máquina | 📋 tabla — aplica a las 3 vistas de período
 function switchInicioVista(vista) {
   INICIO_VISTA = vista;
   ['dia', 'semana', 'mes'].forEach(function (v) {
@@ -793,6 +806,24 @@ function switchInicioVista(vista) {
     document.getElementById('mesSelInput').value = INICIO_FECHA.slice(0, 7);
     renderMensual();
   }
+  aplicarInicioModo();
+}
+
+function switchInicioModo(modo) {
+  INICIO_MODO = modo;
+  document.getElementById('modoBtn-fichas').classList.toggle('active', modo === 'fichas');
+  document.getElementById('modoBtn-tabla').classList.toggle('active', modo === 'tabla');
+  aplicarInicioModo();
+}
+
+function aplicarInicioModo() {
+  var modo = INICIO_MODO;
+  document.getElementById('diaFichas').style.display = modo === 'fichas' ? 'block' : 'none';
+  document.getElementById('diaTabla').style.display = modo === 'tabla' ? 'block' : 'none';
+  document.getElementById('semFichas').style.display = modo === 'fichas' ? 'block' : 'none';
+  document.getElementById('semTabla').style.display = modo === 'tabla' ? 'block' : 'none';
+  document.getElementById('mesFichas').style.display = modo === 'fichas' ? 'block' : 'none';
+  document.getElementById('mesTabla').style.display = modo === 'tabla' ? 'block' : 'none';
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -978,8 +1009,8 @@ function buildMaquinaCardHtml(m, datos) {
   '</div>';
 }
 
-/* ── Fichas por máquina de la vista Semana (reusa el mismo patrón de Día) ── */
-function agruparMaquinaSemana(rows) {
+/* ── Fichas por máquina de las vistas Semana y Mes (reusan el patrón de Día) ── */
+function agruparMaquinaPeriodo(rows) {
   var porMaquina = {};
   rows.forEach(function (p) {
     var mk = p.maquina || 0;
@@ -999,14 +1030,24 @@ function agruparMaquinaSemana(rows) {
 }
 
 function renderSemFichasGrid() {
-  var porMaquina = agruparMaquinaSemana(PROD_SEM);
-  document.getElementById('semFichasGrid').innerHTML =
-    MAQUINAS.map(function (m) { return buildMaquinaCardSemanaHtml(m, porMaquina[m]); }).join('');
+  var porMaquina = agruparMaquinaPeriodo(PROD_SEM);
+  document.getElementById('semFichasGrid').innerHTML = MAQUINAS.map(function (m) {
+    return buildMaquinaCardPeriodoHtml(m, porMaquina[m],
+      { sufijo: 's', labelPeriodo: 'esta semana', toggleLabel: 'Ver detalle de la semana', mensajeVacio: 'Sin producción registrada esta semana.' });
+  }).join('');
+}
+
+function renderMesFichasGrid() {
+  var porMaquina = agruparMaquinaPeriodo(PROD_MES);
+  document.getElementById('mesFichasGrid').innerHTML = MAQUINAS.map(function (m) {
+    return buildMaquinaCardPeriodoHtml(m, porMaquina[m],
+      { sufijo: 'me', labelPeriodo: 'este mes', toggleLabel: 'Ver detalle del mes', mensajeVacio: 'Sin producción registrada este mes.' });
+  }).join('');
 }
 
 // Agrupa el historial (filas turno a turno) de una máquina en totales por día,
 // con SKU principal, operarios y eficiencia diaria propia — base tanto para el
-// promedio semanal de la ficha como para las filas de su tabla de detalle.
+// promedio de la ficha (semana o mes) como para las filas de su tabla de detalle.
 function agruparHistorialPorDia(historial) {
   var porDia = {};
   historial.forEach(function (f) {
@@ -1034,11 +1075,11 @@ function agruparHistorialPorDia(historial) {
   }).sort(function (a, b) { return b.fecha.localeCompare(a.fecha); });
 }
 
-function buildMaqDetalleSemanaHtml(m, historial) {
+function buildMaqDetallePeriodoHtml(m, historial, opts) {
   var dias = agruparHistorialPorDia(historial);
   if (!dias.length) {
-    return '<div class="maq-card-detalle" id="maq-detalle-' + m + 's">' +
-      '<div style="font-size:11px;color:var(--gray-l);padding:6px 0">Sin producción registrada esta semana.</div>' +
+    return '<div class="maq-card-detalle" id="maq-detalle-' + m + opts.sufijo + '">' +
+      '<div style="font-size:11px;color:var(--gray-l);padding:6px 0">' + esc(opts.mensajeVacio) + '</div>' +
     '</div>';
   }
   var rowsHtml = dias.map(function (d) {
@@ -1057,14 +1098,14 @@ function buildMaqDetalleSemanaHtml(m, historial) {
       '<span class="ef-pill ' + efCls + '" style="justify-self:center">' + efTxt + '</span>' +
     '</div>';
   }).join('');
-  return '<div class="maq-card-detalle" id="maq-detalle-' + m + 's">' +
+  return '<div class="maq-card-detalle" id="maq-detalle-' + m + opts.sufijo + '">' +
     '<div class="maq-det-hdr maq-det-hdr-sem"><span>Fecha</span><span>SKU</span><span>Producto</span><span>Cant.</span><span>Operario</span><span>Efic.</span></div>' +
-    rowsHtml +
+    '<div class="maq-det-rows-scroll">' + rowsHtml + '</div>' +
     '<div class="maq-det-meta">Eficiencia diaria = unidades del día ÷ (meta del SKU principal × turnos trabajados ese día). La eficiencia de la ficha es el promedio de los días con meta definida.</div>' +
   '</div>';
 }
 
-function buildMaquinaCardSemanaHtml(m, datos) {
+function buildMaquinaCardPeriodoHtml(m, datos, opts) {
   var tipo = MAQ_TIPO_FULL[m];
   var historial = (datos && datos.historial) || [];
 
@@ -1074,7 +1115,7 @@ function buildMaquinaCardSemanaHtml(m, datos) {
       '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span></div>' +
       '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
       '<div class="maq-card-und" style="margin-top:16px">Sin actividad</div>' +
-      '<div class="maq-card-und-lbl">esta semana</div>' +
+      '<div class="maq-card-und-lbl">' + esc(opts.labelPeriodo) + '</div>' +
       '</div>';
   }
 
@@ -1107,23 +1148,14 @@ function buildMaquinaCardSemanaHtml(m, datos) {
       (otros > 0 ? ' <span class="maq-card-sku-mas">+' + otros + ' más</span>' : '') + '</div>' +
     '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>' +
     '<div class="maq-card-und">' + fmtU(datos.total) + '</div>' +
-    '<div class="maq-card-und-lbl">unidades esta semana</div>' +
+    '<div class="maq-card-und-lbl">unidades ' + esc(opts.labelPeriodo) + '</div>' +
     '<div class="maq-card-bar"><div class="maq-card-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>' +
     '<div class="maq-card-foot"><span>' + turnosTrabajados + ' turno' + (turnosTrabajados === 1 ? ' trabajado' : 's trabajados') + '</span>' +
       '<span title="' + esc(operarios.join(', ')) + '">' + esc(operarios.join(', ') || '—') + '</span></div>' +
-    '<button class="maq-det-toggle" onclick="toggleMaqDetalle(' + m + ',\'s\')">Ver detalle de la semana ' +
-      '<span class="maq-chev" id="maq-chev-' + m + 's">▾</span></button>' +
-    buildMaqDetalleSemanaHtml(m, historial) +
+    '<button class="maq-det-toggle" onclick="toggleMaqDetalle(' + m + ',\'' + opts.sufijo + '\')">' + esc(opts.toggleLabel) + ' ' +
+      '<span class="maq-chev" id="maq-chev-' + m + opts.sufijo + '">▾</span></button>' +
+    buildMaqDetallePeriodoHtml(m, historial, opts) +
   '</div>';
-}
-
-var SEM_VISTA = 'tabla';
-function switchSemVista(v) {
-  SEM_VISTA = v;
-  document.getElementById('semTabla').style.display = v === 'tabla' ? 'block' : 'none';
-  document.getElementById('semFichas').style.display = v === 'fichas' ? 'block' : 'none';
-  document.getElementById('semVistaBtn-tabla').classList.toggle('active', v === 'tabla');
-  document.getElementById('semVistaBtn-fichas').classList.toggle('active', v === 'fichas');
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -2141,7 +2173,7 @@ async function renderMensual() {
 
   try {
     var r = await db.from('produccion_diaria')
-      .select('fecha,turno,maquina,sku,descripcion,cantidad')
+      .select('fecha,turno,maquina,sku,descripcion,cantidad,operador_codigo')
       .gte('fecha', desde).lte('fecha', hasta);
     if (r.error) throw r.error;
     PROD_MES = r.data || [];
@@ -2149,6 +2181,8 @@ async function renderMensual() {
     toast(mensajeError(err), 'err');
     PROD_MES = [];
   }
+
+  renderMesFichasGrid();
 
   var vacio = document.getElementById('mesVacio');
   var cont = document.getElementById('mesContent');
