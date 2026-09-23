@@ -132,6 +132,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ef-media{background:#FEF3C7;color:#B45309}
 .ef-baja{background:#FEE2E2;color:#DC2626}
 .ef-na{background:var(--bg2);color:var(--gray-l)}
+.inicio-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.maq-card{background:var(--card);border:2px solid var(--border);border-radius:12px;padding:14px 16px}
+.maq-card.activa{border-color:var(--prod-l)}
+.maq-card.vacia{opacity:.55}
+.maq-card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.maq-card-num{font-family:var(--mono);font-weight:800;font-size:19px;color:var(--prod-d)}
+.maq-card-tipo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray)}
+.maq-card-sku{font-size:12.5px;font-weight:700;color:var(--ink);margin-top:10px}
+.maq-card-sku-mas{color:var(--gray-l);font-weight:400}
+.maq-card-desc{font-size:11px;color:var(--gray-l);margin:2px 0 8px;min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.maq-card-und{font-family:var(--mono);font-size:25px;font-weight:800;color:var(--prod-d);line-height:1.1}
+.maq-card.vacia .maq-card-und{color:var(--gray-l);font-size:16px}
+.maq-card-und-lbl{font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.maq-card-bar{height:6px;border-radius:3px;background:var(--bg2);margin-bottom:8px;overflow:hidden}
+.maq-card-bar-fill{height:100%;border-radius:3px;transition:width .2s}
+.maq-card-foot{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:10.5px;color:var(--gray);border-top:1px solid var(--border);padding-top:7px}
+.maq-card-foot span:last-child{text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
 .src-tag{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 5px;border-radius:4px;margin-left:5px;vertical-align:middle}
 .src-3m{background:#DCFCE7;color:#15803D}
 .src-todo{background:#FEF3C7;color:#B45309}
@@ -346,14 +363,32 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 
   <div class="tabs">
-    <button class="tab active" id="tab-ingreso" onclick="switchTab('ingreso')">📥 Ingreso</button>
+    <button class="tab active" id="tab-inicio" onclick="switchTab('inicio')">🏠 Inicio</button>
+    <button class="tab" id="tab-ingreso" onclick="switchTab('ingreso')">📥 Ingreso</button>
     <button class="tab" id="tab-semanal" onclick="switchTab('semanal')">📊 Reporte Semanal</button>
     <button class="tab" id="tab-mensual" onclick="switchTab('mensual')">📅 Mensual</button>
     <button class="tab" id="tab-recetario" onclick="switchTab('recetario')">📋 Recetario</button>
   </div>
 
+  <!-- ══════════ VIEW INICIO ══════════ -->
+  <div id="view-inicio">
+    <div style="background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:16px">
+      <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap">
+        <div>
+          <div class="ctrl-lbl">Fecha</div>
+          <input type="date" class="ctrl-in" id="inicioFecha" onchange="renderInicio()">
+        </div>
+        <button class="sem-btn" onclick="cambiarFechaInicio(-1)" title="Día anterior">◀</button>
+        <button class="sem-btn" onclick="cambiarFechaInicio(1)" title="Día siguiente">▶</button>
+        <button class="btn btn-ghost" onclick="irHoyInicio()">Hoy</button>
+        <div id="inicioResumenTxt" style="margin-left:auto;font-size:12px;color:var(--gray)"></div>
+      </div>
+    </div>
+    <div class="inicio-grid" id="inicioGrid"></div>
+  </div>
+
   <!-- ══════════ VIEW INGRESO ══════════ -->
-  <div id="view-ingreso">
+  <div id="view-ingreso" style="display:none">
 
     <div class="ing-grid">
       <div class="ing-card">
@@ -684,13 +719,117 @@ document.addEventListener('click', function () {
 });
 
 function switchTab(tab) {
-  ['ingreso', 'semanal', 'mensual', 'recetario'].forEach(function (t) {
+  ['inicio', 'ingreso', 'semanal', 'mensual', 'recetario'].forEach(function (t) {
     document.getElementById('view-' + t).style.display = t === tab ? 'block' : 'none';
     document.getElementById('tab-' + t).classList.toggle('active', t === tab);
   });
+  if (tab === 'inicio') renderInicio();
   if (tab === 'semanal') renderSemanal();
   if (tab === 'mensual') renderMensual();
   if (tab === 'recetario' && !RECETARIO_CARGADO) cargarRecetario();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   VISTA INICIO — ficha por máquina
+   ══════════════════════════════════════════════════════════════ */
+function irHoyInicio() {
+  document.getElementById('inicioFecha').value = fechaHoy();
+  renderInicio();
+}
+function cambiarFechaInicio(n) {
+  var el = document.getElementById('inicioFecha');
+  el.value = addDias(el.value || fechaHoy(), n);
+  renderInicio();
+}
+
+async function renderInicio() {
+  var input = document.getElementById('inicioFecha');
+  if (!input.value) input.value = fechaHoy();
+  var fecha = input.value;
+  var grid = document.getElementById('inicioGrid');
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--gray-l);padding:30px">Cargando…</div>';
+
+  var rows = [];
+  try {
+    var r = await db.from('produccion_diaria')
+      .select('turno,maquina,sku,descripcion,cantidad,operador_codigo')
+      .eq('fecha', fecha);
+    if (r.error) throw r.error;
+    rows = r.data || [];
+  } catch (err) {
+    toast(mensajeError(err), 'err');
+  }
+
+  var porMaquina = {};
+  rows.forEach(function (p) {
+    var mk = p.maquina || 0;
+    if (mk < 1) return;
+    if (!porMaquina[mk]) porMaquina[mk] = { total: 0, skus: {}, operarios: {}, turnos: {} };
+    var g = porMaquina[mk];
+    g.total += numVal(p.cantidad);
+    if (!g.skus[p.sku]) {
+      g.skus[p.sku] = { cantidad: 0, descripcion: (INV[p.sku] && INV[p.sku].descripcion) || p.descripcion || '—' };
+    }
+    g.skus[p.sku].cantidad += numVal(p.cantidad);
+    if (p.operador_codigo) g.operarios[p.operador_codigo] = true;
+    if (p.turno) g.turnos[p.turno] = true;
+  });
+
+  grid.innerHTML = MAQUINAS.map(function (m) { return buildMaquinaCardHtml(m, porMaquina[m]); }).join('');
+
+  var totalDia = Object.keys(porMaquina).reduce(function (a, m) { return a + porMaquina[m].total; }, 0);
+  document.getElementById('inicioResumenTxt').textContent =
+    (fecha === fechaHoy() ? 'Hoy, ' : '') + fechaLarga(fecha) + ' · ' + fmtU(totalDia) + ' unidades en planta';
+}
+
+function buildMaquinaCardHtml(m, datos) {
+  var tipo = MAQ_TIPO_FULL[m];
+  if (!datos || !datos.total) {
+    return '<div class="maq-card vacia">' +
+      '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span></div>' +
+      '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
+      '<div class="maq-card-und" style="margin-top:16px">Sin actividad</div>' +
+      '<div class="maq-card-und-lbl">este día</div>' +
+      '</div>';
+  }
+
+  var skusOrden = Object.keys(datos.skus).map(function (s) {
+    return { sku: s, cantidad: datos.skus[s].cantidad, descripcion: datos.skus[s].descripcion };
+  }).sort(function (a, b) { return b.cantidad - a.cantidad; });
+  var principal = skusOrden[0];
+  var otros = skusOrden.length - 1;
+
+  var turnosArr = Object.keys(datos.turnos);
+  var meta = numVal(INV[principal.sku] && INV[principal.sku].meta_12hrs);
+  var ef = (meta > 0 && turnosArr.length > 0) ? datos.total / (meta * turnosArr.length) : null;
+
+  var efPill = '', barColor = 'var(--gray-l)', barPct = 0;
+  if (ef !== null) {
+    var efCls = ef >= 0.85 ? 'ef-alta' : (ef >= 0.6 ? 'ef-media' : 'ef-baja');
+    efPill = '<span class="ef-pill ' + efCls + '">' + (ef * 100).toFixed(0) + '%</span>';
+    barColor = ef >= 0.85 ? 'var(--green)' : (ef >= 0.6 ? 'var(--amber)' : 'var(--red)');
+    barPct = Math.min(ef * 100, 100);
+  }
+
+  var operarios = Object.keys(datos.operarios).map(function (cod) {
+    var found = null;
+    PERSONAL_PROD.forEach(function (p) { if (p.codigo === cod) found = p.nombre; });
+    return found || cod;
+  });
+  var turnoTxt = turnosArr.map(function (t) { return t === 'dia' ? '☀️ Día' : '🌙 Noche'; }).join(' · ');
+
+  return '<div class="maq-card activa">' +
+    '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span>' + efPill + '</div>' +
+    '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
+    '<div class="maq-card-sku">' + esc(principal.sku) +
+      (otros > 0 ? ' <span class="maq-card-sku-mas">+' + otros + ' más</span>' : '') + '</div>' +
+    '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>' +
+    '<div class="maq-card-und">' + fmtU(datos.total) + '</div>' +
+    '<div class="maq-card-und-lbl">unidades producidas</div>' +
+    '<div class="maq-card-bar"><div class="maq-card-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>' +
+    '<div class="maq-card-foot"><span>' + (turnoTxt || '—') + '</span><span title="' + esc(operarios.join(', ')) + '">' +
+      esc(operarios.join(', ') || '—') + '</span></div>' +
+  '</div>';
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1863,6 +2002,8 @@ async function init() {
   try { await cargarPersonalProd(); } catch (e) { console.warn('No se pudo cargar personal de Producción:', e); }
   try { await cargarPrecios(); } catch (e) { console.warn(e); }
   await cargarUltimos();
+  document.getElementById('inicioFecha').value = fechaHoy();
+  renderInicio();
 }
 
 /* ══════════════════════════════════════════════════════════════
