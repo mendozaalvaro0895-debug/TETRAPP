@@ -2486,6 +2486,11 @@ async function cargarRecetario() {
   // Catálogo de moldes — autocompletado de Molde/Cavidades en specs de Producción
   var rm = await db.from('moldes').select('id,nombre,cavidades,ciclo_seg').order('nombre');
   MOLDES = rm.error ? [] : (rm.data || []);
+  if (rm.error) {
+    console.warn('[Recetario] error cargando moldes:', rm.error);
+  } else {
+    console.log('[Recetario] MOLDES cargados:', MOLDES.length);
+  }
 
   var rr = await db.from('sku_recetas').select('id,sku_fact,descripcion,area,es_directo,guardado,foto_url');
   RECETAS_MAP = {};
@@ -2963,9 +2968,11 @@ function rcMoldeBuscar(sid) {
   if (!inp || !drop) return;
   var q = inp.value.trim().toLowerCase();
   if (!q) { drop.classList.remove('open'); return; }
+  console.log('[rcMoldeBuscar] q="' + q + '" MOLDES.length=' + MOLDES.length);
   var res = MOLDES.filter(function (m) {
     return String(m.nombre || '').toLowerCase().indexOf(q) !== -1;
   }).slice(0, 14);
+  console.log('[rcMoldeBuscar] resultados:', res.length);
   if (!res.length) { drop.classList.remove('open'); return; }
   drop.innerHTML = res.map(function (m) {
     var cavTxt = m.cavidades ? (m.cavidades + ' cav.') : '';
