@@ -132,7 +132,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ef-media{background:#FEF3C7;color:#B45309}
 .ef-baja{background:#FEE2E2;color:#DC2626}
 .ef-na{background:var(--bg2);color:var(--gray-l)}
-.inicio-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.inicio-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:980px}
+@media(max-width:760px){.inicio-grid{grid-template-columns:1fr}}
 .maq-card{background:var(--card);border:2px solid var(--border);border-radius:12px;padding:14px 16px}
 .maq-card.activa{border-color:var(--prod-l)}
 .maq-card.vacia{opacity:.55}
@@ -151,6 +152,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .maq-card-bar-fill{height:100%;border-radius:3px;transition:width .2s}
 .maq-card-foot{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:10.5px;color:var(--gray);border-top:1px solid var(--border);padding-top:7px}
 .maq-card-foot span:last-child{text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
+.maq-det-toggle{background:none;border:none;font-size:11px;font-weight:700;color:var(--prod);cursor:pointer;padding:8px 0 0;display:flex;align-items:center;gap:4px;font-family:var(--font);width:100%}
+.maq-det-toggle:hover{color:var(--prod-d)}
+.maq-chev{display:inline-block;transition:transform .2s;font-size:9px}
+.maq-chev.open{transform:rotate(180deg)}
+.maq-card-detalle{display:none;margin-top:8px;padding-top:10px;border-top:1px dashed var(--border)}
+.maq-card-detalle.open{display:block}
+.maq-det-hdr,.maq-det-row{display:grid;grid-template-columns:30px 1fr 1.6fr 55px 100px;gap:6px;align-items:center}
+.maq-det-hdr{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-l);padding-bottom:4px;border-bottom:1px solid var(--bg2)}
+.maq-det-row{font-size:11.5px;padding:5px 0;border-bottom:1px solid var(--bg2)}
+.maq-det-row:last-child{border-bottom:none}
+.maq-det-cant{font-family:var(--mono);font-weight:700;text-align:right}
+.maq-det-desc,.maq-det-op{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.maq-det-meta{font-size:10.5px;color:var(--gray-l);margin-top:8px}
 .src-tag{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 5px;border-radius:4px;margin-left:5px;vertical-align:middle}
 .src-3m{background:#DCFCE7;color:#15803D}
 .src-todo{background:#FEF3C7;color:#B45309}
@@ -766,15 +780,15 @@ async function renderInicio() {
   rows.forEach(function (p) {
     var mk = p.maquina || 0;
     if (mk < 1) return;
-    if (!porMaquina[mk]) porMaquina[mk] = { total: 0, skus: {}, operarios: {}, turnos: {} };
+    if (!porMaquina[mk]) porMaquina[mk] = { total: 0, skus: {}, operarios: {}, turnos: {}, filas: [] };
     var g = porMaquina[mk];
+    var desc = (INV[p.sku] && INV[p.sku].descripcion) || p.descripcion || '—';
     g.total += numVal(p.cantidad);
-    if (!g.skus[p.sku]) {
-      g.skus[p.sku] = { cantidad: 0, descripcion: (INV[p.sku] && INV[p.sku].descripcion) || p.descripcion || '—' };
-    }
+    if (!g.skus[p.sku]) g.skus[p.sku] = { cantidad: 0, descripcion: desc };
     g.skus[p.sku].cantidad += numVal(p.cantidad);
     if (p.operador_codigo) g.operarios[p.operador_codigo] = true;
     if (p.turno) g.turnos[p.turno] = true;
+    g.filas.push({ turno: p.turno, sku: p.sku, descripcion: desc, cantidad: numVal(p.cantidad), operador: p.operador_codigo || '' });
   });
 
   grid.innerHTML = MAQUINAS.map(function (m) { return buildMaquinaCardHtml(m, porMaquina[m]); }).join('');
@@ -787,6 +801,47 @@ async function renderInicio() {
 function buildMaquinaImgHtml(m) {
   return '<img class="maq-card-img" src="img/maquinas/maq' + m + '.png" alt=""' +
     ' onerror="this.style.display=\'none\'">';
+}
+
+function operarioNombre(cod) {
+  var found = null;
+  PERSONAL_PROD.forEach(function (p) { if (p.codigo === cod) found = p.nombre; });
+  return found || cod;
+}
+
+function toggleMaqDetalle(m) {
+  var det = document.getElementById('maq-detalle-' + m);
+  var chev = document.getElementById('maq-chev-' + m);
+  if (!det) return;
+  var open = det.classList.toggle('open');
+  if (chev) chev.classList.toggle('open', open);
+}
+
+function buildMaqDetalleHtml(m, datos, meta) {
+  var filas = datos.filas.slice().sort(function (a, b) {
+    if (a.turno !== b.turno) return a.turno === 'dia' ? -1 : 1;
+    return b.cantidad - a.cantidad;
+  });
+  var rowsHtml = filas.map(function (f) {
+    return '<div class="maq-det-row">' +
+      '<span>' + (f.turno === 'dia' ? '☀️' : (f.turno === 'noche' ? '🌙' : '—')) + '</span>' +
+      '<span>' + esc(f.sku) + '</span>' +
+      '<span class="maq-det-desc" title="' + esc(f.descripcion) + '">' + esc(f.descripcion) + '</span>' +
+      '<span class="maq-det-cant">' + fmtU(f.cantidad) + '</span>' +
+      '<span class="maq-det-op" title="' + esc(f.operador ? operarioNombre(f.operador) : '') + '">' +
+        esc(f.operador ? operarioNombre(f.operador) : '—') + '</span>' +
+    '</div>';
+  }).join('');
+
+  var metaTxt = meta > 0
+    ? 'Meta usada: ' + fmtU(meta) + ' und/turno de 12h (SKU con más volumen del día).'
+    : 'Ninguno de los SKU corridos hoy en esta máquina tiene meta_12hrs definida, así que no se calcula eficiencia.';
+
+  return '<div class="maq-card-detalle" id="maq-detalle-' + m + '">' +
+    '<div class="maq-det-hdr"><span>Turno</span><span>SKU</span><span>Producto</span><span>Cant.</span><span>Operario</span></div>' +
+    rowsHtml +
+    '<div class="maq-det-meta">' + metaTxt + '</div>' +
+  '</div>';
 }
 
 function buildMaquinaCardHtml(m, datos) {
@@ -819,11 +874,7 @@ function buildMaquinaCardHtml(m, datos) {
     barPct = Math.min(ef * 100, 100);
   }
 
-  var operarios = Object.keys(datos.operarios).map(function (cod) {
-    var found = null;
-    PERSONAL_PROD.forEach(function (p) { if (p.codigo === cod) found = p.nombre; });
-    return found || cod;
-  });
+  var operarios = Object.keys(datos.operarios).map(operarioNombre);
   var turnoTxt = turnosArr.map(function (t) { return t === 'dia' ? '☀️ Día' : '🌙 Noche'; }).join(' · ');
 
   return '<div class="maq-card activa">' +
@@ -838,6 +889,9 @@ function buildMaquinaCardHtml(m, datos) {
     '<div class="maq-card-bar"><div class="maq-card-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>' +
     '<div class="maq-card-foot"><span>' + (turnoTxt || '—') + '</span><span title="' + esc(operarios.join(', ')) + '">' +
       esc(operarios.join(', ') || '—') + '</span></div>' +
+    '<button class="maq-det-toggle" onclick="toggleMaqDetalle(' + m + ')">Ver detalle del día ' +
+      '<span class="maq-chev" id="maq-chev-' + m + '">▾</span></button>' +
+    buildMaqDetalleHtml(m, datos, meta) +
   '</div>';
 }
 
