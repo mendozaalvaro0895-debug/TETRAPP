@@ -505,6 +505,10 @@ Notas críticas:
     (`sku_recetas`/`sku_receta_partes`/`sku_especificaciones`) al rol `operativo_prod`, además de
     master (antes solo master). Sin correr este SQL, el Recetario sigue bloqueado para Producción
     aunque el código cliente ya lo permita — RLS lo rechaza.
+22. `sql/realtime_produccion_v1.sql` — agrega `produccion_diaria` a la publicación
+    `supabase_realtime` (mismo patrón que `sql/realtime_serig.sql`). Sin correr esto, Inicio e
+    Ingreso de produccion.html siguen funcionando pero sin refresco en vivo entre usuarios/equipos
+    — solo se actualizan al volver a la pestaña/ventana.
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
