@@ -40,6 +40,7 @@ create policy delete_master on public.moldes
   for delete to authenticated using (public.es_master());
 
 revoke all on public.moldes from anon;
+grant select, insert, update, delete on public.moldes to authenticated;
 
 -- Realtime opcional — mismo patrón que produccion_diaria/registro_tiros_serig,
 -- por si en el futuro se quiere ver el catálogo actualizarse en vivo entre
