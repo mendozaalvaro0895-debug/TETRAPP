@@ -469,19 +469,30 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
         <div id="avisoPrecios"></div>
 
-        <div class="tbl-wrap">
-          <div class="tbl-head">
-            <div>
-              <div class="tbl-head-t">Reporte por sopladora</div>
-              <div class="tbl-head-s">Clic en la meta para editarla · celdas verdes = día, azules = noche</div>
+        <div class="iv-tabs" style="margin-bottom:14px">
+          <button class="iv-btn active" id="semVistaBtn-tabla" onclick="switchSemVista('tabla')">📋 Tabla</button>
+          <button class="iv-btn" id="semVistaBtn-fichas" onclick="switchSemVista('fichas')">🃏 Fichas</button>
+        </div>
+
+        <div id="semTabla">
+          <div class="tbl-wrap">
+            <div class="tbl-head">
+              <div>
+                <div class="tbl-head-t">Reporte por sopladora</div>
+                <div class="tbl-head-s">Clic en la meta para editarla · celdas verdes = día, azules = noche</div>
+              </div>
+            </div>
+            <div class="tbl-scroll">
+              <table class="tbl">
+                <thead><tr id="semHead"></tr></thead>
+                <tbody id="semBody"><tr class="empty-row"><td colspan="21">Cargando…</td></tr></tbody>
+              </table>
             </div>
           </div>
-          <div class="tbl-scroll">
-            <table class="tbl">
-              <thead><tr id="semHead"></tr></thead>
-              <tbody id="semBody"><tr class="empty-row"><td colspan="21">Cargando…</td></tr></tbody>
-            </table>
-          </div>
+        </div>
+
+        <div id="semFichas" style="display:none">
+          <div class="inicio-grid" id="semFichasGrid"></div>
         </div>
       </div>
     </div>
@@ -853,15 +864,22 @@ function operarioNombre(cod) {
   return found || cod;
 }
 
-function toggleMaqDetalle(m) {
-  var det = document.getElementById('maq-detalle-' + m);
-  var chev = document.getElementById('maq-chev-' + m);
+function toggleMaqDetalle(m, sufijo) {
+  sufijo = sufijo || '';
+  var det = document.getElementById('maq-detalle-' + m + sufijo);
+  var chev = document.getElementById('maq-chev-' + m + sufijo);
   if (!det) return;
   var open = det.classList.toggle('open');
   if (chev) chev.classList.toggle('open', open);
 }
 
-function buildMaqDetalleHtml(m, historial, meta) {
+function buildMaqDetalleHtml(m, historial, meta, opts) {
+  opts = opts || {};
+  var sufijo = opts.sufijo || '';
+  var periodo = opts.periodo || 'los últimos 5 días';
+  var periodoMeta = opts.periodoMeta || 'hoy';
+  var criterioMeta = opts.criterioMeta || 'del día';
+
   var filas = historial.slice().sort(function (a, b) {
     if (a.fecha !== b.fecha) return b.fecha.localeCompare(a.fecha);
     if (a.turno !== b.turno) return a.turno === 'dia' ? -1 : 1;
@@ -869,8 +887,8 @@ function buildMaqDetalleHtml(m, historial, meta) {
   });
 
   if (!filas.length) {
-    return '<div class="maq-card-detalle" id="maq-detalle-' + m + '">' +
-      '<div style="font-size:11px;color:var(--gray-l);padding:6px 0">Sin producción registrada en los últimos 5 días.</div>' +
+    return '<div class="maq-card-detalle" id="maq-detalle-' + m + sufijo + '">' +
+      '<div style="font-size:11px;color:var(--gray-l);padding:6px 0">Sin producción registrada en ' + periodo + '.</div>' +
     '</div>';
   }
 
@@ -888,12 +906,12 @@ function buildMaqDetalleHtml(m, historial, meta) {
   var metaHtml = '';
   if (meta !== null && meta !== undefined) {
     metaHtml = '<div class="maq-det-meta">' + (meta > 0
-      ? 'Meta usada hoy: ' + fmtU(meta) + ' und/turno de 12h (SKU con más volumen del día).'
-      : 'Ninguno de los SKU corridos hoy en esta máquina tiene meta_12hrs definida, así que no se calcula eficiencia.') +
+      ? 'Meta usada ' + periodoMeta + ': ' + fmtU(meta) + ' und/turno de 12h (SKU con más volumen ' + criterioMeta + ').'
+      : 'Ninguno de los SKU corridos tiene meta_12hrs definida, así que no se calcula eficiencia.') +
     '</div>';
   }
 
-  return '<div class="maq-card-detalle" id="maq-detalle-' + m + '">' +
+  return '<div class="maq-card-detalle" id="maq-detalle-' + m + sufijo + '">' +
     '<div class="maq-det-hdr"><span>Día</span><span>SKU</span><span>Producto</span><span>Cant.</span><span>Operario</span></div>' +
     rowsHtml +
     metaHtml +
@@ -957,6 +975,100 @@ function buildMaquinaCardHtml(m, datos) {
       '<span class="maq-chev" id="maq-chev-' + m + '">▾</span></button>' +
     buildMaqDetalleHtml(m, historial, meta) +
   '</div>';
+}
+
+/* ── Fichas por máquina de la vista Semana (reusa el mismo patrón de Día) ── */
+function agruparMaquinaSemana(rows) {
+  var porMaquina = {};
+  rows.forEach(function (p) {
+    var mk = p.maquina || 0;
+    if (mk < 1) return;
+    if (!porMaquina[mk]) porMaquina[mk] = { total: 0, skus: {}, operarios: {}, celdas: {}, historial: [] };
+    var g = porMaquina[mk];
+    var desc = (INV[p.sku] && INV[p.sku].descripcion) || p.descripcion || '—';
+    var cant = numVal(p.cantidad);
+    g.total += cant;
+    if (!g.skus[p.sku]) g.skus[p.sku] = { cantidad: 0, descripcion: desc };
+    g.skus[p.sku].cantidad += cant;
+    if (p.operador_codigo) g.operarios[p.operador_codigo] = true;
+    g.celdas[p.fecha + '|' + p.turno] = true; // turnos distintos trabajados, para la eficiencia
+    g.historial.push({ fecha: p.fecha, turno: p.turno, sku: p.sku, descripcion: desc, cantidad: cant, operador: p.operador_codigo || '' });
+  });
+  return porMaquina;
+}
+
+function renderSemFichasGrid() {
+  var porMaquina = agruparMaquinaSemana(PROD_SEM);
+  document.getElementById('semFichasGrid').innerHTML =
+    MAQUINAS.map(function (m) { return buildMaquinaCardSemanaHtml(m, porMaquina[m]); }).join('');
+}
+
+function buildMaquinaCardSemanaHtml(m, datos) {
+  var tipo = MAQ_TIPO_FULL[m];
+  var historial = (datos && datos.historial) || [];
+  var detOpts = { sufijo: 's', periodo: 'esta semana', periodoMeta: 'esta semana', criterioMeta: 'de la semana' };
+
+  if (!datos || !datos.total) {
+    var detalleVacio = historial.length
+      ? '<button class="maq-det-toggle" onclick="toggleMaqDetalle(' + m + ',\'s\')">Ver detalle de la semana ' +
+          '<span class="maq-chev" id="maq-chev-' + m + 's">▾</span></button>' +
+        buildMaqDetalleHtml(m, historial, null, detOpts)
+      : '';
+    return '<div class="maq-card vacia">' +
+      buildMaquinaImgHtml(m) +
+      '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span></div>' +
+      '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
+      '<div class="maq-card-und" style="margin-top:16px">Sin actividad</div>' +
+      '<div class="maq-card-und-lbl">esta semana</div>' +
+      detalleVacio +
+      '</div>';
+  }
+
+  var skusOrden = Object.keys(datos.skus).map(function (s) {
+    return { sku: s, cantidad: datos.skus[s].cantidad, descripcion: datos.skus[s].descripcion };
+  }).sort(function (a, b) { return b.cantidad - a.cantidad; });
+  var principal = skusOrden[0];
+  var otros = skusOrden.length - 1;
+
+  var turnosTrabajados = Object.keys(datos.celdas).length;
+  var meta = numVal(INV[principal.sku] && INV[principal.sku].meta_12hrs);
+  var ef = (meta > 0 && turnosTrabajados > 0) ? datos.total / (meta * turnosTrabajados) : null;
+
+  var efPill = '', barColor = 'var(--gray-l)', barPct = 0;
+  if (ef !== null) {
+    var efCls = ef >= 0.85 ? 'ef-alta' : (ef >= 0.6 ? 'ef-media' : 'ef-baja');
+    efPill = '<span class="ef-pill ' + efCls + '">' + (ef * 100).toFixed(0) + '%</span>';
+    barColor = ef >= 0.85 ? 'var(--green)' : (ef >= 0.6 ? 'var(--amber)' : 'var(--red)');
+    barPct = Math.min(ef * 100, 100);
+  }
+
+  var operarios = Object.keys(datos.operarios).map(operarioNombre);
+
+  return '<div class="maq-card activa">' +
+    buildMaquinaImgHtml(m) +
+    '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span>' + efPill + '</div>' +
+    '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
+    '<div class="maq-card-sku">' + esc(principal.sku) +
+      (otros > 0 ? ' <span class="maq-card-sku-mas">+' + otros + ' más</span>' : '') + '</div>' +
+    '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>' +
+    '<div class="maq-card-und">' + fmtU(datos.total) + '</div>' +
+    '<div class="maq-card-und-lbl">unidades esta semana</div>' +
+    '<div class="maq-card-bar"><div class="maq-card-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>' +
+    '<div class="maq-card-foot"><span>' + turnosTrabajados + ' turno' + (turnosTrabajados === 1 ? ' trabajado' : 's trabajados') + '</span>' +
+      '<span title="' + esc(operarios.join(', ')) + '">' + esc(operarios.join(', ') || '—') + '</span></div>' +
+    '<button class="maq-det-toggle" onclick="toggleMaqDetalle(' + m + ',\'s\')">Ver detalle de la semana ' +
+      '<span class="maq-chev" id="maq-chev-' + m + 's">▾</span></button>' +
+    buildMaqDetalleHtml(m, historial, meta, detOpts) +
+  '</div>';
+}
+
+var SEM_VISTA = 'tabla';
+function switchSemVista(v) {
+  SEM_VISTA = v;
+  document.getElementById('semTabla').style.display = v === 'tabla' ? 'block' : 'none';
+  document.getElementById('semFichas').style.display = v === 'fichas' ? 'block' : 'none';
+  document.getElementById('semVistaBtn-tabla').classList.toggle('active', v === 'tabla');
+  document.getElementById('semVistaBtn-fichas').classList.toggle('active', v === 'fichas');
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1738,7 +1850,7 @@ async function renderSemanal() {
 
   try {
     var r = await db.from('produccion_diaria')
-      .select('fecha,turno,maquina,sku,descripcion,cantidad')
+      .select('fecha,turno,maquina,sku,descripcion,cantidad,operador_codigo')
       .gte('fecha', ini).lte('fecha', fin);
     if (r.error) throw r.error;
     PROD_SEM = r.data || [];
@@ -1746,6 +1858,8 @@ async function renderSemanal() {
     toast(mensajeError(err), 'err');
     PROD_SEM = [];
   }
+
+  renderSemFichasGrid();
 
   var vacio = document.getElementById('semVacio');
   var cont = document.getElementById('semContent');
