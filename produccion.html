@@ -54,6 +54,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .tab.active{color:var(--prod)}
 .tab.active::after{content:'';position:absolute;left:0;right:0;bottom:-1.5px;height:2.5px;background:var(--prod);border-radius:2px}
 .tabs-r{margin-left:auto;display:flex;gap:8px;align-items:center;padding-bottom:6px}
+.iv-tabs{display:inline-flex;background:var(--bg2);border-radius:10px;padding:3px;gap:2px;margin-bottom:16px}
+.iv-btn{padding:7px 16px;border-radius:8px;font-size:12.5px;font-weight:700;font-family:var(--font);color:var(--gray);background:none;border:none;cursor:pointer;transition:all .15s}
+.iv-btn:hover{color:var(--prod)}
+.iv-btn.active{background:var(--card);color:var(--prod-d);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 
 /* BOTONES */
 .btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;border:none;transition:all .15s}
@@ -382,26 +386,131 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   <div class="tabs">
     <button class="tab active" id="tab-inicio" onclick="switchTab('inicio')">🏠 Inicio</button>
     <button class="tab" id="tab-ingreso" onclick="switchTab('ingreso')">📥 Ingreso</button>
-    <button class="tab" id="tab-semanal" onclick="switchTab('semanal')">📊 Reporte Semanal</button>
-    <button class="tab" id="tab-mensual" onclick="switchTab('mensual')">📅 Mensual</button>
     <button class="tab" id="tab-recetario" onclick="switchTab('recetario')">📋 Recetario</button>
   </div>
 
   <!-- ══════════ VIEW INICIO ══════════ -->
   <div id="view-inicio">
-    <div style="background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:16px">
-      <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap">
-        <div>
-          <div class="ctrl-lbl">Fecha</div>
-          <input type="date" class="ctrl-in" id="inicioFecha" onchange="renderInicio()">
+    <div class="iv-tabs">
+      <button class="iv-btn active" id="ivBtn-dia" onclick="switchInicioVista('dia')">📅 Día</button>
+      <button class="iv-btn" id="ivBtn-semana" onclick="switchInicioVista('semana')">📊 Semana</button>
+      <button class="iv-btn" id="ivBtn-mes" onclick="switchInicioVista('mes')">🗓️ Mes</button>
+    </div>
+
+    <!-- ── Sub-vista: Día ── -->
+    <div id="inicio-vista-dia">
+      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:16px">
+        <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap">
+          <div>
+            <div class="ctrl-lbl">Fecha</div>
+            <input type="date" class="ctrl-in" id="inicioFecha" onchange="renderInicio()">
+          </div>
+          <button class="sem-btn" onclick="cambiarFechaInicio(-1)" title="Día anterior">◀</button>
+          <button class="sem-btn" onclick="cambiarFechaInicio(1)" title="Día siguiente">▶</button>
+          <button class="btn btn-ghost" onclick="irHoyInicio()">Hoy</button>
+          <div id="inicioResumenTxt" style="margin-left:auto;font-size:12px;color:var(--gray)"></div>
         </div>
-        <button class="sem-btn" onclick="cambiarFechaInicio(-1)" title="Día anterior">◀</button>
-        <button class="sem-btn" onclick="cambiarFechaInicio(1)" title="Día siguiente">▶</button>
-        <button class="btn btn-ghost" onclick="irHoyInicio()">Hoy</button>
-        <div id="inicioResumenTxt" style="margin-left:auto;font-size:12px;color:var(--gray)"></div>
+      </div>
+      <div class="inicio-grid" id="inicioGrid"></div>
+    </div>
+
+    <!-- ── Sub-vista: Semana ── -->
+    <div id="inicio-vista-semana" style="display:none">
+
+      <div class="ctrl-bar">
+        <span class="ctrl-lbl">Semana desde</span>
+        <input type="date" class="ctrl-in" id="semInicio" onchange="renderSemanal()">
+        <div class="sem-nav">
+          <button class="sem-btn" onclick="moverSemana(-7)" title="Semana anterior">‹</button>
+          <button class="sem-btn" onclick="moverSemana(7)" title="Semana siguiente">›</button>
+        </div>
+        <span class="sem-rango" id="semRango">—</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+          <span class="ctrl-lbl">Precio</span>
+          <select class="ctrl-in" id="precioVentana" onchange="recargarPrecios()">
+            <option value="3">Últimos 3 meses</option>
+            <option value="1">Último mes</option>
+            <option value="6">Últimos 6 meses</option>
+            <option value="0">Todo el histórico</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="semVacio" class="empty-mod" style="display:none">
+        <div class="empty-ico">🏭</div>
+        <div class="empty-t">Sin producción en esta semana</div>
+        <div class="empty-s">No hay turnos cargados entre estas fechas. Usa la pestaña Ingreso para subir el PDF de producción o capturarla manualmente.</div>
+        <button class="btn btn-prod" onclick="switchTab('ingreso')">📥 Ir a Ingreso</button>
+      </div>
+
+      <div id="semContent" style="display:none">
+        <div class="kpi-strip">
+          <div class="kpi">
+            <div class="kpi-l">Producción de la semana</div>
+            <div class="kpi-v" id="kpiUnid">—</div>
+            <div class="kpi-s" id="kpiUnidSub">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Eficiencia global</div>
+            <div class="kpi-v" id="kpiEf">—</div>
+            <div class="kpi-s" id="kpiEfSub">producción ÷ meta × turnos</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Venta potencial</div>
+            <div class="kpi-v" id="kpiPot">—</div>
+            <div class="kpi-s" id="kpiPotSub">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Facturado esa semana</div>
+            <div class="kpi-v" id="kpiFact">—</div>
+            <div class="kpi-s" id="kpiFactSub">—</div>
+          </div>
+        </div>
+
+        <div id="avisoPrecios"></div>
+
+        <div class="tbl-wrap">
+          <div class="tbl-head">
+            <div>
+              <div class="tbl-head-t">Reporte por sopladora</div>
+              <div class="tbl-head-s">Clic en la meta para editarla · celdas verdes = día, azules = noche</div>
+            </div>
+          </div>
+          <div class="tbl-scroll">
+            <table class="tbl">
+              <thead><tr id="semHead"></tr></thead>
+              <tbody id="semBody"><tr class="empty-row"><td colspan="21">Cargando…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="inicio-grid" id="inicioGrid"></div>
+
+    <!-- ── Sub-vista: Mes ── -->
+    <div id="inicio-vista-mes" style="display:none">
+
+      <div class="ctrl-bar">
+        <span class="ctrl-lbl">Mes</span>
+        <input type="month" class="ctrl-in" id="mesSelInput" onchange="renderMensual()">
+        <div class="sem-nav">
+          <button class="sem-btn" onclick="moverMes(-1)" title="Mes anterior">‹</button>
+          <button class="sem-btn" onclick="moverMes(1)" title="Mes siguiente">›</button>
+        </div>
+        <span class="sem-rango" id="mesLabel">—</span>
+      </div>
+
+      <div id="mesVacio" class="empty-mod" style="display:none">
+        <div class="empty-ico">📅</div>
+        <div class="empty-t">Sin producción en este mes</div>
+        <div class="empty-s">No hay turnos cargados en este mes. Cambia de mes con el selector o busca el último mes con datos.</div>
+        <button class="btn btn-prod" onclick="irUltimoMesConDatos()">📅 Ir al último mes con datos</button>
+      </div>
+
+      <div id="mesContent" style="display:none">
+        <div id="mesSemanasWrap"></div>
+        <div id="mesResumen"></div>
+      </div>
+    </div>
   </div>
 
   <!-- ══════════ VIEW INGRESO ══════════ -->
@@ -468,103 +577,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     </div>
   </div>
 
-  <!-- ══════════ VIEW SEMANAL ══════════ -->
-  <div id="view-semanal" style="display:none">
-
-    <div class="ctrl-bar">
-      <span class="ctrl-lbl">Semana desde</span>
-      <input type="date" class="ctrl-in" id="semInicio" onchange="renderSemanal()">
-      <div class="sem-nav">
-        <button class="sem-btn" onclick="moverSemana(-7)" title="Semana anterior">‹</button>
-        <button class="sem-btn" onclick="moverSemana(7)" title="Semana siguiente">›</button>
-      </div>
-      <span class="sem-rango" id="semRango">—</span>
-      <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
-        <span class="ctrl-lbl">Precio</span>
-        <select class="ctrl-in" id="precioVentana" onchange="recargarPrecios()">
-          <option value="3">Últimos 3 meses</option>
-          <option value="1">Último mes</option>
-          <option value="6">Últimos 6 meses</option>
-          <option value="0">Todo el histórico</option>
-        </select>
-      </div>
-    </div>
-
-    <div id="semVacio" class="empty-mod" style="display:none">
-      <div class="empty-ico">🏭</div>
-      <div class="empty-t">Sin producción en esta semana</div>
-      <div class="empty-s">No hay turnos cargados entre estas fechas. Usa la pestaña Ingreso para subir el PDF de producción o capturarla manualmente.</div>
-      <button class="btn btn-prod" onclick="switchTab('ingreso')">📥 Ir a Ingreso</button>
-    </div>
-
-    <div id="semContent" style="display:none">
-      <div class="kpi-strip">
-        <div class="kpi">
-          <div class="kpi-l">Producción de la semana</div>
-          <div class="kpi-v" id="kpiUnid">—</div>
-          <div class="kpi-s" id="kpiUnidSub">—</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-l">Eficiencia global</div>
-          <div class="kpi-v" id="kpiEf">—</div>
-          <div class="kpi-s" id="kpiEfSub">producción ÷ meta × turnos</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-l">Venta potencial</div>
-          <div class="kpi-v" id="kpiPot">—</div>
-          <div class="kpi-s" id="kpiPotSub">—</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-l">Facturado esa semana</div>
-          <div class="kpi-v" id="kpiFact">—</div>
-          <div class="kpi-s" id="kpiFactSub">—</div>
-        </div>
-      </div>
-
-      <div id="avisoPrecios"></div>
-
-      <div class="tbl-wrap">
-        <div class="tbl-head">
-          <div>
-            <div class="tbl-head-t">Reporte por sopladora</div>
-            <div class="tbl-head-s">Clic en la meta para editarla · celdas verdes = día, azules = noche</div>
-          </div>
-        </div>
-        <div class="tbl-scroll">
-          <table class="tbl">
-            <thead><tr id="semHead"></tr></thead>
-            <tbody id="semBody"><tr class="empty-row"><td colspan="21">Cargando…</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════ VIEW MENSUAL ══════════ -->
-  <div id="view-mensual" style="display:none">
-
-    <div class="ctrl-bar">
-      <span class="ctrl-lbl">Mes</span>
-      <input type="month" class="ctrl-in" id="mesSelInput" onchange="renderMensual()">
-      <div class="sem-nav">
-        <button class="sem-btn" onclick="moverMes(-1)" title="Mes anterior">‹</button>
-        <button class="sem-btn" onclick="moverMes(1)" title="Mes siguiente">›</button>
-      </div>
-      <span class="sem-rango" id="mesLabel">—</span>
-    </div>
-
-    <div id="mesVacio" class="empty-mod" style="display:none">
-      <div class="empty-ico">📅</div>
-      <div class="empty-t">Sin producción en este mes</div>
-      <div class="empty-s">No hay turnos cargados en este mes. Cambia de mes con el selector o busca el último mes con datos.</div>
-      <button class="btn btn-prod" onclick="irUltimoMesConDatos()">📅 Ir al último mes con datos</button>
-    </div>
-
-    <div id="mesContent" style="display:none">
-      <div id="mesSemanasWrap"></div>
-      <div id="mesResumen"></div>
-    </div>
-  </div>
 
   <!-- ══════════ VIEW RECETARIO ══════════ -->
   <div id="view-recetario" style="display:none">
@@ -741,14 +753,24 @@ document.addEventListener('click', function () {
 });
 
 function switchTab(tab) {
-  ['inicio', 'ingreso', 'semanal', 'mensual', 'recetario'].forEach(function (t) {
+  ['inicio', 'ingreso', 'recetario'].forEach(function (t) {
     document.getElementById('view-' + t).style.display = t === tab ? 'block' : 'none';
     document.getElementById('tab-' + t).classList.toggle('active', t === tab);
   });
-  if (tab === 'inicio') renderInicio();
-  if (tab === 'semanal') renderSemanal();
-  if (tab === 'mensual') renderMensual();
+  if (tab === 'inicio') switchInicioVista(INICIO_VISTA);
   if (tab === 'recetario' && !RECETARIO_CARGADO) cargarRecetario();
+}
+
+var INICIO_VISTA = 'dia';
+function switchInicioVista(vista) {
+  INICIO_VISTA = vista;
+  ['dia', 'semana', 'mes'].forEach(function (v) {
+    document.getElementById('inicio-vista-' + v).style.display = v === vista ? 'block' : 'none';
+    document.getElementById('ivBtn-' + v).classList.toggle('active', v === vista);
+  });
+  if (vista === 'dia') renderInicio();
+  if (vista === 'semana') renderSemanal();
+  if (vista === 'mes') renderMensual();
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1585,16 +1607,10 @@ function buildUltRow(t) {
     '<td style="font-family:var(--mono);font-size:11px;white-space:normal;max-width:180px">' +
       esc(Object.keys(t.docs).sort().join(', ')) + '</td>' +
     '<td style="white-space:nowrap;display:flex;gap:6px">' +
-      '<button class="btn btn-ghost btn-sm" onclick="verSemanaDe(\'' + t.fecha + '\')">Ver semana</button>' +
       '<button class="btn btn-ghost btn-sm" onclick="abrirModalMaq(\'' + t.fecha + '\',\'' + t.turno + '\')">✏️ Máquinas / Operarios</button>' +
       '<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red)" onclick="eliminarTurno(\'' + t.fecha + '\',\'' + t.turno + '\')">🗑️</button>' +
     '</td>' +
     '</tr>';
-}
-
-function verSemanaDe(fecha) {
-  document.getElementById('semInicio').value = lunesDe(fecha);
-  switchTab('semanal');
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1664,8 +1680,8 @@ async function guardarMaquinas() {
     toast('✅ ' + cambios.length + ' fila(s) actualizadas');
     cerrarModalMaq();
     await cargarUltimos();
-    if (document.getElementById('tab-semanal').classList.contains('active')) renderSemanal();
-    if (document.getElementById('tab-mensual').classList.contains('active')) renderMensual();
+    if (document.getElementById('ivBtn-semana').classList.contains('active')) renderSemanal();
+    if (document.getElementById('ivBtn-mes').classList.contains('active')) renderMensual();
   } catch (err) {
     toast(mensajeError(err), 'err');
   }
@@ -1683,8 +1699,8 @@ async function eliminarTurno(fecha, turno) {
     if (r.error) throw r.error;
     toast('🗑️ Turno ' + label + ' eliminado');
     await cargarUltimos();
-    if (document.getElementById('tab-semanal').classList.contains('active')) renderSemanal();
-    if (document.getElementById('tab-mensual').classList.contains('active')) renderMensual();
+    if (document.getElementById('ivBtn-semana').classList.contains('active')) renderSemanal();
+    if (document.getElementById('ivBtn-mes').classList.contains('active')) renderMensual();
   } catch (err) {
     toast(mensajeError(err), 'err');
   }
@@ -1894,7 +1910,7 @@ async function editarMeta(sku) {
     if (!INV[sku]) INV[sku] = { sku: sku };
     INV[sku].meta_12hrs = n;
     toast('Meta actualizada: ' + fmtU(n) + ' und/12h', 'ok');
-    if (document.getElementById('tab-mensual').classList.contains('active')) renderMensual();
+    if (document.getElementById('ivBtn-mes').classList.contains('active')) renderMensual();
     else renderSemanal();
   } catch (err) {
     toast('No se pudo guardar la meta: ' + (err.message || err), 'err');
