@@ -902,10 +902,24 @@ function operarioNombre(cod) {
 }
 
 // Lista, uno por fila, los SKU adicionales de una ficha (todos menos el principal) con su cantidad.
-function buildOtrosSkuHtml(skusOrden) {
+// Última fecha (más reciente) en que corrió cada SKU, según el historial de la ficha.
+function ultimaFechaPorSku(historial) {
+  var map = {};
+  historial.forEach(function (f) {
+    if (!map[f.sku] || f.fecha > map[f.sku]) map[f.sku] = f.fecha;
+  });
+  return map;
+}
+
+// Lista completa de SKUs de la ficha (incluye el principal), ordenada de más reciente a más antiguo.
+function buildSkuDesgloseHtml(skusOrden, historial) {
   if (skusOrden.length < 2) return '';
+  var fechaPorSku = ultimaFechaPorSku(historial);
+  var lista = skusOrden.slice().sort(function (a, b) {
+    return (fechaPorSku[b.sku] || '').localeCompare(fechaPorSku[a.sku] || '');
+  });
   return '<div class="maq-card-otros-sku">' +
-    skusOrden.slice(1).map(function (s) {
+    lista.map(function (s) {
       return '<div class="maq-card-otros-row"><b>' + esc(s.sku) + '</b>' +
         '<span class="maq-card-otros-desc">' + esc(s.descripcion) + '</span>' +
         '<span class="maq-card-otros-cant">' + fmtU(s.cantidad) + ' und</span></div>';
@@ -1014,8 +1028,8 @@ function buildMaquinaCardHtml(m, datos) {
     '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
     '<div class="maq-card-sku">' + esc(principal.sku) +
       (otros > 0 ? ' <span class="maq-card-sku-mas">+' + otros + ' más</span>' : '') + '</div>' +
-    '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>' +
-    buildOtrosSkuHtml(skusOrden) +
+    (otros === 0 ? '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>' : '') +
+    buildSkuDesgloseHtml(skusOrden, historial) +
     '<div class="maq-card-und">' + fmtU(datos.total) + '</div>' +
     '<div class="maq-card-und-lbl">unidades producidas</div>' +
     '<div class="maq-card-bar"><div class="maq-card-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>' +
@@ -1164,8 +1178,8 @@ function buildMaquinaCardPeriodoHtml(m, datos, opts) {
     '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
     '<div class="maq-card-sku">' + esc(principal.sku) +
       (otros > 0 ? ' <span class="maq-card-sku-mas">+' + otros + ' más</span>' : '') + '</div>' +
-    '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>' +
-    buildOtrosSkuHtml(skusOrden) +
+    (otros === 0 ? '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>' : '') +
+    buildSkuDesgloseHtml(skusOrden, historial) +
     '<div class="maq-card-und">' + fmtU(datos.total) + '</div>' +
     '<div class="maq-card-und-lbl">unidades ' + esc(opts.labelPeriodo) + '</div>' +
     '<div class="maq-card-bar"><div class="maq-card-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>' +
