@@ -560,24 +560,37 @@ function fileToDataUrl(file) {
   });
 }
 
-async function fileToImagenes(file) {
-  if (file.type !== 'application/pdf') {
-    var dataUrl = await fileToDataUrl(file);
-    return [{ base64: dataUrl.split(',')[1], mime_type: file.type || 'image/png' }];
+/* Arma la lista de "tareas" (1 por imagen o por página de PDF) SIN renderizar
+   todavía — con un reporte mensual de 64 páginas, tener todas las PNG en
+   memoria a la vez era pesado; cada página se renderiza justo antes de enviarla. */
+async function ciArmarTareas(archivos) {
+  var tareas = [];
+  for (var i = 0; i < archivos.length; i++) {
+    var file = archivos[i];
+    if (file.type !== 'application/pdf') {
+      tareas.push({ file: file, pdf: null, pagina: 1, totalPaginas: 1 });
+      continue;
+    }
+    var pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    for (var p = 1; p <= pdf.numPages; p++) {
+      tareas.push({ file: file, pdf: pdf, pagina: p, totalPaginas: pdf.numPages });
+    }
   }
-  var buf = await file.arrayBuffer();
-  var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  var imagenes = [];
-  for (var p = 1; p <= pdf.numPages; p++) {
-    var page = await pdf.getPage(p);
-    var viewport = page.getViewport({ scale: 2 });
-    var canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
-    imagenes.push({ base64: canvas.toDataURL('image/png').split(',')[1], mime_type: 'image/png' });
+  return tareas;
+}
+
+async function ciTareaAImagen(t) {
+  if (!t.pdf) {
+    var dataUrl = await fileToDataUrl(t.file);
+    return { base64: dataUrl.split(',')[1], mime_type: t.file.type || 'image/png' };
   }
-  return imagenes;
+  var page = await t.pdf.getPage(t.pagina);
+  var viewport = page.getViewport({ scale: 2 });
+  var canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+  return { base64: canvas.toDataURL('image/png').split(',')[1], mime_type: 'image/png' };
 }
 
 async function llamarParseRequi(base64, mimeType) {
@@ -586,8 +599,10 @@ async function llamarParseRequi(base64, mimeType) {
     headers: { 'Content-Type': 'application/json', 'Authorization': HEADERS.Authorization },
     body: JSON.stringify({ image_base64: base64, mime_type: mimeType })
   });
-  var j = await r.json();
-  if (!r.ok) throw new Error(j.error || 'Error al leer el documento');
+  var j = null;
+  try { j = await r.json(); } catch (e) { /* timeout de Vercel u otra respuesta no-JSON */ }
+  if (!r.ok) throw new Error((j && j.error) || ('Error ' + r.status + ' al leer el documento'));
+  if (!j) throw new Error('Respuesta vacía del servidor');
   return j;
 }
 
@@ -667,6 +682,58 @@ async function ciCambiarFecha(di, valor) {
 }
 
 /* ── Paso 1 → 2: procesar archivos con Claude Vision ──────────── */
+var CI_LECTURAS_PARALELAS = 4;  // páginas enviadas a la IA al mismo tiempo
+var CI_AVISO_PAGINAS = 10;      // arriba de esto, confirmar tiempo/costo antes de empezar
+
+function ciEtiquetaTarea(t) {
+  return t.totalPaginas > 1 ? 'pág. ' + t.pagina : t.file.name;
+}
+
+function ciPrepararDoc(d) {
+  d.lineas = (d.lineas || []).map(function(l) {
+    return { codigo: l.codigo, producto: l.producto, cantidad: l.cantidad || 0,
+      costo_unitario: l.costo_unitario || 0, valor_total: l.valor_total || 0,
+      accion: null, cliente: '', turno: ciAdivinarTurno(d.descripcion), maquina: '', operador: '', guardado: false };
+  });
+  if (d.prefijo === 'PRI') {
+    var fechaCorregida = ciAdivinarFechaDescripcion(d.descripcion, d.fecha);
+    if (fechaCorregida) { d.fechaOriginal = d.fecha; d.fecha = fechaCorregida; }
+  }
+  return d;
+}
+
+/* Lee las tareas de a CI_LECTURAS_PARALELAS a la vez. Una página que falla NO
+   corta el resto: se anota en t.error y se sigue. Los documentos quedan en
+   t.documentos (en el orden original de las páginas). Devuelve las fallidas. */
+async function ciLeerTareas(tareas, status) {
+  var siguiente = 0, listas = 0, fallidas = [];
+  function pintar() {
+    status.innerHTML = '<span class="ci-spin"></span>Leyendo página ' + listas + ' / ' + tareas.length +
+      (fallidas.length ? ' · ' + fallidas.length + ' con error' : '') + '…';
+  }
+  async function trabajador() {
+    while (siguiente < tareas.length) {
+      var t = tareas[siguiente++];
+      try {
+        var img = await ciTareaAImagen(t);
+        var resp = await llamarParseRequi(img.base64, img.mime_type);
+        t.documentos = resp.documentos || [];
+      } catch (e) {
+        t.error = e.message;
+        fallidas.push(t);
+      }
+      listas++;
+      pintar();
+    }
+  }
+  pintar();
+  var pool = [];
+  for (var i = 0; i < Math.min(CI_LECTURAS_PARALELAS, tareas.length); i++) pool.push(trabajador());
+  await Promise.all(pool);
+  fallidas.sort(function(a, b) { return tareas.indexOf(a) - tareas.indexOf(b); });
+  return fallidas;
+}
+
 async function ciProcesar() {
   if (!ciArchivos.length) { document.getElementById('ciStatusSubir').textContent = '⚠️ Agregá al menos un archivo'; return; }
   var btn = document.getElementById('ciBtnProcesar');
@@ -674,27 +741,31 @@ async function ciProcesar() {
   var status = document.getElementById('ciStatusSubir');
   var docsNuevos = [];
   try {
-    for (var i = 0; i < ciArchivos.length; i++) {
-      status.innerHTML = '<span class="ci-spin"></span>Leyendo ' + (i + 1) + ' / ' + ciArchivos.length + ' — ' + escHtml(ciArchivos[i].name) + '…';
-      var imagenes = await fileToImagenes(ciArchivos[i]);
-      for (var p = 0; p < imagenes.length; p++) {
-        var resp = await llamarParseRequi(imagenes[p].base64, imagenes[p].mime_type);
-        (resp.documentos || []).forEach(function(d) {
-          d.lineas = (d.lineas || []).map(function(l) {
-            return { codigo: l.codigo, producto: l.producto, cantidad: l.cantidad || 0,
-              costo_unitario: l.costo_unitario || 0, valor_total: l.valor_total || 0,
-              accion: null, cliente: '', turno: ciAdivinarTurno(d.descripcion), maquina: '', operador: '', guardado: false };
-          });
-          if (d.prefijo === 'PRI') {
-            var fechaCorregida = ciAdivinarFechaDescripcion(d.descripcion, d.fecha);
-            if (fechaCorregida) { d.fechaOriginal = d.fecha; d.fecha = fechaCorregida; }
-          }
-          docsNuevos.push(d);
-        });
+    status.innerHTML = '<span class="ci-spin"></span>Preparando archivos…';
+    var tareas = await ciArmarTareas(ciArchivos);
+    if (tareas.length > CI_AVISO_PAGINAS) {
+      var minutos = Math.max(1, Math.round(tareas.length * 60 / CI_LECTURAS_PARALELAS / 60));
+      if (!confirm('Son ' + tareas.length + ' páginas en total — tardará aprox. ' + minutos +
+          ' min y hará ' + tareas.length + ' lecturas de IA (cada una tiene costo).\n\n¿Continuar?')) {
+        status.textContent = '';
+        return;
       }
+    }
+    var fallidas = await ciLeerTareas(tareas, status);
+    tareas.forEach(function(t) {
+      (t.documentos || []).forEach(function(d) { docsNuevos.push(ciPrepararDoc(d)); });
+    });
+    if (!docsNuevos.length) {
+      status.textContent = '⚠️ No se pudo leer ninguna página' + (fallidas.length ? ' — ' + fallidas[0].error : '');
+      return;
     }
     ciDocumentos = ciDocumentos.concat(docsNuevos);
     status.textContent = '';
+    var pie = document.getElementById('ciStatusPie');
+    pie.textContent = fallidas.length
+      ? '⚠️ ' + (tareas.length - fallidas.length) + ' de ' + tareas.length + ' páginas leídas — fallaron: ' +
+        fallidas.map(ciEtiquetaTarea).join(', ') + ' (volvé a subirlas como captura)'
+      : '';
     await ciPrecalcularReconciliacion(docsNuevos);
     docsNuevos.forEach(function(d) {
       d.lineas.forEach(function(l) { l.accion = ciSugerirAccion(d.prefijo, l.producto, l.reconciliacion); });
