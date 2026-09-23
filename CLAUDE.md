@@ -501,6 +501,10 @@ Notas críticas:
     Hernández y Blandina Solares en `personal` (quedaron con 2 filas cada una, codigo distinto,
     probablemente por crear "+ Nueva persona" desde un locker vacío en vez de encontrarlas con
     el buscador — ver nota abajo). Traslada el Locker L-13 a la ficha correcta de Blandina.
+21. `sql/sku_recetario_operativo_prod_v1.sql` — abre escritura del Recetario
+    (`sku_recetas`/`sku_receta_partes`/`sku_especificaciones`) al rol `operativo_prod`, además de
+    master (antes solo master). Sin correr este SQL, el Recetario sigue bloqueado para Producción
+    aunque el código cliente ya lo permita — RLS lo rechaza.
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
@@ -534,7 +538,7 @@ Sólido: sin secretos hardcodeados; CSP + HSTS + X-Frame-Options en vercel.json;
 - `master` → todo · `visor` → solo lectura (banner Modo Visual)
 - `operativo` → enjaulado en registro-tapas.html; INSERT solo en comandas/comanda_tareas
 - `operativo_serig` → enjaulado en registro-serigrafia.html; INSERT en registro_tiros_serig, paros_serig, registro_flameado_serig, registro_empaque_serig
-- `operativo_prod` → NO enjaulado: ve TODOS los módulos en lectura (como visor), pero solo escribe en produccion_diaria (registrar turnos). auth.js bloquea escrituras a otras tablas (flag TETRA.esProdEditor + TETRA_PROD_TABLA); RLS lo respalda. Exento de logout por inactividad. NO edita recetas/fichas (solo-master)
+- `operativo_prod` → NO enjaulado: ve TODOS los módulos en lectura (como visor), pero solo escribe en `produccion_diaria` (registrar turnos) y en el Recetario (`sku_recetas`/`sku_receta_partes`/`sku_especificaciones`, sep/2026 — mismo alcance que master ahí). auth.js bloquea escrituras a cualquier otra tabla (flag TETRA.esProdEditor + TETRA_PROD_TABLA + TETRA_PROD_TABLAS_EXTRA); RLS lo respalda (ver `sql/sku_recetario_operativo_prod_v1.sql`). Exento de logout por inactividad.
 - `supervisor_tapas` → enjaulado en registro-tapas.html (comparte la misma página con `operativo`, no es un módulo nuevo). Piloto (sep/2026): se REPROPÓSITA la cuenta que ya existía (`tapas@tetrapp.app`, antes rol `operativo`) para que ahora sea de la supervisora (Yenifer) — los operarios YA NO tienen acceso a ese login (se les cambió la contraseña); cuando se restaure su participación se creará una cuenta nueva aparte, no esta. Mismo alcance de escritura que `operativo` (solo INSERT en comandas/comanda_tareas). Ver `sql/supervisor_tapas_v1.sql`. Próxima área candidata: Serigrafía (sin tocar todavía).
 - La jaula vive en TETRA_PAGINAS_OPERATIVO (auth.js): rol → página permitida
 - TETRA_PAGINAS_MASTER (auth.js): páginas restringidas SOLO a master (ej. `gestion`) — cualquier
