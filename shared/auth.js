@@ -43,6 +43,10 @@ var TETRA_PAGINAS_MASTER = ['gestion'];
 
 // Tabla que el rol operativo_prod SÍ puede escribir (endpoint REST de Supabase).
 var TETRA_PROD_TABLA = 'produccion_diaria';
+// Tablas adicionales que operativo_prod puede escribir: Recetario completo (RLS también
+// lo permite, ver sql/sku_recetario_operativo_prod_v1.sql) — el personal de Producción
+// captura ahí la ficha técnica (Material/Colorante/Peso/Ciclo) desde su propia pantalla.
+var TETRA_PROD_TABLAS_EXTRA = ['sku_recetas', 'sku_receta_partes', 'sku_especificaciones'];
 
 // ── Escape universal anti-XSS para texto dinámico en innerHTML ──
 // (serigrafia.html tiene su propia copia equivalente; misma firma)
@@ -90,7 +94,8 @@ function tetraRevelar() {
         tetraToastVisor();
         return bloquear('Modo Visual: sin permisos de edición', 'visor');
       }
-      if (TETRA.esProdEditor && url.indexOf('/rest/v1/' + TETRA_PROD_TABLA) === -1) {
+      if (TETRA.esProdEditor && url.indexOf('/rest/v1/' + TETRA_PROD_TABLA) === -1 &&
+          !TETRA_PROD_TABLAS_EXTRA.some(function (t) { return url.indexOf('/rest/v1/' + t) !== -1; })) {
         tetraToastProd();
         return bloquear('Cuenta de Producción: solo puedes editar en el módulo Producción', 'solo_prod');
       }

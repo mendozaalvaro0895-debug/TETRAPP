@@ -2369,6 +2369,10 @@ async function init() {
 /* ══════════════════════════════════════════════════════════════
    RECETARIO DE SKUs — Producción
    ══════════════════════════════════════════════════════════════ */
+// operativo_prod tiene el mismo alcance de edición que master dentro del Recetario
+// (auth.js/RLS ya lo permiten en sku_recetas/sku_receta_partes/sku_especificaciones).
+function puedeEditarRecetario() { return TETRA.rol === 'master' || TETRA.esProdEditor; }
+
 var RECET_SKUS = [];
 var RECETAS_MAP = {};
 var PARTES_MAP = {};
@@ -2541,7 +2545,7 @@ function buildRecetCardGuardado(sku, desc, receta, partes) {
   var area = receta ? (receta.area || '') : '';
   var nP = partes.length;
   var esDir = receta && receta.es_directo;
-  var esMaster = TETRA.rol === 'master';
+  var esMaster = puedeEditarRecetario();
   var badgeTxt = esDir ? 'Directo' : (nP + (nP === 1 ? ' parte' : ' partes'));
   var badgeCls = esDir ? 'rc-badge dir' : 'rc-badge';
   var areaBadge = area ? '<span class="rc-area-badge ' + area + '">' + esc(AREA_LABELS[area] || area) + '</span>' : '';
@@ -2575,7 +2579,7 @@ function buildRecetCardGuardado(sku, desc, receta, partes) {
 function buildRcCuerpo(sku, sid, desc, receta, partes) {
   var descVal = receta ? (receta.descripcion || desc || '') : (desc || '');
   var currentArea = receta ? (receta.area || '') : '';
-  var esMaster = TETRA.rol === 'master';
+  var esMaster = puedeEditarRecetario();
   var partesHdr = partes.length
     ? '<div class="rc-partes-hdr"><span>Tipo</span><span>Código / Proceso</span><span>Nota</span><span></span></div>'
     : '';
@@ -2626,7 +2630,7 @@ function rcSetArea(sid, area) {
   if (specsWrap) {
     if (area === 'produccion') {
       var sku = RECET_SID_SKU[sid];
-      specsWrap.innerHTML = sku ? buildRcEspecsProd(sku, sid, TETRA.rol === 'master') : '';
+      specsWrap.innerHTML = sku ? buildRcEspecsProd(sku, sid, puedeEditarRecetario()) : '';
     } else {
       specsWrap.innerHTML = '';
     }
