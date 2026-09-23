@@ -149,9 +149,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .maq-card-sku{font-size:12.5px;font-weight:700;color:var(--ink);margin-top:10px}
 .maq-card-sku-mas{color:var(--gray-l);font-weight:400}
 .maq-card-desc{font-size:11px;color:var(--gray-l);margin:2px 0 8px;line-height:1.35}
-.maq-card-otros-sku{font-size:10.5px;color:var(--gray-l);margin:-4px 0 8px;line-height:1.5}
-.maq-card-otros-sku>div{font-weight:700}
+.maq-card-otros-sku{font-size:10.5px;color:var(--gray-l);margin:-2px 0 8px;max-height:150px;overflow-y:auto}
+.maq-card-otros-row{display:grid;grid-template-columns:56px 1fr 78px;gap:8px;padding:2px 0;align-items:baseline}
+.maq-card-otros-row b{font-weight:700;color:var(--ink);font-size:10.5px}
 .maq-card-otros-desc{font-weight:400}
+.maq-card-otros-cant{font-family:var(--mono);font-weight:700;color:var(--gray);text-align:right;white-space:nowrap}
 .maq-card-und{font-family:var(--mono);font-size:25px;font-weight:800;color:var(--prod-d);line-height:1.1}
 .maq-card.vacia .maq-card-und{color:var(--gray-l);font-size:16px}
 .maq-card-und-lbl{font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
@@ -904,8 +906,9 @@ function buildOtrosSkuHtml(skusOrden) {
   if (skusOrden.length < 2) return '';
   return '<div class="maq-card-otros-sku">' +
     skusOrden.slice(1).map(function (s) {
-      return '<div>' + esc(s.sku) + ' <span class="maq-card-otros-desc">' + esc(s.descripcion) + '</span>' +
-        ' · ' + fmtU(s.cantidad) + ' und</div>';
+      return '<div class="maq-card-otros-row"><b>' + esc(s.sku) + '</b>' +
+        '<span class="maq-card-otros-desc">' + esc(s.descripcion) + '</span>' +
+        '<span class="maq-card-otros-cant">' + fmtU(s.cantidad) + ' und</span></div>';
     }).join('') +
   '</div>';
 }
