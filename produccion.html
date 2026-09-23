@@ -149,7 +149,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .maq-card-sku{font-size:12.5px;font-weight:700;color:var(--ink);margin-top:10px}
 .maq-card-sku-mas{color:var(--gray-l);font-weight:400}
 .maq-card-desc{font-size:11px;color:var(--gray-l);margin:2px 0 8px;line-height:1.35}
-.maq-card-otros-sku{font-size:10.5px;color:var(--gray-l);margin:-2px 0 8px;max-height:200px;overflow-y:auto;column-count:2;column-gap:18px;column-fill:auto;column-rule:2px solid var(--border)}
+.maq-card-otros-sku{font-size:10.5px;color:var(--gray-l);margin:8px 0;max-height:200px;overflow-y:auto;column-count:2;column-gap:18px;column-fill:auto;column-rule:2px solid var(--border)}
 .maq-card-otros-row{display:grid;grid-template-columns:56px 1fr 70px;gap:6px;padding:4px 0;align-items:baseline;break-inside:avoid;border-bottom:1px solid var(--bg2)}
 .maq-card-otros-row b{font-weight:700;color:var(--ink);font-size:10.5px}
 .maq-card-otros-desc{font-weight:400}
@@ -1026,9 +1026,10 @@ function buildMaquinaCardHtml(m, datos) {
     buildMaquinaImgHtml(m) +
     '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span>' + efPill + '</div>' +
     '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
-    '<div class="maq-card-sku">' + esc(principal.sku) +
-      (otros > 0 ? ' <span class="maq-card-sku-mas">+' + otros + ' más</span>' : '') + '</div>' +
-    (otros === 0 ? '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>' : '') +
+    (otros === 0
+      ? '<div class="maq-card-sku">' + esc(principal.sku) + '</div>' +
+        '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>'
+      : '') +
     buildSkuDesgloseHtml(skusOrden, historial) +
     '<div class="maq-card-und">' + fmtU(datos.total) + '</div>' +
     '<div class="maq-card-und-lbl">unidades producidas</div>' +
@@ -1176,9 +1177,10 @@ function buildMaquinaCardPeriodoHtml(m, datos, opts) {
     buildMaquinaImgHtml(m) +
     '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span>' + efPill + '</div>' +
     '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
-    '<div class="maq-card-sku">' + esc(principal.sku) +
-      (otros > 0 ? ' <span class="maq-card-sku-mas">+' + otros + ' más</span>' : '') + '</div>' +
-    (otros === 0 ? '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>' : '') +
+    (otros === 0
+      ? '<div class="maq-card-sku">' + esc(principal.sku) + '</div>' +
+        '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>'
+      : '') +
     buildSkuDesgloseHtml(skusOrden, historial) +
     '<div class="maq-card-und">' + fmtU(datos.total) + '</div>' +
     '<div class="maq-card-und-lbl">unidades ' + esc(opts.labelPeriodo) + '</div>' +
