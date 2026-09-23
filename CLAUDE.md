@@ -509,6 +509,10 @@ Notas críticas:
     `supabase_realtime` (mismo patrón que `sql/realtime_serig.sql`). Sin correr esto, Inicio e
     Ingreso de produccion.html siguen funcionando pero sin refresco en vivo entre usuarios/equipos
     — solo se actualizan al volver a la pestaña/ventana.
+23. `sql/moldes_v1.sql` — tabla nueva `moldes` (catálogo de moldes de Producción: nombre,
+    cavidades, ciclo_seg) + RLS + 88 moldes importados de "MOLDES Y CICLOS - SEP 2026.xlsx".
+    Alimenta el autocompletado de Molde/Cavidades en el Recetario (produccion.html). Sin correr
+    esto, esos dos campos nuevos quedan como texto libre sin sugerencias ni alta automática.
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
