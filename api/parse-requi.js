@@ -111,9 +111,14 @@ Respondé SOLO con JSON válido, sin markdown, sin texto adicional:
 }`;
 
   try {
-    const aiResp = await anthropic.messages.create({
+    // Sonnet 5 piensa por defecto (thinking adaptativo, no se devuelve como texto):
+    // con 8192 tokens una página densa (ej. reporte de un mes entero) se cortaba
+    // pensando y la respuesta llegaba SIN bloque de texto. Stream + margen amplio
+    // para que alcance a pensar Y a escribir el JSON sin timeout de HTTP.
+    const stream = anthropic.messages.stream({
       model: 'claude-sonnet-5',
-      max_tokens: 8192,
+      max_tokens: 32000,
+      output_config: { effort: 'medium' },
       messages: [{
         role: 'user',
         content: [
@@ -129,9 +134,16 @@ Respondé SOLO con JSON válido, sin markdown, sin texto adicional:
         ]
       }]
     });
+    const aiResp = await stream.finalMessage();
 
+    if (aiResp.stop_reason === 'max_tokens') {
+      throw new Error('La página es demasiado larga para leerla de una vez (se cortó por longitud) — probá recortarla en capturas más chicas');
+    }
+    if (aiResp.stop_reason === 'refusal') {
+      throw new Error('La IA rechazó procesar esta imagen');
+    }
     const textBlock = (aiResp.content || []).find(function(b) { return b.type === 'text' && b.text; });
-    if (!textBlock) throw new Error('La IA no devolvió texto legible');
+    if (!textBlock) throw new Error('La IA no devolvió texto legible (stop_reason: ' + aiResp.stop_reason + ')');
     const raw = textBlock.text.trim()
       .replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim();
     let parsed;
