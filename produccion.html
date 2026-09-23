@@ -159,7 +159,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .maq-chev.open{transform:rotate(180deg)}
 .maq-card-detalle{display:none;margin-top:8px;padding-top:10px;border-top:1px dashed var(--border)}
 .maq-card-detalle.open{display:block}
-.maq-det-hdr,.maq-det-row{display:grid;grid-template-columns:30px 1fr 1.6fr 55px 100px;gap:6px;align-items:center}
+.maq-det-hdr,.maq-det-row{display:grid;grid-template-columns:52px 1fr 1.5fr 52px 92px;gap:6px;align-items:center}
 .maq-det-hdr{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-l);padding-bottom:4px;border-bottom:1px solid var(--bg2)}
 .maq-det-row{font-size:11.5px;padding:5px 0;border-bottom:1px solid var(--bg2)}
 .maq-det-row:last-child{border-bottom:none}
@@ -655,6 +655,7 @@ var MAQ_TIPO_FULL = {1:'Sopladora simple',2:'Sopladora simple',3:'Sopladora simp
   7:'Inyecto Sopladora',8:'Sopladora Doble',9:'Sopladora Doble',
   10:'Inyecto Sopladora'};
 var DIAS_C = ['LUN','MAR','MIÉ','JUE','VIE','SÁB'];
+var DIAS_CORTO = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']; // getDay(): 0=domingo
 var MESES_ABR = {ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,OCT:10,NOV:11,DIC:12};
 var MESES_L = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 var MESES_C = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -688,6 +689,7 @@ function fechaCorta(iso) {
   var d = dObj(iso);
   return ('0' + d.getDate()).slice(-2) + ' ' + MESES_C[d.getMonth()];
 }
+function diaCorta(iso) { return DIAS_CORTO[dObj(iso).getDay()]; }
 function fechaLarga(iso) {
   var d = dObj(iso);
   return ('0' + d.getDate()).slice(-2) + ' ' + MESES_C[d.getMonth()] + ' ' + d.getFullYear();
@@ -766,11 +768,12 @@ async function renderInicio() {
   var grid = document.getElementById('inicioGrid');
   grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--gray-l);padding:30px">Cargando…</div>';
 
+  var desde5 = addDias(fecha, -4);
   var rows = [];
   try {
     var r = await db.from('produccion_diaria')
-      .select('turno,maquina,sku,descripcion,cantidad,operador_codigo')
-      .eq('fecha', fecha);
+      .select('fecha,turno,maquina,sku,descripcion,cantidad,operador_codigo')
+      .gte('fecha', desde5).lte('fecha', fecha);
     if (r.error) throw r.error;
     rows = r.data || [];
   } catch (err) {
@@ -781,15 +784,18 @@ async function renderInicio() {
   rows.forEach(function (p) {
     var mk = p.maquina || 0;
     if (mk < 1) return;
-    if (!porMaquina[mk]) porMaquina[mk] = { total: 0, skus: {}, operarios: {}, turnos: {}, filas: [] };
+    if (!porMaquina[mk]) porMaquina[mk] = { total: 0, skus: {}, operarios: {}, turnos: {}, historial: [] };
     var g = porMaquina[mk];
     var desc = (INV[p.sku] && INV[p.sku].descripcion) || p.descripcion || '—';
-    g.total += numVal(p.cantidad);
-    if (!g.skus[p.sku]) g.skus[p.sku] = { cantidad: 0, descripcion: desc };
-    g.skus[p.sku].cantidad += numVal(p.cantidad);
-    if (p.operador_codigo) g.operarios[p.operador_codigo] = true;
-    if (p.turno) g.turnos[p.turno] = true;
-    g.filas.push({ turno: p.turno, sku: p.sku, descripcion: desc, cantidad: numVal(p.cantidad), operador: p.operador_codigo || '' });
+    var cant = numVal(p.cantidad);
+    g.historial.push({ fecha: p.fecha, turno: p.turno, sku: p.sku, descripcion: desc, cantidad: cant, operador: p.operador_codigo || '' });
+    if (p.fecha === fecha) {
+      g.total += cant;
+      if (!g.skus[p.sku]) g.skus[p.sku] = { cantidad: 0, descripcion: desc };
+      g.skus[p.sku].cantidad += cant;
+      if (p.operador_codigo) g.operarios[p.operador_codigo] = true;
+      if (p.turno) g.turnos[p.turno] = true;
+    }
   });
 
   grid.innerHTML = MAQUINAS.map(function (m) { return buildMaquinaCardHtml(m, porMaquina[m]); }).join('');
@@ -818,14 +824,22 @@ function toggleMaqDetalle(m) {
   if (chev) chev.classList.toggle('open', open);
 }
 
-function buildMaqDetalleHtml(m, datos, meta) {
-  var filas = datos.filas.slice().sort(function (a, b) {
+function buildMaqDetalleHtml(m, historial, meta) {
+  var filas = historial.slice().sort(function (a, b) {
+    if (a.fecha !== b.fecha) return b.fecha.localeCompare(a.fecha);
     if (a.turno !== b.turno) return a.turno === 'dia' ? -1 : 1;
     return b.cantidad - a.cantidad;
   });
+
+  if (!filas.length) {
+    return '<div class="maq-card-detalle" id="maq-detalle-' + m + '">' +
+      '<div style="font-size:11px;color:var(--gray-l);padding:6px 0">Sin producción registrada en los últimos 5 días.</div>' +
+    '</div>';
+  }
+
   var rowsHtml = filas.map(function (f) {
     return '<div class="maq-det-row">' +
-      '<span>' + (f.turno === 'dia' ? '☀️' : (f.turno === 'noche' ? '🌙' : '—')) + '</span>' +
+      '<span>' + diaCorta(f.fecha) + ' ' + (f.turno === 'dia' ? '☀️' : (f.turno === 'noche' ? '🌙' : '')) + '</span>' +
       '<span>' + esc(f.sku) + '</span>' +
       '<span class="maq-det-desc" title="' + esc(f.descripcion) + '">' + esc(f.descripcion) + '</span>' +
       '<span class="maq-det-cant">' + fmtU(f.cantidad) + '</span>' +
@@ -834,26 +848,38 @@ function buildMaqDetalleHtml(m, datos, meta) {
     '</div>';
   }).join('');
 
-  var metaTxt = meta > 0
-    ? 'Meta usada: ' + fmtU(meta) + ' und/turno de 12h (SKU con más volumen del día).'
-    : 'Ninguno de los SKU corridos hoy en esta máquina tiene meta_12hrs definida, así que no se calcula eficiencia.';
+  var metaHtml = '';
+  if (meta !== null && meta !== undefined) {
+    metaHtml = '<div class="maq-det-meta">' + (meta > 0
+      ? 'Meta usada hoy: ' + fmtU(meta) + ' und/turno de 12h (SKU con más volumen del día).'
+      : 'Ninguno de los SKU corridos hoy en esta máquina tiene meta_12hrs definida, así que no se calcula eficiencia.') +
+    '</div>';
+  }
 
   return '<div class="maq-card-detalle" id="maq-detalle-' + m + '">' +
-    '<div class="maq-det-hdr"><span>Turno</span><span>SKU</span><span>Producto</span><span>Cant.</span><span>Operario</span></div>' +
+    '<div class="maq-det-hdr"><span>Día</span><span>SKU</span><span>Producto</span><span>Cant.</span><span>Operario</span></div>' +
     rowsHtml +
-    '<div class="maq-det-meta">' + metaTxt + '</div>' +
+    metaHtml +
   '</div>';
 }
 
 function buildMaquinaCardHtml(m, datos) {
   var tipo = MAQ_TIPO_FULL[m];
+  var historial = (datos && datos.historial) || [];
+
   if (!datos || !datos.total) {
+    var detalleVacio = historial.length
+      ? '<button class="maq-det-toggle" onclick="toggleMaqDetalle(' + m + ')">Ver últimos 5 días ' +
+          '<span class="maq-chev" id="maq-chev-' + m + '">▾</span></button>' +
+        buildMaqDetalleHtml(m, historial, null)
+      : '';
     return '<div class="maq-card vacia">' +
       buildMaquinaImgHtml(m) +
       '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span></div>' +
       '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
       '<div class="maq-card-und" style="margin-top:16px">Sin actividad</div>' +
       '<div class="maq-card-und-lbl">este día</div>' +
+      detalleVacio +
       '</div>';
   }
 
@@ -890,9 +916,9 @@ function buildMaquinaCardHtml(m, datos) {
     '<div class="maq-card-bar"><div class="maq-card-bar-fill" style="width:' + barPct + '%;background:' + barColor + '"></div></div>' +
     '<div class="maq-card-foot"><span>' + (turnoTxt || '—') + '</span><span title="' + esc(operarios.join(', ')) + '">' +
       esc(operarios.join(', ') || '—') + '</span></div>' +
-    '<button class="maq-det-toggle" onclick="toggleMaqDetalle(' + m + ')">Ver detalle del día ' +
+    '<button class="maq-det-toggle" onclick="toggleMaqDetalle(' + m + ')">Ver últimos 5 días ' +
       '<span class="maq-chev" id="maq-chev-' + m + '">▾</span></button>' +
-    buildMaqDetalleHtml(m, datos, meta) +
+    buildMaqDetalleHtml(m, historial, meta) +
   '</div>';
 }
 
