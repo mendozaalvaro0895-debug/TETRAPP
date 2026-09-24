@@ -859,6 +859,29 @@ function renderChart() {
 
 var PROD_CLIENTES_MAP = {}; // { sku: { clientes: {cli: {q,u}}, desc: str } }
 
+// Algunos SKUs de facturación son el SKU base + un dígito sufijo (ej. 10025 → 100251).
+// Devuelve el SKU y, si termina en dígito, también la versión sin ese último carácter.
+function skuVariantes(sku) {
+  var s = (sku || '').trim();
+  var base = (s.length > 4 && /\d$/.test(s)) ? s.slice(0, -1) : null;
+  return base ? [s, base] : [s];
+}
+
+// Fusiona los clientes de dos entradas de PROD_CLIENTES_MAP en un mapa {cli:{q,u}}
+function mergeClientes(skus) {
+  var merged = {};
+  skus.forEach(function(s) {
+    var d = PROD_CLIENTES_MAP[s];
+    if (!d) return;
+    Object.keys(d.clientes).forEach(function(cli) {
+      if (!merged[cli]) merged[cli] = { q: 0, u: 0 };
+      merged[cli].q += d.clientes[cli].q;
+      merged[cli].u += d.clientes[cli].u;
+    });
+  });
+  return merged;
+}
+
 function toggleProdDetalle(rowId) {
   var det = document.getElementById('prodDet-' + rowId);
   var arr = document.getElementById('prodArr-' + rowId);
@@ -871,14 +894,15 @@ function toggleProdDetalle(rowId) {
 function buildProdDetalleHtml(sku) {
   var serigColor = '#92400E';
   var sections = [];
+  var variantes = skuVariantes(sku); // [sku] o [sku, baseSku]
 
-  // — clientes directos —
-  var direct = PROD_CLIENTES_MAP[sku];
-  if (direct && Object.keys(direct.clientes).length) {
-    var clis = Object.keys(direct.clientes).sort(function(a,b){ return direct.clientes[b].q - direct.clientes[a].q; });
-    var totQ = clis.reduce(function(s,c){ return s + direct.clientes[c].q; }, 0);
+  // — clientes directos (fusiona sku + variante base si existe) —
+  var clisMerged = mergeClientes(variantes);
+  if (Object.keys(clisMerged).length) {
+    var clis = Object.keys(clisMerged).sort(function(a,b){ return clisMerged[b].q - clisMerged[a].q; });
+    var totQ = clis.reduce(function(s,c){ return s + clisMerged[c].q; }, 0);
     var rows = clis.map(function(cli) {
-      var d = direct.clientes[cli];
+      var d = clisMerged[cli];
       var pct = totQ > 0 ? d.q / totQ * 100 : 0;
       return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0">' +
         '<div style="flex:1;font-size:11px;color:#1e293b;font-weight:500">' + escHtml(nombreCorto(cli)) + '</div>' +
@@ -890,8 +914,12 @@ function buildProdDetalleHtml(sku) {
     sections.push('<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#94a3b8;margin-bottom:4px">Clientes directos</div>' + rows);
   }
 
-  // — vía Serigrafía (SKUs que usan este como base) —
-  var serigSkus = SERIG_BASE_REVERSE[sku] || [];
+  // — vía Serigrafía: buscar en todas las variantes —
+  var serigSkusSet = {};
+  variantes.forEach(function(v) {
+    (SERIG_BASE_REVERSE[v] || []).forEach(function(ss) { serigSkusSet[ss] = true; });
+  });
+  var serigSkus = Object.keys(serigSkusSet);
   serigSkus.forEach(function(serigSku) {
     var sd = PROD_CLIENTES_MAP[serigSku];
     if (!sd || !Object.keys(sd.clientes).length) return;
@@ -920,7 +948,7 @@ function buildTopProdRow(rowId, idx, sku, dat, total) {
   var m = dat.muestra;
   var pct = total > 0 ? dat.q / total * 100 : 0;
   var desc = m.descripcion || sku || '—';
-  var hasSerig = SERIG_BASE_REVERSE && SERIG_BASE_REVERSE[sku] && SERIG_BASE_REVERSE[sku].length > 0;
+  var hasSerig = SERIG_BASE_REVERSE && skuVariantes(sku).some(function(v){ return (SERIG_BASE_REVERSE[v] || []).length > 0; });
   var badge = hasSerig ? ' <span style="font-size:8px;background:#fef3c7;color:#92400E;border-radius:3px;padding:1px 4px;vertical-align:middle;font-weight:700">+Serig</span>' : '';
   return '<tr id="prodRow-' + rowId + '" onclick="toggleProdDetalle(' + rowId + ')" style="cursor:pointer" ' +
     'onmouseenter="this.style.background=\'#eff6ff\';this.firstElementChild.style.borderLeftColor=\'var(--ven)\'" ' +
