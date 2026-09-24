@@ -2406,7 +2406,7 @@ function rcAcCerrar(sid) {
 // ══════════════════════════════════════════════════════════════
 var STOCK_EST_INV = [];
 var STOCK_EST_CARGADO = false;
-var ESTANCADO_DIAS = 90;
+var ESTANCADO_DIAS = 30;
 
 // SKUs que han pasado por Serigrafía (cargados desde solicitud_lineas)
 var SERIG_SKUS = null; // null = aún cargando; Set vacío = cargado sin datos
@@ -2513,12 +2513,8 @@ function renderStockEstancado() {
       estancados.push({ sku: item.sku, descripcion: item.descripcion, existencia: item.existencia, ultimaVenta: last, dias: dias });
     }
   });
-  estancados.sort(function(a, b) {
-    if (a.dias === null && b.dias !== null) return -1;
-    if (a.dias !== null && b.dias === null) return 1;
-    if (a.dias === null && b.dias === null) return 0;
-    return b.dias - a.dias;
-  });
+  estancados.sort(function(a, b) { return b.existencia - a.existencia; });
+  estancados = estancados.slice(0, 100);
 
   var badge = document.getElementById('estBadge');
   if (badge) badge.textContent = estancados.length ? '(' + estancados.length + ')' : '';
@@ -2526,7 +2522,7 @@ function renderStockEstancado() {
   var body = document.getElementById('estBody');
   if (!body || !body.classList.contains('open')) return;
 
-  var umbralBtns = [60, 90, 180].map(function(d) {
+  var umbralBtns = [30, 60, 90, 180].map(function(d) {
     var sel = ESTANCADO_DIAS === d;
     return '<button onclick="setEstancadoDias(' + d + ')" style="padding:4px 12px;border:1.5px solid ' +
       (sel ? 'var(--ven)' : 'var(--border)') +
