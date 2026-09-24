@@ -858,6 +858,7 @@ function renderChart() {
 }
 
 var PROD_CLIENTES_MAP = {}; // { sku: { clientes: {cli: {q,u}}, desc: str } }
+var CLI_PRODS_MAP = {};    // { cliente: { sku: { q, u, desc } } }
 
 // Algunos SKUs de facturación son el SKU base + un dígito sufijo (ej. 10025 → 100251/100252…).
 // Dado un SKU, devuelve el "base" quitando el último carácter si termina en dígito.
@@ -1198,18 +1199,56 @@ function renderProductos() {
 }
 
 // ── RENDER: Clientes ────────────────────────────────────────────
-function buildCliRow(idx, nombre, dat, total, qAntMap) {
+function toggleCliDetalle(rowId) {
+  var det = document.getElementById('cliDet-' + rowId);
+  var arr = document.getElementById('cliArr-' + rowId);
+  if (!det) return;
+  var opening = det.style.display === 'none';
+  det.style.display = opening ? 'table-row' : 'none';
+  if (arr) arr.textContent = opening ? '▴' : '▾';
+}
+
+function buildCliDetalleHtml(nombre, totalCli) {
+  var prods = CLI_PRODS_MAP[nombre];
+  if (!prods || !Object.keys(prods).length)
+    return '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Sin detalle en este periodo</div>';
+  var skus = Object.keys(prods).sort(function(a,b){ return prods[b].q - prods[a].q; }).slice(0, 15);
+  return skus.map(function(sku, i) {
+    var d = prods[sku];
+    var pct = totalCli > 0 ? d.q / totalCli * 100 : 0;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #f1f5f9">' +
+      '<div style="font-size:10px;color:#94a3b8;width:14px;text-align:right;flex-shrink:0">' + (i+1) + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-family:var(--mono);font-size:9px;color:#94a3b8;line-height:1.1">' + escHtml(sku) + '</div>' +
+        '<div style="font-size:11px;color:#1e293b;font-weight:500;word-break:break-word">' + escHtml(d.desc) + '</div>' +
+      '</div>' +
+      '<div style="font-size:11px;font-weight:600;color:var(--ven);white-space:nowrap">' + fmtQ(d.q) + '</div>' +
+      '<div style="font-size:10px;color:#64748b;width:56px;text-align:right;white-space:nowrap">' + fmtU(d.u) + ' und</div>' +
+      '<div style="font-size:11px;font-weight:700;color:var(--ven);width:38px;text-align:right">' + fmtPct(pct) + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function buildCliRow(rowId, idx, nombre, dat, total, qAntMap) {
   var pct = total > 0 ? dat.q / total * 100 : 0;
   var delta = qAntMap === null ? null : (qAntMap[nombre] ? qAntMap[nombre].q : 0);
-  return '<tr>' +
-    '<td class="pct-cell">' + idx + '</td>' +
-    '<td class="desc-cell" title="' + escHtml(nombre) + '">' + escHtml(nombre) +
+  return '<tr id="cliRow-' + rowId + '" onclick="toggleCliDetalle(' + rowId + ')" style="cursor:pointer"' +
+    ' onmouseenter="this.style.background=\'#eff6ff\';this.firstElementChild.style.borderLeftColor=\'var(--ven)\'"' +
+    ' onmouseleave="this.style.background=\'\';this.firstElementChild.style.borderLeftColor=\'transparent\'">' +
+    '<td class="pct-cell" style="border-left:3px solid transparent;transition:border-color .15s">' + idx + '</td>' +
+    '<td class="desc-cell" title="' + escHtml(nombre) + '">' + escHtml(nombreCorto(nombre)) +
     '<div class="mini-bar"><i style="width:' + Math.min(100, Math.round(pct)) + '%"></i></div></td>' +
     '<td class="num">' + fmtQ(dat.q) + '</td>' +
     '<td class="num pct-cell">' + fmtPct(pct) + '</td>' +
     '<td class="num">' + fmtU(dat.u) + '</td>' +
     '<td class="num">' + Object.keys(dat.facturas).length + '</td>' +
-    '<td class="num">' + (qAntMap === null ? '<span class="pct-cell">—</span>' : deltaHtml(dat.q, delta)) + '</td>' +
+    '<td class="num">' + (qAntMap === null ? '<span class="pct-cell">—</span>' : deltaHtml(dat.q, delta)) +
+      ' <span id="cliArr-' + rowId + '" style="font-size:10px;color:#cbd5e1;margin-left:4px">▾</span></td>' +
+    '</tr>' +
+    '<tr id="cliDet-' + rowId + '" style="display:none">' +
+      '<td colspan="7" style="padding:8px 12px 12px 28px;background:#f8fafc;border-bottom:1px solid var(--border)">' +
+        buildCliDetalleHtml(nombre, dat.q) +
+      '</td>' +
     '</tr>';
 }
 
@@ -1218,6 +1257,17 @@ function renderClientes() {
   var total = totalQ(filas);
   var porCli = agrupar(filas, function (v) { return v.cliente || '—'; });
   var noms = Object.keys(porCli).sort(function (a, b) { return porCli[b].q - porCli[a].q; });
+
+  // Construir mapa cliente → productos para el detalle expandible
+  CLI_PRODS_MAP = {};
+  filas.forEach(function(v) {
+    var cli = v.cliente || '—';
+    var sku = (v.sku || '—').trim();
+    if (!CLI_PRODS_MAP[cli]) CLI_PRODS_MAP[cli] = {};
+    if (!CLI_PRODS_MAP[cli][sku]) CLI_PRODS_MAP[cli][sku] = { q: 0, u: 0, desc: v.descripcion || sku };
+    CLI_PRODS_MAP[cli][sku].q += v.total_quetzales;
+    CLI_PRODS_MAP[cli][sku].u += v.total_unidades;
+  });
 
   var ant = mesSel === 'todo' ? null : mesAnterior(mesSel);
   var qAntMap = ant ? agrupar(filasDelPeriodo(ant), function (v) { return v.cliente || '—'; }) : null;
@@ -1228,7 +1278,7 @@ function renderClientes() {
   document.getElementById('kpiCliConc').textContent = total > 0 ? fmtPct(top3 / total * 100) : '—';
   if (noms.length) {
     var n1 = noms[0];
-    document.getElementById('kpiCli1').textContent = n1.length > 28 ? n1.slice(0, 28) + '…' : n1;
+    document.getElementById('kpiCli1').textContent = nombreCorto(n1);
     document.getElementById('kpiCli1Sub').textContent = fmtQ(porCli[n1].q) + ' · ' + fmtPct(porCli[n1].q / total * 100) + ' del periodo';
   } else {
     document.getElementById('kpiCli1').textContent = '—';
@@ -1237,7 +1287,7 @@ function renderClientes() {
   document.getElementById('cliSub').textContent = mesLabel(mesSel) + ' · ' + noms.length + ' clientes';
 
   var html = '';
-  noms.forEach(function (n, i) { html += buildCliRow(i + 1, n, porCli[n], total, qAntMap); });
+  noms.forEach(function (n, i) { html += buildCliRow(i + 1, i + 1, n, porCli[n], total, qAntMap); });
   document.getElementById('cliBody').innerHTML = html ||
     '<tr class="empty-row"><td colspan="7">Sin clientes en este periodo</td></tr>';
 }
