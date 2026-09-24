@@ -871,42 +871,103 @@ var AREA_FAM_MAP = {
   'SERVICIO':           'Serigrafía'
 };
 var AREA_COLORS = {
-  'Producción': 'var(--ven)',
+  'Producción': '#1D4ED8',
   'Tapas':      '#065F46',
   'Serigrafía': '#92400E'
 };
+var AREA_IDS = { 'Producción': 'prod', 'Tapas': 'tapas', 'Serigrafía': 'serig' };
+var AREA_PRODS = {};
+
+function toggleAreaDetalle(areaId) {
+  var allIds = ['prod', 'tapas', 'serig'];
+  allIds.forEach(function(id) {
+    var det = document.getElementById('areaDetalle-' + id);
+    var arr = document.getElementById('areaArrow-' + id);
+    var row = document.getElementById('areaRow-' + id);
+    var opening = id === areaId && det && det.style.display === 'none';
+    if (det) det.style.display = opening ? 'block' : 'none';
+    if (arr) arr.textContent = opening ? '▴' : '▾';
+    if (row) row.style.background = opening ? '#f8fafc' : '';
+  });
+}
 
 function renderAporteArea(filas, total) {
-  // Mostrar estado de carga si los SKUs de serigrafía todavía no llegaron
   var body = document.getElementById('aporteAreaBody');
   if (SERIG_SKUS === null) {
-    if (body) body.innerHTML = '<div style="color:var(--gray);font-size:12px;padding:8px 0">Cargando clasificación de SKUs…</div>';
+    if (body) body.innerHTML = '<div style="color:var(--gray);font-size:12px;padding:10px 0">Cargando clasificación de SKUs…</div>';
     return;
   }
-  var porArea = { 'Producción': 0, 'Tapas': 0, 'Serigrafía': 0 };
+  var areas = ['Producción', 'Tapas', 'Serigrafía'];
+  var porArea = {};
+  var porAreaProds = {};
+  areas.forEach(function(a) { porArea[a] = 0; porAreaProds[a] = {}; });
+
   filas.forEach(function(v) {
     var sku = (v.sku || '').trim();
     var fam = ((v.descripcion_familia || v.familia || '')).trim().toUpperCase();
-    // SKU conocido de serigrafía → Serigrafía; si no, usa el mapeo de familia
     var area = (sku && SERIG_SKUS.has(sku)) ? 'Serigrafía' : AREA_FAM_MAP[fam];
-    if (area) porArea[area] += qVal(v.total_quetzales || 0);
+    if (!area) return;
+    var q = qVal(v.total_quetzales || 0);
+    porArea[area] += q;
+    if (!porAreaProds[area][sku]) porAreaProds[area][sku] = { q: 0, u: 0, desc: v.descripcion || sku };
+    porAreaProds[area][sku].q += q;
+    porAreaProds[area][sku].u += (v.total_unidades || 0);
   });
+
+  AREA_PRODS = {};
+  areas.forEach(function(area) {
+    AREA_PRODS[area] = Object.keys(porAreaProds[area])
+      .sort(function(a, b) { return porAreaProds[area][b].q - porAreaProds[area][a].q; })
+      .slice(0, 5)
+      .map(function(sku) { return { sku: sku, desc: porAreaProds[area][sku].desc, q: porAreaProds[area][sku].q, u: porAreaProds[area][sku].u }; });
+  });
+
   var sub = document.getElementById('aporteAreaSub');
   if (sub) sub.textContent = mesLabel(mesSel);
-  var areas = ['Producción', 'Tapas', 'Serigrafía'];
-  var html = '<div style="display:flex;flex-direction:column;gap:9px">';
+
+  var html = '<div style="display:flex;flex-direction:column;gap:4px">';
   areas.forEach(function(area) {
     var v = porArea[area] || 0;
     var pct = total > 0 ? v / total * 100 : 0;
-    var color = AREA_COLORS[area] || '#64748b';
-    html += '<div style="display:flex;align-items:center;gap:10px">' +
-      '<div style="width:95px;font-size:13px;font-weight:600;color:#1e293b">' + area + '</div>' +
-      '<div style="flex:1;background:#f1f5f9;border-radius:4px;height:12px;overflow:hidden">' +
-      '<div style="width:' + pct.toFixed(1) + '%;background:' + color + ';height:100%;border-radius:4px"></div>' +
+    var color = AREA_COLORS[area];
+    var areaId = AREA_IDS[area];
+    var prods = AREA_PRODS[area] || [];
+
+    html += '<div id="areaRow-' + areaId + '" onclick="toggleAreaDetalle(\'' + areaId + '\')" ' +
+      'style="cursor:pointer;border-radius:10px;padding:12px 14px;transition:background .12s" ' +
+      'onmouseenter="this.style.background=\'#f8fafc\'" onmouseleave="if(!document.getElementById(\'areaDetalle-' + areaId + '\').style.display||document.getElementById(\'areaDetalle-' + areaId + '\').style.display===\'none\')this.style.background=\'\'">' +
+
+      '<div style="display:flex;align-items:center;gap:12px">' +
+        '<div style="width:5px;height:42px;background:' + color + ';border-radius:3px;flex-shrink:0"></div>' +
+        '<div style="width:96px;flex-shrink:0">' +
+          '<div style="font-size:15px;font-weight:700;color:#0f172a;line-height:1.2">' + area + '</div>' +
+          '<div style="font-size:11px;color:#64748b;margin-top:1px">' + fmtQ(v) + '</div>' +
+        '</div>' +
+        '<div style="flex:1;background:#e2e8f0;border-radius:6px;height:22px;overflow:hidden">' +
+          '<div style="width:' + pct.toFixed(1) + '%;background:' + color + ';height:100%;border-radius:6px"></div>' +
+        '</div>' +
+        '<div style="width:52px;text-align:right;font-size:20px;font-weight:800;color:' + color + ';letter-spacing:-0.5px">' + Math.round(pct) + '%</div>' +
+        '<div id="areaArrow-' + areaId + '" style="font-size:13px;color:#94a3b8;width:14px;text-align:center">▾</div>' +
       '</div>' +
-      '<div style="width:48px;text-align:right;font-size:13px;font-weight:700;color:' + color + '">' + fmtPct(pct) + '</div>' +
-      '<div style="width:88px;text-align:right;font-size:11px;color:#64748b">' + fmtQ(v) + '</div>' +
-      '</div>';
+
+      '<div id="areaDetalle-' + areaId + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0">' +
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#94a3b8;margin-bottom:8px">Top 5 productos</div>' +
+        (prods.length ? prods.map(function(p, i) {
+          var ppct = v > 0 ? p.q / v * 100 : 0;
+          var desc = p.desc || p.sku;
+          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9">' +
+            '<div style="width:16px;font-size:10px;color:#94a3b8;text-align:right;flex-shrink:0">' + (i+1) + '</div>' +
+            '<div style="flex:1;min-width:0">' +
+              '<div style="font-size:12px;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + escHtml(p.sku + ' · ' + desc) + '">' + escHtml(desc.length > 35 ? desc.slice(0, 35) + '…' : desc) + '</div>' +
+              '<div style="font-size:9px;font-family:var(--mono);color:#94a3b8">' + escHtml(p.sku) + '</div>' +
+            '</div>' +
+            '<div style="font-size:12px;font-weight:600;color:' + color + ';flex-shrink:0">' + fmtQ(p.q) + '</div>' +
+            '<div style="font-size:10px;color:#94a3b8;width:34px;text-align:right;flex-shrink:0">' + fmtPct(ppct) + '</div>' +
+          '</div>';
+        }).join('') : '<div style="font-size:12px;color:#94a3b8;padding:4px 0">Sin datos</div>') +
+      '</div>' +
+
+    '</div>';
   });
   html += '</div>';
   if (body) body.innerHTML = html;
