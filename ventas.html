@@ -653,6 +653,21 @@ function fmtU(n) {
 function fmtPct(n) {
   return (Math.round(n * 10) / 10).toFixed(1) + '%';
 }
+function nombreCorto(nombre) {
+  if (!nombre || nombre === '—') return nombre;
+  var s = nombre.trim().toUpperCase();
+  var prefijos = ['DROGUERIA','DROGUERIAS','LABORATORIO','LABORATORIOS',
+    'DISTRIBUIDORA','DISTRIBUIDORAS','IMPORTADORA','IMPORTADORAS',
+    'COMERCIAL','FARMACIA','FARMACIAS','EMPRESA','EMPRESAS',
+    'INDUSTRIA','INDUSTRIAS','CORPORACION','GRUPO'];
+  prefijos.forEach(function(p) { if (s.indexOf(p + ' ') === 0) s = s.slice(p.length + 1).trim(); });
+  s = s.replace(/,\s*(SOCIEDAD ANONIMA|SOCIEDAD AN[OÓ]NIMA|S\.A\.|LIMITADA|DE R\.L\.|DE C\.V\.|CIA\.).*$/i, '');
+  s = s.replace(/\s+(S\.A\.|LIMITADA|DE R\.L\.|DE C\.V\.|CIA\.|Y CIA\.)\s*$/i, '');
+  s = s.replace(/\s+(DE GUATEMALA|INTERNACIONAL|INTERNATIONAL)\s*$/i, '');
+  s = s.trim();
+  if (!s) return nombre.split(',')[0].trim();
+  return s.charAt(0) + s.slice(1).toLowerCase();
+}
 function fmtFechaISO(iso) {
   var p = String(iso || '').slice(0, 10).split('-');
   return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : '';
@@ -962,7 +977,7 @@ function renderAporteArea(filas, total) {
         (prods.length ? prods.map(function(p, i) {
           var ppct = v > 0 ? p.q / v * 100 : 0;
           var desc = p.desc || p.sku;
-          var cliLabel = escHtml(p.cliente) + (p.masClientes > 0 ? ' <span style="color:#94a3b8">+' + p.masClientes + '</span>' : '');
+          var cliLabel = escHtml(nombreCorto(p.cliente)) + (p.masClientes > 0 ? ' <span style="color:#94a3b8">+' + p.masClientes + '</span>' : '');
           return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9">' +
             '<div style="width:16px;font-size:10px;color:#94a3b8;text-align:right;flex-shrink:0">' + (i+1) + '</div>' +
             '<div style="flex:2;min-width:0">' +
