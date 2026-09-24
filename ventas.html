@@ -872,10 +872,18 @@ var AREA_COLORS = {
 };
 
 function renderAporteArea(filas, total) {
+  // Mostrar estado de carga si los SKUs de serigrafía todavía no llegaron
+  var body = document.getElementById('aporteAreaBody');
+  if (SERIG_SKUS === null) {
+    if (body) body.innerHTML = '<div style="color:var(--gray);font-size:12px;padding:8px 0">Cargando clasificación de SKUs…</div>';
+    return;
+  }
   var porArea = { 'Producción': 0, 'Tapas': 0, 'Serigrafía': 0 };
   filas.forEach(function(v) {
+    var sku = (v.sku || '').trim();
     var fam = ((v.descripcion_familia || v.familia || '')).trim().toUpperCase();
-    var area = AREA_FAM_MAP[fam];
+    // SKU conocido de serigrafía → Serigrafía; si no, usa el mapeo de familia
+    var area = (sku && SERIG_SKUS.has(sku)) ? 'Serigrafía' : AREA_FAM_MAP[fam];
     if (area) porArea[area] += qVal(v.total_quetzales || 0);
   });
   var sub = document.getElementById('aporteAreaSub');
@@ -896,7 +904,6 @@ function renderAporteArea(filas, total) {
       '</div>';
   });
   html += '</div>';
-  var body = document.getElementById('aporteAreaBody');
   if (body) body.innerHTML = html;
 }
 
@@ -1315,6 +1322,7 @@ async function recargar() {
     poblarSelectores();
     renderTodo();
     cargarStockEstancado(); // background, no await
+    cargarSerigSkus();      // background, no await
     var maxFecha = VENTAS.length ? VENTAS[VENTAS.length - 1].fecha : null;
     var notaFecha = document.getElementById('ultActFecha');
     if (notaFecha) notaFecha.textContent = maxFecha ? 'Última actualización: ' + fmtFechaISO(maxFecha) : '';
@@ -2083,6 +2091,31 @@ function rcAcCerrar(sid) {
 var STOCK_EST_INV = [];
 var STOCK_EST_CARGADO = false;
 var ESTANCADO_DIAS = 90;
+
+// SKUs que han pasado por Serigrafía (cargados desde solicitud_lineas)
+var SERIG_SKUS = null; // null = aún cargando; Set vacío = cargado sin datos
+
+async function cargarSerigSkus() {
+  try {
+    var r = await db.from('solicitud_lineas')
+      .select('sku')
+      .not('sku', 'is', null)
+      .not('sku', 'eq', '');
+    SERIG_SKUS = new Set(
+      (r.error ? [] : (r.data || []))
+        .map(function(x){ return (x.sku || '').trim(); })
+        .filter(Boolean)
+    );
+  } catch(e) {
+    SERIG_SKUS = new Set();
+  }
+  // Si el bloque ya está renderizado, actualizar con los datos reales
+  var body = document.getElementById('aporteAreaBody');
+  if (body && VENTAS.length) {
+    var filas = filasDelPeriodo(mesSel);
+    renderAporteArea(filas, totalQ(filas));
+  }
+}
 
 async function cargarStockEstancado() {
   try {
