@@ -396,6 +396,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="chart-scroll"><div class="chart" id="chartMeses"></div></div>
       </div>
 
+      <!-- Aporte por área -->
+      <div class="tbl-wrap" style="margin-bottom:18px">
+        <div class="tbl-head">
+          <div><div class="tbl-head-t">Aporte por área</div><div class="tbl-head-s" id="aporteAreaSub">—</div></div>
+        </div>
+        <div id="aporteAreaBody" style="padding:14px 16px 12px"></div>
+      </div>
+
       <div class="grid-2">
         <div class="tbl-wrap" style="margin-bottom:0">
           <div class="tbl-head">
@@ -806,6 +814,7 @@ function renderResumen() {
   }
 
   renderChart();
+  renderAporteArea(filas, q);
   renderFamilias(filas, q);
   renderTopClientes(filas, q);
 }
@@ -842,6 +851,53 @@ function buildFamRow(nombre, dat, total) {
     '<td class="num pct-cell">' + fmtPct(pct) + '</td>' +
     '<td class="num">' + fmtU(dat.u) + '</td>' +
     '</tr>';
+}
+
+var AREA_FAM_MAP = {
+  'ENVASE':             'Producción',
+  'BOLAS DE ROLL-ON':   'Producción',
+  'PEINES':             'Producción',
+  'PP':                 'Producción',
+  'CONSUMIBLES':        'Producción',
+  'EMPAQUE Y EMBALAJE': 'Producción',
+  'TAPA':               'Tapas',
+  'BASE TAPA':          'Tapas',
+  'LINER':              'Tapas',
+  'SERVICIO':           'Serigrafía'
+};
+var AREA_COLORS = {
+  'Producción': 'var(--ven)',
+  'Tapas':      '#065F46',
+  'Serigrafía': '#92400E'
+};
+
+function renderAporteArea(filas, total) {
+  var porArea = { 'Producción': 0, 'Tapas': 0, 'Serigrafía': 0 };
+  filas.forEach(function(v) {
+    var fam = ((v.descripcion_familia || v.familia || '')).trim().toUpperCase();
+    var area = AREA_FAM_MAP[fam];
+    if (area) porArea[area] += qVal(v.total_quetzales || 0);
+  });
+  var sub = document.getElementById('aporteAreaSub');
+  if (sub) sub.textContent = mesLabel(mesSel);
+  var areas = ['Producción', 'Tapas', 'Serigrafía'];
+  var html = '<div style="display:flex;flex-direction:column;gap:9px">';
+  areas.forEach(function(area) {
+    var v = porArea[area] || 0;
+    var pct = total > 0 ? v / total * 100 : 0;
+    var color = AREA_COLORS[area] || '#64748b';
+    html += '<div style="display:flex;align-items:center;gap:10px">' +
+      '<div style="width:95px;font-size:13px;font-weight:600;color:#1e293b">' + area + '</div>' +
+      '<div style="flex:1;background:#f1f5f9;border-radius:4px;height:12px;overflow:hidden">' +
+      '<div style="width:' + pct.toFixed(1) + '%;background:' + color + ';height:100%;border-radius:4px"></div>' +
+      '</div>' +
+      '<div style="width:48px;text-align:right;font-size:13px;font-weight:700;color:' + color + '">' + fmtPct(pct) + '</div>' +
+      '<div style="width:88px;text-align:right;font-size:11px;color:#64748b">' + fmtQ(v) + '</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  var body = document.getElementById('aporteAreaBody');
+  if (body) body.innerHTML = html;
 }
 
 function renderFamilias(filas, total) {
