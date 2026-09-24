@@ -110,9 +110,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
 
 /* TABLE */
-.tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:18px}
+.tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .tbl-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px}
-.tbl-head-t{font-size:13px;font-weight:700}
+.tbl-head-t{font-size:13px;font-weight:700;letter-spacing:.01em}
 .tbl-head-s{font-size:11px;color:var(--gray-l)}
 .tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .tbl{width:100%;border-collapse:collapse}
@@ -925,7 +925,7 @@ function renderAporteArea(filas, total) {
   var sub = document.getElementById('aporteAreaSub');
   if (sub) sub.textContent = mesLabel(mesSel);
 
-  var html = '<div style="display:flex;flex-direction:column;gap:4px">';
+  var html = '<div style="display:flex;flex-direction:column;gap:8px">';
   areas.forEach(function(area) {
     var v = porArea[area] || 0;
     var pct = total > 0 ? v / total * 100 : 0;
@@ -934,8 +934,9 @@ function renderAporteArea(filas, total) {
     var prods = AREA_PRODS[area] || [];
 
     html += '<div id="areaRow-' + areaId + '" onclick="toggleAreaDetalle(\'' + areaId + '\')" ' +
-      'style="cursor:pointer;border-radius:10px;padding:12px 14px;transition:background .12s" ' +
-      'onmouseenter="this.style.background=\'#f8fafc\'" onmouseleave="if(!document.getElementById(\'areaDetalle-' + areaId + '\').style.display||document.getElementById(\'areaDetalle-' + areaId + '\').style.display===\'none\')this.style.background=\'\'">' +
+      'style="cursor:pointer;border-radius:10px;padding:12px 14px;border:1px solid #e2e8f0;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.05);transition:box-shadow .15s,transform .15s" ' +
+      'onmouseenter="this.style.boxShadow=\'0 4px 12px rgba(0,0,0,.10)\';this.style.transform=\'translateY(-1px)\'" ' +
+      'onmouseleave="this.style.boxShadow=\'0 1px 3px rgba(0,0,0,.05)\';this.style.transform=\'\'">' +
 
       '<div style="display:flex;align-items:center;gap:12px">' +
         '<div style="width:5px;height:42px;background:' + color + ';border-radius:3px;flex-shrink:0"></div>' +
