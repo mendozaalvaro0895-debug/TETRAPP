@@ -857,19 +857,87 @@ function renderChart() {
   document.getElementById('chartMeses').innerHTML = html;
 }
 
-function buildTopProdRow(idx, sku, dat, total) {
+var PROD_CLIENTES_MAP = {}; // { sku: { clientes: {cli: {q,u}}, desc: str } }
+
+function toggleProdDetalle(rowId) {
+  var det = document.getElementById('prodDet-' + rowId);
+  var arr = document.getElementById('prodArr-' + rowId);
+  if (!det) return;
+  var opening = det.style.display === 'none';
+  det.style.display = opening ? 'table-row' : 'none';
+  if (arr) arr.textContent = opening ? '▴' : '▾';
+}
+
+function buildProdDetalleHtml(sku) {
+  var serigColor = '#92400E';
+  var sections = [];
+
+  // — clientes directos —
+  var direct = PROD_CLIENTES_MAP[sku];
+  if (direct && Object.keys(direct.clientes).length) {
+    var clis = Object.keys(direct.clientes).sort(function(a,b){ return direct.clientes[b].q - direct.clientes[a].q; });
+    var totQ = clis.reduce(function(s,c){ return s + direct.clientes[c].q; }, 0);
+    var rows = clis.map(function(cli) {
+      var d = direct.clientes[cli];
+      var pct = totQ > 0 ? d.q / totQ * 100 : 0;
+      return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0">' +
+        '<div style="flex:1;font-size:11px;color:#1e293b;font-weight:500">' + escHtml(nombreCorto(cli)) + '</div>' +
+        '<div style="font-size:11px;font-weight:600;color:var(--ven)">' + fmtQ(d.q) + '</div>' +
+        '<div style="font-size:10px;color:#64748b;width:58px;text-align:right">' + fmtU(d.u) + ' und</div>' +
+        '<div style="font-size:11px;font-weight:700;color:var(--ven);width:38px;text-align:right">' + fmtPct(pct) + '</div>' +
+      '</div>';
+    }).join('');
+    sections.push('<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#94a3b8;margin-bottom:4px">Clientes directos</div>' + rows);
+  }
+
+  // — vía Serigrafía (SKUs que usan este como base) —
+  var serigSkus = SERIG_BASE_REVERSE[sku] || [];
+  serigSkus.forEach(function(serigSku) {
+    var sd = PROD_CLIENTES_MAP[serigSku];
+    if (!sd || !Object.keys(sd.clientes).length) return;
+    var clis = Object.keys(sd.clientes).sort(function(a,b){ return sd.clientes[b].q - sd.clientes[a].q; });
+    var totQ = clis.reduce(function(s,c){ return s + sd.clientes[c].q; }, 0);
+    var rows = clis.map(function(cli) {
+      var d = sd.clientes[cli];
+      var pct = totQ > 0 ? d.q / totQ * 100 : 0;
+      return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0">' +
+        '<div style="flex:1;font-size:11px;color:#1e293b;font-weight:500">' + escHtml(nombreCorto(cli)) + '</div>' +
+        '<div style="font-size:11px;font-weight:600;color:' + serigColor + '">' + fmtQ(d.q) + '</div>' +
+        '<div style="font-size:10px;color:#64748b;width:58px;text-align:right">' + fmtU(d.u) + ' und</div>' +
+        '<div style="font-size:11px;font-weight:700;color:' + serigColor + ';width:38px;text-align:right">' + fmtPct(pct) + '</div>' +
+      '</div>';
+    }).join('');
+    sections.push(
+      '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:' + serigColor + ';margin-bottom:4px">🖨 Serigrafía — ' + escHtml(sd.desc || serigSku) + ' <span style="font-family:var(--mono);font-weight:400">' + escHtml(serigSku) + '</span></div>' + rows
+    );
+  });
+
+  if (!sections.length) return '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Sin ventas en este periodo</div>';
+  return sections.join('<div style="border-top:1px dashed #e2e8f0;margin:8px 0"></div>');
+}
+
+function buildTopProdRow(rowId, idx, sku, dat, total) {
   var m = dat.muestra;
   var pct = total > 0 ? dat.q / total * 100 : 0;
   var desc = m.descripcion || sku || '—';
-  return '<tr>' +
+  var hasSerig = SERIG_BASE_REVERSE && SERIG_BASE_REVERSE[sku] && SERIG_BASE_REVERSE[sku].length > 0;
+  var badge = hasSerig ? ' <span style="font-size:8px;background:#fef3c7;color:#92400E;border-radius:3px;padding:1px 4px;vertical-align:middle;font-weight:700">+Serig</span>' : '';
+  return '<tr id="prodRow-' + rowId + '" onclick="toggleProdDetalle(' + rowId + ')" style="cursor:pointer" ' +
+    'onmouseenter="this.style.background=\'#f8fafc\'" onmouseleave="this.style.background=\'\'">' +
     '<td class="num pct-cell" style="font-size:10px;color:var(--gray)">' + idx + '</td>' +
     '<td class="desc-cell" title="' + escHtml(sku + ' · ' + desc) + '">' +
       '<span style="font-family:var(--mono);font-size:9px;color:var(--gray);display:block;line-height:1.1">' + escHtml(sku) + '</span>' +
-      escHtml(desc) +
+      escHtml(desc) + badge +
     '</td>' +
     '<td class="num">' + fmtQ(dat.q) + '</td>' +
     '<td class="num pct-cell">' + fmtPct(pct) + '</td>' +
-    '<td class="num">' + fmtU(dat.u) + '</td>' +
+    '<td class="num" style="padding-right:6px">' + fmtU(dat.u) +
+      ' <span id="prodArr-' + rowId + '" style="font-size:10px;color:#94a3b8;margin-left:2px">▾</span></td>' +
+    '</tr>' +
+    '<tr id="prodDet-' + rowId + '" style="display:none">' +
+      '<td colspan="5" style="padding:8px 12px 12px 28px;background:#f8fafc;border-bottom:1px solid var(--border)">' +
+        buildProdDetalleHtml(sku) +
+      '</td>' +
     '</tr>';
 }
 
@@ -1001,13 +1069,27 @@ function renderAporteArea(filas, total) {
 }
 
 function renderFamilias(filas, total) {
+  // Construir mapa de clientes por SKU (todos los SKUs del periodo, no solo top)
+  PROD_CLIENTES_MAP = {};
+  filas.forEach(function(v) {
+    var sku = (v.sku || '').trim();
+    if (!sku) return;
+    if (!PROD_CLIENTES_MAP[sku]) PROD_CLIENTES_MAP[sku] = { clientes: {}, desc: v.descripcion || sku };
+    var cli = (v.cliente || '').trim();
+    if (cli) {
+      if (!PROD_CLIENTES_MAP[sku].clientes[cli]) PROD_CLIENTES_MAP[sku].clientes[cli] = { q: 0, u: 0 };
+      PROD_CLIENTES_MAP[sku].clientes[cli].q += qVal(v.total_quetzales || 0);
+      PROD_CLIENTES_MAP[sku].clientes[cli].u += (v.total_unidades || 0);
+    }
+  });
+
   var TOP_N = 15;
   var porProd = agrupar(filas, function (v) { return v.sku || '—'; });
   var skus = Object.keys(porProd).sort(function (a, b) { return porProd[b].q - porProd[a].q; }).slice(0, TOP_N);
   var totalSkus = Object.keys(porProd).length;
   document.getElementById('famSub').textContent = mesLabel(mesSel) + ' · top ' + Math.min(TOP_N, totalSkus) + ' de ' + totalSkus + ' SKUs';
   var html = '';
-  skus.forEach(function (sku, i) { html += buildTopProdRow(i + 1, sku, porProd[sku], total); });
+  skus.forEach(function (sku, i) { html += buildTopProdRow(i, i + 1, sku, porProd[sku], total); });
   document.getElementById('famBody').innerHTML = html ||
     '<tr class="empty-row"><td colspan="5">Sin datos en este periodo</td></tr>';
 }
@@ -2189,26 +2271,38 @@ var ESTANCADO_DIAS = 90;
 
 // SKUs que han pasado por Serigrafía (cargados desde solicitud_lineas)
 var SERIG_SKUS = null; // null = aún cargando; Set vacío = cargado sin datos
+var SERIG_BASE_REVERSE = {}; // { baseSku: [serigSku1, serigSku2, ...] }
 
 async function cargarSerigSkus() {
   try {
     var r = await db.from('solicitud_lineas')
-      .select('sku')
+      .select('sku,sku_base')
       .not('sku', 'is', null)
       .not('sku', 'eq', '');
-    SERIG_SKUS = new Set(
-      (r.error ? [] : (r.data || []))
-        .map(function(x){ return (x.sku || '').trim(); })
-        .filter(Boolean)
-    );
+    SERIG_SKUS = new Set();
+    SERIG_BASE_REVERSE = {};
+    (r.error ? [] : (r.data || [])).forEach(function(x) {
+      var sku  = (x.sku      || '').trim();
+      var base = (x.sku_base || '').trim();
+      if (!sku) return;
+      SERIG_SKUS.add(sku);
+      if (base) {
+        if (!SERIG_BASE_REVERSE[base]) SERIG_BASE_REVERSE[base] = [];
+        if (SERIG_BASE_REVERSE[base].indexOf(sku) === -1) SERIG_BASE_REVERSE[base].push(sku);
+      }
+    });
   } catch(e) {
     SERIG_SKUS = new Set();
+    SERIG_BASE_REVERSE = {};
   }
-  // Si el bloque ya está renderizado, actualizar con los datos reales
-  var body = document.getElementById('aporteAreaBody');
-  if (body && VENTAS.length) {
+  // Re-renderizar si los bloques ya están visibles
+  if (VENTAS.length) {
     var filas = filasDelPeriodo(mesSel);
-    renderAporteArea(filas, totalQ(filas));
+    var q = totalQ(filas);
+    var aporteBody = document.getElementById('aporteAreaBody');
+    if (aporteBody) renderAporteArea(filas, q);
+    var famBody = document.getElementById('famBody');
+    if (famBody) renderFamilias(filas, q);
   }
 }
 
