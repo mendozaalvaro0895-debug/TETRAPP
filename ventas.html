@@ -407,12 +407,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="grid-2">
         <div class="tbl-wrap" style="margin-bottom:0">
           <div class="tbl-head">
-            <div><div class="tbl-head-t">Por familia</div><div class="tbl-head-s" id="famSub">—</div></div>
+            <div><div class="tbl-head-t">Top productos del mes</div><div class="tbl-head-s" id="famSub">—</div></div>
           </div>
           <div class="tbl-scroll">
             <table class="tbl" style="min-width:0">
-              <thead><tr><th>Familia</th><th class="num">Quetzales</th><th class="num">% mes</th><th class="num">Unidades</th></tr></thead>
-              <tbody id="famBody"><tr class="empty-row"><td colspan="4">Cargando…</td></tr></tbody>
+              <thead><tr><th class="num" style="width:22px">#</th><th>Producto</th><th class="num">Quetzales</th><th class="num">% mes</th><th class="num">Unidades</th></tr></thead>
+              <tbody id="famBody"><tr class="empty-row"><td colspan="5">Cargando…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -842,11 +842,16 @@ function renderChart() {
   document.getElementById('chartMeses').innerHTML = html;
 }
 
-function buildFamRow(nombre, dat, total) {
+function buildTopProdRow(idx, sku, dat, total) {
+  var m = dat.muestra;
   var pct = total > 0 ? dat.q / total * 100 : 0;
+  var desc = m.descripcion || sku || '—';
   return '<tr>' +
-    '<td><span class="fam-pill">' + escHtml(nombre) + '</span>' +
-    '<div class="mini-bar"><i style="width:' + Math.min(100, Math.round(pct)) + '%"></i></div></td>' +
+    '<td class="num pct-cell" style="font-size:10px;color:var(--gray)">' + idx + '</td>' +
+    '<td class="desc-cell" title="' + escHtml(sku + ' · ' + desc) + '">' +
+      '<span style="font-family:var(--mono);font-size:9px;color:var(--gray);display:block;line-height:1.1">' + escHtml(sku) + '</span>' +
+      escHtml(desc.length > 28 ? desc.slice(0, 28) + '…' : desc) +
+    '</td>' +
     '<td class="num">' + fmtQ(dat.q) + '</td>' +
     '<td class="num pct-cell">' + fmtPct(pct) + '</td>' +
     '<td class="num">' + fmtU(dat.u) + '</td>' +
@@ -908,13 +913,15 @@ function renderAporteArea(filas, total) {
 }
 
 function renderFamilias(filas, total) {
-  var porFam = agrupar(filas, function (v) { return v.descripcion_familia || v.familia || 'SIN FAMILIA'; });
-  var noms = Object.keys(porFam).sort(function (a, b) { return porFam[b].q - porFam[a].q; });
-  document.getElementById('famSub').textContent = mesLabel(mesSel) + ' · ' + noms.length + ' familias';
+  var TOP_N = 15;
+  var porProd = agrupar(filas, function (v) { return v.sku || '—'; });
+  var skus = Object.keys(porProd).sort(function (a, b) { return porProd[b].q - porProd[a].q; }).slice(0, TOP_N);
+  var totalSkus = Object.keys(porProd).length;
+  document.getElementById('famSub').textContent = mesLabel(mesSel) + ' · top ' + Math.min(TOP_N, totalSkus) + ' de ' + totalSkus + ' SKUs';
   var html = '';
-  noms.forEach(function (n) { html += buildFamRow(n, porFam[n], total); });
+  skus.forEach(function (sku, i) { html += buildTopProdRow(i + 1, sku, porProd[sku], total); });
   document.getElementById('famBody').innerHTML = html ||
-    '<tr class="empty-row"><td colspan="4">Sin datos en este periodo</td></tr>';
+    '<tr class="empty-row"><td colspan="5">Sin datos en este periodo</td></tr>';
 }
 
 function buildTopCliRow(nombre, dat, total) {
