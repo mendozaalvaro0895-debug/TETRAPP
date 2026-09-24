@@ -859,15 +859,26 @@ function renderChart() {
 
 var PROD_CLIENTES_MAP = {}; // { sku: { clientes: {cli: {q,u}}, desc: str } }
 
-// Algunos SKUs de facturación son el SKU base + un dígito sufijo (ej. 10025 → 100251).
-// Devuelve el SKU y, si termina en dígito, también la versión sin ese último carácter.
-function skuVariantes(sku) {
+// Algunos SKUs de facturación son el SKU base + un dígito sufijo (ej. 10025 → 100251/100252…).
+// Dado un SKU, devuelve el "base" quitando el último carácter si termina en dígito.
+function skuBase(sku) {
   var s = (sku || '').trim();
-  var base = (s.length > 4 && /\d$/.test(s)) ? s.slice(0, -1) : null;
-  return base ? [s, base] : [s];
+  return (s.length > 4 && /\d$/.test(s)) ? s.slice(0, -1) : s;
 }
 
-// Fusiona los clientes de dos entradas de PROD_CLIENTES_MAP en un mapa {cli:{q,u}}
+// Devuelve TODOS los SKUs del periodo (PROD_CLIENTES_MAP) que son variantes del mismo base:
+// el propio SKU + cualquier otro que empiece con el base y tenga como mucho 1 carácter extra.
+function todasVariantesDeSku(sku) {
+  var base = skuBase(sku);
+  var found = {};
+  found[sku] = true;
+  Object.keys(PROD_CLIENTES_MAP).forEach(function(s) {
+    if (s !== sku && s.indexOf(base) === 0 && s.length <= base.length + 1) found[s] = true;
+  });
+  return Object.keys(found);
+}
+
+// Fusiona los clientes de una lista de SKUs en un mapa {cli:{q,u}}
 function mergeClientes(skus) {
   var merged = {};
   skus.forEach(function(s) {
@@ -894,9 +905,9 @@ function toggleProdDetalle(rowId) {
 function buildProdDetalleHtml(sku) {
   var serigColor = '#92400E';
   var sections = [];
-  var variantes = skuVariantes(sku); // [sku] o [sku, baseSku]
+  var variantes = todasVariantesDeSku(sku); // sku + todas sus variantes en el periodo
 
-  // — clientes directos (fusiona sku + variante base si existe) —
+  // — clientes directos (fusiona todas las variantes del mismo SKU base) —
   var clisMerged = mergeClientes(variantes);
   if (Object.keys(clisMerged).length) {
     var clis = Object.keys(clisMerged).sort(function(a,b){ return clisMerged[b].q - clisMerged[a].q; });
@@ -948,7 +959,7 @@ function buildTopProdRow(rowId, idx, sku, dat, total) {
   var m = dat.muestra;
   var pct = total > 0 ? dat.q / total * 100 : 0;
   var desc = m.descripcion || sku || '—';
-  var hasSerig = SERIG_BASE_REVERSE && skuVariantes(sku).some(function(v){ return (SERIG_BASE_REVERSE[v] || []).length > 0; });
+  var hasSerig = SERIG_BASE_REVERSE && todasVariantesDeSku(sku).some(function(v){ return (SERIG_BASE_REVERSE[v] || []).length > 0; });
   var badge = hasSerig ? ' <span style="font-size:8px;background:#fef3c7;color:#92400E;border-radius:3px;padding:1px 4px;vertical-align:middle;font-weight:700">+Serig</span>' : '';
   return '<tr id="prodRow-' + rowId + '" onclick="toggleProdDetalle(' + rowId + ')" style="cursor:pointer" ' +
     'onmouseenter="this.style.background=\'#eff6ff\';this.firstElementChild.style.borderLeftColor=\'var(--ven)\'" ' +
