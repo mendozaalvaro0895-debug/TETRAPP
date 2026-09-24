@@ -653,6 +653,10 @@ function fmtU(n) {
 function fmtPct(n) {
   return (Math.round(n * 10) / 10).toFixed(1) + '%';
 }
+function fechaHoy() {
+  var d = new Date(Date.now() - 6 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+}
 function nombreCorto(nombre) {
   if (!nombre || nombre === '—') return nombre;
   var s = nombre.trim().toUpperCase();
@@ -896,11 +900,17 @@ function mergeClientes(skus) {
 
 function toggleProdDetalle(rowId) {
   var det = document.getElementById('prodDet-' + rowId);
+  var row = document.getElementById('prodRow-' + rowId);
   var arr = document.getElementById('prodArr-' + rowId);
-  if (!det) return;
+  if (!det || !row) return;
   var opening = det.style.display === 'none';
   det.style.display = opening ? 'table-row' : 'none';
   if (arr) arr.textContent = opening ? '▴' : '▾';
+  if (opening) {
+    var sku = row.getAttribute('data-sku');
+    var td = det.querySelector('td');
+    if (td && sku) td.innerHTML = buildProdDetalleHtml(sku);
+  }
 }
 
 function buildProdDetalleHtml(sku) {
@@ -962,7 +972,7 @@ function buildTopProdRow(rowId, idx, sku, dat, total) {
   var desc = m.descripcion || sku || '—';
   var hasSerig = SERIG_BASE_REVERSE && todasVariantesDeSku(sku).some(function(v){ return (SERIG_BASE_REVERSE[v] || []).length > 0; });
   var badge = hasSerig ? ' <span style="font-size:8px;background:#fef3c7;color:#92400E;border-radius:3px;padding:1px 4px;vertical-align:middle;font-weight:700">+Serig</span>' : '';
-  return '<tr id="prodRow-' + rowId + '" onclick="toggleProdDetalle(' + rowId + ')" style="cursor:pointer" ' +
+  return '<tr id="prodRow-' + rowId + '" data-sku="' + escHtml(sku) + '" onclick="toggleProdDetalle(' + rowId + ')" style="cursor:pointer" ' +
     'onmouseenter="this.style.background=\'#eff6ff\';this.firstElementChild.style.borderLeftColor=\'var(--ven)\'" ' +
     'onmouseleave="this.style.background=\'\';this.firstElementChild.style.borderLeftColor=\'transparent\'">' +
     '<td class="num pct-cell" style="font-size:10px;color:var(--gray);border-left:3px solid transparent;transition:border-color .15s">' + idx + '</td>' +
@@ -976,9 +986,7 @@ function buildTopProdRow(rowId, idx, sku, dat, total) {
       ' <span id="prodArr-' + rowId + '" style="font-size:10px;color:#cbd5e1;margin-left:4px">▾</span></td>' +
     '</tr>' +
     '<tr id="prodDet-' + rowId + '" style="display:none">' +
-      '<td colspan="5" style="padding:8px 12px 12px 28px;background:#f8fafc;border-bottom:1px solid var(--border)">' +
-        buildProdDetalleHtml(sku) +
-      '</td>' +
+      '<td colspan="5" style="padding:8px 12px 12px 28px;background:#f8fafc;border-bottom:1px solid var(--border)"></td>' +
     '</tr>';
 }
 
@@ -1201,11 +1209,18 @@ function renderProductos() {
 // ── RENDER: Clientes ────────────────────────────────────────────
 function toggleCliDetalle(rowId) {
   var det = document.getElementById('cliDet-' + rowId);
+  var row = document.getElementById('cliRow-' + rowId);
   var arr = document.getElementById('cliArr-' + rowId);
-  if (!det) return;
+  if (!det || !row) return;
   var opening = det.style.display === 'none';
   det.style.display = opening ? 'table-row' : 'none';
   if (arr) arr.textContent = opening ? '▴' : '▾';
+  if (opening) {
+    var nombre = row.getAttribute('data-nombre');
+    var totalCli = parseFloat(row.getAttribute('data-q') || '0');
+    var td = det.querySelector('td');
+    if (td && nombre) td.innerHTML = buildCliDetalleHtml(nombre, totalCli);
+  }
 }
 
 function buildCliDetalleHtml(nombre, totalCli) {
@@ -1232,7 +1247,7 @@ function buildCliDetalleHtml(nombre, totalCli) {
 function buildCliRow(rowId, idx, nombre, dat, total, qAntMap) {
   var pct = total > 0 ? dat.q / total * 100 : 0;
   var delta = qAntMap === null ? null : (qAntMap[nombre] ? qAntMap[nombre].q : 0);
-  return '<tr id="cliRow-' + rowId + '" onclick="toggleCliDetalle(' + rowId + ')" style="cursor:pointer"' +
+  return '<tr id="cliRow-' + rowId + '" data-nombre="' + escHtml(nombre) + '" data-q="' + dat.q + '" onclick="toggleCliDetalle(' + rowId + ')" style="cursor:pointer"' +
     ' onmouseenter="this.style.background=\'#eff6ff\';this.firstElementChild.style.borderLeftColor=\'var(--ven)\'"' +
     ' onmouseleave="this.style.background=\'\';this.firstElementChild.style.borderLeftColor=\'transparent\'">' +
     '<td class="pct-cell" style="border-left:3px solid transparent;transition:border-color .15s">' + idx + '</td>' +
@@ -1246,9 +1261,7 @@ function buildCliRow(rowId, idx, nombre, dat, total, qAntMap) {
       ' <span id="cliArr-' + rowId + '" style="font-size:10px;color:#cbd5e1;margin-left:4px">▾</span></td>' +
     '</tr>' +
     '<tr id="cliDet-' + rowId + '" style="display:none">' +
-      '<td colspan="7" style="padding:8px 12px 12px 28px;background:#f8fafc;border-bottom:1px solid var(--border)">' +
-        buildCliDetalleHtml(nombre, dat.q) +
-      '</td>' +
+      '<td colspan="7" style="padding:8px 12px 12px 28px;background:#f8fafc;border-bottom:1px solid var(--border)"></td>' +
     '</tr>';
 }
 
