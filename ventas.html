@@ -1263,7 +1263,7 @@ function buildCliDetalleHtml(nombre, totalCli) {
   var prods = CLI_PRODS_MAP[nombre];
   if (!prods || !Object.keys(prods).length)
     return '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Sin detalle en este periodo</div>';
-  var skus = Object.keys(prods).sort(function(a,b){ return prods[b].q - prods[a].q; }).slice(0, 15);
+  var skus = Object.keys(prods).sort(function(a,b){ return prods[b].q - prods[a].q; }).slice(0, 5);
   return skus.map(function(sku, i) {
     var d = prods[sku];
     var pct = totalCli > 0 ? d.q / totalCli * 100 : 0;
