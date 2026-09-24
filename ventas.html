@@ -909,9 +909,11 @@ function renderAporteArea(filas, total) {
     if (!area) return;
     var q = qVal(v.total_quetzales || 0);
     porArea[area] += q;
-    if (!porAreaProds[area][sku]) porAreaProds[area][sku] = { q: 0, u: 0, desc: v.descripcion || sku };
+    if (!porAreaProds[area][sku]) porAreaProds[area][sku] = { q: 0, u: 0, desc: v.descripcion || sku, clientes: {} };
     porAreaProds[area][sku].q += q;
     porAreaProds[area][sku].u += (v.total_unidades || 0);
+    var cli = (v.cliente || '').trim();
+    if (cli) porAreaProds[area][sku].clientes[cli] = (porAreaProds[area][sku].clientes[cli] || 0) + q;
   });
 
   AREA_PRODS = {};
@@ -919,7 +921,11 @@ function renderAporteArea(filas, total) {
     AREA_PRODS[area] = Object.keys(porAreaProds[area])
       .sort(function(a, b) { return porAreaProds[area][b].q - porAreaProds[area][a].q; })
       .slice(0, 5)
-      .map(function(sku) { return { sku: sku, desc: porAreaProds[area][sku].desc, q: porAreaProds[area][sku].q, u: porAreaProds[area][sku].u }; });
+      .map(function(sku) {
+        var d = porAreaProds[area][sku];
+        var clis = Object.keys(d.clientes).sort(function(a, b) { return d.clientes[b] - d.clientes[a]; });
+        return { sku: sku, desc: d.desc, q: d.q, u: d.u, cliente: clis[0] || '—', masClientes: clis.length - 1 };
+      });
   });
 
   var sub = document.getElementById('aporteAreaSub');
@@ -956,14 +962,19 @@ function renderAporteArea(filas, total) {
         (prods.length ? prods.map(function(p, i) {
           var ppct = v > 0 ? p.q / v * 100 : 0;
           var desc = p.desc || p.sku;
-          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9">' +
-            '<div style="width:16px;font-size:10px;color:#94a3b8;text-align:right;flex-shrink:0">' + (i+1) + '</div>' +
+          var cliLabel = escHtml(p.cliente) + (p.masClientes > 0 ? ' <span style="color:#94a3b8">+' + p.masClientes + '</span>' : '');
+          return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9">' +
+            '<div style="width:16px;font-size:10px;color:#94a3b8;text-align:right;flex-shrink:0;padding-top:2px">' + (i+1) + '</div>' +
             '<div style="flex:1;min-width:0">' +
-              '<div style="font-size:12px;color:#1e293b;line-height:1.35">' + escHtml(desc) + '</div>' +
-              '<div style="font-size:9px;font-family:var(--mono);color:#94a3b8">' + escHtml(p.sku) + '</div>' +
+              '<div style="font-size:12px;color:#1e293b;line-height:1.35;font-weight:500">' + escHtml(desc) + '</div>' +
+              '<div style="font-size:9px;font-family:var(--mono);color:#94a3b8;margin-top:1px">' + escHtml(p.sku) + '</div>' +
+              '<div style="font-size:10px;color:#475569;margin-top:2px">👤 ' + cliLabel + '</div>' +
             '</div>' +
-            '<div style="font-size:12px;font-weight:600;color:' + color + ';flex-shrink:0">' + fmtQ(p.q) + '</div>' +
-            '<div style="font-size:10px;color:#94a3b8;width:34px;text-align:right;flex-shrink:0">' + fmtPct(ppct) + '</div>' +
+            '<div style="text-align:right;flex-shrink:0">' +
+              '<div style="font-size:12px;font-weight:600;color:' + color + '">' + fmtQ(p.q) + '</div>' +
+              '<div style="font-size:10px;color:#64748b;margin-top:1px">' + fmtU(p.u) + ' und</div>' +
+            '</div>' +
+            '<div style="font-size:10px;color:#94a3b8;width:34px;text-align:right;flex-shrink:0;padding-top:2px">' + fmtPct(ppct) + '</div>' +
           '</div>';
         }).join('') : '<div style="font-size:12px;color:#94a3b8;padding:4px 0">Sin datos</div>') +
       '</div>' +
