@@ -1143,21 +1143,57 @@ function renderFamilias(filas, total) {
     '<tr class="empty-row"><td colspan="5">Sin datos en este periodo</td></tr>';
 }
 
-function buildTopCliRow(nombre, dat, total) {
+function toggleTopCliDetalle(rowId) {
+  var det = document.getElementById('cliTopDet-' + rowId);
+  var row = document.getElementById('cliTopRow-' + rowId);
+  var arr = document.getElementById('cliTopArr-' + rowId);
+  if (!det || !row) return;
+  var opening = det.style.display === 'none';
+  det.style.display = opening ? 'table-row' : 'none';
+  if (arr) arr.textContent = opening ? '▴' : '▾';
+  if (opening) {
+    var nombre = row.getAttribute('data-nombre');
+    var totalCli = parseFloat(row.getAttribute('data-q') || '0');
+    var td = det.querySelector('td');
+    if (td && nombre) td.innerHTML = buildCliDetalleHtml(nombre, totalCli);
+  }
+}
+
+function buildTopCliRow(rowId, nombre, dat, total) {
   var pct = total > 0 ? dat.q / total * 100 : 0;
-  return '<tr>' +
-    '<td class="desc-cell" title="' + escHtml(nombre) + '">' + escHtml(nombre.length > 34 ? nombre.slice(0, 34) + '…' : nombre) + '</td>' +
+  return '<tr id="cliTopRow-' + rowId + '" data-nombre="' + escHtml(nombre) + '" data-q="' + dat.q + '"' +
+    ' onclick="toggleTopCliDetalle(' + rowId + ')" style="cursor:pointer"' +
+    ' onmouseenter="this.style.background=\'#eff6ff\';this.firstElementChild.style.borderLeftColor=\'var(--ven)\'"' +
+    ' onmouseleave="this.style.background=\'\';this.firstElementChild.style.borderLeftColor=\'transparent\'">' +
+    '<td class="desc-cell" style="border-left:3px solid transparent;transition:border-color .15s" title="' + escHtml(nombre) + '">' + escHtml(nombreCorto(nombre)) + '</td>' +
     '<td class="num">' + fmtQ(dat.q) + '</td>' +
-    '<td class="num pct-cell">' + fmtPct(pct) + '</td>' +
+    '<td class="num pct-cell">' + fmtPct(pct) +
+      ' <span id="cliTopArr-' + rowId + '" style="font-size:10px;color:#cbd5e1;margin-left:4px">▾</span></td>' +
+    '</tr>' +
+    '<tr id="cliTopDet-' + rowId + '" style="display:none">' +
+      '<td colspan="3" style="padding:8px 12px 12px 20px;background:#f8fafc;border-bottom:1px solid var(--border)"></td>' +
     '</tr>';
 }
 
 function renderTopClientes(filas, total) {
   var porCli = agrupar(filas, function (v) { return v.cliente || '—'; });
   var noms = Object.keys(porCli).sort(function (a, b) { return porCli[b].q - porCli[a].q; }).slice(0, 8);
+
+  // Poblar CLI_PRODS_MAP si aún no lo hizo renderClientes
+  if (!Object.keys(CLI_PRODS_MAP).length) {
+    filas.forEach(function(v) {
+      var cli = v.cliente || '—';
+      var sku = (v.sku || '—').trim();
+      if (!CLI_PRODS_MAP[cli]) CLI_PRODS_MAP[cli] = {};
+      if (!CLI_PRODS_MAP[cli][sku]) CLI_PRODS_MAP[cli][sku] = { q: 0, u: 0, desc: v.descripcion || sku };
+      CLI_PRODS_MAP[cli][sku].q += v.total_quetzales;
+      CLI_PRODS_MAP[cli][sku].u += v.total_unidades;
+    });
+  }
+
   document.getElementById('cliTopSub').textContent = mesLabel(mesSel);
   var html = '';
-  noms.forEach(function (n) { html += buildTopCliRow(n, porCli[n], total); });
+  noms.forEach(function (n, i) { html += buildTopCliRow(i + 1, n, porCli[n], total); });
   document.getElementById('cliTopBody').innerHTML = html ||
     '<tr class="empty-row"><td colspan="3">Sin datos en este periodo</td></tr>';
 }
