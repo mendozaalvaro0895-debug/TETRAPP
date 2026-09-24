@@ -2494,8 +2494,19 @@ function renderStockEstancado() {
   var hoyStr = fechaHoy();
   var hoyMs = new Date(hoyStr + 'T12:00:00').getTime();
 
+  // Mapa sku → familia, construido desde VENTAS (que sí tiene familia)
+  var skuFamilia = {};
+  VENTAS.forEach(function(v) {
+    if (v.sku && v.familia && !skuFamilia[v.sku]) skuFamilia[v.sku] = (v.familia || '').toUpperCase();
+  });
+
   var estancados = [];
   STOCK_EST_INV.forEach(function(item) {
+    // Solo envases: familia ENVASE en ventas, o descripción que empiece con ENV
+    var fam = skuFamilia[item.sku] || '';
+    var desc = (item.descripcion || '').toUpperCase();
+    var esEnvase = fam === 'ENVASE' || (!fam && (desc.indexOf('ENVASE') === 0 || desc.indexOf('ENV.') === 0 || desc.indexOf('ENV ') === 0));
+    if (!esEnvase) return;
     var last = ultimaVenta[item.sku] || null;
     var dias = last ? Math.floor((hoyMs - new Date(last + 'T12:00:00').getTime()) / 86400000) : null;
     if (dias === null || dias >= ESTANCADO_DIAS) {
