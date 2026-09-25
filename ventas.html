@@ -1063,10 +1063,11 @@ function renderAporteArea(filas, total) {
   var sub = document.getElementById('aporteAreaSub');
   if (sub) sub.textContent = mesLabel(mesSel);
 
+  var totalAreas = areas.reduce(function(s,a){ return s + (porArea[a]||0); }, 0);
   var html = '<div style="display:flex;flex-direction:column;gap:8px">';
   areas.forEach(function(area) {
     var v = porArea[area] || 0;
-    var pct = total > 0 ? v / total * 100 : 0;
+    var pct = totalAreas > 0 ? v / totalAreas * 100 : 0;
     var color = AREA_COLORS[area];
     var areaId = AREA_IDS[area];
     var prods = AREA_PRODS[area] || [];
@@ -2695,11 +2696,12 @@ function generarReporte() {
   });
   var AREA_C = { 'Producción':'#1D4ED8', 'Tapas':'#065F46', 'Serigrafía':'#92400E' };
   var areasOrd = Object.keys(porAreaQ).sort(function(a,b){ return porAreaQ[b]-porAreaQ[a]; });
+  var totalAreas = areasOrd.reduce(function(s,a){ return s + porAreaQ[a]; }, 0);
 
   var areaHtml = '';
   areasOrd.forEach(function(area) {
     var av = porAreaQ[area];
-    var pct = q > 0 ? av/q*100 : 0;
+    var pct = totalAreas > 0 ? av/totalAreas*100 : 0;
     var pctStr = fmtPct(pct);
     var color = AREA_C[area] || '#6b7280';
     var skusArea = Object.keys(areaProdData[area]).sort(function(a,b){ return areaProdData[area][b].q - areaProdData[area][a].q; }).slice(0,5);
