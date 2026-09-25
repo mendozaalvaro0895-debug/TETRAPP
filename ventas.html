@@ -2407,6 +2407,7 @@ function rcAcCerrar(sid) {
 var STOCK_EST_INV = [];
 var STOCK_EST_CARGADO = false;
 var ESTANCADO_DIAS = 30;
+var ESTANCADO_TAB = 'envases';
 
 // SKUs que han pasado por Serigrafía (cargados desde solicitud_lineas)
 var SERIG_SKUS = null; // null = aún cargando; Set vacío = cargado sin datos
@@ -2482,13 +2483,38 @@ function setEstancadoDias(d) {
   renderStockEstancado();
 }
 
+function setEstancadoTab(t) {
+  ESTANCADO_TAB = t;
+  renderStockEstancado();
+}
+
+function buildEstancadosDeTabla(tab, skuFamilia, ultimaVenta, hoyMs) {
+  var lista = [];
+  STOCK_EST_INV.forEach(function(item) {
+    var fam = skuFamilia[item.sku] || '';
+    var desc = (item.descripcion || '').toUpperCase();
+    var ok = false;
+    if (tab === 'envases') {
+      ok = fam === 'ENVASE' || (!fam && (desc.indexOf('ENVASE') === 0 || desc.indexOf('ENV.') === 0 || desc.indexOf('ENV ') === 0));
+    } else {
+      ok = fam.indexOf('TAPA') === 0 || (!fam && desc.indexOf('TAPA') === 0);
+    }
+    if (!ok) return;
+    var last = ultimaVenta[item.sku] || null;
+    var dias = last ? Math.floor((hoyMs - new Date(last + 'T12:00:00').getTime()) / 86400000) : null;
+    if (dias === null || dias >= ESTANCADO_DIAS) {
+      lista.push({ sku: item.sku, descripcion: item.descripcion, existencia: item.existencia, ultimaVenta: last, dias: dias });
+    }
+  });
+  lista.sort(function(a, b) { return b.existencia - a.existencia; });
+  return lista;
+}
+
 function renderStockEstancado() {
   if (!STOCK_EST_CARGADO) return;
 
   var ultimaVenta = {};
-  // Mapa sku → familia, construido desde VENTAS (que sí tiene familia)
   var skuFamilia = {};
-  // Mapa sku → { cliente: Q } para recomendar a quién ofrecer
   var skuClientes = {};
   VENTAS.forEach(function(v) {
     if (!v.sku) return;
@@ -2503,28 +2529,35 @@ function renderStockEstancado() {
   var hoyStr = fechaHoy();
   var hoyMs = new Date(hoyStr + 'T12:00:00').getTime();
 
-  var estancados = [];
-  STOCK_EST_INV.forEach(function(item) {
-    // Solo envases: familia ENVASE en ventas, o descripción que empiece con ENV
-    var fam = skuFamilia[item.sku] || '';
-    var desc = (item.descripcion || '').toUpperCase();
-    var esEnvase = fam === 'ENVASE' || (!fam && (desc.indexOf('ENVASE') === 0 || desc.indexOf('ENV.') === 0 || desc.indexOf('ENV ') === 0));
-    if (!esEnvase) return;
-    var last = ultimaVenta[item.sku] || null;
-    var dias = last ? Math.floor((hoyMs - new Date(last + 'T12:00:00').getTime()) / 86400000) : null;
-    if (dias === null || dias >= ESTANCADO_DIAS) {
-      estancados.push({ sku: item.sku, descripcion: item.descripcion, existencia: item.existencia, ultimaVenta: last, dias: dias });
-    }
-  });
-  estancados.sort(function(a, b) { return b.existencia - a.existencia; });
-  estancados = estancados.slice(0, 100);
+  var envases = buildEstancadosDeTabla('envases', skuFamilia, ultimaVenta, hoyMs);
+  var tapas   = buildEstancadosDeTabla('tapas',   skuFamilia, ultimaVenta, hoyMs);
+  var estancados = ESTANCADO_TAB === 'tapas' ? tapas : envases;
 
   var badge = document.getElementById('estBadge');
-  if (badge) badge.textContent = estancados.length ? '(' + estancados.length + ')' : '';
+  if (badge) badge.textContent = (envases.length + tapas.length) ? '(' + (envases.length + tapas.length) + ')' : '';
 
   var body = document.getElementById('estBody');
   if (!body || !body.classList.contains('open')) return;
 
+  // — Pestañas —
+  function tabBtn(t, label, n) {
+    var sel = ESTANCADO_TAB === t;
+    return '<button onclick="setEstancadoTab(\'' + t + '\')" style="padding:6px 18px;border:none;border-bottom:2.5px solid ' +
+      (sel ? 'var(--ven)' : 'transparent') +
+      ';background:none;font-size:12px;font-weight:' + (sel ? '800' : '600') +
+      ';color:' + (sel ? 'var(--ven)' : 'var(--gray)') +
+      ';cursor:pointer;font-family:var(--font);white-space:nowrap">' + label +
+      ' <span style="background:' + (sel ? 'var(--ven)' : '#e2e8f0') +
+      ';color:' + (sel ? '#fff' : 'var(--gray)') +
+      ';border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700">' + n + '</span></button>';
+  }
+
+  var tabs = '<div style="display:flex;border-bottom:1px solid var(--border);padding:0 16px;gap:4px">' +
+    tabBtn('envases', 'Envases', envases.length) +
+    tabBtn('tapas', 'Tapas', tapas.length) +
+    '</div>';
+
+  // — Botones de umbral —
   var umbralBtns = [30, 60, 90, 180].map(function(d) {
     var sel = ESTANCADO_DIAS === d;
     return '<button onclick="setEstancadoDias(' + d + ')" style="padding:4px 12px;border:1.5px solid ' +
@@ -2535,7 +2568,8 @@ function renderStockEstancado() {
       ';font-family:var(--font)">' + d + ' días</button>';
   }).join('');
 
-  var html = '<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+  var html = tabs +
+    '<div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
     '<span style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Sin venta hace más de</span>' +
     umbralBtns + '</div>';
 
@@ -2550,7 +2584,8 @@ function renderStockEstancado() {
       '<div style="flex:1;min-width:120px"><div style="font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)">Total existencias</div>' +
       '<div style="font-family:var(--mono);font-size:20px;font-weight:700">' + fmtU(totalExist) + '</div></div>' +
       '</div>' +
-      '<div class="tbl-scroll"><table class="tbl"><thead><tr>' +
+      '<div style="max-height:480px;overflow-y:auto">' +
+      '<table class="tbl" style="min-width:700px"><thead><tr style="position:sticky;top:0;z-index:2">' +
       '<th>#</th><th>SKU</th><th>Descripción</th>' +
       '<th class="num">Existencia</th><th>Ofrecerlo a…</th><th class="num">Última venta</th><th class="num">Días sin venta</th>' +
       '</tr></thead><tbody>';
