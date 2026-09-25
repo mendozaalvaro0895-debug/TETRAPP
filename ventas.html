@@ -998,10 +998,20 @@ var AREA_FAM_MAP = {
   'CONSUMIBLES':        'Producción',
   'EMPAQUE Y EMBALAJE': 'Producción',
   'TAPA':               'Tapas',
-  'BASE TAPA':          'Tapas',
+  'BASE':               'Tapas',
+  'CONTRATAPA':         'Tapas',
   'LINER':              'Tapas',
   'SERVICIO':           'Serigrafía'
 };
+var AREA_VENTAS_OVERRIDE_MAP = { 'produccion': 'Producción', 'tapas': 'Tapas', 'serig': 'Serigrafía' };
+// { sku: 'Producción'|'Tapas'|'Serigrafía' } — cargado desde inventario.area_ventas
+var SKU_AREA_OVERRIDES = {};
+
+function clasificarArea(sku, fam) {
+  if (sku && SKU_AREA_OVERRIDES[sku]) return SKU_AREA_OVERRIDES[sku];
+  if (sku && SERIG_SKUS && SERIG_SKUS.has(sku)) return 'Serigrafía';
+  return AREA_FAM_MAP[fam] || null;
+}
 var AREA_COLORS = {
   'Producción': '#1D4ED8',
   'Tapas':      '#065F46',
@@ -1037,7 +1047,7 @@ function renderAporteArea(filas, total) {
   filas.forEach(function(v) {
     var sku = (v.sku || '').trim();
     var fam = ((v.descripcion_familia || v.familia || '')).trim().toUpperCase();
-    var area = (sku && SERIG_SKUS.has(sku)) ? 'Serigrafía' : AREA_FAM_MAP[fam];
+    var area = clasificarArea(sku, fam);
     if (!area) return;
     var q = qVal(v.total_quetzales || 0);
     porArea[area] += q;
@@ -2450,13 +2460,27 @@ async function cargarSerigSkus() {
 async function cargarStockEstancado() {
   try {
     var r = await db.from('inventario')
-      .select('sku,descripcion,existencia,activo')
+      .select('sku,descripcion,existencia,activo,area_ventas')
       .order('descripcion')
       .limit(2000);
     var todos = r.error ? [] : (r.data || []);
     STOCK_EST_INV = todos.filter(function(item) {
       return item.activo && (parseFloat(item.existencia) || 0) > 0;
     });
+    // Construir mapa de overrides de área para clasificarArea()
+    SKU_AREA_OVERRIDES = {};
+    todos.forEach(function(item) {
+      if (item.area_ventas && item.sku) {
+        SKU_AREA_OVERRIDES[item.sku] = AREA_VENTAS_OVERRIDE_MAP[item.area_ventas] || null;
+      }
+    });
+    // Re-renderizar bloques de área si ya hay ventas cargadas
+    if (VENTAS.length) {
+      var filas = filasDelPeriodo(mesSel);
+      var q = totalQ(filas);
+      var aporteBody = document.getElementById('aporteAreaBody');
+      if (aporteBody) renderAporteArea(filas, q);
+    }
     STOCK_EST_CARGADO = true;
     renderStockEstancado();
   } catch (e) {
@@ -2682,7 +2706,7 @@ function generarReporte() {
   filas.forEach(function(v) {
     var sku = (v.sku || '').trim();
     var fam = ((v.descripcion_familia || v.familia || '')).trim().toUpperCase();
-    var area = (sku && SERIG_SKUS.has(sku)) ? 'Serigrafía' : (AREA_FAM_MAP[fam] || null);
+    var area = clasificarArea(sku, fam);
     if (!area) return;
     var qv = qVal(v.total_quetzales || 0);
     porAreaQ[area] = (porAreaQ[area] || 0) + qv;

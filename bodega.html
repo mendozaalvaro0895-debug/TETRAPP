@@ -299,6 +299,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
             <th class="sortable" onclick="ordenar('descripcion')" id="th-descripcion">Descripción<span class="sort-ico">↕</span></th>
             <th class="sortable" onclick="ordenar('existencia')" id="th-existencia" style="text-align:right">Existencia<span class="sort-ico">↕</span></th>
             <th id="th-minimo" style="text-align:right;display:none">Mínimo</th>
+            <th id="th-areaventas">Área Venta</th>
             <th class="sortable" onclick="ordenar('activo')" id="th-activo">Estado<span class="sort-ico">↕</span></th>
             <th></th>
           </tr>
@@ -617,14 +618,14 @@ var sortCol = 'sku';
 var sortDir = 1;
 
 async function cargarTodo() {
-  document.getElementById('tblBody').innerHTML = '<tr class="empty-row"><td colspan="5">Cargando…</td></tr>';
+  document.getElementById('tblBody').innerHTML = '<tr class="empty-row"><td colspan="6">Cargando…</td></tr>';
   try {
     var todos = [];
     var desde = 0;
     var BATCH = 1000;
     while (true) {
       var r = await db.from('inventario')
-        .select('sku,descripcion,existencia,facturable,activo,bodega,stock_minimo')
+        .select('sku,descripcion,existencia,facturable,activo,bodega,stock_minimo,area_ventas')
         .order('sku', { ascending: true })
         .range(desde, desde + BATCH - 1);
       if (r.error) throw r.error;
@@ -792,6 +793,8 @@ function buildFila(item) {
     minimoTd = '<td class="min-cell"><span id="mv-' + escHtml(item.sku) + '" ondblclick="editarMinimo(\'' + skuEsc + '\')" title="Doble clic para editar mínimo">' + minLbl + '</span></td>';
   }
 
+  var areaVentasTd = buildAreaVentasTd(item);
+
   return '<tr class="' + rowClass + '">' +
     '<td class="sku-cell">' + escHtml(item.sku) + '</td>' +
     '<td class="desc-cell">' + escHtml(item.descripcion || '—') + '</td>' +
@@ -799,12 +802,72 @@ function buildFila(item) {
       '<span id="ev-' + escHtml(item.sku) + '" ondblclick="editarExist(\'' + skuEsc + '\')" title="Doble clic para editar">' + exist + '</span>' +
     '</td>' +
     minimoTd +
+    areaVentasTd +
     '<td>' + badge + '</td>' +
     '<td><div class="act-btns">' +
       '<button class="btn btn-ghost btn-sm" onclick="editarExist(\'' + skuEsc + '\')" title="Actualizar existencia">📝</button>' +
       '<button class="btn btn-ghost btn-sm" onclick="toggleActivo(\'' + skuEsc + '\',' + item.activo + ')">' + toggleLabel + '</button>' +
     '</div></td>' +
   '</tr>';
+}
+
+var AREA_VENTAS_LABELS = { 'produccion': 'Producción', 'tapas': 'Tapas', 'serig': 'Serigrafía' };
+var AREA_VENTAS_COLORS = { 'produccion': '#1D4ED8', 'tapas': '#065F46', 'serig': '#92400E' };
+
+function buildAreaVentasTd(item) {
+  if (bodegaFiltro === 'B7') return '<td id="av-' + escHtml(item.sku) + '"></td>';
+  var val = item.area_ventas || '';
+  var label = val ? AREA_VENTAS_LABELS[val] : 'Auto';
+  var color = val ? AREA_VENTAS_COLORS[val] : '#A8A6A0';
+  var skuAt = escHtml(item.sku.replace(/'/g, "\\'"));
+  return '<td id="av-' + escHtml(item.sku) + '">' +
+    '<span class="av-pill" style="color:' + color + ';background:' + color + '1A;border:1px solid ' + color + '44;' +
+    'font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;cursor:pointer;white-space:nowrap" ' +
+    'onclick="abrirAreaVentas(\'' + skuAt + '\')" title="Clic para cambiar área de venta">' + escHtml(label) + '</span>' +
+    '</td>';
+}
+
+function abrirAreaVentas(sku) {
+  var item = todosLosItems.find(function(i) { return i.sku === sku; });
+  if (!item) return;
+  var cell = document.getElementById('av-' + sku);
+  if (!cell) return;
+  var skuAt = escHtml(sku.replace(/'/g, "\\'"));
+  cell.innerHTML = '<select id="avsel-' + escHtml(sku) + '" ' +
+    'onchange="guardarAreaVentas(\'' + skuAt + '\',this.value)" ' +
+    'onblur="cancelarAreaVentas(\'' + skuAt + '\')" ' +
+    'style="font-size:11px;padding:2px 4px;border-radius:6px;border:1.5px solid var(--ven);outline:none">' +
+    '<option value="">Auto (familia)</option>' +
+    '<option value="produccion"' + (item.area_ventas === 'produccion' ? ' selected' : '') + '>Producción</option>' +
+    '<option value="tapas"'      + (item.area_ventas === 'tapas'      ? ' selected' : '') + '>Tapas</option>' +
+    '<option value="serig"'      + (item.area_ventas === 'serig'      ? ' selected' : '') + '>Serigrafía</option>' +
+    '</select>';
+  var sel = document.getElementById('avsel-' + sku);
+  if (sel) { sel.focus(); }
+}
+
+function cancelarAreaVentas(sku) {
+  var item = todosLosItems.find(function(i) { return i.sku === sku; });
+  if (!item) return;
+  var cell = document.getElementById('av-' + sku);
+  if (cell) cell.innerHTML = buildAreaVentasTd(item).replace(/^<td[^>]*>/, '').replace(/<\/td>$/, '');
+}
+
+async function guardarAreaVentas(sku, val) {
+  var item = todosLosItems.find(function(i) { return i.sku === sku; });
+  if (!item) return;
+  var nuevoVal = val || null;
+  try {
+    var r = await db.from('inventario').update({ area_ventas: nuevoVal }).eq('sku', sku);
+    if (r.error) throw r.error;
+    item.area_ventas = nuevoVal;
+    var cell = document.getElementById('av-' + sku);
+    if (cell) cell.innerHTML = buildAreaVentasTd(item).replace(/^<td[^>]*>/, '').replace(/<\/td>$/, '');
+    toast('Área de venta actualizada', 'ok');
+  } catch(e) {
+    toast('Error: ' + e.message, 'err');
+    cancelarAreaVentas(sku);
+  }
 }
 
 function editarExist(sku) {
@@ -913,6 +976,8 @@ function setBodega(val) {
   });
   var thMin = document.getElementById('th-minimo');
   if (thMin) thMin.style.display = val === 'B7' ? 'table-cell' : 'none';
+  var thAv = document.getElementById('th-areaventas');
+  if (thAv) thAv.style.display = val === 'B7' ? 'none' : 'table-cell';
   pag = 0;
   actualizarStats();
   aplicarFiltro();
