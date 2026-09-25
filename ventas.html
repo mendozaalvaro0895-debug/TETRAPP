@@ -380,9 +380,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="kpi-s" id="kpiDeltaSub">—</div>
         </div>
         <div class="kpi">
-          <div class="kpi-l">Unidades</div>
+          <div class="kpi-l">Unidades Facturadas</div>
           <div class="kpi-v" id="kpiUnidades">—</div>
-          <div class="kpi-s" id="kpiUnidadesSub">facturadas en el mes</div>
+          <div class="kpi-s" id="kpiUnidadesSub">—</div>
         </div>
         <div class="kpi">
           <div class="kpi-l">Facturas</div>
@@ -824,12 +824,17 @@ function renderResumen() {
 
   var ant = mesSel === 'todo' ? null : mesAnterior(mesSel);
   if (ant) {
-    var qAnt = totalQ(filasDelPeriodo(ant));
+    var filasAnt = filasDelPeriodo(ant);
+    var qAnt = totalQ(filasAnt);
+    var uAnt = 0;
+    filasAnt.forEach(function(v) { uAnt += v.total_unidades; });
     document.getElementById('kpiDelta').innerHTML = deltaHtml(q, qAnt);
     document.getElementById('kpiDeltaSub').textContent = mesLabel(ant) + ': ' + fmtQ(qAnt);
+    document.getElementById('kpiUnidadesSub').textContent = mesLabel(ant) + ': ' + fmtU(uAnt) + ' und';
   } else {
     document.getElementById('kpiDelta').textContent = '—';
     document.getElementById('kpiDeltaSub').textContent = mesSel === 'todo' ? 'selecciona un mes' : 'primer mes con datos';
+    document.getElementById('kpiUnidadesSub').textContent = mesSel === 'todo' ? '—' : 'primer mes con datos';
   }
 
   renderChart();
@@ -2659,7 +2664,9 @@ function generarReporte() {
   var nCli = Object.keys(cliSet).length;
 
   var ant = mesSel === 'todo' ? null : mesAnterior(mesSel);
-  var qAnt = ant ? totalQ(filasDelPeriodo(ant)) : null;
+  var filasAntRpt = ant ? filasDelPeriodo(ant) : [];
+  var qAnt = ant ? totalQ(filasAntRpt) : null;
+  var uAnt = 0; filasAntRpt.forEach(function(v) { uAnt += v.total_unidades; });
   var deltaStr = '—'; var deltaLabel = ''; var deltaNeg = false;
   if (qAnt !== null) {
     var pctD = qAnt > 0 ? (q - qAnt) / qAnt * 100 : (q > 0 ? 100 : 0);
@@ -2853,7 +2860,7 @@ function generarReporte() {
     '<div class="kpis">' +
     '<div class="kpi"><div class="kpi-l">Ventas del mes</div><div class="kpi-v">' + fmtQ(q) + '</div><div class="kpi-s">' + ivaNote + ' · ' + periodo + '</div></div>' +
     '<div class="kpi"><div class="kpi-l">vs mes anterior</div><div class="kpi-v ' + (deltaNeg?'dn':'up') + '">' + deltaStr + '</div><div class="kpi-s">' + deltaLabel + '</div></div>' +
-    '<div class="kpi"><div class="kpi-l">Unidades</div><div class="kpi-v">' + fmtU(u) + '</div><div class="kpi-s">facturadas en el mes</div></div>' +
+    '<div class="kpi"><div class="kpi-l">Unidades Facturadas</div><div class="kpi-v">' + fmtU(u) + '</div><div class="kpi-s">' + (ant ? mesLabel(ant) + ': ' + fmtU(uAnt) + ' und' : '—') + '</div></div>' +
     '<div class="kpi"><div class="kpi-l">Facturas</div><div class="kpi-v">' + nFact.toLocaleString('es-GT') + '</div><div class="kpi-s">' + nCli + ' clientes · ' + (nFact?fmtQ(q/nFact):'—') + ' por factura</div></div>' +
     '</div></div>' +
 
