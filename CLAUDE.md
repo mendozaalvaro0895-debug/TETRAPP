@@ -106,10 +106,22 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
     default), botón "💾 Guardar" (guardarAsistenciaTapas: bloquea + confirma — no hay nada
     "pendiente" que commitear, ya se guardó por clic; a diferencia de serigrafia.html, cuyo
     Guardar sí hace algo real: el tablero de roles/líneas que Tapas no tiene), exportación
-    a PDF (exportarAsistGridPDFTapas: mismo mecanismo — tabla HTML standalone en pestaña
-    nueva + window.print() — recortado sin matriz de roles por celda ni quincenas de
-    nómina, ver bloque de arriba; SÍ incluye la cola de 5 días antes/después), sincronización
-    con rrhh_faltas
+    a PDF (exportarAsistGridPDFTapas: MISMO formato que exportarAsistGridPDF de
+    serigrafia.html — SEPARADO POR QUINCENAS con idénticas fechas de corte, mismo
+    calendario de nómina de la empresa: Quincena 1 = últimos 2 días del mes anterior +
+    días 01–13 del mes actual; Quincena 2 = días 14–(último día del mes − 2). Los últimos
+    2 días del mes quedan para la Quincena 1 del SIGUIENTE PDF, es una ventana rotando
+    mes a mes, no se pierden. Cada quincena en su propia página (`.q-sep{page-break-
+    before:always}`) con su propio resumen de Inasistencias/Tarde/Veladas/Domingos y su
+    propia racha "fila verde ⭐ = quincena completa" (los 2 días del mes anterior NO
+    cuentan para esa racha). Recortado frente a Serigrafía: sin matriz de roles por celda,
+    sin agrupación "Prestados", sin bloques de Inicios/Bajas (piden fecha_inicio/
+    fecha_baja en `personal`, que Tapas no usa) — mismo mecanismo de generación: tabla
+    HTML standalone en pestaña nueva + window.print(). ⚠️ Los 2 días "del mes anterior"
+    de la Quincena 1 (`anteriorQ1`) son un concepto DISTINTO a la cola de
+    ASIST_MARGEN_TAPAS=5 días de la grilla en vivo (ver abajo) — el PDF reutiliza el
+    mismo `asistCacheTapas` (que ya trae ±5 días de margen) sin necesidad de una consulta
+    aparte, porque 5 ≥ 2), sincronización con rrhh_faltas
     (sincronizarFaltaDesdeAsistenciaTapas, origen='asistencia_tapas' — distinto de
     'asistencia_serig' para no mezclar proveniencia), racha verde de fila completa,
     feriados vía toggleFeriado (clic derecho en el día — dias_feriados es GLOBAL, Tapas

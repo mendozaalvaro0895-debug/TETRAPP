@@ -2114,34 +2114,43 @@ async function guardarJustificacionTapas(faltaId, texto, codigo, fecha) {
 }
 
 // ── Exportar a PDF ────────────────────────────────────────────
-// Mismo mecanismo que exportarAsistGridPDF (serigrafia.html): tabla HTML
-// standalone en una pestaña nueva + window.print(). Recorta lo que Tapas
-// no tiene (matriz de roles por celda, agrupación "Prestados", quincenas
-// de nómina — no confirmado que Tapas divida el mes así) e incluye la
-// cola de días antes/después que sí construimos para Tapas.
+// Mismo mecanismo Y mismo formato que exportarAsistGridPDF (serigrafia.html):
+// tabla HTML standalone en una pestaña nueva + window.print(), SEPARADO POR
+// QUINCENAS con las mismas fechas de corte que Serigrafía (mismo calendario
+// de nómina de la empresa):
+//   Quincena 1: últimos 2 días del mes anterior + días 01–13 del mes actual
+//   Quincena 2: días 14–(último día del mes − 2)
+// (los últimos 2 días del mes quedan para la Quincena 1 del SIGUIENTE PDF,
+// como "días del mes anterior" — es la misma ventana rotando mes a mes).
+// Recorta lo que Tapas no tiene: matriz de roles por celda, agrupación
+// "Prestados", bloques de Inicios/Bajas (piden fecha_inicio/fecha_baja en
+// personal, que Tapas no usa). asistCacheTapas ya trae ±ASIST_MARGEN_TAPAS
+// días de margen alrededor del mes (para la cola de corte de nómina de la
+// grilla en vivo), así que alcanza de sobra para los 2 días que pide Q1
+// sin necesidad de una consulta aparte.
 async function exportarAsistGridPDFTapas() {
   if (!asistCacheTapas) { showToast('Sin datos cargados', '#B87200'); return; }
   var byPD = asistCacheTapas.byPersonDay;
   var mesStr = asistCacheTapas._mes;
   var anio = parseInt(mesStr.slice(0, 4), 10), mesN = parseInt(mesStr.slice(5, 7), 10);
   var hoy = fechaHoy();
-  var diasMesN = new Date(anio, mesN, 0).getDate();
+  var ultimoDia = new Date(anio, mesN, 0).getDate();
 
-  var diasMesActual = [];
-  for (var dd = 1; dd <= diasMesN; dd++) diasMesActual.push(mesStr + '-' + String(dd).padStart(2, '0'));
-  var diasAntes = [];
-  for (var ka = ASIST_MARGEN_TAPAS; ka >= 1; ka--) {
-    var da = new Date(anio, mesN - 1, 1); da.setDate(da.getDate() - ka);
-    diasAntes.push(fmtISOTapas(da));
+  var prevDate = new Date(anio, mesN - 1, 0);
+  var diasMesAnt = prevDate.getDate();
+  var prevMesStr = prevDate.getFullYear() + '-' + String(prevDate.getMonth() + 1).padStart(2, '0');
+
+  var diasQ1 = [], anteriorQ1 = {};
+  for (var dpa = diasMesAnt - 1; dpa <= diasMesAnt; dpa++) {
+    var fAntQ = prevMesStr + '-' + String(dpa).padStart(2, '0');
+    diasQ1.push(fAntQ);
+    anteriorQ1[fAntQ] = true;
   }
-  var diasDespues = [];
-  for (var kd = 1; kd <= ASIST_MARGEN_TAPAS; kd++) {
-    var dd2 = new Date(anio, mesN - 1, diasMesN); dd2.setDate(dd2.getDate() + kd);
-    diasDespues.push(fmtISOTapas(dd2));
-  }
-  var dias = diasAntes.concat(diasMesActual).concat(diasDespues);
-  var margenSet = {};
-  diasAntes.concat(diasDespues).forEach(function(f) { margenSet[f] = true; });
+  for (var d1a = 1; d1a <= 13; d1a++) diasQ1.push(mesStr + '-' + String(d1a).padStart(2, '0'));
+
+  var diasQ2 = [];
+  var finQ2 = ultimoDia - 2;
+  for (var d2a = 14; d2a <= finQ2; d2a++) diasQ2.push(mesStr + '-' + String(d2a).padStart(2, '0'));
 
   await cargarJustifMesTapas(mesStr);
 
@@ -2152,26 +2161,33 @@ async function exportarAsistGridPDFTapas() {
     .sort(function(a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
 
   var mesNombre = new Date(anio, mesN - 1, 1).toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+  var prevNom = prevDate.toLocaleDateString('es-GT', { month: 'long' });
   var MESES_ABBR_PDF = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
 
-  function thDiasArrTapas() {
-    return dias.map(function(f) {
+  var lblQ1 = (diasMesAnt - 1) + '–' + diasMesAnt + ' ' + prevNom + ' · 01–13 ' + MESES_ABBR_PDF[mesN - 1];
+  var lblQ2 = '14–' + finQ2 + ' ' + MESES_ABBR_PDF[mesN - 1];
+
+  function thDiasArrTapas(diasArr, anteriorSet) {
+    return diasArr.map(function(f) {
       var dow = new Date(f + 'T12:00:00').getDay();
       var esFin = dow === 0 || !!feriadosSet[f];
-      var esMargen = !!margenSet[f];
-      var bg = esMargen ? '#fffbeb' : esFin ? '#e2e8f0' : f === hoy ? '#dbeafe' : '#f8fafc';
-      var lbl = esMargen
+      var esAnt = !!anteriorSet[f];
+      var bg = esAnt ? '#fffbeb' : esFin ? '#e2e8f0' : f === hoy ? '#dbeafe' : '#f8fafc';
+      var lbl = esAnt
         ? parseInt(f.slice(8), 10) + '<div style="font-size:5.5px;font-weight:800;color:#92400e">' + MESES_ABBR_PDF[parseInt(f.slice(5, 7), 10) - 1] + '</div>'
         : parseInt(f.slice(8), 10);
       return '<th style="background:' + bg + ';width:18px;min-width:18px;font-size:7px;font-weight:700;text-align:center;padding:3px 0;border:1px solid #cbd5e1">' + lbl + '</th>';
     }).join('');
   }
 
-  function buildPersonaRowsArrTapas() {
+  function buildPersonaRowsArrTapas(diasArr, anteriorSet) {
     var html = '';
     ops.forEach(function(p) {
       var daysByP = byPD[p.codigo] || {};
-      var isFullGreen = diasMesActual.every(function(f) {
+      // fila verde = asistencia completa en los días del mes actual de ESTA
+      // quincena (los 2 días "del mes anterior" no cuentan para la racha)
+      var diasActQ = diasArr.filter(function(f) { return !anteriorSet[f]; });
+      var isFullGreen = diasActQ.every(function(f) {
         if (f > hoy) return true;
         var dow = new Date(f + 'T12:00:00').getDay();
         if (dow === 0 || feriadosSet[f]) return true;
@@ -2182,7 +2198,7 @@ async function exportarAsistGridPDFTapas() {
       var nameClr = isFullGreen ? '#fff' : '#111';
       html += '<tr>';
       html += '<td style="background:' + nameBg + ';color:' + nameClr + ';font-size:8px;font-weight:' + (isFullGreen ? '700' : '600') + ';padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + (isFullGreen ? ' ⭐' : '') + '</td>';
-      dias.forEach(function(f) {
+      diasArr.forEach(function(f) {
         var dow = new Date(f + 'T12:00:00').getDay();
         var esFin = dow === 0 || !!feriadosSet[f];
         var esFuturo = f > hoy;
@@ -2205,12 +2221,12 @@ async function exportarAsistGridPDFTapas() {
     return html;
   }
 
-  function buildResumenTapas() {
+  function buildResumenQTapas(diasQ) {
     var resAus = [], resTard = [], resVel = [], resDom = [];
     ops.forEach(function(p) {
       var daysByP = byPD[p.codigo] || {};
       var fAus = [], fTard = [], fVel = [], fDom = [];
-      dias.forEach(function(f) {
+      diasQ.forEach(function(f) {
         if (f > hoy) return;
         var dow = new Date(f + 'T12:00:00').getDay();
         var est = daysByP[f];
@@ -2236,7 +2252,7 @@ async function exportarAsistGridPDFTapas() {
     var total = items.reduce(function(s, it) { return s + (it.fechas ? it.fechas.length : 0); }, 0);
     var hdrTxt = titulo + (total ? ' (' + total + ')' : '');
     var body = !items.length
-      ? '<div style="color:#9ca3af;font-size:8px;font-style:italic;padding:4px 0">Ninguno en el mes</div>'
+      ? '<div style="color:#9ca3af;font-size:8px;font-style:italic;padding:4px 0">Ninguno en la quincena</div>'
       : items.map(function(it) {
           var linesHtml = (it.fechas || []).map(function(fd) {
             if (typeof fd === 'string') return '<span>' + fd + '</span>';
@@ -2263,12 +2279,35 @@ async function exportarAsistGridPDFTapas() {
     + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#7c3aed;font-size:6px;color:#fff;text-align:center;line-height:10px">☾</span>Velada</span>'
     + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#cbd5e1"></span>Pendiente</span>'
     + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#475569"></span>Dom / Feriado</span>'
-    + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#fffbeb;border:1px solid #92400e"></span>Cola corte de nómina</span>'
-    + '<span style="font-weight:700;color:#22c55e">Nombre en verde ⭐ = mes completo</span>'
+    + '<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle;background:#fffbeb"></span>Días del mes anterior</span>'
+    + '<span style="font-weight:700;color:#22c55e">Nombre en verde ⭐ = quincena completa</span>'
     + '<span>✓ = justificado</span>'
   + '</div>';
 
   var genFecha = new Date().toLocaleDateString('es-GT');
+
+  function buildSeccionTapas(qTitulo, qLbl, diasQ, anteriorSet) {
+    var rowsQ = buildPersonaRowsArrTapas(diasQ, anteriorSet);
+    var secHtml = '<h2>Tetraplastic · Tapas — ' + qTitulo + '</h2>'
+      + '<p style="text-transform:capitalize">' + mesNombre + ' &nbsp;·&nbsp; ' + qLbl + ' &nbsp;·&nbsp; Generado: ' + genFecha + '</p>'
+      + '<table><thead><tr>'
+      +   '<th style="background:#f8fafc;font-size:8px;font-weight:700;text-align:left;padding:3px 6px;border:1px solid #cbd5e1;min-width:110px">Operario</th>'
+      +   thDiasArrTapas(diasQ, anteriorSet)
+      + '</tr></thead><tbody>' + rowsQ + '</tbody></table>'
+      + leyendaHtmlTapas;
+
+    var res = buildResumenQTapas(diasQ);
+    secHtml += '<div style="margin-top:18px;page-break-inside:avoid">'
+      + '<div style="font-size:10px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">Resumen ' + qTitulo + ' &nbsp;·&nbsp; <span style="font-weight:500;text-transform:none;font-size:9px;color:#64748b">' + qLbl + '</span></div>'
+      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">'
+      +   buildResumenBloqueTapas('⛔ Inasistencias', res.resAus, '#ef4444')
+      +   buildResumenBloqueTapas('⏰ Llegadas tarde', res.resTard, '#f59e0b')
+      +   buildResumenBloqueTapas('🌙 Veladas', res.resVel, '#7c3aed')
+      +   buildResumenBloqueTapas('📅 Domingos trab.', res.resDom, '#0ea5e9')
+      + '</div>'
+    + '</div>';
+    return secHtml;
+  }
 
   var htmlPdf = '<!DOCTYPE html><html><head><meta charset="utf-8">'
     + '<title>Asistencia ' + mesNombre + '</title>'
@@ -2279,27 +2318,13 @@ async function exportarAsistGridPDFTapas() {
     +   'table{border-collapse:collapse;width:100%}'
     +   'h2{margin:0 0 4px;font-size:13px;color:#1e293b}'
     +   'p{margin:0 0 8px;font-size:9px;color:#64748b}'
+    +   '.q-sep{page-break-before:always;margin:0}'
     + '</style></head><body>'
-    + '<h2>Tetraplastic · Tapas — Asistencia Mensual</h2>'
-    + '<p style="text-transform:capitalize">' + mesNombre + ' &nbsp;·&nbsp; incluye ' + ASIST_MARGEN_TAPAS + ' días antes/después por corte de nómina &nbsp;·&nbsp; Generado: ' + genFecha + '</p>'
-    + '<table><thead><tr>'
-    +   '<th style="background:#f8fafc;font-size:8px;font-weight:700;text-align:left;padding:3px 6px;border:1px solid #cbd5e1;min-width:110px">Operario</th>'
-    +   thDiasArrTapas()
-    + '</tr></thead><tbody>' + buildPersonaRowsArrTapas() + '</tbody></table>'
-    + leyendaHtmlTapas;
-
-  var resTapas = buildResumenTapas();
-  htmlPdf += '<div style="margin-top:18px;page-break-inside:avoid">'
-    + '<div style="font-size:10px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #e2e8f0">Resumen del mes</div>'
-    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">'
-    +   buildResumenBloqueTapas('⛔ Inasistencias', resTapas.resAus, '#ef4444')
-    +   buildResumenBloqueTapas('⏰ Llegadas tarde', resTapas.resTard, '#f59e0b')
-    +   buildResumenBloqueTapas('🌙 Veladas', resTapas.resVel, '#7c3aed')
-    +   buildResumenBloqueTapas('📅 Domingos trab.', resTapas.resDom, '#0ea5e9')
-    + '</div>'
-  + '</div>';
-
-  htmlPdf += '<script>window.onload=function(){window.print();}<\/script></body></html>';
+    + buildSeccionTapas('QUINCENA 1', lblQ1, diasQ1, anteriorQ1)
+    + '<div class="q-sep"></div>'
+    + buildSeccionTapas('QUINCENA 2', lblQ2, diasQ2, {})
+    + '<script>window.onload=function(){window.print();}<\/script>'
+    + '</body></html>';
 
   var w = window.open('', '_blank');
   if (w) { w.document.write(htmlPdf); w.document.close(); }
