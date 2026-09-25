@@ -2495,9 +2495,9 @@ function buildEstancadosDeTabla(tab, skuFamilia, ultimaVenta, hoyMs) {
     var desc = (item.descripcion || '').toUpperCase();
     var ok = false;
     if (tab === 'envases') {
-      ok = fam === 'ENVASE' || (!fam && (desc.indexOf('ENVASE') === 0 || desc.indexOf('ENV.') === 0 || desc.indexOf('ENV ') === 0));
+      ok = fam === 'ENVASE' || desc.indexOf('ENVASE') === 0 || desc.indexOf('ENV.') === 0 || desc.indexOf('ENV ') === 0;
     } else {
-      ok = fam.indexOf('TAPA') === 0 || (!fam && desc.indexOf('TAPA') === 0);
+      ok = fam.indexOf('TAPA') === 0 || desc.indexOf('TAPA') === 0;
     }
     if (!ok) return;
     var last = ultimaVenta[item.sku] || null;
