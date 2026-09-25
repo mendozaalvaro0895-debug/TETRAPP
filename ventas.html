@@ -2495,9 +2495,11 @@ function buildEstancadosDeTabla(tab, skuFamilia, ultimaVenta, hoyMs) {
     var desc = (item.descripcion || '').toUpperCase();
     var ok = false;
     if (tab === 'envases') {
-      ok = fam === 'ENVASE' || desc.indexOf('ENVASE') === 0 || desc.indexOf('ENV.') === 0 || desc.indexOf('ENV ') === 0;
+      ok = fam === 'ENVASE' || fam === 'BOLAS DE ROLL-ON' || fam === 'PEINES' || fam === 'PP' ||
+           desc.indexOf('ENVASE') === 0 || desc.indexOf('ENV.') === 0 || desc.indexOf('ENV ') === 0;
     } else {
-      ok = fam.indexOf('TAPA') === 0 || desc.indexOf('TAPA') === 0;
+      ok = fam === 'TAPA' || fam === 'BASE TAPA' || fam === 'LINER' ||
+           (!fam && (desc.indexOf('TAPA') === 0 || desc.indexOf('LINER') === 0));
     }
     if (!ok) return;
     var last = ultimaVenta[item.sku] || null;
@@ -2519,7 +2521,8 @@ function renderStockEstancado() {
   VENTAS.forEach(function(v) {
     if (!v.sku) return;
     if (!ultimaVenta[v.sku] || v.fecha > ultimaVenta[v.sku]) ultimaVenta[v.sku] = v.fecha;
-    if (v.familia && !skuFamilia[v.sku]) skuFamilia[v.sku] = (v.familia || '').toUpperCase();
+    var dfam = (v.descripcion_familia || v.familia || '').trim().toUpperCase();
+    if (dfam && !skuFamilia[v.sku]) skuFamilia[v.sku] = dfam;
     if (v.cliente) {
       if (!skuClientes[v.sku]) skuClientes[v.sku] = {};
       skuClientes[v.sku][v.cliente] = (skuClientes[v.sku][v.cliente] || 0) + (v.total_quetzales || 0);
