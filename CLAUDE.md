@@ -112,16 +112,21 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
     días 01–13 del mes actual; Quincena 2 = días 14–(último día del mes − 2). Los últimos
     2 días del mes quedan para la Quincena 1 del SIGUIENTE PDF, es una ventana rotando
     mes a mes, no se pierden. Cada quincena en su propia página (`.q-sep{page-break-
-    before:always}`) con su propio resumen de Inasistencias/Tarde/Veladas/Domingos y su
-    propia racha "fila verde ⭐ = quincena completa" (los 2 días del mes anterior NO
-    cuentan para esa racha). Recortado frente a Serigrafía: sin matriz de roles por celda,
-    sin agrupación "Prestados", sin bloques de Inicios/Bajas (piden fecha_inicio/
-    fecha_baja en `personal`, que Tapas no usa) — mismo mecanismo de generación: tabla
-    HTML standalone en pestaña nueva + window.print(). ⚠️ Los 2 días "del mes anterior"
-    de la Quincena 1 (`anteriorQ1`) son un concepto DISTINTO a la cola de
-    ASIST_MARGEN_TAPAS=5 días de la grilla en vivo (ver abajo) — el PDF reutiliza el
-    mismo `asistCacheTapas` (que ya trae ±5 días de margen) sin necesidad de una consulta
-    aparte, porque 5 ≥ 2), sincronización con rrhh_faltas
+    before:always}`) con su propio resumen de Inasistencias/Tarde/Veladas/Domingos/
+    Inicios/Bajas y su propia racha "fila verde ⭐ = quincena completa" (los 2 días del
+    mes anterior NO cuentan para esa racha, tampoco los días antes del ingreso o tras la
+    baja). `fecha_inicio`/`fecha_baja` de `personal` SÍ aplican a Tapas (son columnas
+    genéricas, no solo de Serigrafía — gestion.html las edita para cualquier área desde
+    Datos generales; confirmado sep/2026 tras un caso real: el PDF no marcaba el ingreso
+    de una operaria que sí tenía `fecha_inicio` cargada). Celdas antes del ingreso/tras
+    la baja se pintan gris `#e2e8f0` sin dato (igual que serigrafia.html), y esos días NO
+    rompen la racha verde. Recortado frente a Serigrafía SOLO en: sin matriz de roles por
+    celda, sin agrupación "Prestados" (esos dos sí son específicos de cómo trabaja esa
+    área) — mismo mecanismo de generación: tabla HTML standalone en pestaña nueva +
+    window.print(). ⚠️ Los 2 días "del mes anterior" de la Quincena 1 (`anteriorQ1`) son
+    un concepto DISTINTO a la cola de ASIST_MARGEN_TAPAS=5 días de la grilla en vivo (ver
+    abajo) — el PDF reutiliza el mismo `asistCacheTapas` (que ya trae ±5 días de margen)
+    sin necesidad de una consulta aparte, porque 5 ≥ 2), sincronización con rrhh_faltas
     (sincronizarFaltaDesdeAsistenciaTapas, origen='asistencia_tapas' — distinto de
     'asistencia_serig' para no mezclar proveniencia), racha verde de fila completa,
     feriados vía toggleFeriado (clic derecho en el día — dias_feriados es GLOBAL, Tapas
@@ -445,9 +450,11 @@ Notas críticas:
   vía `buildOperarioOptions()`. gestion.html → Personal → pestaña Capacitaciones lee esta columna para
   mostrar unidades producidas por operario (ver arriba).
 - `inventario`: +3 cols producción: `meta_12hrs`, `maquina_default`, `precio_ponderado_manual`
-- `personal`: fuente única de supervisores — registro-tapas.html NO los hardcodea. `area` es 1:1
-  por persona (solo valores `'tapas'`/`'serig'` — produccion.html no usa esta tabla). +5 cols RRHH
-  (`locker`, `talla_uniforme`, `epp_asignado`, `epp_fecha`, `notas_rrhh`) gestionadas desde gestion.html
+- `personal`: fuente única de supervisores — registro-tapas.html NO los hardcodea. +5 cols RRHH
+  (`locker`, `talla_uniforme`, `epp_asignado`, `epp_fecha`, `notas_rrhh`) gestionadas desde gestion.html.
+  `fecha_inicio`/`fecha_baja` son GENÉRICAS (no solo de Serigrafía) — gestion.html → Personal →
+  Datos generales las edita para cualquier área; exportarAsistGridPDFTapas (tapas.html) también
+  las usa desde sep/2026 (ver view-inicio arriba).
 - `rrhh_permisos` / `rrhh_incidentes`: historial por persona (FK `personal_id` uuid), master-only
   lectura+escritura (RLS). Gestionadas desde gestion.html
 - `mejoras_planta`: seguimiento de infraestructura — tabla lista, vista pendiente en gestion.html
