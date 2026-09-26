@@ -825,12 +825,21 @@ function renderResumen() {
   var ant = mesSel === 'todo' ? null : mesAnterior(mesSel);
   if (ant) {
     var filasAnt = filasDelPeriodo(ant);
+    // Si el mes seleccionado es el mes en curso, comparar solo hasta el mismo día del mes anterior
+    var hoy = fechaHoy();
+    var mesHoy = hoy.slice(0, 7);
+    var diaHoyCmp = hoy.slice(8, 10); // '25' como string — comparación lexicográfica funciona en DD zero-padded
+    var esMesActual = (mesSel === mesHoy);
+    if (esMesActual) {
+      filasAnt = filasAnt.filter(function(v) { return v.fecha.slice(8, 10) <= diaHoyCmp; });
+    }
     var qAnt = totalQ(filasAnt);
     var uAnt = 0;
     filasAnt.forEach(function(v) { uAnt += v.total_unidades; });
     document.getElementById('kpiDelta').innerHTML = deltaHtml(q, qAnt);
-    document.getElementById('kpiDeltaSub').textContent = mesLabel(ant) + ': ' + fmtQ(qAnt);
-    document.getElementById('kpiUnidadesSub').textContent = mesLabel(ant) + ': ' + fmtU(uAnt) + ' und';
+    var notaDia = esMesActual ? ' (al día ' + parseInt(diaHoyCmp, 10) + ')' : '';
+    document.getElementById('kpiDeltaSub').textContent = mesLabel(ant) + notaDia + ': ' + fmtQ(qAnt);
+    document.getElementById('kpiUnidadesSub').textContent = mesLabel(ant) + notaDia + ': ' + fmtU(uAnt) + ' und';
   } else {
     document.getElementById('kpiDelta').textContent = '—';
     document.getElementById('kpiDeltaSub').textContent = mesSel === 'todo' ? 'selecciona un mes' : 'primer mes con datos';
@@ -2665,14 +2674,22 @@ function generarReporte() {
 
   var ant = mesSel === 'todo' ? null : mesAnterior(mesSel);
   var filasAntRpt = ant ? filasDelPeriodo(ant) : [];
+  // Si el mes seleccionado es el mes en curso, comparar solo hasta el mismo día del mes anterior
+  var hoyRpt = fechaHoy();
+  var esMesActualRpt = ant && (mesSel === hoyRpt.slice(0, 7));
+  if (esMesActualRpt) {
+    var diaCorteRpt = hoyRpt.slice(8, 10);
+    filasAntRpt = filasAntRpt.filter(function(v) { return v.fecha.slice(8, 10) <= diaCorteRpt; });
+  }
   var qAnt = ant ? totalQ(filasAntRpt) : null;
   var uAnt = 0; filasAntRpt.forEach(function(v) { uAnt += v.total_unidades; });
   var deltaStr = '—'; var deltaLabel = ''; var deltaNeg = false;
+  var notaDiaRpt = esMesActualRpt ? ' (al día ' + parseInt(diaCorteRpt, 10) + ')' : '';
   if (qAnt !== null) {
     var pctD = qAnt > 0 ? (q - qAnt) / qAnt * 100 : (q > 0 ? 100 : 0);
     deltaStr = (pctD >= 0 ? '+' : '') + fmtPct(pctD);
     deltaNeg = pctD < 0;
-    deltaLabel = mesLabel(ant) + ': ' + fmtQ(qAnt);
+    deltaLabel = mesLabel(ant) + notaDiaRpt + ': ' + fmtQ(qAnt);
   } else {
     deltaLabel = mesSel === 'todo' ? 'Todo el periodo' : 'Primer mes con datos';
   }
@@ -2860,7 +2877,7 @@ function generarReporte() {
     '<div class="kpis">' +
     '<div class="kpi"><div class="kpi-l">Ventas del mes</div><div class="kpi-v">' + fmtQ(q) + '</div><div class="kpi-s">' + ivaNote + ' · ' + periodo + '</div></div>' +
     '<div class="kpi"><div class="kpi-l">vs mes anterior</div><div class="kpi-v ' + (deltaNeg?'dn':'up') + '">' + deltaStr + '</div><div class="kpi-s">' + deltaLabel + '</div></div>' +
-    '<div class="kpi"><div class="kpi-l">Unidades Facturadas</div><div class="kpi-v">' + fmtU(u) + '</div><div class="kpi-s">' + (ant ? mesLabel(ant) + ': ' + fmtU(uAnt) + ' und' : '—') + '</div></div>' +
+    '<div class="kpi"><div class="kpi-l">Unidades Facturadas</div><div class="kpi-v">' + fmtU(u) + '</div><div class="kpi-s">' + (ant ? mesLabel(ant) + notaDiaRpt + ': ' + fmtU(uAnt) + ' und' : '—') + '</div></div>' +
     '<div class="kpi"><div class="kpi-l">Facturas</div><div class="kpi-v">' + nFact.toLocaleString('es-GT') + '</div><div class="kpi-s">' + nCli + ' clientes · ' + (nFact?fmtQ(q/nFact):'—') + ' por factura</div></div>' +
     '</div></div>' +
 
