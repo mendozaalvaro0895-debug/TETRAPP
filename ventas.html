@@ -1662,6 +1662,7 @@ async function recargar() {
     mesSel = MESES.length ? MESES[MESES.length - 1] : 'todo';
     poblarSelectores();
     renderTodo();
+    cargarAreaOverrides();  // background, no await
     cargarStockEstancado(); // background, no await
     cargarSerigSkus();      // background, no await
     var maxFecha = VENTAS.length ? VENTAS[VENTAS.length - 1].fecha : null;
@@ -2471,22 +2472,39 @@ async function cargarSerigSkus() {
   }
 }
 
+async function cargarAreaOverrides() {
+  try {
+    var r = await db.from('inventario')
+      .select('sku,area_ventas')
+      .not('area_ventas', 'is', null)
+      .limit(500);
+    if (r.error) { console.warn('[area_ventas] error al cargar overrides:', r.error); return; }
+    var rows = r.data || [];
+    rows.forEach(function(item) {
+      if (item.area_ventas && item.sku) {
+        SKU_AREA_OVERRIDES[String(item.sku).trim()] = AREA_VENTAS_OVERRIDE_MAP[item.area_ventas] || null;
+      }
+    });
+    if (VENTAS.length && SERIG_SKUS !== null) {
+      var filas = filasDelPeriodo(mesSel);
+      var q = totalQ(filas);
+      var aporteBody = document.getElementById('aporteAreaBody');
+      if (aporteBody) renderAporteArea(filas, q);
+    }
+  } catch(e) {
+    console.warn('[area_ventas] excepcion al cargar overrides:', e);
+  }
+}
+
 async function cargarStockEstancado() {
   try {
     var r = await db.from('inventario')
-      .select('sku,descripcion,existencia,activo,area_ventas')
+      .select('sku,descripcion,existencia,activo')
       .order('descripcion')
       .limit(2000);
     var todos = r.error ? [] : (r.data || []);
     STOCK_EST_INV = todos.filter(function(item) {
       return item.activo && (parseFloat(item.existencia) || 0) > 0;
-    });
-    // Construir mapa de overrides de área para clasificarArea()
-    SKU_AREA_OVERRIDES = {};
-    todos.forEach(function(item) {
-      if (item.area_ventas && item.sku) {
-        SKU_AREA_OVERRIDES[item.sku] = AREA_VENTAS_OVERRIDE_MAP[item.area_ventas] || null;
-      }
     });
     // Re-renderizar bloques de área si ya hay ventas cargadas
     if (VENTAS.length) {
