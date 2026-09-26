@@ -2471,12 +2471,12 @@ function boardBuildCard(item) {
       m.lineas.forEach(function(l) {
         if (l.solId === item.solId) {
           entregado += (l.cant || 0);
-          requis.push({ cant: l.cant, fecha: m.fecha, requi: m.requi });
+          requis.push({ cant: l.cant, fecha: m.fecha, requi: m.requi, linea: l.linea || '' });
         }
       });
     } else if (m.solId === item.solId) {
       entregado += (m.cant || 0);
-      requis.push({ cant: m.cant, fecha: m.fecha, requi: m.requi });
+      requis.push({ cant: m.cant, fecha: m.fecha, requi: m.requi, linea: '' });
     }
   });
   var progColor = item.prog >= 80 ? 'var(--green)' : item.prog >= 40 ? 'var(--amber)' : 'var(--serig-m)';
@@ -2507,6 +2507,7 @@ function boardBuildCard(item) {
     ? '<div style="margin-top:5px;padding-top:5px;border-top:1px dashed var(--border);font-size:10px;color:var(--gray-l);line-height:1.5">' +
         requis.map(function(m) {
           return '<span style="white-space:nowrap">' +
+            (m.linea ? '<b>L' + escHtml(m.linea) + '</b> · ' : '') +
             (m.cant||0).toLocaleString() + ' und · ' + (m.fecha || '—') +
             (m.requi ? ' <em>(' + escHtml(m.requi) + ')</em>' : '') +
             '</span>';
@@ -2565,12 +2566,12 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
       m.lineas.forEach(function(l) {
         if (l.solId === item.solId) {
           entregado += (l.cant || 0);
-          requis.push({ cant: l.cant, fecha: m.fecha, requi: m.requi });
+          requis.push({ cant: l.cant, fecha: m.fecha, requi: m.requi, linea: l.linea || '' });
         }
       });
     } else if (m.solId === item.solId) {
       entregado += (m.cant || 0);
-      requis.push({ cant: m.cant, fecha: m.fecha, requi: m.requi });
+      requis.push({ cant: m.cant, fecha: m.fecha, requi: m.requi, linea: '' });
     }
   });
   var badgeBg  = item.estado === 'lista' ? '#dcfce7' : item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'parcial' ? '#fef9c3' : '#f1f5f9';
@@ -2597,6 +2598,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     ? '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed ' + cardBdr + ';display:flex;flex-wrap:wrap;gap:4px">' +
         requis.map(function(r) {
           return '<span style="font-size:9px;background:rgba(255,255,255,.55);border:1px solid ' + cardBdr + ';border-radius:4px;padding:1px 5px;color:' + (isComplete ? 'var(--gray)' : '#111') + ';white-space:nowrap">' +
+            (r.linea ? '<span style="font-weight:800;color:' + requiAccent + '">L' + escHtml(r.linea) + '</span> · ' : '') +
             (r.requi ? '<span style="font-family:var(--mono);font-weight:700;color:' + requiAccent + '">REQUI ' + escHtml(r.requi) + '</span> · ' : '') +
             (r.cant||0).toLocaleString() + ' und' +
             (r.fecha ? ' · ' + r.fecha.slice(5) : '') +
@@ -5881,7 +5883,7 @@ function abrirFormEntregado() {
   agregarLineaEntregado();
 }
 
-function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal, solIdVal) {
+function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal, solIdVal, lineaProdVal) {
   var container = document.getElementById('eLineasContainer');
   if (!container) return;
   var i = eLineasCount++;
@@ -5894,7 +5896,7 @@ function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal, solIdVal) {
   var bSty = 'padding:5px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;box-sizing:border-box;width:100%';
   var row = document.createElement('div');
   row.id = 'eLinea-' + i;
-  row.style.cssText = 'display:grid;grid-template-columns:150px 185px 1fr 90px 28px;gap:5px;margin-bottom:5px;align-items:start';
+  row.style.cssText = 'display:grid;grid-template-columns:150px 185px 1fr 90px 60px 28px;gap:5px;margin-bottom:5px;align-items:start';
   var cliOpts = eClientesOptsHtml.replace(
     'value="' + escHtml(clienteVal || '') + '"',
     'value="' + escHtml(clienteVal || '') + '" selected'
@@ -5922,6 +5924,13 @@ function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal, solIdVal) {
       '<div class="sku-drop-s" id="e-sku-drop-' + i + '"></div>' +
     '</div>' +
     '<input id="eCant-' + i + '" type="number" min="1" placeholder="Cant." style="' + bSty + '" value="' + (cantVal || '') + '">' +
+    '<select id="eLp-' + i + '" title="Línea de producción" style="' + bSty + ';background:var(--card);color:var(--text)">' +
+      '<option value=""' + (!lineaProdVal ? ' selected' : '') + '>— L —</option>' +
+      '<option value="1"' + (lineaProdVal === '1' ? ' selected' : '') + '>L1</option>' +
+      '<option value="2"' + (lineaProdVal === '2' ? ' selected' : '') + '>L2</option>' +
+      '<option value="3"' + (lineaProdVal === '3' ? ' selected' : '') + '>L3</option>' +
+      '<option value="4"' + (lineaProdVal === '4' ? ' selected' : '') + '>L4</option>' +
+    '</select>' +
     '<button onclick="eliminarLineaEntregado(' + i + ')" title="Quitar" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--gray-l);font-size:13px;cursor:pointer;padding:3px 5px;line-height:1">✕</button>';
   container.appendChild(row);
 }
@@ -6049,15 +6058,17 @@ async function guardarEntregadoManual() {
       var cliEl = document.getElementById('eCli-' + idx);
       var dInp  = document.getElementById('eDesc-' + idx);
       var cInp  = document.getElementById('eCant-' + idx);
+      var lpEl  = document.getElementById('eLp-' + idx);
       var cliv = cliEl ? cliEl.value : '';
       var dv   = dInp ? dInp.value.trim() : '';
       var cv   = cInp ? parseInt(cInp.value || '0') : 0;
+      var lpv  = lpEl ? lpEl.value : '';
       if (!cliv) { showToast('⚠️ Seleccioná el cliente en producto ' + (ri + 1), '#92400e'); if (cliEl) { cliEl.style.outline='2px solid #dc2626'; cliEl.focus(); } return; }
       if (!dv)   { showToast('⚠️ Completá la descripción del producto ' + (ri + 1), '#92400e'); if (dInp) { dInp.style.borderColor='#dc2626'; dInp.focus(); } return; }
       if (!cv || cv < 1) { showToast('⚠️ Cantidad inválida en producto ' + (ri + 1), '#92400e'); if (cInp) { cInp.style.borderColor='#dc2626'; cInp.focus(); } return; }
       var solv  = eEntregadoSolIds[idx] || '';
       var solS  = solv ? solicitudes.find(function(x) { return x.id === solv; }) : null;
-      lineas.push({ cliente: cliv, sku: eEntregadoSkus[idx] || '', desc: dv, cant: cv, solId: solv || '', solCodigo: solS ? (solS.id_display || '') : '' });
+      lineas.push({ cliente: cliv, sku: eEntregadoSkus[idx] || '', desc: dv, cant: cv, solId: solv || '', solCodigo: solS ? (solS.id_display || '') : '', linea: lpv || '' });
     }
   }
   if (!lineas.length) { showToast('⚠️ Agregá al menos un producto', '#92400e'); return; }
@@ -6168,7 +6179,7 @@ function editarEntregadoManual(id) {
   lineas.forEach(function(l) {
     // Si el solId ya no existe en solicitudes, limpiar el vínculo para que el usuario lo corrija
     var solIdValido = l.solId && solicitudes.some(function(x) { return x.id === l.solId; }) ? l.solId : null;
-    agregarLineaEntregado(l.desc, l.sku, l.cant, l.cliente, solIdValido);
+    agregarLineaEntregado(l.desc, l.sku, l.cant, l.cliente, solIdValido, l.linea || '');
   });
   // Hacer scroll al form
   var formEl = document.getElementById('formEntregadoInline');
