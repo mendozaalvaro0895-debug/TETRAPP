@@ -2474,11 +2474,10 @@ async function cargarSerigSkus() {
 
 async function cargarAreaOverrides() {
   try {
-    var r = await db.from('inventario')
-      .select('sku,area_ventas')
-      .not('area_ventas', 'is', null)
-      .limit(500);
-    if (r.error) { console.warn('[area_ventas] error al cargar overrides:', r.error); return; }
+    // Usa RPC para bypass el schema cache de PostgREST (la columna area_ventas
+    // puede no estar en el cache aunque exista en la BD)
+    var r = await db.rpc('get_area_ventas_overrides');
+    if (r.error) { console.warn('[area_ventas] error RPC:', r.error); return; }
     var rows = r.data || [];
     rows.forEach(function(item) {
       if (item.area_ventas && item.sku) {
@@ -2492,7 +2491,7 @@ async function cargarAreaOverrides() {
       if (aporteBody) renderAporteArea(filas, q);
     }
   } catch(e) {
-    console.warn('[area_ventas] excepcion al cargar overrides:', e);
+    console.warn('[area_ventas] excepcion:', e);
   }
 }
 
