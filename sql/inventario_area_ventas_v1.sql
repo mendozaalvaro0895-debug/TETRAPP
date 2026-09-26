@@ -17,3 +17,10 @@ ALTER TABLE inventario
 CREATE INDEX IF NOT EXISTS idx_inventario_area_ventas
   ON inventario (sku)
   WHERE area_ventas IS NOT NULL;
+
+-- ── Pre-tageo inicial: tapas sin proceso de maquila → aportan a Producción ──
+-- Identificadas por Álvaro 2026-09-26. Agrega más filas aquí o usa bodega.html → Existencias.
+UPDATE inventario SET area_ventas = 'produccion' WHERE sku IN (
+  '106811',   -- TAPA ROLL ON BLANCA 90ML ME04819
+  '10690'     -- TAPA PARA ROLL-ON FROSTEADA COD.201776
+);
