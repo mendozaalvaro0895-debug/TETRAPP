@@ -466,8 +466,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
             <input class="fi" id="mpTelefono" placeholder="Ej: 5555-5555" style="width:100%">
           </div>
           <div class="fg">
-            <div class="fl">Edad</div>
-            <input class="fi" id="mpEdad" type="number" min="16" max="99" placeholder="Ej: 28" style="width:100%">
+            <div class="fl">Fecha de nacimiento</div>
+            <input class="fi" id="mpFechaNacimiento" type="date" style="width:100%" onchange="actualizarEdadCalculada()">
+            <div id="mpEdadCalc" style="font-size:11px;color:var(--gray);margin-top:4px">&nbsp;</div>
           </div>
         </div>
         <div class="fr">
@@ -503,6 +504,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
               <option value="XL">XL</option><option value="XXL">XXL</option>
             </select>
           </div>
+        </div>
+        <div class="fg full">
+          <div class="fl">Talla de botas</div>
+          <input class="fi" id="mpTallaBotas" placeholder="Ej: 40" style="width:100%">
         </div>
         <div class="fr">
           <div class="fg">
@@ -915,6 +920,35 @@ function fechaHoy() {
   return d.getFullYear() + '-' +
     String(d.getMonth() + 1).padStart(2, '0') + '-' +
     String(d.getDate()).padStart(2, '0');
+}
+
+// Edad calculada desde fecha_nacimiento (reemplaza la vieja columna edad,
+// que quedó como número fijo sin actualizarse — ver nota en CLAUDE.md)
+function calcularEdad(fechaNacStr) {
+  if (!fechaNacStr) return null;
+  var hoy = new Date(fechaHoy() + 'T12:00:00');
+  var nac = new Date(fechaNacStr + 'T12:00:00');
+  if (isNaN(nac.getTime())) return null;
+  var edad = hoy.getFullYear() - nac.getFullYear();
+  var noHaCumplidoAun = (hoy.getMonth() < nac.getMonth()) ||
+    (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate());
+  if (noHaCumplidoAun) edad--;
+  return edad >= 0 ? edad : null;
+}
+
+// p.edad es la columna vieja (número fijo, ya no se edita) — se usa solo
+// de respaldo para personas que aún no tienen fecha_nacimiento cargada.
+function edadDePersona(p) {
+  var calc = calcularEdad(p.fecha_nacimiento);
+  return calc != null ? calc : (p.edad != null ? p.edad : null);
+}
+
+function actualizarEdadCalculada() {
+  var el = document.getElementById('mpEdadCalc');
+  if (!el) return;
+  var fecha = document.getElementById('mpFechaNacimiento').value;
+  var edad = calcularEdad(fecha);
+  el.innerHTML = edad != null ? ('→ ' + edad + ' años') : '&nbsp;';
 }
 
 function formatFechaCorta(iso) {
@@ -1505,7 +1539,7 @@ function buildPersonalRow(p) {
   return '<tr class="p-row' + (p.activo ? '' : ' inactivo') + '" onclick="abrirPerfil(\'' + p.id + '\')">' +
     '<td><span class="p-row-avatar" style="background:' + (p.color_hex || '#6B6B6A') + '">' + iniciales + '</span>' + escHtml(p.nombre) + '</td>' +
     '<td style="font-family:var(--mono);font-size:11px">' + escHtml(p.codigo) + '</td>' +
-    '<td>' + (p.edad != null ? escHtml(p.edad) : '—') + '</td>' +
+    '<td>' + (edadDePersona(p) != null ? escHtml(edadDePersona(p)) : '—') + '</td>' +
     '<td>' + (p.telefono ? escHtml(p.telefono) : '—') + '</td>' +
     '<td>' + (p.fecha_inicio ? escHtml(p.fecha_inicio) : '—') + '</td>' +
     '<td>' + (p.talla_uniforme ? escHtml(p.talla_uniforme) : '—') + '</td>' +
@@ -1550,12 +1584,14 @@ function abrirNuevaPersona() {
   document.getElementById('mpRolBase').value = 'operador';
   document.getElementById('mpProceso').value = '';
   document.getElementById('mpTelefono').value = '';
-  document.getElementById('mpEdad').value = '';
+  document.getElementById('mpFechaNacimiento').value = '';
+  actualizarEdadCalculada();
   document.getElementById('mpActivo').checked = true;
   document.getElementById('mpFechaInicio').value = fechaHoy();
   document.getElementById('mpFechaBaja').value = '';
   document.getElementById('mpLocker').value = '';
   document.getElementById('mpTalla').value = '';
+  document.getElementById('mpTallaBotas').value = '';
   document.getElementById('mpEppAsignado').checked = false;
   document.getElementById('mpEppFecha').value = '';
   document.getElementById('mpNotasRrhh').value = '';
@@ -1583,12 +1619,14 @@ function abrirPerfil(id) {
   document.getElementById('mpRolBase').value = p.rol === 'supervisor' ? 'supervisor' : 'operador';
   document.getElementById('mpProceso').value = p.proceso_hab || '';
   document.getElementById('mpTelefono').value = p.telefono || '';
-  document.getElementById('mpEdad').value = (p.edad != null) ? p.edad : '';
+  document.getElementById('mpFechaNacimiento').value = p.fecha_nacimiento || '';
+  actualizarEdadCalculada();
   document.getElementById('mpActivo').checked = !!p.activo;
   document.getElementById('mpFechaInicio').value = p.fecha_inicio || '';
   document.getElementById('mpFechaBaja').value = p.fecha_baja || '';
   document.getElementById('mpLocker').value = p.locker || '';
   document.getElementById('mpTalla').value = p.talla_uniforme || '';
+  document.getElementById('mpTallaBotas').value = p.talla_botas || '';
   document.getElementById('mpEppAsignado').checked = !!p.epp_asignado;
   document.getElementById('mpEppFecha').value = p.epp_fecha || '';
   document.getElementById('mpNotasRrhh').value = p.notas_rrhh || '';
@@ -1638,8 +1676,7 @@ async function guardarPersona() {
   var rolBase   = document.getElementById('mpRolBase').value;
   var proceso   = (document.getElementById('mpProceso').value || '').trim();
   var telefono  = (document.getElementById('mpTelefono').value || '').trim() || null;
-  var edadVal   = document.getElementById('mpEdad').value;
-  var edad      = edadVal !== '' ? parseInt(edadVal, 10) : null;
+  var fechaNacimiento = document.getElementById('mpFechaNacimiento').value || null;
   var fechaBaja = document.getElementById('mpFechaBaja').value || null;
   var activo    = fechaBaja ? false : document.getElementById('mpActivo').checked;
   var fechaInicio = document.getElementById('mpFechaInicio').value || null;
@@ -1651,10 +1688,11 @@ async function guardarPersona() {
 
   var payload = {
     nombre: nombre, iniciales: iniciales, area: area, rol: rolBase,
-    proceso_hab: proceso, telefono: telefono, edad: edad, activo: activo, turno_produccion: turnoProduccion,
+    proceso_hab: proceso, telefono: telefono, fecha_nacimiento: fechaNacimiento, activo: activo, turno_produccion: turnoProduccion,
     fecha_inicio: fechaInicio, fecha_baja: fechaBaja,
     locker: (document.getElementById('mpLocker').value || '').trim() || null,
     talla_uniforme: document.getElementById('mpTalla').value || null,
+    talla_botas: (document.getElementById('mpTallaBotas').value || '').trim() || null,
     epp_asignado: document.getElementById('mpEppAsignado').checked,
     epp_fecha: document.getElementById('mpEppFecha').value || null,
     notas_rrhh: (document.getElementById('mpNotasRrhh').value || '').trim() || null

@@ -378,8 +378,15 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   alguien de Tapas certificado para cubrir una máquina de Producción en almuerzo). Clic abre
   el perfil directo en la pestaña Capacitaciones (`abrirPerfilEnCapacitaciones`).
   Click en fila → modalPersona con 7 sub-tabs:
-    Datos generales (editable: nombre/iniciales/código/área/rol/proceso_hab/teléfono/edad/activo/fechas)
-    RRHH           (editable: locker/talla_uniforme/epp_asignado/epp_fecha/notas_rrhh)
+    Datos generales (editable: nombre/iniciales/código/área/rol/proceso_hab/teléfono/
+                     fecha_nacimiento/activo/fechas — la columna "Edad" de la tabla y del
+                     modal ya NO se edita como número: se pide fecha_nacimiento y
+                     `calcularEdad()`/`edadDePersona()` la calculan en vivo (`mpEdadCalc`
+                     bajo el campo, actualizado por `actualizarEdadCalculada()`). La vieja
+                     columna `personal.edad` queda de solo-respaldo para quien no tenga
+                     fecha_nacimiento cargada todavía — no se vuelve a escribir.)
+    RRHH           (editable: locker/talla_uniforme/talla_botas/epp_asignado/epp_fecha/
+                     notas_rrhh)
     Capacitaciones (historial rrhh_capacitaciones + registrar nueva — área de la habilidad
                      independiente del área de la persona, estado en_proceso/certificado,
                      comentario del supervisor OBLIGATORIO, foto de respaldo opcional
@@ -532,6 +539,9 @@ Notas críticas:
     cavidades, ciclo_seg) + RLS + 88 moldes importados de "MOLDES Y CICLOS - SEP 2026.xlsx".
     Alimenta el autocompletado de Molde/Cavidades en el Recetario (produccion.html). Sin correr
     esto, esos dos campos nuevos quedan como texto libre sin sugerencias ni alta automática.
+24. `sql/personal_nacimiento_botas_v1.sql` — columnas `fecha_nacimiento` (reemplaza a `edad`,
+    que ahora se calcula en vivo) y `talla_botas` en `personal`. Sin correr esto,
+    gestion.html → Personal falla al guardar esos dos campos nuevos.
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
