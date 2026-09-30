@@ -373,10 +373,15 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   `cargarFaltasResumen()`, que ya filtra por mes — una falta sin justificar de un mes
   anterior deja de contar/alertar) con su SI/NO de justificación en la misma fila; clic
   en cualquiera de las dos abre el perfil directo en la pestaña Faltas (`abrirPerfilEnFaltas`).
-  Columna Habilidades: lista cada capacitación (ícono ✅ certificado / 🕐 en proceso +
-  habilidad, con el área entre paréntesis SOLO si es distinta al área de la persona — ej.
-  alguien de Tapas certificado para cubrir una máquina de Producción en almuerzo). Clic abre
-  el perfil directo en la pestaña Capacitaciones (`abrirPerfilEnCapacitaciones`).
+  ⚠️ Columna "Habilidades" RETIRADA de la tabla (30-sep-2026, a pedido de Álvaro — "aún no se
+  usa"): `CAPACITACIONES_RESUMEN`/`cargarCapacitacionesResumen()` y `abrirPerfilEnCapacitaciones()`
+  se dejaron intactos (la pestaña Capacitaciones del modal sigue funcionando igual) por si se
+  quiere traer de vuelta la columna más adelante — solo falta restaurar el `<th>`/`<col
+  class="c-habil">`/`<td class="td-multi">` en `buildPersonalTable()`/`buildPersonalRow()` y
+  subir `P_TABLE_COLS` de 12 a 13.
+  El/la supervisor(a) de cada grupo se ordena SIEMPRE primero dentro de su área
+  (`ordenSupervisorPrimero()`, orden estable — el resto conserva activo desc/nombre asc) y se
+  distingue con "★ " antes del nombre + fondo tenue + nombre en negrita (`tr.p-row.supervisor`).
   Click en fila → modalPersona con 7 sub-tabs:
     Datos generales (editable: nombre/iniciales/código/área/rol/proceso_hab/teléfono/
                      fecha_nacimiento/activo/fechas — la columna "Edad" de la tabla y del

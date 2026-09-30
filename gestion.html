@@ -153,7 +153,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .p-table col.c-inicio{width:106px}
 .p-table col.c-talla{width:68px}
 .p-table col.c-rol{width:150px}
-.p-table col.c-habil{width:170px}
 .p-table col.c-turno{width:100px}
 .p-table col.c-estado{width:86px}
 .p-table col.c-locker{width:150px}
@@ -162,6 +161,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .p-table tr.p-row{cursor:pointer;transition:background .12s}
 .p-table tr.p-row:hover{background:var(--gest-l)}
 .p-table tr.p-row.inactivo{opacity:.55}
+.p-table tr.p-row.supervisor{background:#4338CA0D}
+.p-table tr.p-row.supervisor:hover{background:var(--gest-l)}
+.p-table tr.p-row.supervisor td:first-child{font-weight:800}
 .p-table tr.p-group{cursor:pointer;user-select:none}
 .p-table tr.p-group td{background:var(--bg2);font-weight:800;font-size:11px;letter-spacing:.4px;padding:8px 12px;color:var(--ink);border-bottom:1px solid var(--border);text-align:left}
 .p-table tr.p-group:hover td{background:var(--gest-l)}
@@ -1465,12 +1467,18 @@ var AREA_COLOR_DEFAULT = {
 var AREA_LBL_MAP = {};
 AREA_GRUPOS.forEach(function(a) { AREA_LBL_MAP[a.key] = a.label; });
 
-var P_TABLE_COLS = 13;
+var P_TABLE_COLS = 12;
 var gruposColapsados = {}; // { area: true } — colapsado; ausente/false = desplegado (default)
 
 function toggleGrupoArea(area) {
   gruposColapsados[area] = !gruposColapsados[area];
   renderPersonalGrid();
+}
+
+// El/la supervisor(a) del área queda primero en su grupo (orden estable: el resto
+// conserva el orden que ya traía — activo desc, nombre asc, de cargarPersonal()).
+function ordenSupervisorPrimero(a, b) {
+  return (a.rol === 'supervisor' ? 0 : 1) - (b.rol === 'supervisor' ? 0 : 1);
 }
 
 function buildGrupoBloque(key, label, grupo) {
@@ -1485,21 +1493,21 @@ function buildGrupoBloque(key, label, grupo) {
 function buildPersonalTable(lista) {
   var html = '<table class="p-table"><colgroup>' +
     '<col class="c-persona"><col class="c-codigo"><col class="c-edad"><col class="c-numero">' +
-    '<col class="c-inicio"><col class="c-talla"><col class="c-rol"><col class="c-habil"><col class="c-turno"><col class="c-estado">' +
+    '<col class="c-inicio"><col class="c-talla"><col class="c-rol"><col class="c-turno"><col class="c-estado">' +
     '<col class="c-locker"><col class="c-faltas"><col class="c-justif">' +
     '</colgroup><thead><tr>' +
     '<th>Persona</th><th>Código</th><th>Edad</th><th>Número</th><th>Fecha de inicio</th><th>Talla</th>' +
-    '<th>Rol / Proceso</th><th title="Capacitaciones y certificaciones">Habilidades</th><th>Turno</th><th>Estado</th><th>Locker asignado</th>' +
+    '<th>Rol / Proceso</th><th>Turno</th><th>Estado</th><th>Locker asignado</th>' +
     '<th title="Solo el mes en curso">Faltas</th><th title="Solo el mes en curso">Justificación</th>' +
     '</tr></thead>';
   var vistos = {};
   AREA_GRUPOS.forEach(function(a) {
-    var grupo = lista.filter(function(p) { return p.area === a.key; });
+    var grupo = lista.filter(function(p) { return p.area === a.key; }).sort(ordenSupervisorPrimero);
     vistos[a.key] = true;
     if (!grupo.length) return;
     html += buildGrupoBloque(a.key, a.label, grupo);
   });
-  var otros = lista.filter(function(p) { return !vistos[p.area]; });
+  var otros = lista.filter(function(p) { return !vistos[p.area]; }).sort(ordenSupervisorPrimero);
   if (otros.length) html += buildGrupoBloque('otras', 'Otras áreas', otros);
   html += '</table>';
   return html;
@@ -1528,23 +1536,16 @@ function buildPersonalRow(p) {
       return f.justificada ? '<div class="falta-si">SI</div>' : '<div class="falta-no">NO</div>';
     }).join('');
   }
-  var habilList = CAPACITACIONES_RESUMEN[p.id] || [];
-  var habilCell = !habilList.length
-    ? '<span class="falta-none">—</span>'
-    : habilList.map(function(h) {
-        var icon = h.estado === 'certificado' ? '✅' : '🕐';
-        var areaTag = h.area !== p.area ? ' · ' + (AREA_LBL_MAP[h.area] || h.area) : '';
-        return '<div>' + icon + ' ' + escHtml(h.habilidad) + areaTag + '</div>';
-      }).join('');
-  return '<tr class="p-row' + (p.activo ? '' : ' inactivo') + '" onclick="abrirPerfil(\'' + p.id + '\')">' +
-    '<td><span class="p-row-avatar" style="background:' + (p.color_hex || '#6B6B6A') + '">' + iniciales + '</span>' + escHtml(p.nombre) + '</td>' +
+  var esSup = p.rol === 'supervisor';
+  var nombreCell = (esSup ? '★ ' : '') + escHtml(p.nombre);
+  return '<tr class="p-row' + (p.activo ? '' : ' inactivo') + (esSup ? ' supervisor' : '') + '" onclick="abrirPerfil(\'' + p.id + '\')">' +
+    '<td><span class="p-row-avatar" style="background:' + (p.color_hex || '#6B6B6A') + '">' + iniciales + '</span>' + nombreCell + '</td>' +
     '<td style="font-family:var(--mono);font-size:11px">' + escHtml(p.codigo) + '</td>' +
     '<td>' + (edadDePersona(p) != null ? escHtml(edadDePersona(p)) : '—') + '</td>' +
     '<td>' + (p.telefono ? escHtml(p.telefono) : '—') + '</td>' +
     '<td>' + (p.fecha_inicio ? escHtml(p.fecha_inicio) : '—') + '</td>' +
     '<td>' + (p.talla_uniforme ? escHtml(p.talla_uniforme) : '—') + '</td>' +
     '<td>' + escHtml(rolTxt) + '</td>' +
-    '<td class="td-multi" onclick="event.stopPropagation();abrirPerfilEnCapacitaciones(\'' + p.id + '\')">' + habilCell + '</td>' +
     '<td>' + escHtml(turnoTxt) + '</td>' +
     '<td>' + estadoBadge + '</td>' +
     '<td>' + lockerChip + '</td>' +
