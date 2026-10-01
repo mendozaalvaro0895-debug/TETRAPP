@@ -547,6 +547,14 @@ Notas críticas:
 24. `sql/personal_nacimiento_botas_v1.sql` — columnas `fecha_nacimiento` (reemplaza a `edad`,
     que ahora se calcula en vivo) y `talla_botas` en `personal`. Sin correr esto,
     gestion.html → Personal falla al guardar esos dos campos nuevos.
+25. `sql/personal_area_mantenimiento_torno_v1.sql` — agrega 'mantenimiento'/'torno' al CHECK
+    constraint `personal_area_check`. Correr ANTES del 26 (lo necesita).
+26. `sql/reconciliacion_hoja_asistencia_v1.sql` (oct/2026) — reconciliación puntual de
+    `personal` contra la hoja "ASISTENCIA DE PLANTA" (Google Sheets, ver nota abajo):
+    recodifica el choque p-57/P-57, da de baja a Holger Baleu y Miriam Cano, reactiva a
+    Karen Hernández en Tapas (quedó mal desactivada), reclasifica a Gerardo González y
+    Josué Gamaliel Choc a Mantenimiento y a Ludwin Alvarez Pérez a Torno, y corrige
+    `fecha_inicio` de ~60 personas con la fecha de ingreso real de la hoja.
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
@@ -618,6 +626,20 @@ Las 4 copias (misma lógica, autónomas por arquitectura):
 ---
 
 ## Personal
-⚠️ Supervisora actual real tapas: **Yenifer** (tabla `personal` aún dice Heidy — pendiente Álvaro).
-registro-tapas.html lee supervisor en vivo → se corregirá solo al actualizar el registro.
+Supervisora tapas: **Yenifer Leisi Lopez Espinal** (`T1`, activa) — ya corregida en `personal`
+(el registro viejo con "Heidy" quedó como `codigo='T0'`, inactivo, sin borrar).
 Serigrafía: S0 Luis Cordova (supervisor), S1-S7 operadores.
+
+### Referencia externa — "ASISTENCIA DE PLANTA" (Google Sheets)
+Álvaro lleva un control de asistencia diaria de TODA la planta en Google Sheets (fuera de
+TETRAPP, él la comparte por link cuando hace falta) — una pestaña por mes, agrupada por
+Supervisor/Turno/Línea con un ✅/❌ por persona y día. Cubre MÁS áreas que TETRAPP: además de
+tapas/serig/producción(turnos Alex y Gabino)/molino/bodega/moldes, tiene **Mantenimiento**,
+**Torno** y **Oficina/Administración** (estas tres sin módulo ni tabla en TETRAPP todavía).
+Es más confiable que `personal` para nombre completo, fecha de ingreso real y supervisor
+correcto — se usó como fuente de verdad para `sql/reconciliacion_hoja_asistencia_v1.sql`
+(oct/2026). Sin API ni credenciales de Google configuradas en el proyecto — cualquier
+comparación contra ella hoy es manual (Claude la lee por navegador, el usuario pega el dump
+de `personal` para comparar). Sincronización automática de asistencia diaria (no solo del
+roster) quedó evaluada pero no construida — necesitaría una integración nueva con la API de
+Google Sheets.
