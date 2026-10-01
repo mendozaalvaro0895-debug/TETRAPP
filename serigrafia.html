@@ -294,9 +294,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-sin-hdr{padding:12px 16px;border-bottom:1px solid var(--border);background:var(--serig-l);display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px}
 .board-sin-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--serig-m);display:flex;align-items:center;gap:8px;white-space:nowrap}
 .board-sin-count{font-size:11px;background:#fff;color:var(--serig-m);border-radius:12px;padding:2px 10px;font-weight:700}
-.board-sin-cards{padding:8px 12px 12px;min-height:96px;display:flex;flex-direction:row;gap:10px;overflow-x:auto;align-items:flex-start}
-.sin-cli-col{flex:0 0 440px;display:flex;flex-direction:column;gap:8px;align-self:flex-start}
-.sin-grupo{width:100%;background:var(--bg2);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;transition:box-shadow .15s}
+.board-sin-cards{padding:8px 12px 12px;min-height:96px;overflow-x:auto}
+.sin-cli-grid{display:grid;gap:10px}
+.sin-cli-cell{height:100%}
+.sin-grupo{width:100%;height:100%;background:var(--bg2);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;transition:box-shadow .15s}
 .sin-grupo.drag-grupo-over{box-shadow:inset 0 0 0 2px var(--serig-m)}
 .sin-grupo-hdr{display:flex;align-items:flex-start;gap:6px;padding:8px 10px;background:var(--serig-m);cursor:grab;user-select:none}
 .sin-grupo-hdr:active{cursor:grabbing}
@@ -3050,6 +3051,22 @@ function boardBuildSinBlock(items) {
     grupoKeys.push(gk);
   });
 
+  // Fila del mes en curso siempre presente por cliente (aunque esté en 0):
+  // así la fila de hasta arriba es siempre el mes actual para todos, en vez
+  // de que un cliente sin pedidos nuevos encabece con el mes anterior.
+  (function() {
+    var mesActual = periodoActualKey();
+    var clientesVistos = {};
+    grupoKeys.forEach(function(gk) { clientesVistos[grupoMap[gk].cli] = true; });
+    Object.keys(clientesVistos).forEach(function(cli) {
+      var gk0 = cli + '§' + mesActual;
+      if (!grupoMap[gk0]) {
+        grupoMap[gk0] = { cli: cli, per: periodoPorKey(mesActual), items: [] };
+        grupoKeys.push(gk0);
+      }
+    });
+  })();
+
   // Orden: el guardado sigue indexado por CLIENTE (no por período) para no perder
   // la prioridad ya definida; dentro de cada cliente, período más reciente primero.
   var orden = getSinGrupoOrden();
@@ -3202,21 +3219,34 @@ function boardBuildSinBlock(items) {
         '</div>';
       });
 
-  // Una columna por cliente: sus períodos se apilan verticalmente.
-  // grupoKeys ya viene ordenado (cliente por prioridad, período reciente primero),
-  // así que basta con recorrerlo y repartir las fichas en su columna.
-  var colKeys = [], colMap = {};
-  grupoKeys.forEach(function(gk, i) {
+  // Grilla cliente × período: cada cliente es una columna fija y cada
+  // período es una fila, para que un mismo mes quede alineado entre
+  // clientes — si un cliente no tuvo pedidos ese mes, la celda queda en
+  // blanco en vez de recorrer la columna hacia arriba.
+  var colKeys = [], colSeen = {};
+  grupoKeys.forEach(function(gk) {
     var c = grupoMap[gk].cli;
-    if (!colMap[c]) { colMap[c] = []; colKeys.push(c); }
-    colMap[c].push(fichas[i]);
+    if (!colSeen[c]) { colSeen[c] = true; colKeys.push(c); }
+  });
+  var rowKeys = [], rowSeen = {};
+  grupoKeys.forEach(function(gk) {
+    var k = grupoMap[gk].per.key;
+    if (!rowSeen[k]) { rowSeen[k] = true; rowKeys.push(k); }
+  });
+  rowKeys.sort(function(a, b) { return a < b ? 1 : -1; }); // período más reciente primero
+
+  var cellsHtml = '';
+  rowKeys.forEach(function(rk, ri) {
+    colKeys.forEach(function(ck, ci) {
+      var idx = grupoKeys.indexOf(ck + '§' + rk);
+      if (idx === -1) return; // sin pedidos ese mes para este cliente: celda en blanco
+      cellsHtml += '<div class="sin-cli-cell" style="grid-column:' + (ci + 1) + ';grid-row:' + (ri + 1) + '">' + fichas[idx] + '</div>';
+    });
   });
 
   var gruposHtml = colKeys.length === 0
     ? '<div class="board-empty-lane">No hay pedidos sin asignar</div>'
-    : colKeys.map(function(c) {
-        return '<div class="sin-cli-col">' + colMap[c].join('') + '</div>';
-      }).join('');
+    : '<div class="sin-cli-grid" style="grid-template-columns:repeat(' + colKeys.length + ',440px)">' + cellsHtml + '</div>';
 
   return '<div class="board-sin" id="bl-0"' +
     ' ondragover="event.preventDefault();document.getElementById(\'bl-0\').classList.add(\'drag-over\')"' +
