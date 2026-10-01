@@ -555,6 +555,13 @@ Notas críticas:
     Karen Hernández en Tapas (quedó mal desactivada), reclasifica a Gerardo González y
     Josué Gamaliel Choc a Mantenimiento y a Ludwin Alvarez Pérez a Torno, y corrige
     `fecha_inicio` de ~60 personas con la fecha de ingreso real de la hoja.
+27. `sql/personal_area_oficina_v1.sql` — agrega 'oficina' al CHECK constraint
+    `personal_area_check`. Correr ANTES del 28 (lo necesita).
+28. `sql/reconciliacion_hoja_asistencia_v2.sql` (oct/2026) — segunda parte de la
+    reconciliación: código `T3` pasa de la ficha vieja de Elsa Tul (se BORRA, a pedido
+    explícito de Álvaro) a Glenda Sequen; agrega 8 personas que estaban en la hoja y no
+    en `personal` (Henry Mejía en Moldes, Luis González en Mantenimiento, Fox en Torno,
+    y 5 personas de Oficina/Administración — incluido el propio Álvaro).
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
