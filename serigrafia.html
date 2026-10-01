@@ -1084,6 +1084,15 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
   </div>
 </div>
 
+<div id="overlayBaseHistorial" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.45);align-items:center;justify-content:center">
+  <div style="background:var(--card);border-radius:16px;padding:22px 24px;max-width:420px;width:92%;max-height:80vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.3)">
+    <div style="font-size:14px;font-weight:800;color:var(--ink);margin-bottom:4px">📦 Envase base usado antes para este SKU</div>
+    <div id="bhSku" style="font-size:11px;color:var(--gray);margin-bottom:14px;font-weight:600"></div>
+    <div id="bhOpciones" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+    <button type="button" class="btn btn-g" style="width:100%;font-size:12px" onclick="cerrarOverlayBaseHistorial()">Ingresar manualmente</button>
+  </div>
+</div>
+
 <!-- ══════════════════ MODAL OPERARIO ═════════════════════ -->
 <div class="overlay" id="modalPersonal" onclick="cerrarSiOverlayPersonal(event)">
   <div class="modal" style="max-width:440px">
@@ -7750,23 +7759,84 @@ function seleccionarLineaSku(idx, sku) {
   lineas[idx].es_nuevo   = false;
   cerrarLineaSkuDrop(idx);
 
+  var hist = buscarHistorialBase(sku);
   var tirosAlmacenado = item.tiros_hora || 0;
-  if (tirosAlmacenado > 0) {
-    if (capActual === 0 || capActual === tirosAlmacenado) {
-      // Auto-relleno silencioso
-      lineas[idx].cap_impresion = tirosAlmacenado;
-      renderLineas();
-      calcular();
-    } else {
-      // Conflicto: hay valor distinto → mostrar popup de confirmación
-      renderLineas();
-      calcular();
-      mostrarConflictoTiros(idx, tirosAlmacenado, capActual, item);
-    }
-  } else {
+  if (tirosAlmacenado > 0 && capActual > 0 && capActual !== tirosAlmacenado) {
+    // Conflicto de CAP U/H: hay un valor distinto ya cargado → resolver eso primero
     renderLineas();
     calcular();
+    mostrarConflictoTiros(idx, tirosAlmacenado, capActual, item);
+    return;
   }
+  if (tirosAlmacenado > 0 && capActual === 0) {
+    // Auto-relleno silencioso del CAP U/H
+    lineas[idx].cap_impresion = tirosAlmacenado;
+  }
+  renderLineas();
+  calcular();
+  if (hist.length) mostrarHistorialBase(idx, sku, hist);
+}
+
+// Busca, entre las solicitudes ya cargadas, con qué envase(s) base se armó
+// antes este mismo SKU — para sugerirlo al crear una ficha nueva en vez de
+// que haya que volver a escribirlo (y detectar a tiempo si cambió de envase).
+function buscarHistorialBase(sku) {
+  var sNorm = String(sku || '').trim();
+  if (!sNorm) return [];
+  var vistos = {};
+  var out = [];
+  (solicitudes || []).forEach(function(sol) {
+    (sol.lineas || []).forEach(function(l) {
+      if (String(l.sku || '') !== sNorm) return;
+      if (!l.sku_base) return;
+      var key = l.sku_base + '|' + (l.tiros || 1) + '|' + (l.cap_impresion || 0);
+      if (vistos[key]) return;
+      vistos[key] = true;
+      out.push({ sku_base: l.sku_base, tiros: l.tiros || 1, cap_impresion: l.cap_impresion || 0,
+                 fecha: sol.created_at, ficha: sol.id_display });
+    });
+  });
+  out.sort(function(a, b) { return (b.fecha || '') < (a.fecha || '') ? -1 : 1; }); // más reciente primero
+  return out;
+}
+
+function mostrarHistorialBase(idx, sku, opciones) {
+  var pop = document.getElementById('overlayBaseHistorial');
+  if (!pop) return;
+  pop._idx = idx;
+  pop._opciones = opciones;
+  var skuEl = document.getElementById('bhSku');
+  if (skuEl) skuEl.textContent = sku;
+  var html = opciones.map(function(o, i) {
+    var baseItem = inventarioCache.find(function(it) { return it.sku === o.sku_base; });
+    var desc = baseItem ? (baseItem.descripcion || '') : '';
+    return '<button type="button" onclick="elegirHistorialBase(' + i + ')" style="text-align:left;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);cursor:pointer">' +
+      '<div style="font-family:var(--mono);font-weight:800;font-size:12px;color:var(--serig-m)">' + escHtml(o.sku_base) + '</div>' +
+      (desc ? '<div style="font-size:11px;color:var(--gray);margin:2px 0">' + escHtml(desc) + '</div>' : '') +
+      '<div style="font-size:10px;color:var(--gray-l)">Tiros ' + o.tiros + ' · Cap ' + (o.cap_impresion || '—') + ' u/h · Ficha ' + escHtml(o.ficha || '') + '</div>' +
+    '</button>';
+  }).join('');
+  var optEl = document.getElementById('bhOpciones');
+  if (optEl) optEl.innerHTML = html;
+  pop.style.display = 'flex';
+}
+
+function elegirHistorialBase(i) {
+  var pop = document.getElementById('overlayBaseHistorial');
+  if (!pop || !pop._opciones) return;
+  var o = pop._opciones[i];
+  var idx = pop._idx;
+  pop.style.display = 'none';
+  seleccionarLineaSkuBase(idx, o.sku_base);
+  lineas[idx].tiros = o.tiros || 1;
+  if (o.cap_impresion && !lineas[idx].cap_impresion) lineas[idx].cap_impresion = o.cap_impresion;
+  renderLineas();
+  calcular();
+}
+
+function cerrarOverlayBaseHistorial() {
+  var pop = document.getElementById('overlayBaseHistorial');
+  if (pop) pop.style.display = 'none';
 }
 
 function mostrarConflictoTiros(idx, almacenado, enPedido, item) {
