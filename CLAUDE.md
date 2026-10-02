@@ -53,6 +53,20 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
   Env: ANTHROPIC_API_KEY, SUPA_URL, SUPA_SERVICE_KEY, TWILIO_AUTH_TOKEN (obligatorio), TWILIO_WEBHOOK_URL, TETRA_WA_ALLOW.
 - `api/parse-doc.js` — parsea foto de requi con Claude Vision → JSON {requi, fecha, productos[]}.
   ⚠️ PENDIENTE: CORS `*` + sin auth → gasto de tokens de Claude. Falta gatear con JWT de sesión.
+- `api/parse-reporte-tapas.js` (oct/2026) — parsea el TEXTO de los reportes diarios que los
+  supervisores de Tapas mandan por WhatsApp (formato real: un operario por bloque, sub-
+  encabezados opcionales de día "Martes"/"Miércoles", líneas "cantidad + texto libre" que
+  mezclan proceso+producto, ej. "1,300 liner 28 negra") → JSON `{filas:[{operario_texto,
+  fecha, dia_texto, cantidad, proceso, descripcion, metodo, proceso_dudoso}], warnings:[]}`.
+  Resuelve nombres de día de la semana a fecha real contra `fecha_referencia` (más cercana
+  y anterior o igual, nunca futura). Si no reconoce el proceso de una línea, deja
+  `proceso:""` + `proceso_dudoso:true` en vez de adivinar. A diferencia de `parse-doc.js`,
+  este SÍ está gateado desde el día uno: exige `Authorization: Bearer <access_token>` de la
+  sesión de Supabase del que llama y verifica `rol='master'` en `perfiles` antes de llamar a
+  Claude (Haiku). Consumido solo por comandas.html → "📥 Importar reporte WhatsApp" (ver
+  abajo) — no hay flujo que inserte directo desde WhatsApp para este formato de reporte por
+  lotes (es demasiado grande/variado para el flujo de confirmación SI/NO de una sola tarea
+  que ya usa `api/whatsapp.js`); Álvaro sigue copiando el texto a mano del chat a la app.
 
 ### Módulos activos
 | Archivo | Descripción |
@@ -61,7 +75,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | `tapas.html` | Módulo completo Tapas: hub (Personal y Roles + Asistencia Mensual) + movimientos (salidas/ingresos/rechazos) + productividad + trazabilidad + personal + pedidos |
 | `serigrafia.html` | Módulo admin Serigrafía: Inicio (board) + Movimientos + Productividad + Personal |
 | `registro-serigrafia.html` | Formulario móvil rol `operativo_serig`: Flameado / Impresión / Empaque |
-| `comandas.html` | Registro de producción diaria por operario (vista admin) |
+| `comandas.html` | Registro de producción diaria por operario (vista admin) + "📥 Importar reporte WhatsApp" (oct/2026, lotes multi-operario/multi-día) |
 | `registro-tapas.html` | Formulario móvil rol `operativo`: comanda concluida, correlativo CMD-### vía trigger DB |
 | `dashboard.html` | KPIs ejecutivos globales |
 | `ventas.html` | Ventas y Financiero: Resumen · Productos · Clientes · Rotación · Importar facturación (Excel/CSV cols A-R) · toggle IVA |
@@ -449,6 +463,34 @@ Acceso: restringido a rol master vía TETRA_PAGINAS_MASTER en shared/auth.js.
 Ver flujos completos y componentes en `.claude/docs/design-system.md` § Flujos.
 Pantallas: `scrTarea(0)` → Impresión / Flameado / Empaque → `scrOk*`.
 `mostrarPantalla()` · `buildOpCardGen()` · apoyo externo: `operador_codigo=null + area_origen`.
+
+---
+
+## comandas.html — Importar reporte WhatsApp (oct/2026)
+Botón "📥 Importar reporte WhatsApp" (junto a "+ Nueva") abre `overlayImportar`, flujo de 2
+pasos sobre el mismo modelo comanda+tareas que ya usa el editor manual (una comanda =
+operario+fecha, N `comanda_tareas`):
+1. Pegar el texto crudo del reporte (`impTexto`) + fecha de referencia (`impFechaRef`,
+   default `fechaHoyGT()`) → `analizarReporte()` llama a `api/parse-reporte-tapas.js` con el
+   `access_token` de la sesión (`db.auth.getSession()`) en el header `Authorization`.
+2. `construirGruposImportacion(filas)` agrupa las filas devueltas por (operario, fecha) en
+   `impGrupos`, resolviendo cada operario vía RPC `bot_buscar_operario` y cada descripción vía
+   RPC `bot_buscar_sku` — MISMO criterio tolerante que `resolverOperario`/`resolverSku` en
+   `api/whatsapp.js` (solo auto-asigna si un candidato cubre todas las palabras y no hay
+   empate; si no, deja el texto libre + insignia `.imp-warn`). `renderImportarPreview()`
+   pinta una tarjeta por grupo (operario editable, fecha editable, tabla de tareas editable:
+   proceso/descripción-SKU/cantidad/método, con `select.dudoso` resaltado en ámbar cuando
+   `proceso_dudoso` vino marcado por el parser) — todo corregible antes de guardar, nada se
+   inserta en el paso 1. "✅ Guardar todo" (`guardarImportacion()`) filtra tareas sin
+   proceso o cantidad≤0 (se excluyen silenciosamente, no bloquean el resto del lote) e
+   inserta una `comandas`+N `comanda_tareas` por grupo, reusando `getCapacidad()` ya
+   existente — sin duplicar la fórmula de capacidad/horas_efectivas del editor manual.
+⚠️ De paso se corrigió un hardcode que quedó de cuando Heidy (T0, inactiva) era supervisora:
+  `guardar()` escribía siempre `supervisor_id:'T0', supervisor_nombre:'Heidy'` y el `<select
+  id="fSupervisor">` tenía la opción fija "Heidy" — ambos ahora se resuelven en vivo contra
+  `personal` (`cargarSupervisorTapas()`, area='tapas' + rol='supervisor' + activo=true, misma
+  fuente que ya usa `bot_insertar_comanda_tapas`), igual en el editor manual y en la
+  importación. Si Tapas cambia de supervisor otra vez, no hay que tocar código acá.
 
 ---
 

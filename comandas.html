@@ -128,6 +128,37 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
 .spinner { display:inline-block; width:30px; height:30px; border:3px solid #C8EDE7; border-top-color:#1A6B5B; border-radius:50%; animation:spin .8s linear infinite; margin-bottom:10px; }
 @keyframes spin { to { transform:rotate(360deg); } }
 
+/* ── Importar reporte WhatsApp ───────────────────────────────── */
+.btn-importar { width:100%; margin-top:6px; background:#0C0C0B; color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; }
+.btn-importar:hover { background:#1A1A19; }
+.overlay-imp { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(12,12,11,.75); z-index:10000; align-items:center; justify-content:center; padding:20px; }
+.overlay-imp.open { display:flex; }
+.modal-imp { background:#fff; border-radius:16px; width:100%; max-width:880px; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 20px 40px rgba(0,0,0,.3); }
+.mi-head { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:2px solid #E0DED8; }
+.mi-title { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; }
+.mi-close { background:none; border:none; font-size:20px; cursor:pointer; color:#6B6B6A; }
+.mi-body { padding:18px 20px; overflow-y:auto; flex:1; }
+.mi-foot { display:flex; justify-content:flex-end; gap:10px; padding:14px 20px; border-top:2px solid #E0DED8; }
+.mi-step1 .field { margin-bottom:12px; }
+.mi-step1 textarea { width:100%; min-height:220px; border:1.5px solid #C8C6C0; border-radius:8px; padding:10px; font-size:12px; font-family:'DM Mono',monospace; resize:vertical; }
+.imp-card { background:#F7F6F2; border:1.5px solid #D8D6D0; border-radius:12px; padding:14px; margin-bottom:12px; }
+.imp-card-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+.imp-card-op { display:flex; align-items:center; gap:8px; }
+.imp-card-op select { border:1.5px solid #C8C6C0; border-radius:8px; padding:6px 10px; font-size:13px; font-weight:700; }
+.imp-card-fecha input { border:1.5px solid #C8C6C0; border-radius:8px; padding:6px 10px; font-size:12px; }
+.imp-card-total { font-family:'DM Mono',monospace; font-size:13px; font-weight:700; color:#1A6B5B; }
+.imp-warn { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; background:#FEE2E2; color:#B83232; margin-left:6px; white-space:nowrap; }
+.imp-rows table { width:100%; border-collapse:collapse; }
+.imp-rows th { font-size:9px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:#6B6B6A; padding:4px 6px; border-bottom:1.5px solid #E0DED8; text-align:left; }
+.imp-rows td { padding:4px 4px; vertical-align:middle; border-bottom:1px solid #EDEBE6; }
+.imp-rows select, .imp-rows input { border:1.5px solid #C8C6C0; border-radius:7px; padding:5px 7px; font-size:11.5px; width:100%; }
+.imp-rows select.dudoso { border-color:#B87200; background:#FFF8EA; }
+.imp-add-row { background:#EBF7F4; border:1.5px dashed #1A6B5B; color:#1A6B5B; border-radius:8px; padding:5px 10px; font-size:11px; font-weight:700; cursor:pointer; margin-top:6px; }
+.mi-empty { text-align:center; padding:40px 20px; color:#6B6B6A; font-size:13px; }
+.mi-summary { background:#0C0C0B; border-radius:10px; padding:10px 16px; display:flex; gap:22px; margin-bottom:14px; flex-wrap:wrap; }
+.mi-summary div { font-size:11px; color:rgba(255,255,255,.6); }
+.mi-summary strong { color:#7ECEC0; font-family:'DM Mono',monospace; font-size:14px; display:block; }
+
 /* ── Responsive móvil ─────────────────────────────────────────── */
 @media(max-width:768px){
   .layout{grid-template-columns:1fr;height:auto;overflow:visible}
@@ -193,6 +224,7 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
         <input type="date" class="fecha-input" id="filtroFecha" onchange="cargarComandasPorFecha()">
         <button class="btn-nueva" type="button" id="btnNuevaComanda">+ Nueva</button>
       </div>
+      <button class="btn-importar" type="button" id="btnImportarReporte">📥 Importar reporte WhatsApp</button>
       <div id="filtroOperarioWrap" style="display:none;margin-bottom:8px">
         <select class="buscar" id="filtroOperarioSel" onchange="cargarPorOperario()" style="width:100%"><option value="">— Selecciona operario —</option></select>
         <div style="display:flex;gap:6px;margin-top:6px">
@@ -214,13 +246,41 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
     <div class="welcome" id="stWelcome"><div style="font-size:48px">📝</div><h3>Comandas de trabajo</h3><p>Selecciona una comanda o crea una nueva<br>para registrar el trabajo del día.</p></div>
     <div class="form-wrap" id="stForm">
       <div class="form-top"><div class="form-title" id="formTitle">Nueva comanda</div><div class="form-btns"><button class="btn btn-cancel" onclick="cancelar()">Cancelar</button><button class="btn btn-save" onclick="guardar()">💾 Guardar</button></div></div>
-      <div class="sec"><div class="sec-label">📋 Encabezado de comanda</div><div class="grid-3"><div class="field"><label>Correlativo</label><input type="text" id="fCorr" placeholder="CMD-001"></div><div class="field"><label>Fecha</label><input type="date" id="fFecha"></div><div class="field"><label>Hora de inicio</label><input type="time" id="fHoraInicio"></div></div><div class="grid-2"><div class="field"><label>Operario *</label><select id="fOperario"></select></div><div class="field"><label>Supervisor</label><select id="fSupervisor"><option value="T0">Heidy</option></select></div></div></div>
+      <div class="sec"><div class="sec-label">📋 Encabezado de comanda</div><div class="grid-3"><div class="field"><label>Correlativo</label><input type="text" id="fCorr" placeholder="CMD-001"></div><div class="field"><label>Fecha</label><input type="date" id="fFecha"></div><div class="field"><label>Hora de inicio</label><input type="time" id="fHoraInicio"></div></div><div class="grid-2"><div class="field"><label>Operario *</label><select id="fOperario"></select></div><div class="field"><label>Supervisor</label><select id="fSupervisor"></select></div></div></div>
       <div class="sec"><div class="sec-label">🔧 Tareas del día</div><table class="tareas-table"><thead><tr><th style="width:130px">Proceso</th><th>Tapa asignada</th><th style="width:90px">Cantidad</th><th style="width:130px">Método</th><th style="width:110px">Estado</th><th></th></tr></thead><tbody id="tareasBody"></tbody></table><button class="btn-add-row" onclick="addTareaRow()">+ Agregar línea</button></div>
       <div class="total-bar"><div><div class="total-bar-lbl">Total unidades PT del día</div><div style="font-size:10px;color:rgba(255,255,255,.3)">Solo líneas marcadas como "Terminada"</div></div><div class="total-bar-val" id="totalVal">0 und</div></div>
       <div class="sec cierre"><div class="sec-label">✅ Cierre · Firma del supervisor</div><div style="margin-bottom:12px"><label style="font-size:11px;font-weight:700;color:#3A3A38;display:block;margin-bottom:8px">📦 MATERIAL DEVUELTO A BODEGA</label><table class="tareas-table"><thead><tr><th>Material / SKU</th><th style="width:90px">Cantidad</th><th></th></tr></thead><tbody id="devolucionBody"></tbody></table><button type="button" class="btn-add-row" onclick="addDevolucionRow()">+ Agregar línea</button></div><div class="grid-2"><div class="field"><label>Hora de cierre</label><input type="time" id="fHoraCierre"></div><div class="field"><label>Observaciones</label><input type="text" id="fObs" placeholder="Notas del día..."></div></div></div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;margin-bottom:24px;padding-top:8px;border-top:2px solid #E0DED8"><button class="btn btn-cancel" type="button" onclick="cancelar()">Cancelar</button><button class="btn btn-save" type="button" onclick="guardar()">💾 Guardar comanda</button></div>
     </div>
     <div class="detail-wrap" id="stDetail"><div id="detailContent"></div></div>
+  </div>
+</div>
+
+<div class="overlay-imp" id="overlayImportar" onclick="if(event.target===this) cerrarModalImportar()">
+  <div class="modal-imp">
+    <div class="mi-head">
+      <div class="mi-title">📥 Importar reporte WhatsApp</div>
+      <button class="mi-close" onclick="cerrarModalImportar()">✕</button>
+    </div>
+    <div class="mi-body" id="miBody">
+      <div id="miStep1" class="mi-step1">
+        <div class="field">
+          <label style="font-size:11px;font-weight:700;color:#3A3A38;display:block;margin-bottom:6px">Fecha del reporte (los días sin fecha explícita del mensaje, ej. "Martes", se calculan a partir de esta)</label>
+          <input type="date" id="impFechaRef" style="border:1.5px solid #C8C6C0;border-radius:8px;padding:8px 10px;font-size:13px">
+        </div>
+        <div class="field">
+          <label style="font-size:11px;font-weight:700;color:#3A3A38;display:block;margin-bottom:6px">Pega aquí el texto del reporte, tal cual lo recibiste</label>
+          <textarea id="impTexto" placeholder="Reporte del día miércoles 30 de septiembre&#10;&#10;Johana&#10;1,300 liner 28 negra&#10;3,000 28 negra armada&#10;..."></textarea>
+        </div>
+      </div>
+      <div id="impPreviewWrap" style="display:none"></div>
+    </div>
+    <div class="mi-foot">
+      <button class="btn btn-cancel" type="button" onclick="cerrarModalImportar()">Cancelar</button>
+      <button class="btn btn-cancel" type="button" id="btnVolverTexto" style="display:none" onclick="volverATexto()">⬅ Editar texto</button>
+      <button class="btn btn-save" type="button" id="btnAnalizarReporte" onclick="analizarReporte()">🔍 Analizar</button>
+      <button class="btn btn-save" type="button" id="btnGuardarImportacion" style="display:none" onclick="guardarImportacion()">✅ Guardar todo</button>
+    </div>
   </div>
 </div>
 
@@ -242,6 +302,9 @@ let timeoutBusqueda = null;
 let modoActual = 'fecha';
 let operariosCache = [];
 let inventarioCache = [];
+let supervisorTapasActual = null;
+let impGrupos = [];
+let impRowSeq = 0;
 
 const PROCS_LIST = ['Armado','Banda','Liner','Impresión','Encajado','Flameado','Otra tarea'];
 const ESTADOS_TAREA = ['Asignada','En proceso','Terminada'];
@@ -284,6 +347,28 @@ async function cargarOperarios() {
 
 function getOperarioById(id) {
   return operariosCache.find(op => op.codigo === id) || { nombre: id, iniciales: '?', color_hex: '#6B6B6A' };
+}
+
+// ============================================
+// SUPERVISOR — resuelto en vivo desde `personal`, nunca hardcodeado
+// ============================================
+async function cargarSupervisorTapas() {
+  try {
+    const { data, error } = await db.from('personal').select('codigo, nombre')
+      .eq('area', 'tapas').eq('rol', 'supervisor').eq('activo', true).limit(1);
+    if (error) throw error;
+    supervisorTapasActual = (data && data[0]) || null;
+    const sel = document.getElementById('fSupervisor');
+    if (sel) {
+      sel.innerHTML = supervisorTapasActual
+        ? `<option value="${escHtml(supervisorTapasActual.codigo)}">${escHtml(supervisorTapasActual.nombre)}</option>`
+        : '<option value="">— Sin supervisor activo —</option>';
+    }
+  } catch(e) { console.error('Error cargando supervisor:', e); }
+}
+
+function fechaHoyGT() {
+  return new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 // ============================================
@@ -845,8 +930,8 @@ async function guardar() {
     fecha: fecha,
     operario_id: operarioId,
     operario_nombre: op.nombre || '',
-    supervisor_id: 'T0',
-    supervisor_nombre: 'Heidy',
+    supervisor_id: supervisorTapasActual ? supervisorTapasActual.codigo : '',
+    supervisor_nombre: supervisorTapasActual ? supervisorTapasActual.nombre : '',
     hora_inicio: get12h('fHoraInicio'),
     hora_cierre: get12h('fHoraCierre'),
     total_unidades: totalPT,
@@ -897,10 +982,311 @@ async function guardar() {
 }
 
 // ============================================
+// IMPORTAR REPORTE WHATSAPP
+// ============================================
+function abrirModalImportar() {
+  document.getElementById('impFechaRef').value = fechaHoyGT();
+  document.getElementById('impTexto').value = '';
+  document.getElementById('impPreviewWrap').innerHTML = '';
+  volverATexto();
+  impGrupos = [];
+  document.getElementById('overlayImportar').classList.add('open');
+}
+
+function cerrarModalImportar() {
+  document.getElementById('overlayImportar').classList.remove('open');
+}
+
+function volverATexto() {
+  document.getElementById('miStep1').style.display = 'block';
+  document.getElementById('impPreviewWrap').style.display = 'none';
+  document.getElementById('btnAnalizarReporte').style.display = 'inline-block';
+  document.getElementById('btnGuardarImportacion').style.display = 'none';
+  document.getElementById('btnVolverTexto').style.display = 'none';
+}
+
+// Mismo criterio tolerante que resolverOperario() en api/whatsapp.js:
+// solo se auto-asigna si hay un candidato que cubre todas las palabras
+// del texto y no hay empate con el siguiente.
+async function resolverOperarioTexto(texto) {
+  const limpio = (texto || '').trim();
+  if (!limpio) return { codigo: '', nombre: limpio, confiable: false };
+  try {
+    const { data, error } = await db.rpc('bot_buscar_operario', { p_texto: limpio, p_area: 'tapas' });
+    if (error || !data) return { codigo: '', nombre: limpio, confiable: false };
+    const conHits = data.filter(x => x.hits > 0);
+    if (!conHits.length) return { codigo: '', nombre: limpio, confiable: false };
+    const toks = limpio.toLowerCase().split(/\s+/).filter(t => t.length >= 2);
+    const top = conHits[0];
+    const unico = conHits.length === 1 || conHits[1].hits < top.hits;
+    if (top.hits >= toks.length && unico) return { codigo: top.codigo, nombre: top.nombre, confiable: true };
+    return { codigo: '', nombre: limpio, confiable: false };
+  } catch(e) { return { codigo: '', nombre: limpio, confiable: false }; }
+}
+
+// Mismo criterio tolerante que resolverSku() en api/whatsapp.js.
+async function resolverSkuTexto(texto) {
+  const limpio = (texto || '').trim();
+  if (!limpio) return { sku: '', descripcion: limpio, confiable: false };
+  try {
+    const { data, error } = await db.rpc('bot_buscar_sku', { p_texto: limpio });
+    if (error || !data) return { sku: '', descripcion: limpio, confiable: false };
+    const conHits = data.filter(x => x.hits > 0);
+    if (!conHits.length) return { sku: '', descripcion: limpio, confiable: false };
+    const toks = limpio.toLowerCase().split(/\s+/).filter(t => t.length >= 2);
+    const top = conHits[0];
+    const unico = conHits.length === 1 || conHits[1].hits < top.hits;
+    if (top.hits >= toks.length && unico) return { sku: String(top.sku), descripcion: top.descripcion, confiable: true };
+    return { sku: '', descripcion: limpio, confiable: false };
+  } catch(e) { return { sku: '', descripcion: limpio, confiable: false }; }
+}
+
+async function construirGruposImportacion(filas) {
+  const operarioCache = {};
+  const grupos = {};
+  const fechaDefault = document.getElementById('impFechaRef').value;
+  for (const f of filas) {
+    const opTexto = (f.operario_texto || '').trim();
+    if (!(opTexto in operarioCache)) operarioCache[opTexto] = await resolverOperarioTexto(opTexto);
+    const op = operarioCache[opTexto];
+    const skuRes = await resolverSkuTexto(f.descripcion || '');
+    const fecha = f.fecha || fechaDefault;
+    const key = (op.codigo || opTexto) + '|' + fecha;
+    if (!grupos[key]) {
+      grupos[key] = {
+        id: 'grp_' + (++impRowSeq),
+        operarioTexto: opTexto,
+        operarioCodigo: op.codigo,
+        operarioNombre: op.nombre,
+        operarioConfiable: op.confiable,
+        fecha: fecha,
+        tareas: [],
+      };
+    }
+    grupos[key].tareas.push({
+      id: ++impRowSeq,
+      proceso: f.proceso || '',
+      procesoDudoso: !!f.proceso_dudoso || !f.proceso,
+      descripcion: skuRes.confiable ? skuRes.descripcion : (f.descripcion || ''),
+      sku: skuRes.sku || '',
+      skuConfiable: skuRes.confiable,
+      cantidad: f.cantidad || 0,
+      metodo: f.metodo || 'manual',
+    });
+  }
+  impGrupos = Object.values(grupos);
+}
+
+async function analizarReporte() {
+  const texto = document.getElementById('impTexto').value.trim();
+  const fechaRef = document.getElementById('impFechaRef').value;
+  if (!texto || !fechaRef) {
+    showToast('❌ Pega el texto y confirma la fecha del reporte', '#B83232');
+    return;
+  }
+  const btn = document.getElementById('btnAnalizarReporte');
+  btn.disabled = true; btn.textContent = '⏳ Analizando...';
+  try {
+    const sesion = await db.auth.getSession();
+    const token = (sesion && sesion.data && sesion.data.session) ? sesion.data.session.access_token : '';
+    const resp = await fetch('/api/parse-reporte-tapas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ texto, fecha_referencia: fechaRef }),
+    });
+    const out = await resp.json();
+    if (!resp.ok) throw new Error(out.error || ('Error ' + resp.status));
+    if (!out.filas || !out.filas.length) {
+      showToast('⚠️ No encontré líneas de producción en ese texto', '#B87200');
+      return;
+    }
+    await construirGruposImportacion(out.filas);
+    renderImportarPreview();
+    document.getElementById('miStep1').style.display = 'none';
+    document.getElementById('impPreviewWrap').style.display = 'block';
+    document.getElementById('btnAnalizarReporte').style.display = 'none';
+    document.getElementById('btnGuardarImportacion').style.display = 'inline-block';
+    document.getElementById('btnVolverTexto').style.display = 'inline-block';
+  } catch(e) {
+    console.error(e);
+    showToast('❌ ' + e.message, '#B83232');
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Analizar';
+  }
+}
+
+function hallarGrupoImp(gid) { return impGrupos.find(g => g.id === gid); }
+
+function renderImportarPreview() {
+  const wrap = document.getElementById('impPreviewWrap');
+  if (!impGrupos.length) { wrap.innerHTML = '<div class="mi-empty">Nada para mostrar.</div>'; return; }
+  const totalUnd = impGrupos.reduce((s, g) => s + g.tareas.reduce((a, t) => a + (t.cantidad || 0), 0), 0);
+  const totalOps = new Set(impGrupos.map(g => g.operarioTexto)).size;
+  wrap.innerHTML =
+    `<div class="mi-summary">
+      <div><strong>${impGrupos.length}</strong>Comandas a crear</div>
+      <div><strong>${totalOps}</strong>Operarios</div>
+      <div><strong>${totalUnd.toLocaleString()}</strong>Unidades totales</div>
+    </div>` + impGrupos.map(buildGrupoCard).join('');
+}
+
+function buildGrupoCard(g) {
+  const opOpts = operariosCache.map(op =>
+    `<option value="${escHtml(op.codigo)}" ${op.codigo === g.operarioCodigo ? 'selected' : ''}>${escHtml(op.nombre)}</option>`
+  ).join('');
+  const warnOp = g.operarioConfiable ? '' : `<span class="imp-warn">⚠️ sin match: "${escHtml(g.operarioTexto)}"</span>`;
+  const totalGrupo = g.tareas.reduce((s, t) => s + (t.cantidad || 0), 0);
+  return `
+    <div class="imp-card" id="${g.id}">
+      <div class="imp-card-head">
+        <div class="imp-card-op">
+          <select onchange="cambiarOperarioGrupo('${g.id}', this.value)">
+            <option value="">— Selecciona operario —</option>
+            ${opOpts}
+          </select>
+          ${warnOp}
+        </div>
+        <div class="imp-card-fecha"><input type="date" value="${g.fecha}" onchange="cambiarFechaGrupo('${g.id}', this.value)"></div>
+        <div class="imp-card-total" id="${g.id}_total">${totalGrupo.toLocaleString()} und</div>
+      </div>
+      <div class="imp-rows">
+        <table>
+          <thead><tr><th style="width:120px">Proceso</th><th>Descripción / SKU</th><th style="width:80px">Cant.</th><th style="width:120px">Método</th><th></th></tr></thead>
+          <tbody id="${g.id}_body">${g.tareas.map(t => buildTareaImpRow(g.id, t)).join('')}</tbody>
+        </table>
+        <button type="button" class="imp-add-row" onclick="agregarTareaImp('${g.id}')">+ línea</button>
+      </div>
+    </div>`;
+}
+
+function buildTareaImpRow(gid, t) {
+  const procsOpts = [''].concat(PROCS_LIST).map(p =>
+    `<option value="${p}" ${t.proceso === p ? 'selected' : ''}>${p || '— elegir —'}</option>`
+  ).join('');
+  const warnSku = t.skuConfiable ? '' : '<span class="imp-warn">sin SKU</span>';
+  return `
+    <tr id="imp_${t.id}">
+      <td><select class="${t.procesoDudoso ? 'dudoso' : ''}" onchange="actualizarTareaImp('${gid}',${t.id},'proceso',this.value)">${procsOpts}</select></td>
+      <td><input type="text" value="${escHtml(t.descripcion)}" oninput="actualizarTareaImp('${gid}',${t.id},'descripcion',this.value)"> ${warnSku}</td>
+      <td><input type="number" min="0" value="${t.cantidad}" oninput="actualizarTareaImp('${gid}',${t.id},'cantidad',this.value)"></td>
+      <td>
+        <select onchange="actualizarTareaImp('${gid}',${t.id},'metodo',this.value)">
+          <option value="manual" ${t.metodo === 'manual' ? 'selected' : ''}>✋ Manual</option>
+          <option value="maquina_liner" ${t.metodo === 'maquina_liner' ? 'selected' : ''}>⚙ Máq. Liner</option>
+          <option value="maquina_armado" ${t.metodo === 'maquina_armado' ? 'selected' : ''}>⚙ Máq. Armado</option>
+        </select>
+      </td>
+      <td><button class="btn-rm-row" onclick="quitarTareaImp('${gid}',${t.id})">✕</button></td>
+    </tr>`;
+}
+
+function cambiarOperarioGrupo(gid, codigo) {
+  const g = hallarGrupoImp(gid); if (!g) return;
+  const op = operariosCache.find(o => o.codigo === codigo);
+  g.operarioCodigo = codigo || '';
+  g.operarioNombre = op ? op.nombre : g.operarioTexto;
+  g.operarioConfiable = !!codigo;
+  renderImportarPreview();
+}
+
+function cambiarFechaGrupo(gid, fecha) {
+  const g = hallarGrupoImp(gid); if (!g) return;
+  g.fecha = fecha;
+}
+
+function actualizarTareaImp(gid, tid, campo, valor) {
+  const g = hallarGrupoImp(gid); if (!g) return;
+  const t = g.tareas.find(x => x.id === tid); if (!t) return;
+  if (campo === 'cantidad') t.cantidad = parseInt(valor) || 0;
+  else t[campo] = valor;
+  if (campo === 'proceso') t.procesoDudoso = false;
+  if (campo === 'descripcion') { t.sku = ''; t.skuConfiable = false; }
+  const totalEl = document.getElementById(gid + '_total');
+  if (totalEl) totalEl.textContent = g.tareas.reduce((s, x) => s + (x.cantidad || 0), 0).toLocaleString() + ' und';
+}
+
+function agregarTareaImp(gid) {
+  const g = hallarGrupoImp(gid); if (!g) return;
+  const t = { id: ++impRowSeq, proceso: '', procesoDudoso: false, descripcion: '', sku: '', skuConfiable: false, cantidad: 0, metodo: 'manual' };
+  g.tareas.push(t);
+  document.getElementById(gid + '_body').insertAdjacentHTML('beforeend', buildTareaImpRow(gid, t));
+}
+
+function quitarTareaImp(gid, tid) {
+  const g = hallarGrupoImp(gid); if (!g) return;
+  g.tareas = g.tareas.filter(t => t.id !== tid);
+  document.getElementById('imp_' + tid)?.remove();
+  const totalEl = document.getElementById(gid + '_total');
+  if (totalEl) totalEl.textContent = g.tareas.reduce((s, x) => s + (x.cantidad || 0), 0).toLocaleString() + ' und';
+}
+
+async function guardarImportacion() {
+  if (!impGrupos.length) return;
+  const gruposValidos = impGrupos.filter(g => g.tareas.some(t => t.cantidad > 0 && t.proceso));
+  if (!gruposValidos.length) {
+    showToast('❌ No hay tareas válidas (falta proceso o cantidad) para guardar', '#B83232');
+    return;
+  }
+  const btn = document.getElementById('btnGuardarImportacion');
+  btn.disabled = true; btn.textContent = '⏳ Guardando...';
+  let comandasCreadas = 0, tareasCreadas = 0;
+  try {
+    for (const g of gruposValidos) {
+      const tareasOk = g.tareas.filter(t => t.cantidad > 0 && t.proceso);
+      if (!tareasOk.length) continue;
+      const totalUnd = tareasOk.reduce((s, t) => s + t.cantidad, 0);
+      const cabecera = {
+        fecha: g.fecha,
+        operario_id: g.operarioCodigo || '',
+        operario_nombre: g.operarioNombre || g.operarioTexto,
+        supervisor_id: supervisorTapasActual ? supervisorTapasActual.codigo : '',
+        supervisor_nombre: supervisorTapasActual ? supervisorTapasActual.nombre : '',
+        hora_inicio: null,
+        hora_cierre: null,
+        total_unidades: totalUnd,
+        observaciones: 'Importado de reporte WhatsApp',
+      };
+      const { data, error } = await db.from('comandas').insert(cabecera).select();
+      if (error) throw error;
+      const cmdId = data[0].id;
+      const tareasData = tareasOk.map((t, i) => {
+        const cap = getCapacidad(t.proceso, t.metodo);
+        return {
+          comanda_id: cmdId,
+          orden: i + 1,
+          proceso: t.proceso,
+          tapa_desc: t.descripcion || '',
+          tapa_sku: t.sku || '',
+          cantidad: t.cantidad,
+          metodo: t.metodo,
+          capacidad_hora: cap,
+          horas_efectivas: Math.round((t.cantidad / cap) * 100) / 100,
+          unidades_completadas: t.cantidad,
+          estado: 'Terminada',
+        };
+      });
+      const { error: errT } = await db.from('comanda_tareas').insert(tareasData);
+      if (errT) throw errT;
+      comandasCreadas++;
+      tareasCreadas += tareasData.length;
+    }
+    showToast(`✅ ${comandasCreadas} comanda(s) · ${tareasCreadas} tarea(s) guardadas`);
+    cerrarModalImportar();
+    await cargarComandasPorFecha();
+  } catch(e) {
+    console.error(e);
+    showToast('❌ Error guardando: ' + e.message, '#B83232');
+  } finally {
+    btn.disabled = false; btn.textContent = '✅ Guardar todo';
+  }
+}
+
+// ============================================
 // INICIALIZACIÓN
 // ============================================
 async function inicializar() {
   await cargarOperarios();
+  await cargarSupervisorTapas();
   await getInventario(); // Precargar inventario
 
   const hoy = new Date().toISOString().split('T')[0];
@@ -910,6 +1296,7 @@ async function inicializar() {
   set12h('fHoraCierre', new Date().toTimeString().slice(0,5));
   
   document.getElementById('btnNuevaComanda')?.addEventListener('click', (e) => { e.preventDefault(); nuevaComanda(); });
+  document.getElementById('btnImportarReporte')?.addEventListener('click', (e) => { e.preventDefault(); abrirModalImportar(); });
   
   const urlParams = new URLSearchParams(window.location.search);
   const comandaId = urlParams.get('id');
