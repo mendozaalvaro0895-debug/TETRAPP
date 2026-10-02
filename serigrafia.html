@@ -320,6 +320,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sin-card-wrap{border-radius:8px;transition:box-shadow .1s}
 .sin-card-wrap.drop-before{box-shadow:0 -3px 0 0 var(--serig-m)}
 .sin-card-wrap.drop-after{box-shadow:0 3px 0 0 var(--serig-m)}
+.lane-card-wrap{border-radius:8px;transition:box-shadow .1s}
+.lane-card-wrap.drop-before{box-shadow:0 -3px 0 0 var(--serig-m)}
+.lane-card-wrap.drop-after{box-shadow:0 3px 0 0 var(--serig-m)}
 .sin-reorder-handle{display:flex;align-items:center;justify-content:center;height:4px;background:var(--serig-l);border-radius:4px 4px 0 0;cursor:grab;font-size:0;color:var(--serig-m);user-select:none;opacity:.5}
 .sin-reorder-handle:hover{opacity:1;background:var(--serig-ll,#ede9fe)}
 .sin-reorder-handle:active{cursor:grabbing}
@@ -1109,6 +1112,12 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
         <div class="fg">
           <div class="fl">Iniciales *</div>
           <input class="fi" id="mpIniciales" placeholder="GG" maxlength="3" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+        </div>
+      </div>
+      <div class="fr">
+        <div class="fg" style="grid-column:1/-1">
+          <div class="fl">Nombre en el tablero <span style="font-weight:500;text-transform:none;color:var(--gray-l)">(opcional — vacío = primer nombre)</span></div>
+          <input class="fi" id="mpNombreCorto" placeholder="Ej: Gladys R." maxlength="24">
         </div>
       </div>
       <div class="fr">
@@ -2106,12 +2115,16 @@ function matrizOpByCodigo(codigo) {
   return lista.find(function(p) { return p.codigo === codigo; });
 }
 
+function nombreTablero(p) {
+  return escHtml((p.nombre_corto || '').trim() || (p.nombre || '').split(' ')[0]);
+}
+
 function matrizChip(codigo) {
   var p = matrizOpByCodigo(codigo);
   if (!p) return '';
   var ini    = p.iniciales || (p.nombre ? p.nombre.charAt(0) : '?');
   var color  = (p.proceso_hab === 'Prestado') ? '#b45309' : (p.color_hex || '#166534');
-  var nombre = (p.nombre || '').split(' ')[0];
+  var nombre = nombreTablero(p);
   return '<div class="mtx-chip" draggable="true"' +
     ' ondragstart="matrizDragStart(event,\'' + codigo + '\')"' +
     ' ondragend="this.classList.remove(\'dragging\')"' +
@@ -2136,7 +2149,7 @@ function renderMatriz() {
   var ausenteChips = lista.filter(function(p) { return !!ausentesDia[p.codigo]; })
                           .map(function(p) {
                             var ini = (p.nombre || '?')[0].toUpperCase();
-                            var nombre = (p.nombre || '').split(' ')[0];
+                            var nombre = nombreTablero(p);
                             return '<div class="mtx-chip" draggable="false" title="' + (p.nombre||'') + ' · Ausente hoy"' +
                               ' style="opacity:.55;cursor:default;background:var(--bg3)">' +
                               '<span class="mtx-ava" style="background:#dc2626">' + ini + '</span>' + nombre +
@@ -2922,6 +2935,8 @@ function saveSinCardOrden(obj) {
 }
 
 function sinHandleDragStart(e, solId, cliente) {
+  boardDragId = null;
+  boardDragSolId = null;
   sinHandleDrag = { solId: solId, cliente: cliente };
   e.dataTransfer.setData('text/plain', 'reorder:' + solId);
   e.stopPropagation();
@@ -2962,6 +2977,86 @@ function sinCardDrop(e, targetSolId, cliente) {
   allOrden[dragCli] = cliOrden;
   saveSinCardOrden(allOrden);
   renderBoard();
+}
+
+// ── Orden manual de las fichas dentro de cada línea de producción ──
+// laneCardOrdenCache: { '1': [lineaDbId, ...], '2': [...] } — se guarda en
+// configuracion (clave lane_cards_serig), igual que el orden de Sin asignar.
+var laneCardOrdenCache = {};
+
+function saveLaneCardOrden(obj) {
+  laneCardOrdenCache = obj;
+  db.from('configuracion').upsert({ clave: 'lane_cards_serig', valor: obj, updated_at: new Date().toISOString() }).then(function(){});
+}
+
+function laneCardKey(item) { return item.lineaDbId || item.solId; }
+
+function ordenarLaneItems(laneId, items) {
+  var orden = laneCardOrdenCache[String(laneId)] || [];
+  var base = {};
+  items.forEach(function(it, i) { base[laneCardKey(it)] = i; });
+  return items.slice().sort(function(a, b) {
+    var ia = orden.indexOf(laneCardKey(a)), ib = orden.indexOf(laneCardKey(b));
+    ia = ia === -1 ? 9999 : ia; ib = ib === -1 ? 9999 : ib;
+    if (ia !== ib) return ia - ib;
+    return base[laneCardKey(a)] - base[laneCardKey(b)];
+  });
+}
+
+function laneCardDragOver(e) {
+  if (!boardDragId) return;
+  e.preventDefault();
+  e.stopPropagation();
+  document.querySelectorAll('.lane-card-wrap').forEach(function(el){ el.classList.remove('drop-before','drop-after'); });
+  var rect = e.currentTarget.getBoundingClientRect();
+  e.currentTarget.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drop-before' : 'drop-after');
+}
+
+function laneCardDragLeave(e) {
+  e.currentTarget.classList.remove('drop-before','drop-after');
+}
+
+async function laneCardDrop(e, laneId, targetKey) {
+  document.querySelectorAll('.lane-card-wrap').forEach(function(el){ el.classList.remove('drop-before','drop-after'); });
+  var dragKey = boardDragId;
+  if (!dragKey) return; // no es una ficha arrastrada: dejar que lo maneje la línea
+  e.preventDefault();
+  e.stopPropagation();
+  if (dragKey === targetKey) { boardDragId = null; boardDragSolId = null; return; }
+
+  var wrap = e.currentTarget;
+  var rect = wrap.getBoundingClientRect();
+  var insertBefore = e.clientY < rect.top + rect.height / 2;
+
+  // Orden actual tal como se ve en pantalla (incluye fichas aún sin posición guardada)
+  var actual = [];
+  document.querySelectorAll('#bc-' + laneId + ' .lane-card-wrap').forEach(function(el) {
+    var k = el.getAttribute('data-key');
+    if (k && k !== dragKey) actual.push(k);
+  });
+  var idx = actual.indexOf(targetKey);
+  if (idx === -1) idx = actual.length; else if (!insertBefore) idx++;
+  actual.splice(idx, 0, dragKey);
+
+  var todos = Object.assign({}, laneCardOrdenCache);
+  Object.keys(todos).forEach(function(l) {
+    if (l !== String(laneId)) todos[l] = (todos[l] || []).filter(function(k){ return k !== dragKey; });
+  });
+  todos[String(laneId)] = actual;
+  saveLaneCardOrden(todos);
+
+  // ¿Viene de otra línea (o de Sin asignar)? Entonces además hay que asignarla
+  var desde = 0;
+  solicitudes.forEach(function(s) {
+    (s.lineas || []).forEach(function(l) { if (l.id === dragKey) desde = l.linea_id || 0; });
+  });
+  if (desde !== laneId) {
+    await boardDrop(e, laneId); // asigna la línea, recarga y re-renderiza
+  } else {
+    boardDragId = null;
+    boardDragSolId = null;
+    renderBoard();
+  }
 }
 
 var sinGrupoOrdenCache = [];
@@ -3280,7 +3375,15 @@ function boardBuildLane(laneId, items, label, active) {
   var hdrBg  = active ? 'var(--serig-l)' : '#f8f8f8';
   var hdrClr = active ? 'var(--serig-m)' : 'var(--gray-l)';
   var therm  = '';
-  var cards  = items.map(boardBuildCard).join('');
+  var cards  = ordenarLaneItems(laneId, items).map(function(it) {
+    var key = laneCardKey(it);
+    return '<div class="lane-card-wrap" data-key="' + key + '"' +
+      ' ondragover="laneCardDragOver(event)"' +
+      ' ondragleave="laneCardDragLeave(event)"' +
+      ' ondrop="laneCardDrop(event,' + laneId + ',\'' + key + '\')">' +
+      boardBuildCard(it) +
+    '</div>';
+  }).join('');
   return '<div class="board-lane' + (active ? '' : ' linea-inactiva') + '" id="bl-' + laneId + '"' +
     ' ondragover="event.preventDefault();document.getElementById(\'bl-' + laneId + '\').classList.add(\'drag-over\')"' +
     ' ondragleave="document.getElementById(\'bl-' + laneId + '\').classList.remove(\'drag-over\')"' +
@@ -3411,6 +3514,7 @@ document.addEventListener('drop',    _stopDragScroll);
 function boardDragStart(e, lineaDbId, solId) {
   boardDragId = lineaDbId;
   boardDragSolId = solId;
+  sinHandleDrag = null;          // un arrastre de ficha cancela un reorden pendiente de Sin asignar
   matrizDragCodigo = null;       // evita cruces con el drag de la matriz
   e.dataTransfer.setData('text/plain', String(lineaDbId));
   var card = e.currentTarget || e.target;
@@ -6032,8 +6136,10 @@ function entregadoSolInput(val, i) {
   if (!drop) return;
   eEntregadoSolIds[i] = null;
   var v = val.trim().toLowerCase();
+  // Solo fichas activas del mes vigente (período efectivo, igual que el board)
+  var perHoy = periodoActualKey();
   var candidatos = solicitudes.filter(function(s) {
-    return ESTADOS_SERIG.indexOf(s.estado) >= 0;
+    return ['nueva','proceso','parcial'].indexOf(s.estado) >= 0 && mesSol(s) === perHoy;
   });
   var matches = v.length === 0 ? candidatos.slice(0, 12) : candidatos.filter(function(s) {
     return (s.id_display || '').toLowerCase().includes(v) || (s.cliente || '').toLowerCase().includes(v) || (s.desc || '').toLowerCase().includes(v);
@@ -11542,6 +11648,7 @@ function abrirModalNuevoOperario() {
   mpEditCodigo = null;
   document.getElementById('mpTitle').textContent = 'Nuevo operario';
   document.getElementById('mpNombre').value = '';
+  document.getElementById('mpNombreCorto').value = '';
   document.getElementById('mpIniciales').value = '';
   document.getElementById('mpCodigo').value = '';
   document.getElementById('mpCodigo').disabled = false;
@@ -11561,6 +11668,7 @@ function abrirModalEditarOperario(codigo) {
   mpEditCodigo = codigo;
   document.getElementById('mpTitle').textContent = 'Editar operario';
   document.getElementById('mpNombre').value = p.nombre || '';
+  document.getElementById('mpNombreCorto').value = p.nombre_corto || '';
   document.getElementById('mpIniciales').value = p.iniciales || '';
   document.getElementById('mpCodigo').value = p.codigo || '';
   document.getElementById('mpCodigo').disabled = true;
@@ -11596,8 +11704,9 @@ async function guardarOperario() {
   if (!iniciales) { showToast('⚠️ Iniciales requeridas', '#B83232'); animShake(document.getElementById('modalPersonal')); return; }
   if (!codigo)    { showToast('⚠️ Código requerido', '#B83232');    animShake(document.getElementById('modalPersonal')); return; }
 
+  var nombreCorto = (document.getElementById('mpNombreCorto').value || '').trim();
   var payload = {
-    nombre: nombre, iniciales: iniciales, area: 'serig',
+    nombre: nombre, nombre_corto: nombreCorto || null, iniciales: iniciales, area: 'serig',
     activo: activo, color_hex: color, proceso_hab: rol || '',
     fecha_inicio: fechaInicio, fecha_baja: fechaBaja
   };
@@ -11947,11 +12056,12 @@ async function asistCambiarFecha(delta) {
 
 async function cargarOrdenSinAsignar() {
   try {
-    var r = await db.from('configuracion').select('clave,valor').in('clave', ['sin_cards_serig', 'sin_grupos_serig']);
+    var r = await db.from('configuracion').select('clave,valor').in('clave', ['sin_cards_serig', 'sin_grupos_serig', 'lane_cards_serig']);
     if (r.data && r.data.length) {
       r.data.forEach(function(row) {
         if (row.clave === 'sin_cards_serig') sinCardOrdenCache = row.valor || {};
         if (row.clave === 'sin_grupos_serig') sinGrupoOrdenCache = row.valor || [];
+        if (row.clave === 'lane_cards_serig') laneCardOrdenCache = row.valor || {};
       });
     } else {
       // migrar desde localStorage si existe
