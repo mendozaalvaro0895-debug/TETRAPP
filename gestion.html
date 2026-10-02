@@ -1481,6 +1481,17 @@ function ordenSupervisorPrimero(a, b) {
   return (a.rol === 'supervisor' ? 0 : 1) - (b.rol === 'supervisor' ? 0 : 1);
 }
 
+// Producción tiene 2 turnos con su propio supervisor cada uno — primero se agrupa
+// por turno (Gabino, luego Alex — mismo orden que la hoja de asistencia de planta),
+// y DENTRO de cada turno el supervisor queda arriba (orden estable para el resto).
+var TURNO_PRODUCCION_ORDEN = { gabino: 0, alex: 1 };
+function ordenProduccionPorTurno(a, b) {
+  var ta = TURNO_PRODUCCION_ORDEN[a.turno_produccion] != null ? TURNO_PRODUCCION_ORDEN[a.turno_produccion] : 99;
+  var tb = TURNO_PRODUCCION_ORDEN[b.turno_produccion] != null ? TURNO_PRODUCCION_ORDEN[b.turno_produccion] : 99;
+  if (ta !== tb) return ta - tb;
+  return (a.rol === 'supervisor' ? 0 : 1) - (b.rol === 'supervisor' ? 0 : 1);
+}
+
 function buildGrupoBloque(key, label, grupo) {
   var colapsado = !!gruposColapsados[key];
   var chevron = colapsado ? '▸' : '▾';
@@ -1502,7 +1513,8 @@ function buildPersonalTable(lista) {
     '</tr></thead>';
   var vistos = {};
   AREA_GRUPOS.forEach(function(a) {
-    var grupo = lista.filter(function(p) { return p.area === a.key; }).sort(ordenSupervisorPrimero);
+    var comparador = a.key === 'produccion' ? ordenProduccionPorTurno : ordenSupervisorPrimero;
+    var grupo = lista.filter(function(p) { return p.area === a.key; }).sort(comparador);
     vistos[a.key] = true;
     if (!grupo.length) return;
     html += buildGrupoBloque(a.key, a.label, grupo);

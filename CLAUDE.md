@@ -382,6 +382,12 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   El/la supervisor(a) de cada grupo se ordena SIEMPRE primero dentro de su área
   (`ordenSupervisorPrimero()`, orden estable — el resto conserva activo desc/nombre asc) y se
   distingue con "★ " antes del nombre + fondo tenue + nombre en negrita (`tr.p-row.supervisor`).
+  ⚠️ Producción usa un comparador aparte (`ordenProduccionPorTurno()`, elegido en
+  `buildPersonalTable()` solo para `a.key==='produccion'`): agrupa primero por
+  `turno_produccion` (Gabino, luego Alex — mismo orden que la hoja de asistencia de planta;
+  cualquier otro valor/null cae al final) y DENTRO de cada turno aplica el mismo criterio de
+  supervisor-primero. Sin esto los dos supervisores de Producción quedaban juntos arriba del
+  todo y los operarios de ambos turnos mezclados entre sí.
   Click en fila → modalPersona con 7 sub-tabs:
     Datos generales (editable: nombre/iniciales/código/área/rol/proceso_hab/teléfono/
                      fecha_nacimiento/activo/fechas — la columna "Edad" de la tabla y del
