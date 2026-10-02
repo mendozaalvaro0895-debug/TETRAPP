@@ -1095,7 +1095,7 @@ async function analizarReporte() {
       body: JSON.stringify({ texto, fecha_referencia: fechaRef }),
     });
     const out = await resp.json();
-    if (!resp.ok) throw new Error(out.error || ('Error ' + resp.status));
+    if (!resp.ok) throw new Error((out.error || ('Error ' + resp.status)) + (out.detalle ? ' · ' + out.detalle : ''));
     if (!out.filas || !out.filas.length) {
       showToast('⚠️ No encontré líneas de producción en ese texto', '#B87200');
       return;

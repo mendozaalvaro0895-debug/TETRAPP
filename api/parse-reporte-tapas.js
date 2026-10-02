@@ -90,13 +90,19 @@ module.exports = async function handler(req, res) {
 
     const { data: userData, error: userErr } = await db.auth.getUser(token);
     if (userErr || !userData || !userData.user) {
-      res.status(401).json({ error: 'Sesión inválida' });
+      console.error('[parse-reporte-tapas] getUser falló:', userErr && userErr.message);
+      res.status(401).json({ error: 'Sesión inválida', detalle: userErr ? userErr.message : null });
       return;
     }
 
-    const { data: perfil } = await db.from('perfiles').select('rol').eq('user_id', userData.user.id).single();
-    if (!perfil || perfil.rol !== 'master') {
-      res.status(403).json({ error: 'Sin permiso — se requiere rol master' });
+    const { data: perfil, error: perfilErr } = await db.from('perfiles').select('rol').eq('user_id', userData.user.id).single();
+    if (perfilErr || !perfil || perfil.rol !== 'master') {
+      console.error('[parse-reporte-tapas] chequeo de rol falló. user_id:', userData.user.id,
+        '| error:', perfilErr && perfilErr.message, '| perfil:', perfil);
+      res.status(403).json({
+        error: 'Sin permiso — se requiere rol master',
+        detalle: perfilErr ? perfilErr.message : (perfil ? ('rol actual: ' + perfil.rol) : 'no se encontró perfil para este usuario'),
+      });
       return;
     }
 
