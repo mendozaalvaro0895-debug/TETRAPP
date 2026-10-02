@@ -96,6 +96,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 /* ── ALERTAS STOCK B7 ─────────────────────────────────────── */
 .alertas-row{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}
 .alertas-slot-r{flex:1;min-width:0}
+.alertas-col-izq{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.alertas-col-izq .b7-alert-wrap{flex:none}
+.alertas-col-izq .env-wrap{margin-bottom:0}
+.rech-wrap{background:var(--card);border:2px solid #FCA5A5;border-radius:10px;overflow:hidden}
+.rech-hdr{display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;user-select:none;background:#FEF2F2;border-bottom:1px solid rgba(0,0,0,.06)}
+.rech-wrap.collapsed .rech-body,.rech-wrap.collapsed .rech-foot{display:none}
+.rech-wrap.collapsed .rech-hdr{border-bottom:none}
+.rech-ttl{font-size:13px;font-weight:700;color:#991B1B;flex:1}
+.rech-sub{font-size:10px;color:var(--gray-l);font-weight:500;text-transform:capitalize}
+.rech-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 12px 4px}
+.rech-kpi{background:var(--bg2);border-radius:8px;padding:6px 8px;text-align:center}
+.rech-kpi b{display:block;font-size:16px;font-weight:800;font-family:var(--mono)}
+.rech-kpi span{font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.3px}
+.rech-list{padding:6px 12px 10px;display:flex;flex-direction:column;gap:2px}
+.rech-item{display:grid;grid-template-columns:auto 52px 1fr auto;gap:8px;align-items:center;font-size:11px;padding:4px 0;border-bottom:1px dashed var(--border)}
+.rech-item:last-child{border-bottom:none}
+.rech-foot{padding:6px 12px 10px;text-align:right}
 .b7-alert-wrap{background:#FFFBEB;border:2px solid #FDE68A;border-radius:10px;overflow:hidden;display:none;flex:1;min-width:0}
 .b7-alert-wrap.critico-hay{background:#FEF2F2;border-color:#FECACA}
 .b7-alert-hdr{display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;user-select:none;border-bottom:1px solid rgba(0,0,0,.06)}
@@ -664,8 +681,9 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
           </div>
         </div>
 
-        <!-- Fila de alertas (½ izquierda + ½ derecha para futuras alertas) -->
+        <!-- Fila de alertas: ½ izquierda = Bajo stock (insumos arriba, envases abajo) · ½ derecha = Rechazos del mes -->
         <div class="alertas-row">
+         <div class="alertas-col-izq">
           <!-- Bajo stock Bodega 7 -->
           <div class="b7-alert-wrap" id="b7AlertWrap">
             <div class="b7-alert-hdr" onclick="toggleB7Alert()">
@@ -702,7 +720,10 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
               </div>
             </div>
           </div>
-          <!-- Slot para futuras alertas -->
+          <!-- Bajo stock de envases base (debajo del de insumos) -->
+          <div id="envasesSlot"></div>
+         </div>
+          <!-- Rechazos del mes -->
           <div class="alertas-slot-r" id="alertasSlotR"></div>
         </div>
 
@@ -3701,6 +3722,7 @@ function renderInicio() {
   renderProdMensual();
   renderBoard();
   renderConsolidadoEnvases();
+  renderRechazosInicio();
   renderProduccionActual();
   renderAsistHoy();
   renderFaltasChart();
@@ -6371,7 +6393,7 @@ function invB2De(sku) {
 }
 
 async function renderConsolidadoEnvases() {
-  var el = document.getElementById('alertasSlotR');
+  var el = document.getElementById('envasesSlot');
   if (!el) return;
 
   var ESTADOS_VIVOS = ['nueva','proceso','parcial'];
@@ -6539,6 +6561,101 @@ async function renderConsolidadoEnvases() {
     var wrap = el.querySelector('.env-wrap');
     if (wrap) wrap.classList.add('collapsed');
   }
+}
+
+// ── Rechazos del mes en Inicio (mitad derecha de la fila de alertas) ──
+var rechInicioCache = null;
+
+async function cargarRechazosInicio() {
+  var desde = fechaHoy().slice(0, 7) + '-01T00:00:00-06:00'; // 1° del mes, hora Guatemala
+  try {
+    var r = await db.from('rechazos').select('*').eq('area', 'serig')
+      .gte('created_at', desde).order('created_at', { ascending: false }).limit(300);
+    if (r.error) throw r.error;
+    rechInicioCache = r.data || [];
+  } catch(e) {
+    console.error('cargarRechazosInicio:', e);
+    rechInicioCache = [];
+  }
+}
+
+async function renderRechazosInicio(forzar) {
+  var el = document.getElementById('alertasSlotR');
+  if (!el) return;
+  if (forzar || rechInicioCache === null) await cargarRechazosInicio();
+  var data = rechInicioCache || [];
+
+  var mesHdr = new Date(fechaHoy() + 'T12:00:00').toLocaleString('es-GT', { month: 'long', year: 'numeric' });
+  var tot = 0, rec = 0, interno = 0, cliente = 0;
+  data.forEach(function(r) {
+    var c = r.cantidad_rechazada || 0;
+    tot += c;
+    rec += (r.cantidad_recuperada || 0);
+    if (r.origen === 'cliente') cliente += c; else interno += c;
+  });
+  var neta = tot - rec;
+  function fmtN(n) { return n.toLocaleString(); }
+
+  var ultimos = data.slice(0, 6).map(function(r) {
+    var f = (r.created_at || '').slice(8, 10) + '/' + (r.created_at || '').slice(5, 7);
+    var badge = r.origen === 'cliente'
+      ? '<span class="mov-badge-rech-cli">CLIENTE</span>'
+      : '<span class="mov-badge-rech-int">INTERNO</span>';
+    var motivo = (r.motivo || '—').replace(/_/g, ' ');
+    return '<div class="rech-item">' + badge +
+      '<span style="color:var(--gray-l)">' + escHtml(f) + '</span>' +
+      '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml((r.descripcion || '') + ' · ' + motivo) + '">' +
+        '<span class="mov-sku">' + escHtml(r.sku || '—') + '</span> ' +
+        '<span style="color:var(--gray);text-transform:capitalize">' + escHtml(motivo) + '</span>' +
+        (r.cliente ? ' <span style="color:var(--gray-l)">· ' + escHtml(r.cliente) + '</span>' : '') +
+      '</span>' +
+      '<b style="color:var(--red);font-family:var(--mono)">' + fmtN(r.cantidad_rechazada || 0) + '</b>' +
+    '</div>';
+  }).join('');
+
+  el.innerHTML =
+    '<div class="rech-wrap">' +
+      '<div class="rech-hdr" onclick="toggleRechazosInicio(event)">' +
+        '<span style="font-size:17px">⛔</span>' +
+        '<span class="rech-ttl">Rechazos del mes <span class="rech-sub">· ' + escHtml(mesHdr) + '</span></span>' +
+        '<span class="b7-alert-cnt" style="background:#FECACA;color:#991B1B">' + data.length + '</span>' +
+        '<button onclick="event.stopPropagation();abrirModalRechazoSerig()" style="font-size:11px;font-weight:700;background:var(--red);color:#fff;border:none;border-radius:7px;padding:4px 10px;cursor:pointer;white-space:nowrap">+ Registrar</button>' +
+        '<button onclick="event.stopPropagation();renderRechazosInicio(true)" title="Recargar" style="font-size:13px;background:transparent;border:1px solid #FCA5A5;border-radius:6px;padding:2px 7px;cursor:pointer;color:#991B1B;line-height:1">↻</button>' +
+        '<span class="b7-alert-chev">▾</span>' +
+      '</div>' +
+      '<div class="rech-body">' +
+        '<div class="rech-kpis">' +
+          '<div class="rech-kpi"><b style="color:var(--red)">' + fmtN(tot) + '</b><span>Rechazadas</span></div>' +
+          '<div class="rech-kpi"><b style="color:var(--green)">' + fmtN(rec) + '</b><span>Recuperadas</span></div>' +
+          '<div class="rech-kpi"><b style="color:#991B1B">' + fmtN(interno) + '</b><span>Internos</span></div>' +
+          '<div class="rech-kpi"><b style="color:#5b21b6">' + fmtN(cliente) + '</b><span>De cliente</span></div>' +
+        '</div>' +
+        '<div class="rech-list">' +
+          (ultimos || '<div style="padding:10px 0;text-align:center;color:var(--gray-l);font-style:italic;font-size:12px">Sin rechazos registrados este mes ✅</div>') +
+        '</div>' +
+      '</div>' +
+      '<div class="rech-foot">' +
+        '<span style="float:left;font-size:10px;color:var(--gray-l);padding-top:3px">Neto sin recuperar: <b style="color:var(--amber)">' + fmtN(neta) + '</b> und</span>' +
+        '<button class="btn btn-g btn-xs" onclick="irARechazos()">Ver todos en Movimientos →</button>' +
+      '</div>' +
+    '</div>';
+  if (localStorage.getItem('rech_inicio_collapsed') === '1') {
+    var w = el.querySelector('.rech-wrap');
+    if (w) w.classList.add('collapsed');
+  }
+}
+
+function toggleRechazosInicio(e) {
+  if (e) e.stopPropagation();
+  var wrap = document.querySelector('#alertasSlotR .rech-wrap');
+  if (!wrap) return;
+  var collapsed = wrap.classList.toggle('collapsed');
+  localStorage.setItem('rech_inicio_collapsed', collapsed ? '1' : '0');
+}
+
+function irARechazos() {
+  switchTab('movimientos');
+  setMovVista('rechazos');
 }
 
 
@@ -7654,7 +7771,7 @@ function toggleB7Alert() {
 
 function toggleEnvConsolidado(e) {
   if (e) e.stopPropagation();
-  var wrap = document.querySelector('#alertasSlotR .env-wrap');
+  var wrap = document.querySelector('#envasesSlot .env-wrap');
   if (!wrap) return;
   var collapsed = wrap.classList.toggle('collapsed');
   localStorage.setItem('env_cons_collapsed', collapsed ? '1' : '0');
@@ -11033,6 +11150,7 @@ async function confirmarRechazoSerig() {
   await cargarMovimientosSerig();
     refreshKPIs();
     renderConsolidadoEnvases(); // el caché de salidas se invalidó arriba
+    renderRechazosInicio(true);
   } catch(e) {
     showToast('❌ Error: ' + e.message, '#B83232');
   } finally {
