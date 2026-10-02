@@ -1323,7 +1323,7 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
 <div class="overlay" id="modalRechazoSerig">
   <div class="modal" style="max-width:500px">
     <div class="mh">
-      <div class="mh-title">⛔ Registrar Rechazo</div>
+      <div class="mh-title" id="rechSTitle">⛔ Registrar Rechazo</div>
       <button class="m-close" onclick="cerrarModalRechazoSerig()">✕</button>
     </div>
     <div class="mb">
@@ -1387,8 +1387,8 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
           </select>
         </div>
         <div class="fg">
-          <div class="fl">Tiempo de selección (min)</div>
-          <input class="fi" id="rechSTiempo" type="number" min="0" placeholder="0">
+          <div class="fl">Tiempo de selección (días)</div>
+          <input class="fi" id="rechSTiempo" type="number" min="0" step="0.5" placeholder="0">
         </div>
       </div>
 
@@ -8536,6 +8536,10 @@ function buildRechazoRowSerig(r) {
     '<td style="font-size:11px">' + escHtml(r.cliente || '—') + '</td>' +
     '<td style="font-size:12px">' + escHtml(r.operador_id || '—') + '</td>' +
     '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(r.observaciones || '') + '</td>' +
+    '<td style="white-space:nowrap">' +
+      '<button onclick="event.stopPropagation();editarRechazoSerig(\'' + escHtml(r.id) + '\')" title="Editar rechazo" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 6px;cursor:pointer;font-size:12px;margin-right:3px">✏️</button>' +
+      '<button onclick="event.stopPropagation();eliminarRechazoSerig(\'' + escHtml(r.id) + '\')" title="Eliminar rechazo" style="background:none;border:1px solid #fca5a5;border-radius:5px;padding:2px 6px;cursor:pointer;font-size:12px;color:var(--red)">🗑</button>' +
+    '</td>' +
     '</tr>';
 }
 
@@ -8550,7 +8554,7 @@ function renderMovTabla(data) {
     tabla.innerHTML = '<table class="mov-table"><thead><tr>' +
       '<th></th><th>Fecha</th><th>SKU / Producto</th><th>Motivo</th>' +
       '<th style="text-align:right">Rechazado</th><th style="text-align:right">Recuperado</th>' +
-      '<th style="text-align:right">Pérdida neta</th><th>Cliente</th><th>Operador</th><th>Notas</th>' +
+      '<th style="text-align:right">Pérdida neta</th><th>Cliente</th><th>Operador</th><th>Notas</th><th></th>' +
       '</tr></thead><tbody>' + data.map(buildRechazoRowSerig).join('') + '</tbody></table>';
   } else {
     tabla.innerHTML = '<table class="mov-table"><thead><tr>' +
@@ -8565,11 +8569,11 @@ function actualizarKPIsMov(data) {
   if (movVistaActual === 'rechazos') {
     var rech = data.reduce(function(a,r){ return a + (r.cantidad_rechazada||0); }, 0);
     var rec  = data.reduce(function(a,r){ return a + (r.cantidad_recuperada||0); }, 0);
-    var mins = data.reduce(function(a,r){ return a + (r.tiempo_min||0); }, 0);
+    var dias = data.reduce(function(a,r){ return a + (Number(r.tiempo_dias)||0); }, 0);
     setV('mkpi-v1', rech.toLocaleString());
     setV('mkpi-v2', rec.toLocaleString());
     setV('mkpi-v3', (rech-rec).toLocaleString());
-    setV('mkpi-v4', mins ? mins + ' min' : '—');
+    setV('mkpi-v4', dias ? (Math.round(dias * 10) / 10) + (dias === 1 ? ' día' : ' días') : '—');
   } else {
     var totalUnd = data.reduce(function(a,r){ return a + (r.cantidad||0); }, 0);
     var docs = {}; data.forEach(function(r){ if (r.num_documento) docs[r.num_documento] = 1; });
@@ -11045,9 +11049,20 @@ function setRechSOrigen(origen) {
   if (wrap) wrap.style.display = origen === 'cliente' ? '' : 'none';
 }
 
+var rechSEditId = null; // id del rechazo que se está editando (null = registro nuevo)
+
+function _rechSModoModal(editando) {
+  var t = document.getElementById('rechSTitle');
+  if (t) t.textContent = editando ? '✏️ Editar Rechazo' : '⛔ Registrar Rechazo';
+  var b = document.getElementById('rechSBtnOk');
+  if (b) b.textContent = editando ? '💾 Guardar cambios' : '⛔ Guardar rechazo';
+}
+
 function abrirModalRechazoSerig() {
   var m = document.getElementById('modalRechazoSerig');
   if (!m) return;
+  rechSEditId = null;
+  _rechSModoModal(false);
   ['rechSSku','rechSDesc','rechSCantRech','rechSCantRec','rechSTiempo','rechSCliente','rechSObs'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
   });
@@ -11057,9 +11072,44 @@ function abrirModalRechazoSerig() {
   m.classList.add('open');
 }
 
+function editarRechazoSerig(id) {
+  var row = movDataCache.find(function(x) { return x.id === id; });
+  var m = document.getElementById('modalRechazoSerig');
+  if (!row || !m) return;
+  rechSEditId = id;
+  _rechSModoModal(true);
+  document.getElementById('rechSSku').value      = row.sku || '';
+  document.getElementById('rechSDesc').value     = row.descripcion || '';
+  document.getElementById('rechSCantRech').value = row.cantidad_rechazada  || '';
+  document.getElementById('rechSCantRec').value  = row.cantidad_recuperada || '';
+  document.getElementById('rechSTiempo').value   = row.tiempo_dias != null ? row.tiempo_dias : '';
+  document.getElementById('rechSCliente').value  = row.cliente || '';
+  document.getElementById('rechSObs').value      = row.observaciones || '';
+  document.getElementById('rechSMotivo').value   = row.motivo || '';
+  setRechSOrigen(row.origen === 'cliente' ? 'cliente' : 'interno');
+  actualizarPerdidaNetaSerig();
+  m.classList.add('open');
+}
+
+async function eliminarRechazoSerig(id) {
+  var row = movDataCache.find(function(x) { return x.id === id; });
+  var det = row ? ('\n' + (row.sku || '') + ' · ' + (row.cantidad_rechazada || 0).toLocaleString() + ' und rechazadas') : '';
+  if (!confirm('¿Eliminar este rechazo?' + det + '\nLa acción no se puede deshacer.')) return;
+  var r = await db.from('rechazos').delete().eq('id', id);
+  if (r.error) { showToast('⚠️ Error: ' + r.error.message, '#b91c1c'); return; }
+  showToast('🗑 Rechazo eliminado');
+  envSalidoCache = null;
+  await cargarMovimientosSerig();
+  refreshKPIs();
+  renderConsolidadoEnvases();
+  renderRechazosInicio(true);
+}
+
 function cerrarModalRechazoSerig() {
   var m = document.getElementById('modalRechazoSerig');
   if (m) m.classList.remove('open');
+  rechSEditId = null;
+  _rechSModoModal(false);
 }
 
 function actualizarPerdidaNetaSerig() {
@@ -11110,7 +11160,7 @@ async function confirmarRechazoSerig() {
   var rech    = parseInt(document.getElementById('rechSCantRech').value) || 0;
   var rec     = parseInt(document.getElementById('rechSCantRec').value)  || 0;
   var motivo  = document.getElementById('rechSMotivo').value;
-  var tiempo  = parseInt(document.getElementById('rechSTiempo').value) || null;
+  var tiempo  = parseFloat(document.getElementById('rechSTiempo').value) || null; // días (admite 0.5)
   var cliente = (document.getElementById('rechSCliente').value || '').trim();
   var obs     = (document.getElementById('rechSObs').value || '').trim();
 
@@ -11124,19 +11174,26 @@ async function confirmarRechazoSerig() {
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
 
   try {
-    var r = await db.from('rechazos').insert({
+    var editId = rechSEditId;
+    var datos = {
       sku: sku,
-      descripcion: item ? item.descripcion : '',
+      descripcion: item ? item.descripcion : ((document.getElementById('rechSDesc').value || '').trim()),
       motivo: motivo,
       cantidad_rechazada: rech,
       cantidad_recuperada: rec,
-      tiempo_min: tiempo,
-      operador_id: 'operador',
+      tiempo_dias: tiempo,
       observaciones: obs,
       origen: rechSOrigenActual,
-      cliente: rechSOrigenActual === 'cliente' ? cliente : null,
-      area: 'serig'
-    });
+      cliente: rechSOrigenActual === 'cliente' ? cliente : null
+    };
+    var r;
+    if (editId) {
+      r = await db.from('rechazos').update(datos).eq('id', editId);
+    } else {
+      datos.operador_id = 'operador';
+      datos.area = 'serig';
+      r = await db.from('rechazos').insert(datos);
+    }
     if (r.error) {
       if (r.error.code === 'PGRST205' || r.error.code === '42P01') {
         showToast('⚠️ Tabla rechazos no existe — ejecuta el SQL en Supabase', '#92400e');
@@ -11144,7 +11201,9 @@ async function confirmarRechazoSerig() {
       }
       throw r.error;
     }
-    showToast('✅ Rechazo registrado: ' + rech.toLocaleString() + ' und de ' + sku);
+    showToast(editId
+      ? '✅ Rechazo actualizado'
+      : '✅ Rechazo registrado: ' + rech.toLocaleString() + ' und de ' + sku);
     cerrarModalRechazoSerig();
     envSalidoCache = null;
   await cargarMovimientosSerig();
@@ -11154,7 +11213,7 @@ async function confirmarRechazoSerig() {
   } catch(e) {
     showToast('❌ Error: ' + e.message, '#B83232');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '⛔ Guardar rechazo'; }
+    if (btn) { btn.disabled = false; _rechSModoModal(!!rechSEditId); }
   }
 }
 
