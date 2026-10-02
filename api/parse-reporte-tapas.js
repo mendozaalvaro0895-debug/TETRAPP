@@ -83,9 +83,14 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // Chequeo de rol: corre COMO el usuario que llama (igual que shared/auth.js en el
+    // navegador), no con la service key — `perfiles` nunca le dio grants directos a
+    // service_role (es tabla sensible de auth, el resto de páginas solo la leen vía RLS
+    // con el token del propio usuario). Así este chequeo no depende de permisos nuevos.
     const db = createClient(
       process.env.SUPA_URL,
-      process.env.SUPA_SERVICE_KEY || process.env.SUPA_KEY
+      process.env.SUPA_KEY || 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i',
+      { global: { headers: { Authorization: 'Bearer ' + token } } }
     );
 
     const { data: userData, error: userErr } = await db.auth.getUser(token);
