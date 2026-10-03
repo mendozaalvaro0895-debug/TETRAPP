@@ -112,6 +112,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rech-list{padding:6px 12px 10px;display:flex;flex-direction:column;gap:2px}
 .rech-item{display:grid;grid-template-columns:auto 52px 1fr auto;gap:8px;align-items:center;font-size:11px;padding:4px 0;border-bottom:1px dashed var(--border)}
 .rech-item:last-child{border-bottom:none}
+.rech-nota{grid-column:1/-1;font-size:10.5px;color:var(--gray);font-style:italic;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .rech-foot{padding:6px 12px 10px;text-align:right}
 .b7-alert-wrap{background:#FFFBEB;border:2px solid #FDE68A;border-radius:10px;overflow:hidden;display:none;flex:1;min-width:0}
 .b7-alert-wrap.critico-hay{background:#FEF2F2;border-color:#FECACA}
@@ -1334,6 +1335,11 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
           <button type="button" id="rechSOrigenInt" class="seg-btn seg-active" onclick="setRechSOrigen('interno')">🏭 Interno</button>
           <button type="button" id="rechSOrigenCli" class="seg-btn"            onclick="setRechSOrigen('cliente')">👤 Cliente</button>
         </div>
+      </div>
+
+      <div class="fg full">
+        <div class="fl">Fecha del rechazo *</div>
+        <input class="fi" id="rechSFecha" type="date">
       </div>
 
       <div class="fg full" id="rechSClienteWrap" style="display:none">
@@ -6610,6 +6616,7 @@ async function renderRechazosInicio(forzar) {
         (r.cliente ? ' <span style="color:var(--gray-l)">· ' + escHtml(r.cliente) + '</span>' : '') +
       '</span>' +
       '<b style="color:var(--red);font-family:var(--mono)">' + fmtN(r.cantidad_rechazada || 0) + '</b>' +
+      (r.observaciones ? '<div class="rech-nota" title="' + escHtml(r.observaciones) + '">💬 ' + escHtml(r.observaciones) + '</div>' : '') +
     '</div>';
   }).join('');
 
@@ -11068,6 +11075,7 @@ function abrirModalRechazoSerig() {
   });
   var neta = document.getElementById('rechSNeta'); if (neta) neta.textContent = '—';
   var mot  = document.getElementById('rechSMotivo'); if (mot) mot.value = '';
+  var fch  = document.getElementById('rechSFecha'); if (fch) fch.value = fechaHoy();
   setRechSOrigen('interno');
   m.classList.add('open');
 }
@@ -11086,6 +11094,7 @@ function editarRechazoSerig(id) {
   document.getElementById('rechSCliente').value  = row.cliente || '';
   document.getElementById('rechSObs').value      = row.observaciones || '';
   document.getElementById('rechSMotivo').value   = row.motivo || '';
+  document.getElementById('rechSFecha').value    = (row.created_at || '').slice(0, 10); // misma fecha que muestra la tabla
   setRechSOrigen(row.origen === 'cliente' ? 'cliente' : 'interno');
   actualizarPerdidaNetaSerig();
   m.classList.add('open');
@@ -11168,6 +11177,8 @@ async function confirmarRechazoSerig() {
   if (!rech)   { showToast('⚠️ Cantidad rechazada requerida', '#B83232'); return; }
   if (!motivo) { showToast('⚠️ Motivo requerido', '#B83232'); return; }
   if (rechSOrigenActual === 'cliente' && !cliente) { showToast('⚠️ Cliente requerido para rechazo de cliente', '#B83232'); return; }
+  var fecha = (document.getElementById('rechSFecha').value || '').trim();
+  if (!fecha)  { showToast('⚠️ Fecha requerida', '#B83232'); return; }
 
   var item = inventarioCache.find(function(i){ return i.sku === sku; });
   var btn = document.getElementById('rechSBtnOk');
@@ -11186,6 +11197,16 @@ async function confirmarRechazoSerig() {
       origen: rechSOrigenActual,
       cliente: rechSOrigenActual === 'cliente' ? cliente : null
     };
+    // La fecha del rechazo es created_at (la que ya usan lista, filtros y panel de Inicio).
+    // Solo se pisa si el usuario la cambió; mediodía hora Guatemala evita saltos de día por UTC.
+    var fechaActual = '';
+    if (editId) {
+      var rowAct = movDataCache.find(function(x){ return x.id === editId; });
+      fechaActual = rowAct ? (rowAct.created_at || '').slice(0, 10) : '';
+    } else {
+      fechaActual = fechaHoy();
+    }
+    if (fecha !== fechaActual) datos.created_at = fecha + 'T12:00:00-06:00';
     var r;
     if (editId) {
       r = await db.from('rechazos').update(datos).eq('id', editId);
