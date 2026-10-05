@@ -41,6 +41,13 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .op-sel-cod{font-family:'DM Mono',monospace;font-size:10px;color:#6B6B6A;margin-top:3px}
 .op-sel-card.sup{border:2.5px solid #1A6B5B;background:#EBF7F4}
 .op-sel-card.sup .op-sel-nombre{font-weight:900}
+.op-term{margin-top:10px;text-align:left}
+.op-term-bar{position:relative;height:10px;background:#EDEBE6;border-radius:6px;overflow:visible}
+.op-term-fill{height:100%;border-radius:6px;background:#1A6B5B;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.op-term-fill.bajo{background:#E8A33D}
+.op-term-tick{position:absolute;top:-3px;width:2px;height:16px;background:#0C0C0B;border-radius:1px}
+.op-term-txt{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:10px;color:#3A3A38;margin-top:4px}
+.op-term-txt b{font-weight:700}
 .op-sel-tag{font-size:9px;font-weight:800;letter-spacing:1px;color:#1A6B5B;margin-top:6px}
 
 /* FORM */
@@ -267,6 +274,75 @@ function buildOpCard(op) {
     + '<div class="op-sel-nombre">' + escHtml(op.nombre) + '</div>'
     + '<div class="op-sel-cod">' + escHtml(op.codigo) + '</div>'
     + (esSup ? '<div class="op-sel-tag">★ SUPERVISIÓN</div>' : '')
+    + buildTermometro(op.codigo)
+    + '</div>';
+}
+
+// ── Termómetro de meta mensual ────────────────────────────────
+// Meta estándar: 10,000 und por día hábil (lunes a sábado, sin feriados), sumando
+// cualquier proceso. La marca negra es el ritmo esperado al día de hoy (días hábiles
+// ya cumplidos); la barra se pone ámbar mientras el operador va por debajo de ese ritmo.
+var META_DIA = 10000;
+var progreso = null; // { und: {codigo: unidades}, metaMes, metaHoy }
+
+function fechaGT() {
+  return new Date(Date.now() - 6 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+function calcularMetas(hoy, feriados) {
+  var y = parseInt(hoy.slice(0, 4), 10), m = parseInt(hoy.slice(5, 7), 10), dHoy = parseInt(hoy.slice(8, 10), 10);
+  var ultimo = new Date(y, m, 0).getDate();
+  var habilesMes = 0, habilesCumplidos = 0;
+  for (var d = 1; d <= ultimo; d++) {
+    var f = hoy.slice(0, 8) + (d < 10 ? '0' : '') + d;
+    if (new Date(y, m - 1, d).getDay() === 0 || feriados[f]) continue;
+    habilesMes++;
+    if (d < dHoy) habilesCumplidos++;
+  }
+  return { metaMes: META_DIA * habilesMes, metaHoy: META_DIA * habilesCumplidos };
+}
+
+async function cargarProgreso() {
+  try {
+    var hoy = fechaGT();
+    var desde = hoy.slice(0, 8) + '01';
+    var ultimo = new Date(parseInt(hoy.slice(0, 4), 10), parseInt(hoy.slice(5, 7), 10), 0).getDate();
+    var hasta = hoy.slice(0, 8) + (ultimo < 10 ? '0' : '') + ultimo;
+
+    var rc = await db.from('comandas')
+      .select('operario_id, comanda_tareas(cantidad, unidades_completadas, estado)')
+      .gte('fecha', desde).lte('fecha', hasta);
+    if (rc.error) throw rc.error;
+
+    var feriados = {};
+    try {
+      var rf = await db.from('dias_feriados').select('fecha').gte('fecha', desde).lte('fecha', hasta);
+      (rf.data || []).forEach(function(x){ feriados[x.fecha] = true; });
+    } catch(_) {}
+
+    var und = {};
+    (rc.data || []).forEach(function(c) {
+      (c.comanda_tareas || []).forEach(function(t) {
+        if (t.estado !== 'Terminada') return;
+        und[c.operario_id] = (und[c.operario_id] || 0) + (t.unidades_completadas || t.cantidad || 0);
+      });
+    });
+    var metas = calcularMetas(hoy, feriados);
+    progreso = { und: und, metaMes: metas.metaMes, metaHoy: metas.metaHoy };
+    renderSeleccion();
+  } catch(e) { console.error('cargarProgreso:', e); }
+}
+
+function buildTermometro(codigo) {
+  if (!progreso || !progreso.metaMes) return '';
+  var und = progreso.und[codigo] || 0;
+  var pct = Math.min(100, und / progreso.metaMes * 100);
+  var tick = Math.min(100, progreso.metaHoy / progreso.metaMes * 100);
+  var bajo = und < progreso.metaHoy;
+  return '<div class="op-term">'
+    + '<div class="op-term-bar"><div class="op-term-fill' + (bajo ? ' bajo' : '') + '" style="width:' + pct.toFixed(1) + '%"></div>'
+    + (tick > 0 ? '<div class="op-term-tick" style="left:' + tick.toFixed(1) + '%"></div>' : '') + '</div>'
+    + '<div class="op-term-txt"><b>' + und.toLocaleString() + '</b><span>' + progreso.metaMes.toLocaleString() + '</span></div>'
     + '</div>';
 }
 
@@ -293,7 +369,7 @@ function elegirOperario(codigo) {
   // Reset del formulario
   tareaCount = 0;
   document.getElementById('tareasWrap').innerHTML = '';
-  document.getElementById('fFecha').value = new Date(Date.now() - 6 * 3600 * 1000).toISOString().slice(0, 10);
+  document.getElementById('fFecha').value = fechaGT();
   document.getElementById('fObs').value = '';
   document.getElementById('totalVal').textContent = '0';
   addTarea();
@@ -304,6 +380,7 @@ function elegirOperario(codigo) {
 
 function volverSeleccion() {
   opActual = null;
+  cargarProgreso();
   mostrarPantalla('scrSel');
   window.scrollTo(0, 0);
 }
@@ -528,6 +605,7 @@ function showToast(msg, color) {
 // ── Init ──────────────────────────────────────────────────────
 async function init() {
   await cargarOperarios();
+  cargarProgreso();
   await cargarInventario();
 }
 init();
