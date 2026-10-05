@@ -162,7 +162,7 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
     consulta a asistencia_diaria se amplía ±5 días fuera del mes para traer esos datos
     (ya no usa el helper compartido `rangoMes()`, calcula el rango manual con
     `fmtISOTapas()` para no afectar Productividad/Trazabilidad que sí lo usan).
-  2) "👥 Personal y Roles" (termómetro, NO es el tablero drag-drop de serigrafia.html
+  2) "👥 Personal y Roles" (termómetro; incluye a supervisión desde oct/2026 porque también registra producción; NO es el tablero drag-drop de serigrafia.html
     a propósito — Tapas no tiene ese concepto de rol/línea): barra horizontal por operario
     activo (rol≠supervisor) con las unidades Terminada del MES ACTUAL desde comandas+
     comanda_tareas. 100% de la barra = el operario con más unidades ese mes (relativo, no

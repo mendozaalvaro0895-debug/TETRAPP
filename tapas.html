@@ -1705,7 +1705,7 @@ function renderTermometro() {
   agruparComandasPorOperario(termComandas).forEach(function(o) { byCodigo[o.codigo] = o.und; });
 
   var ops = (personalData && personalData.tapas ? personalData.tapas : [])
-    .filter(function(p) { return p.activo && p.rol !== 'supervisor'; })
+    .filter(function(p) { return p.activo; })
     .map(function(p) { return { codigo: p.codigo, nombre: p.nombre, und: byCodigo[p.codigo] || 0 }; })
     .sort(function(a, b) { return b.und - a.und; });
 
