@@ -41,13 +41,22 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .op-sel-cod{font-family:'DM Mono',monospace;font-size:10px;color:#6B6B6A;margin-top:3px}
 .op-sel-card.sup{border:2.5px solid #1A6B5B;background:#EBF7F4}
 .op-sel-card.sup .op-sel-nombre{font-weight:900}
-.op-term{margin-top:10px;text-align:left}
-.op-term-bar{position:relative;height:10px;background:#EDEBE6;border-radius:6px;overflow:visible}
-.op-term-fill{height:100%;border-radius:6px;background:#1A6B5B;transition:width .6s cubic-bezier(.4,0,.2,1)}
-.op-term-fill.bajo{background:#E8A33D}
-.op-term-tick{position:absolute;top:-3px;width:2px;height:16px;background:#0C0C0B;border-radius:1px}
-.op-term-txt{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:10px;color:#3A3A38;margin-top:4px}
-.op-term-txt b{font-weight:700}
+.mtx-wrap{background:#fff;border:1.5px solid #E0DED8;border-radius:14px;padding:14px 16px;margin-top:22px}
+.mtx-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.mtx-hdr-title{font-family:'Playfair Display',serif;font-size:16px;font-weight:800;color:#1A6B5B}
+.mtx-hdr-sub{font-size:11px;color:#9A9A98}
+.term-row{display:grid;grid-template-columns:minmax(120px,190px) 1fr auto;align-items:center;gap:10px;padding:9px 6px;cursor:pointer;border-radius:8px;border-top:1px solid #F7F6F2;-webkit-tap-highlight-color:transparent}
+.term-row:hover{background:#F7F6F2}
+.term-row-open{background:#EBF7F4}
+.term-nombre{font-size:12px;font-weight:600;line-height:1.3}
+.term-bar-wrap{background:#F7F6F2;border-radius:20px;height:14px;overflow:hidden}
+.term-row-open .term-bar-wrap{background:#fff}
+.term-bar{background:#1A6B5B;height:100%;border-radius:20px;transition:width .5s ease}
+.term-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:#1A6B5B;white-space:nowrap;text-align:right;min-width:72px}
+.term-detalle{padding:2px 6px 10px 16px;display:flex;flex-direction:column;gap:4px;background:#EBF7F4;border-radius:0 0 8px 8px}
+.term-detalle-row{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#3A3A38;max-width:300px}
+.term-detalle-row span:last-child{font-family:'DM Mono',monospace;font-weight:700;color:#1A6B5B}
+.term-detalle-vacio{font-size:11px;color:#9A9A98;font-style:italic}
 .op-sel-tag{font-size:9px;font-weight:800;letter-spacing:1px;color:#1A6B5B;margin-top:6px}
 
 /* FORM */
@@ -134,6 +143,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
     <div id="opGrid" class="op-grid">
       <div class="cargando" style="grid-column:1/-1"><div class="spinner"></div><div>Cargando operarios…</div></div>
     </div>
+    <div id="termometroWrap"></div>
   </div>
 
   <!-- PANTALLA 2: FORMULARIO -->
@@ -274,75 +284,99 @@ function buildOpCard(op) {
     + '<div class="op-sel-nombre">' + escHtml(op.nombre) + '</div>'
     + '<div class="op-sel-cod">' + escHtml(op.codigo) + '</div>'
     + (esSup ? '<div class="op-sel-tag">★ SUPERVISIÓN</div>' : '')
-    + buildTermometro(op.codigo)
     + '</div>';
 }
 
-// ── Termómetro de meta mensual ────────────────────────────────
-// Meta estándar: 10,000 und por día hábil (lunes a sábado, sin feriados), sumando
-// cualquier proceso. La marca negra es el ritmo esperado al día de hoy (días hábiles
-// ya cumplidos); la barra se pone ámbar mientras el operador va por debajo de ese ritmo.
-var META_DIA = 10000;
-var progreso = null; // { und: {codigo: unidades}, metaMes, metaHoy }
+// ── Personal y Roles: producción del mes por persona ──────────
+// Mismo bloque que Tapas → Inicio: la barra es relativa a quien más lleva (100%),
+// y al tocar un nombre se despliega el desglose por proceso.
+var termComandas = [];
+var termExpandidoCodigo = null;
 
 function fechaGT() {
   return new Date(Date.now() - 6 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
-function calcularMetas(hoy, feriados) {
-  var y = parseInt(hoy.slice(0, 4), 10), m = parseInt(hoy.slice(5, 7), 10), dHoy = parseInt(hoy.slice(8, 10), 10);
-  var ultimo = new Date(y, m, 0).getDate();
-  var habilesMes = 0, habilesCumplidos = 0;
-  for (var d = 1; d <= ultimo; d++) {
-    var f = hoy.slice(0, 8) + (d < 10 ? '0' : '') + d;
-    if (new Date(y, m - 1, d).getDay() === 0 || feriados[f]) continue;
-    habilesMes++;
-    if (d < dHoy) habilesCumplidos++;
-  }
-  return { metaMes: META_DIA * habilesMes, metaHoy: META_DIA * habilesCumplidos };
+function undDeTarea(t) { return t.unidades_completadas || t.cantidad || 0; }
+
+function unidadesPorOperario() {
+  var map = {};
+  termComandas.forEach(function(c) {
+    (c.comanda_tareas || []).forEach(function(t) {
+      if (t.estado !== 'Terminada') return;
+      map[c.operario_id] = (map[c.operario_id] || 0) + undDeTarea(t);
+    });
+  });
+  return map;
 }
 
-async function cargarProgreso() {
+function procesosDeOperario(codigo) {
+  var map = {};
+  termComandas.forEach(function(c) {
+    if (c.operario_id !== codigo) return;
+    (c.comanda_tareas || []).forEach(function(t) {
+      if (t.estado !== 'Terminada') return;
+      var proc = t.proceso || 'Otra tarea';
+      map[proc] = (map[proc] || 0) + undDeTarea(t);
+    });
+  });
+  return map;
+}
+
+async function cargarTermometro() {
   try {
     var hoy = fechaGT();
     var desde = hoy.slice(0, 8) + '01';
     var ultimo = new Date(parseInt(hoy.slice(0, 4), 10), parseInt(hoy.slice(5, 7), 10), 0).getDate();
     var hasta = hoy.slice(0, 8) + (ultimo < 10 ? '0' : '') + ultimo;
-
-    var rc = await db.from('comandas')
-      .select('operario_id, comanda_tareas(cantidad, unidades_completadas, estado)')
+    var r = await db.from('comandas')
+      .select('operario_id, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
       .gte('fecha', desde).lte('fecha', hasta);
-    if (rc.error) throw rc.error;
-
-    var feriados = {};
-    try {
-      var rf = await db.from('dias_feriados').select('fecha').gte('fecha', desde).lte('fecha', hasta);
-      (rf.data || []).forEach(function(x){ feriados[x.fecha] = true; });
-    } catch(_) {}
-
-    var und = {};
-    (rc.data || []).forEach(function(c) {
-      (c.comanda_tareas || []).forEach(function(t) {
-        if (t.estado !== 'Terminada') return;
-        und[c.operario_id] = (und[c.operario_id] || 0) + (t.unidades_completadas || t.cantidad || 0);
-      });
-    });
-    var metas = calcularMetas(hoy, feriados);
-    progreso = { und: und, metaMes: metas.metaMes, metaHoy: metas.metaHoy };
-    renderSeleccion();
-  } catch(e) { console.error('cargarProgreso:', e); }
+    if (r.error) throw r.error;
+    termComandas = r.data || [];
+    renderTermometro();
+  } catch(e) { console.error('cargarTermometro:', e); }
 }
 
-function buildTermometro(codigo) {
-  if (!progreso || !progreso.metaMes) return '';
-  var und = progreso.und[codigo] || 0;
-  var pct = Math.min(100, und / progreso.metaMes * 100);
-  var tick = Math.min(100, progreso.metaHoy / progreso.metaMes * 100);
-  var bajo = und < progreso.metaHoy;
-  return '<div class="op-term">'
-    + '<div class="op-term-bar"><div class="op-term-fill' + (bajo ? ' bajo' : '') + '" style="width:' + pct.toFixed(1) + '%"></div>'
-    + (tick > 0 ? '<div class="op-term-tick" style="left:' + tick.toFixed(1) + '%"></div>' : '') + '</div>'
-    + '<div class="op-term-txt"><b>' + und.toLocaleString() + '</b><span>' + progreso.metaMes.toLocaleString() + '</span></div>'
+function toggleTermDetalle(codigo) {
+  termExpandidoCodigo = (termExpandidoCodigo === codigo) ? null : codigo;
+  renderTermometro();
+}
+
+function buildTermDetalleRow(proceso, und) {
+  return '<div class="term-detalle-row"><span>' + escHtml(proceso) + '</span><span>' + und.toLocaleString() + ' und</span></div>';
+}
+
+function buildTermometroRow(o, maxUnd) {
+  var pct = maxUnd > 0 ? Math.round((o.und / maxUnd) * 100) : 0;
+  var abierto = termExpandidoCodigo === o.codigo;
+  var html = '<div class="term-row' + (abierto ? ' term-row-open' : '') + '" onclick="toggleTermDetalle(\'' + escHtml(o.codigo) + '\')">'
+    + '<div class="term-nombre">' + escHtml(o.nombre) + '</div>'
+    + '<div class="term-bar-wrap"><div class="term-bar" style="width:' + pct + '%"></div></div>'
+    + '<div class="term-val">' + o.und.toLocaleString() + ' und</div>'
+    + '</div>';
+  if (abierto) {
+    var procs = procesosDeOperario(o.codigo);
+    var keys = Object.keys(procs).sort(function(a, b) { return procs[b] - procs[a]; });
+    html += '<div class="term-detalle">' + (keys.length
+      ? keys.map(function(p) { return buildTermDetalleRow(p, procs[p]); }).join('')
+      : '<div class="term-detalle-vacio">Sin tareas registradas este mes</div>') + '</div>';
+  }
+  return html;
+}
+
+function renderTermometro() {
+  var wrap = document.getElementById('termometroWrap');
+  if (!wrap || !operarios.length) return;
+  var und = unidadesPorOperario();
+  var ops = operarios.map(function(p) { return { codigo: p.codigo, nombre: p.nombre, und: und[p.codigo] || 0 }; })
+    .sort(function(a, b) { return b.und - a.und; });
+  var maxUnd = ops.length ? ops[0].und : 0;
+  var mes = new Date(fechaGT() + 'T12:00:00').toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+  wrap.innerHTML = '<div class="mtx-wrap">'
+    + '<div class="mtx-hdr"><span class="mtx-hdr-title">👥 Personal y Roles</span>'
+    + '<span class="mtx-hdr-sub">Producción de ' + escHtml(mes) + ' por operario · toca un nombre para ver el desglose por proceso</span></div>'
+    + ops.map(function(o) { return buildTermometroRow(o, maxUnd); }).join('')
     + '</div>';
 }
 
@@ -353,6 +387,7 @@ function renderSeleccion() {
     return;
   }
   g.innerHTML = operarios.map(buildOpCard).join('');
+  renderTermometro();
 }
 
 function elegirOperario(codigo) {
@@ -380,7 +415,7 @@ function elegirOperario(codigo) {
 
 function volverSeleccion() {
   opActual = null;
-  cargarProgreso();
+  cargarTermometro();
   mostrarPantalla('scrSel');
   window.scrollTo(0, 0);
 }
@@ -605,7 +640,7 @@ function showToast(msg, color) {
 // ── Init ──────────────────────────────────────────────────────
 async function init() {
   await cargarOperarios();
-  cargarProgreso();
+  cargarTermometro();
   await cargarInventario();
 }
 init();
