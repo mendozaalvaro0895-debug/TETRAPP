@@ -69,7 +69,8 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 
 /* AUTOCOMPLETE */
 .ac-wrap{position:relative}
-.ac-drop{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #1A6B5B;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.15);z-index:999;max-height:220px;overflow-y:auto;margin-top:3px}
+.ac-drop{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #1A6B5B;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.15);z-index:999;max-height:45vh;overflow-y:auto;margin-top:3px}
+.ac-count{padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#6B6B6A;background:#F7F6F2;border-bottom:1px solid #F0EDE8;position:sticky;top:0}
 .ac-item{padding:10px 12px;cursor:pointer;border-bottom:1px solid #F0EDE8}
 .ac-item:last-child{border-bottom:none}
 .ac-item:hover,.ac-item:active{background:#EBF7F4}
@@ -372,7 +373,7 @@ function buildAcItem(inputId, dropId, item) {
   return '<div class="ac-item" onmousedown="acElegir(\'' + inputId + '\',\'' + dropId + '\',\''
     + escHtml(sku.replace(/'/g, '')) + '\',\'' + escHtml(desc.replace(/'/g, '')) + '\')">'
     + '<div class="ac-sku">' + escHtml(sku) + '</div>'
-    + '<div class="ac-desc">' + escHtml(desc.slice(0, 60)) + '</div>'
+    + '<div class="ac-desc">' + escHtml(desc) + '</div>'
     + '</div>';
 }
 
@@ -380,13 +381,20 @@ function acBuscar(inputId, dropId, query) {
   var drop = document.getElementById(dropId);
   if (!drop) return;
   if (!query || query.length < 2) { drop.style.display = 'none'; return; }
-  var q = query.toLowerCase();
+  var toks = acNorm(query).split(/\s+/).filter(Boolean);
   var results = inventarioCache.filter(function(i){
-    return ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().indexOf(q) !== -1;
-  }).slice(0, 7);
+    var texto = acNorm((i.sku || '') + ' ' + (i.descripcion || ''));
+    return toks.every(function(t){ return texto.indexOf(t) !== -1; });
+  });
   if (!results.length) { drop.style.display = 'none'; return; }
-  drop.innerHTML = results.map(function(i){ return buildAcItem(inputId, dropId, i); }).join('');
+  drop.innerHTML = '<div class="ac-count">' + results.length + ' coincidencia' + (results.length === 1 ? '' : 's') + '</div>'
+    + results.map(function(i){ return buildAcItem(inputId, dropId, i); }).join('');
   drop.style.display = 'block';
+}
+
+// Sin tildes y en minúsculas, para que "elíptica" encuentre "eliptica" y viceversa
+function acNorm(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
 function acElegir(inputId, dropId, sku, desc) {
