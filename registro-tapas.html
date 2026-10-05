@@ -91,7 +91,10 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ac-item:last-child{border-bottom:none}
 .ac-item:hover,.ac-item:active{background:#EBF7F4}
 .ac-sku{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:#1A6B5B}
-.ac-nofact{font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;color:#B87200;background:#FFF3D6;border-radius:6px;padding:1px 6px;margin-left:6px}
+.ac-grp{padding:6px 12px;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+.ac-grp-ok{background:#DCFCE7;color:#166534}
+.ac-grp-no{background:#FFF3D6;color:#7A4800}
+.ac-vacio{padding:8px 12px;font-size:11px;color:#9A9A98;font-style:italic}
 .ac-desc{font-size:12px;color:#3A3A38;margin-top:2px}
 
 /* TOTAL */
@@ -485,7 +488,7 @@ function buildAcItem(inputId, dropId, item) {
   var desc = String(item.descripcion || '');
   return '<div class="ac-item" onmousedown="acElegir(\'' + inputId + '\',\'' + dropId + '\',\''
     + escHtml(sku.replace(/'/g, '')) + '\',\'' + escHtml(desc.replace(/'/g, '')) + '\')">'
-    + '<div class="ac-sku">' + escHtml(sku) + (item.facturable === false ? ' <span class="ac-nofact">no facturable</span>' : '') + '</div>'
+    + '<div class="ac-sku">' + escHtml(sku) + '</div>'
     + '<div class="ac-desc">' + escHtml(desc) + '</div>'
     + '</div>';
 }
@@ -494,16 +497,24 @@ function acBuscar(inputId, dropId, query) {
   var drop = document.getElementById(dropId);
   if (!drop) return;
   if (!query || query.length < 2) { drop.style.display = 'none'; return; }
-  var toks = acNorm(query).split(/\s+/).filter(Boolean);
+  var toks = acNorm(query).split(/[^a-z0-9]+/).filter(Boolean);
+  if (!toks.length) { drop.style.display = 'none'; return; }
   var results = inventarioCache.filter(function(i){
     var texto = acNorm((i.sku || '') + ' ' + (i.descripcion || ''));
     return toks.every(function(t){ return texto.indexOf(t) !== -1; });
   });
-  // Facturables primero (null cuenta como facturable, igual que el bot); sort estable conserva el orden previo
-  results.sort(function(a, b){ return (a.facturable === false ? 1 : 0) - (b.facturable === false ? 1 : 0); });
   if (!results.length) { drop.style.display = 'none'; return; }
-  drop.innerHTML = '<div class="ac-count">' + results.length + ' coincidencia' + (results.length === 1 ? '' : 's') + '</div>'
-    + results.map(function(i){ return buildAcItem(inputId, dropId, i); }).join('');
+  // null cuenta como facturable (igual que el bot); solo false es no facturable
+  var fact = results.filter(function(i){ return i.facturable !== false; });
+  var noFact = results.filter(function(i){ return i.facturable === false; });
+  var html = '<div class="ac-count">' + results.length + ' coincidencia' + (results.length === 1 ? '' : 's') + '</div>';
+  html += '<div class="ac-grp ac-grp-ok">✅ Facturables · ' + fact.length + '</div>'
+    + (fact.length ? fact.map(function(i){ return buildAcItem(inputId, dropId, i); }).join('') : '<div class="ac-vacio">Ninguno facturable</div>');
+  if (noFact.length) {
+    html += '<div class="ac-grp ac-grp-no">⚠️ No facturables · ' + noFact.length + '</div>'
+      + noFact.map(function(i){ return buildAcItem(inputId, dropId, i); }).join('');
+  }
+  drop.innerHTML = html;
   drop.style.display = 'block';
 }
 

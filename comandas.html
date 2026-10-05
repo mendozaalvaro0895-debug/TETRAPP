@@ -114,13 +114,18 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
 .sb-proceso   { background:#DBEAFE; color:#1A3B8B; }
 .sb-terminada { background:#DCFCE7; color:#166534; }
 .ac-wrap { position:relative; }
-.ac-drop { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid #1A6B5B; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.12); z-index:999; max-height:200px; overflow-y:auto; margin-top:2px; }
+.ac-drop { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid #1A6B5B; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.12); z-index:999; max-height:45vh; overflow-y:auto; margin-top:2px; }
 .ac-item { padding:8px 12px; cursor:pointer; border-bottom:1px solid #F0EDE8; font-size:12px; }
 .ac-item:last-child { border-bottom:none; }
 .ac-item:hover { background:#EBF7F4; }
 .ac-sku { font-family:'DM Mono',monospace; font-weight:700; color:#1A6B5B; margin-bottom:2px; }
 .ac-desc { color:#3A3A38; }
 .ac-exist { color:#6B6B6A; font-size:10px; margin-top:2px; }
+.ac-count { padding:6px 12px; font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:#6B6B6A; background:#F7F6F2; border-bottom:1px solid #F0EDE8; position:sticky; top:0; }
+.ac-grp { padding:6px 12px; font-size:10px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; }
+.ac-grp-ok { background:#DCFCE7; color:#166534; }
+.ac-grp-no { background:#FFF3D6; color:#7A4800; }
+.ac-vacio { padding:8px 12px; font-size:11px; color:#9A9A98; font-style:italic; }
 .toast-msg { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1A6B5B; color:#fff; padding:11px 22px; border-radius:10px; font-size:13px; font-weight:700; z-index:9999; white-space:nowrap; animation:fadeInUp .3s ease; }
 @keyframes fadeInUp { from { opacity:0; transform:translateX(-50%) translateY(20px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
 .loader-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000; }
@@ -377,9 +382,18 @@ function fechaHoyGT() {
 async function getInventario() {
   if (inventarioCache.length) return inventarioCache;
   try {
-    const { data, error } = await db.from('inventario').select('sku, descripcion, existencia').eq('activo', true);
-    if (error) throw error;
-    inventarioCache = data || [];
+    // Paginado: PostgREST corta a 1000 filas por consulta y el catálogo es más grande
+    let todos = [], desde = 0;
+    const BATCH = 1000;
+    while (true) {
+      const { data, error } = await db.from('inventario').select('sku, descripcion, existencia, facturable')
+        .eq('activo', true).range(desde, desde + BATCH - 1);
+      if (error) throw error;
+      todos = todos.concat(data || []);
+      if (!data || data.length < BATCH) break;
+      desde += BATCH;
+    }
+    inventarioCache = todos;
     return inventarioCache;
   } catch(e) { console.error('Error inventario:', e); return []; }
 }
@@ -739,27 +753,48 @@ function recalcTotal() {
 // ============================================
 // AUTOCOMPLETADO DE INVENTARIO
 // ============================================
+// Sin tildes y en minúsculas, para que "elíptica" encuentre "eliptica" y viceversa
+function acNorm(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// Todas las coincidencias (cada palabra por separado, en cualquier orden), separadas en
+// Facturables / No facturables. facturable null cuenta como facturable, igual que el bot.
+function acListaHtml(inv, query, itemFn) {
+  const toks = acNorm(query).split(/[^a-z0-9]+/).filter(Boolean);
+  if (!toks.length) return '';
+  const results = inv.filter(i => {
+    const texto = acNorm((i.sku || '') + ' ' + (i.descripcion || ''));
+    return toks.every(t => texto.indexOf(t) !== -1);
+  });
+  if (!results.length) return '';
+  const fact = results.filter(i => i.facturable !== false);
+  const noFact = results.filter(i => i.facturable === false);
+  let html = `<div class="ac-count">${results.length} coincidencia${results.length === 1 ? '' : 's'}</div>`;
+  html += `<div class="ac-grp ac-grp-ok">✅ Facturables · ${fact.length}</div>`
+    + (fact.length ? fact.map(itemFn).join('') : '<div class="ac-vacio">Ninguno facturable</div>');
+  if (noFact.length) html += `<div class="ac-grp ac-grp-no">⚠️ No facturables · ${noFact.length}</div>` + noFact.map(itemFn).join('');
+  return html;
+}
+
+function acItemHtml(i, fnName, n) {
+  const sku = i.sku || '';
+  const desc = i.descripcion || '';
+  const exist = i.existencia !== undefined && i.existencia !== null ? i.existencia : '';
+  return `<div class="ac-item" onclick="${fnName}(${n},'${escHtml(sku).replace(/'/g, "\\'")}','${escHtml(desc.replace(/'/g, "\\'"))}')">
+      <div class="ac-sku">${escHtml(sku)}</div>
+      <div class="ac-desc">${escHtml(desc)}</div>
+      ${exist !== '' ? `<div class="ac-exist">Existencia: ${Number(exist).toLocaleString()} und</div>` : ''}
+    </div>`;
+}
+
 async function buscarSKURow(n, query) {
   const drop = document.getElementById(`row_${n}_drop`);
   if (!drop) return;
   if (!query || query.length < 2) { drop.style.display = 'none'; return; }
-  
-  const inv = await getInventario();
-  const q = query.toLowerCase();
-  const results = inv.filter(i => ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().includes(q)).slice(0, 7);
-  
-  if (!results.length) { drop.style.display = 'none'; return; }
-  
-  drop.innerHTML = results.map(i => {
-    const sku = i.sku || '';
-    const desc = i.descripcion || '';
-    const exist = i.existencia !== undefined ? i.existencia : '';
-    return `<div class="ac-item" onclick="seleccionarTapa(${n},'${escHtml(sku).replace(/'/g, "\\'")}','${escHtml(desc.replace(/'/g, "\\'"))}')">
-      <div class="ac-sku">${escHtml(sku)}</div>
-      <div class="ac-desc">${escHtml(desc.substring(0, 60))}</div>
-      ${exist !== '' ? `<div class="ac-exist">Existencia: ${exist.toLocaleString()} und</div>` : ''}
-    </div>`;
-  }).join('');
+  const html = acListaHtml(await getInventario(), query, i => acItemHtml(i, 'seleccionarTapa', n));
+  if (!html) { drop.style.display = 'none'; return; }
+  drop.innerHTML = html;
   drop.style.display = 'block';
 }
 
@@ -811,23 +846,9 @@ async function buscarSKUDev(n, query) {
   const drop = document.getElementById(`dev_${n}_drop`);
   if (!drop) return;
   if (!query || query.length < 2) { drop.style.display = 'none'; return; }
-  
-  const inv = await getInventario();
-  const q = query.toLowerCase();
-  const results = inv.filter(i => ((i.sku || '') + ' ' + (i.descripcion || '')).toLowerCase().includes(q)).slice(0, 7);
-  
-  if (!results.length) { drop.style.display = 'none'; return; }
-  
-  drop.innerHTML = results.map(i => {
-    const sku = i.sku || '';
-    const desc = i.descripcion || '';
-    const exist = i.existencia !== undefined ? i.existencia : '';
-    return `<div class="ac-item" onclick="seleccionarDev(${n},'${escHtml(sku).replace(/'/g, "\\'")}','${escHtml(desc.replace(/'/g, "\\'"))}')">
-      <div class="ac-sku">${escHtml(sku)}</div>
-      <div class="ac-desc">${escHtml(desc.substring(0, 60))}</div>
-      ${exist !== '' ? `<div class="ac-exist">Existencia: ${exist.toLocaleString()} und</div>` : ''}
-    </div>`;
-  }).join('');
+  const html = acListaHtml(await getInventario(), query, i => acItemHtml(i, 'seleccionarDev', n));
+  if (!html) { drop.style.display = 'none'; return; }
+  drop.innerHTML = html;
   drop.style.display = 'block';
 }
 
