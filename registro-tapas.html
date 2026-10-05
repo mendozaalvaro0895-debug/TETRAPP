@@ -54,7 +54,6 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .sec-label{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#1A6B5B;border-bottom:2px solid #C8EDE7;padding-bottom:8px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .paso-num{background:#1A6B5B;color:#fff;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
-.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
 .field{display:flex;flex-direction:column;gap:4px}
 .field label{font-size:11px;font-weight:700;color:#3A3A38}
 .field input,.field select,.field textarea{border:1.5px solid #C8C6C0;border-radius:10px;padding:11px 12px;font-size:16px;font-family:'DM Sans',sans-serif;background:#fff;width:100%}
@@ -100,13 +99,9 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 @keyframes spin{to{transform:rotate(360deg)}}
 
 @media(max-width:480px){
-  .grid-3{grid-template-columns:1fr 1fr}
   .op-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
 }
 /* ── Time Picker 12h ── */
-.t12w{display:flex;align-items:center;gap:3px;background:#fff;border:1.5px solid #C8C6C0;border-radius:10px;padding:11px 12px;width:100%;box-sizing:border-box}
-.t12w select{border:none;background:transparent;font-size:16px;font-family:'DM Mono',monospace;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;color:#0C0C0B;padding:0}
-.t12w .t12h{width:1.8ch}.t12w .t12m{width:2.1ch}.t12w .t12p{width:2.5ch;font-weight:700;color:#1A6B5B;margin-left:4px}.t12w .t12s{font-weight:600;color:#9CA3AF}
 </style>
 </head>
 <body>
@@ -146,12 +141,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 
     <div class="sec">
       <div class="sec-label"><span class="paso-num">1</span> Datos del día</div>
-      <div class="grid-3">
-        <div class="field"><label>Fecha</label><input type="date" id="fFecha"></div>
-        <div class="field"><label>Hora de inicio</label><input type="time" id="fHoraInicio"></div>
-        <div class="field"><label>Hora de cierre</label><input type="time" id="fHoraCierre"></div>
-      </div>
-      <div class="field"><label>Supervisor</label><input type="text" value="Supervisor" readonly style="background:#F7F6F2;color:#6B6B6A"></div>
+      <div class="field"><label>Fecha</label><input type="date" id="fFecha"></div>
     </div>
 
     <div class="sec">
@@ -301,9 +291,7 @@ function elegirOperario(codigo) {
   // Reset del formulario
   tareaCount = 0;
   document.getElementById('tareasWrap').innerHTML = '';
-  document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
-  set12h('fHoraInicio', '06:00');
-  set12h('fHoraCierre', '18:00');
+  document.getElementById('fFecha').value = new Date(Date.now() - 6 * 3600 * 1000).toISOString().slice(0, 10);
   document.getElementById('fObs').value = '';
   document.getElementById('totalVal').textContent = '0';
   addTarea();
@@ -467,8 +455,8 @@ async function guardarRegistro() {
     operario_nombre: opActual.nombre || '',
     supervisor_id: supervisorActual.codigo || null,
     supervisor_nombre: supervisorActual.nombre || '',
-    hora_inicio: get12h('fHoraInicio'),
-    hora_cierre: get12h('fHoraCierre'),
+    hora_inicio: null,
+    hora_cierre: null,
     total_unidades: totalPT,
     observaciones: document.getElementById('fObs').value
   };
@@ -531,9 +519,6 @@ async function init() {
   await cargarOperarios();
   await cargarInventario();
 }
-function get12h(id){var w=document.getElementById(id);if(!w||w.tagName==='INPUT')return(w?w.value:'')||'';var h=parseInt(w.querySelector('.t12h').value)||12,m=w.querySelector('.t12m').value||'00',ap=w.querySelector('.t12p').value;if(ap==='AM')h=(h===12)?0:h;else h=(h===12)?12:h+12;return(h<10?'0':'')+h+':'+m;}
-function set12h(id,v){var w=document.getElementById(id);if(!w||w.tagName==='INPUT'){if(w)w.value=v||'';return;}if(!v)return;var p=String(v).split(':'),h=parseInt(p[0])||0,m=('00'+(parseInt(p[1])||0)).slice(-2),ap=h<12?'AM':'PM',h12=(h===0)?12:(h>12?h-12:h);w.querySelector('.t12h').value=String(h12);w.querySelector('.t12m').value=m;w.querySelector('.t12p').value=ap;}
-(function(){var hO='',mO='';for(var i=1;i<=12;i++)hO+='<option value="'+i+'">'+i+'</option>';for(var i=0;i<60;i++){var ms=i<10?'0'+i:''+i;mO+='<option value="'+ms+'">'+ms+'</option>';}document.querySelectorAll('input[type="time"]').forEach(function(inp){var id=inp.id,ro=inp.readOnly,dis=ro?' disabled':'',dv=document.createElement('div');dv.className='t12w'+(ro?' t12w-ro':'');dv.id=id;dv.innerHTML='<select class="t12h"'+dis+'>'+hO+'</select><span class="t12s">:</span><select class="t12m"'+dis+'>'+mO+'</select><select class="t12p"'+dis+'><option>AM</option><option>PM</option></select>';inp.parentNode.replaceChild(dv,inp);set12h(id,new Date().toTimeString().slice(0,5));});})();
 init();
 </script>
 </body>
