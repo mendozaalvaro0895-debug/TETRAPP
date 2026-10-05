@@ -75,6 +75,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ac-item:last-child{border-bottom:none}
 .ac-item:hover,.ac-item:active{background:#EBF7F4}
 .ac-sku{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:#1A6B5B}
+.ac-nofact{font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;color:#B87200;background:#FFF3D6;border-radius:6px;padding:1px 6px;margin-left:6px}
 .ac-desc{font-size:12px;color:#3A3A38;margin-top:2px}
 
 /* TOTAL */
@@ -245,7 +246,7 @@ async function cargarInventario() {
     var BATCH = 1000;
     while (true) {
       var r = await db.from('inventario')
-        .select('sku, descripcion, existencia')
+        .select('sku, descripcion, existencia, facturable')
         .eq('activo', true).range(desde, desde + BATCH - 1);
       if (r.error) throw r.error;
       todos = todos.concat(r.data || []);
@@ -372,7 +373,7 @@ function buildAcItem(inputId, dropId, item) {
   var desc = String(item.descripcion || '');
   return '<div class="ac-item" onmousedown="acElegir(\'' + inputId + '\',\'' + dropId + '\',\''
     + escHtml(sku.replace(/'/g, '')) + '\',\'' + escHtml(desc.replace(/'/g, '')) + '\')">'
-    + '<div class="ac-sku">' + escHtml(sku) + '</div>'
+    + '<div class="ac-sku">' + escHtml(sku) + (item.facturable === false ? ' <span class="ac-nofact">no facturable</span>' : '') + '</div>'
     + '<div class="ac-desc">' + escHtml(desc) + '</div>'
     + '</div>';
 }
@@ -386,6 +387,8 @@ function acBuscar(inputId, dropId, query) {
     var texto = acNorm((i.sku || '') + ' ' + (i.descripcion || ''));
     return toks.every(function(t){ return texto.indexOf(t) !== -1; });
   });
+  // Facturables primero (null cuenta como facturable, igual que el bot); sort estable conserva el orden previo
+  results.sort(function(a, b){ return (a.facturable === false ? 1 : 0) - (b.facturable === false ? 1 : 0); });
   if (!results.length) { drop.style.display = 'none'; return; }
   drop.innerHTML = '<div class="ac-count">' + results.length + ' coincidencia' + (results.length === 1 ? '' : 's') + '</div>'
     + results.map(function(i){ return buildAcItem(inputId, dropId, i); }).join('');
