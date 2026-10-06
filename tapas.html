@@ -147,8 +147,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .dt{width:100%;border-collapse:collapse}
 .dt th{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}
 .dt td{padding:8px;font-size:12px;border-bottom:1px solid var(--bg)}
-.op-chip{padding:3px 8px;background:var(--bg);border-radius:20px;font-size:9px;cursor:pointer;transition:all .1s}
-.op-chip.sel-proc{background:var(--teal);color:#fff}
 
 /* MODAL */
 .overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(12,12,11,.8);z-index:10000;align-items:center;justify-content:center}
@@ -895,12 +893,6 @@ let inventarioCache = [];
 let personalData = null;
 let perdidaSolicitudActual = null;
 
-const ALL_PROCS_TAPAS = [
-  {val:'armado', lbl:'Armado'}, {val:'banda', lbl:'Banda'},
-  {val:'liner', lbl:'Liner'}, {val:'impresion', lbl:'Impresión'},
-  {val:'encajado', lbl:'Encajado'}
-];
-
 // ── Metas de producción por proceso (und/hora) ───────────────
 // Nota especial: tapa PUSH PULL en Armado → 700/hora
 const METAS = {
@@ -1548,11 +1540,6 @@ function renderLineas(focusId) {
     + '</div>'
     + '<div class="lin-comp-title">Componentes <span>(opcionales)</span></div>'
     + COMP_FORM.map(function(c) { return buildCompRow(l, c); }).join('')
-    + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">'
-    + ALL_PROCS_TAPAS.map(function(p) {
-        return '<div class="op-chip ' + (l.procs.indexOf(p.val) >= 0 ? 'sel-proc' : '') + '" onclick="toggleLineaProc(0,\'' + p.val + '\')" style="font-size:10px">' + p.lbl + '</div>';
-      }).join('')
-    + '</div>'
     + '</div>';
   updateTotals();
   autoAjustarCamposSku();
@@ -1636,15 +1623,6 @@ function formSkuSelect(kind, sku) {
     l.comp[kind] = { sku: item.sku, desc: item.descripcion || '', ex: item.existencia || 0 };
   }
   cerrarFormDrop();
-  renderLineas();
-  calcular();
-}
-
-function toggleLineaProc(idx, procVal) {
-  const arr = lineas[idx].procs;
-  const pos = arr.indexOf(procVal);
-  if (pos >= 0) arr.splice(pos, 1);
-  else arr.push(procVal);
   renderLineas();
   calcular();
 }
