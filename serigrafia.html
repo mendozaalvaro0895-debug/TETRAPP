@@ -2443,27 +2443,43 @@ function fmtFechaCorta(iso) {
   return d.length === 3 ? d[2] + '/' + d[1] + '/' + d[0] : iso;
 }
 
-// Minificha con el stock (Bodega 2) del envase base de la ficha, comparado contra
-// lo que pide ESTA ficha. Fuente de stock: invB2De() — la misma del bloque de envases.
-function buildBaseStockRow(item) {
-  if (!item.linea_id || !item.skuBase) return '';
+// Estado del stock (Bodega 2) del envase base de una ficha, comparado contra lo que pide
+// ESTA ficha. Fuente de stock: invB2De() — la misma del bloque de envases.
+function baseStockEstado(item) {
+  if (!item.skuBase) return null;
   var inv   = invB2De(item.skuBase);
   var stock = inv ? (inv.existencia || 0) : null;
   var necesita = item.cant || 0;
-  var clr, bg, chip;
-  if (stock === null)           { clr = '#64748b'; bg = '#f1f5f9'; chip = '❓ sin dato B2'; }
-  else if (stock === 0)         { clr = '#991b1b'; bg = '#fee2e2'; chip = '🔴 sin stock'; }
-  else if (stock < necesita)    { clr = '#92400e'; bg = '#fef9c3'; chip = '🟡 insuficiente'; }
-  else                          { clr = '#15803d'; bg = '#dcfce7'; chip = '✅ alcanza'; }
-  var desc = (inv && inv.descripcion) ? inv.descripcion : '';
-  return '<div style="margin-top:5px;padding:5px 8px;background:' + bg + ';border-left:3px solid ' + clr + ';border-radius:6px;font-size:10px;line-height:1.35"' +
-    ' title="' + escHtml(desc) + '">' +
+  var e = { stock: stock, desc: (inv && inv.descripcion) ? inv.descripcion : '' };
+  if (stock === null)        { e.clr = '#64748b'; e.bg = '#f1f5f9'; e.chip = '❓ sin dato B2'; }
+  else if (stock === 0)      { e.clr = '#991b1b'; e.bg = '#fee2e2'; e.chip = '🔴 sin stock'; }
+  else if (stock < necesita) { e.clr = '#92400e'; e.bg = '#fef9c3'; e.chip = '🟡 insuficiente'; }
+  else                       { e.clr = '#15803d'; e.bg = '#dcfce7'; e.chip = '✅ alcanza'; }
+  return e;
+}
+
+// Minificha (fichas dentro de una línea)
+function buildBaseStockRow(item) {
+  if (!item.linea_id) return '';
+  var e = baseStockEstado(item);
+  if (!e) return '';
+  return '<div style="margin-top:5px;padding:5px 8px;background:' + e.bg + ';border-left:3px solid ' + e.clr + ';border-radius:6px;font-size:10px;line-height:1.35"' +
+    ' title="' + escHtml(e.desc) + '">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">' +
-      '<span style="font-weight:700;color:' + clr + '">📦 Envase base · <span style="font-family:var(--mono)">' + escHtml(item.skuBase) + '</span></span>' +
-      '<span style="font-weight:800;color:' + clr + ';white-space:nowrap">' + chip + '</span>' +
+      '<span style="font-weight:700;color:' + e.clr + '">📦 Envase base · <span style="font-family:var(--mono)">' + escHtml(item.skuBase) + '</span></span>' +
+      '<span style="font-weight:800;color:' + e.clr + ';white-space:nowrap">' + e.chip + '</span>' +
     '</div>' +
-    '<div style="color:var(--ink);margin-top:1px">Stock B2: <b>' + (stock === null ? '—' : stock.toLocaleString()) + '</b> und</div>' +
+    '<div style="color:var(--ink);margin-top:1px">Stock B2: <b>' + (e.stock === null ? '—' : e.stock.toLocaleString()) + '</b> und</div>' +
   '</div>';
+}
+
+// Chip compacto (fichas en "Sin asignar")
+function buildBaseStockChip(item) {
+  var e = baseStockEstado(item);
+  if (!e) return '';
+  return '<div style="margin-top:4px"><span title="' + escHtml(e.desc) + '" style="display:inline-flex;align-items:center;gap:5px;background:' + e.bg + ';color:' + e.clr + ';border:1px solid ' + e.clr + '55;border-radius:10px;padding:1px 8px;font-size:9px;font-weight:800;white-space:nowrap">' +
+    '📦 <span style="font-family:var(--mono)">' + escHtml(item.skuBase) + '</span> · ' + (e.stock === null ? '—' : e.stock.toLocaleString()) + ' und · ' + e.chip +
+  '</span></div>';
 }
 
 function boardBuildCard(item) {
@@ -2637,6 +2653,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     '</div>' +
     '<div style="margin-top:3px;font-size:10px;color:' + descClr + ';font-weight:' + descWt + ';line-height:1.35">' + escHtml(desc) + '</div>' +
     fechasRow +
+    buildBaseStockChip(item) +
     notasRow +
     requiRow +
   '</div>';
