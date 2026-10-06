@@ -208,7 +208,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .lin-prod{display:grid;grid-template-columns:1fr 90px 80px;gap:6px;align-items:center}
 .lin-in-wrap{min-width:0}
 .lin-in-wrap .fi{width:100%;box-sizing:border-box}
-.lin-ta{resize:none;overflow:hidden;line-height:1.35;font-family:var(--font);display:block}
+.lin-ta{resize:none;overflow:hidden;line-height:1.35;font-family:var(--font);display:block;min-height:34px}
 .lin-comp-title{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--teal);margin:12px 0 4px;padding-top:8px;border-top:1px dashed var(--border)}
 .lin-comp-title span{font-weight:500;color:var(--gray-l);text-transform:none;letter-spacing:0}
 .lin-comp{display:grid;grid-template-columns:78px 1fr auto auto;gap:8px;align-items:center;margin-top:5px}
@@ -1509,6 +1509,7 @@ function abrirForm() {
   document.getElementById('fPrioSelect').value = 'normal';
   renderLineas();
   document.getElementById('overlay').classList.add('open');
+  autoAjustarCamposSku();
   calcular();
 }
 
@@ -1525,8 +1526,9 @@ function normBusqueda(s) {
 // Los cuadros crecen en alto para mostrar el SKU + la descripción completa sin cortarla
 function autoAjustarCamposSku() {
   document.querySelectorAll('#lineasPedido .lin-ta').forEach(function(t) {
+    if (!t.offsetParent) return; // modal aún cerrado: no hay medidas, se ajusta al abrirlo
     t.style.height = 'auto';
-    t.style.height = t.scrollHeight + 2 + 'px';
+    t.style.height = Math.max(t.scrollHeight + 2, 34) + 'px';
   });
 }
 
