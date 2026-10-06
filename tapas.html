@@ -1502,6 +1502,7 @@ function toggleLineaProc(procVal) {
 }
 
 function abrirForm() {
+  cargarInsumosB7(); // refresca el stock de B7 en segundo plano
   lineas = [nuevaLineaForm()];
   document.getElementById('fCli').value = '';
   document.getElementById('fNotas').value = '';
@@ -1547,7 +1548,7 @@ function buildCompRow(l, c) {
   var info = '';
   if (st.ex !== undefined) {
     var falta = (l.cant || 0) - st.ex;
-    info = '<span class="lin-stk">Stock <b style="color:' + (falta <= 0 ? 'var(--green)' : 'var(--amber)') + '">' + st.ex.toLocaleString() + '</b></span>'
+    info = '<span class="lin-stk">Stock ' + (esKindB7(c.k) ? 'B7 ' : '') + '<b style="color:' + (falta <= 0 ? 'var(--green)' : 'var(--amber)') + '">' + st.ex.toLocaleString() + '</b></span>'
       + (falta > 0 && l.cant > 0 ? '<span class="lin-falta">Faltante: ' + falta.toLocaleString() + '</span>' : '');
   }
   return '<div class="lin-comp">'
@@ -1593,13 +1594,34 @@ function renderLineas(focusId) {
   }
 }
 
+// Liner y Banda son insumos de Bodega 7 (tabla insumos_b7), no producto de inventario:
+// su buscador y su stock salen de ahí. Producto, Base y Contratapa siguen en inventario (B2).
+var insumosB7Cache = [];
+function esKindB7(kind) { return kind === 'liner' || kind === 'banda'; }
+
+async function cargarInsumosB7() {
+  try {
+    var todos = [], desde = 0, BATCH = 1000;
+    while (true) {
+      var r = await db.from('insumos_b7').select('sku, descripcion, existencia')
+        .eq('activo', true).range(desde, desde + BATCH - 1);
+      if (r.error) throw r.error;
+      todos = todos.concat(r.data || []);
+      if (!r.data || r.data.length < BATCH) break;
+      desde += BATCH;
+    }
+    insumosB7Cache = todos;
+  } catch(e) { console.error('Error cargando insumos B7:', e); }
+}
+
 // ── Buscador de SKU del formulario ────────────────────────────
 // Todas las coincidencias (cada palabra por separado, sin tildes), FACTURABLES PRIMERO.
 // facturable null cuenta como facturable, igual que el bot.
 function buildFormDropHtml(kind, query) {
   var toks = normBusqueda(query).split(/[^a-z0-9]+/).filter(Boolean);
   if (!toks.length) return '';
-  var res = inventarioCache.filter(function(i) {
+  var b7 = esKindB7(kind);
+  var res = (b7 ? insumosB7Cache : inventarioCache).filter(function(i) {
     var texto = normBusqueda((i.sku || '') + ' ' + (i.descripcion || ''));
     return toks.every(function(t) { return texto.indexOf(t) !== -1; });
   });
@@ -1610,10 +1632,11 @@ function buildFormDropHtml(kind, query) {
   var noFact = res.filter(function(i) { return i.facturable === false; });
   function item(i) {
     return '<div class="lin-item" onmousedown="formSkuSelect(\'' + kind + '\',\'' + escHtml(String(i.sku).replace(/'/g, '')) + '\')">'
-      + '<div class="lin-item-sku">' + escHtml(i.sku) + '<span>Stock ' + (i.existencia || 0).toLocaleString() + '</span></div>'
+      + '<div class="lin-item-sku">' + escHtml(i.sku) + '<span>Stock ' + (b7 ? 'B7 ' : '') + (i.existencia || 0).toLocaleString() + '</span></div>'
       + '<div class="lin-item-desc">' + escHtml(i.descripcion || '') + '</div></div>';
   }
-  var html = '<div class="lin-count">' + res.length + ' coincidencia' + (res.length === 1 ? '' : 's') + '</div>';
+  var html = '<div class="lin-count">' + res.length + ' coincidencia' + (res.length === 1 ? '' : 's') + (b7 ? ' · Bodega 7' : '') + '</div>';
+  if (b7) return html + res.map(item).join('');
   if (fact.length) html += '<div class="lin-grp lin-grp-ok">✅ Facturables · ' + fact.length + '</div>' + fact.map(item).join('');
   if (noFact.length) html += '<div class="lin-grp lin-grp-no">⚠️ No facturables · ' + noFact.length + '</div>' + noFact.map(item).join('');
   return html;
@@ -1658,7 +1681,7 @@ function cerrarFormDrop() {
 }
 
 function formSkuSelect(kind, sku) {
-  var item = invB2DeTapas(sku);
+  var item = esKindB7(kind) ? insumosB7Cache.find(function(i) { return i.sku === sku; }) : invB2DeTapas(sku);
   var l = lineas[0];
   if (!item || !l) return;
   if (kind === 'prod') {
@@ -1697,10 +1720,10 @@ async function guardar() {
   const l = lineas[0];
   if (!l || !(l.cant > 0)) { alert('Indica la cantidad'); return; }
 
-  // Los componentes deben ser SKUs reales de inventario (las alertas de stock los buscan por SKU)
+  // Los componentes deben ser SKUs reales (inventario, o Bodega 7 para Liner y Banda): las alertas de stock los buscan por SKU
   var sinSku = COMP_FORM.filter(function(c) {
     var s = compDe(l, c.k).sku.trim();
-    return s && !inventarioCache.some(function(i) { return i.sku === s; });
+    return s && !(esKindB7(c.k) ? insumosB7Cache : inventarioCache).some(function(i) { return i.sku === s; });
   }).map(function(c) { return c.lbl; });
   if (sinSku.length) { alert('Elige de la lista el SKU de: ' + sinSku.join(', ') + ' (o deja el campo vacío)'); return; }
 
@@ -3360,6 +3383,7 @@ async function init() {
 
   // Cargar datos
   await cargarInventario();
+  await cargarInsumosB7();
   await cargarPersonal();
   await cargarFeriados();
   await cargarSolicitudes();
