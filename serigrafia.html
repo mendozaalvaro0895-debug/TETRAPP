@@ -668,20 +668,6 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
       <!-- Scroll content -->
       <div style="flex:1;overflow-y:auto;padding:20px 24px">
 
-        <!-- Nav cards -->
-        <div class="hub-grid">
-          <div class="hub-card" onclick="switchTab('movimientos')">
-            <div class="hub-card-ico">⬇⬆</div>
-            <div><div class="hub-card-title">Movimientos</div>
-            <div class="hub-card-sub">Salidas de bodega · Ingresos PT</div></div>
-          </div>
-          <div class="hub-card" onclick="switchTab('personal')">
-            <div class="hub-card-ico">👥</div>
-            <div><div class="hub-card-title">Personal</div>
-            <div class="hub-card-sub" id="hc-personal-sub">Cargando…</div></div>
-          </div>
-        </div>
-
         <!-- Fila de alertas: ½ izquierda = Bajo stock (insumos arriba, envases abajo) · ½ derecha = Rechazos del mes -->
         <div class="alertas-row">
          <div class="alertas-col-izq">
@@ -3714,12 +3700,6 @@ function renderInicio() {
   countUp(document.getElementById('ki-pend'),      pendientesCount,   700);
   countUp(document.getElementById('ki-ops'),       ops,               700);
 
-  // Hub card subtitles
-  el = document.getElementById('hc-prog-sub');
-  if (el) el.textContent = enProceso.length + ' en proceso · ' + pendientesCount + ' pendientes';
-  el = document.getElementById('hc-personal-sub');
-  if (el) el.textContent = ops + ' operadores activos';
-
   // Timestamp
   el = document.getElementById('lastUpdate');
   if (el) el.textContent = new Date().toLocaleTimeString('es-GT', {hour:'2-digit', minute:'2-digit'});
@@ -3734,9 +3714,8 @@ function renderInicio() {
   renderFaltasChart();
   renderAsistGrid();
 
-  // Stagger: KPI cells → hub-cards
+  // Stagger: KPI cells
   staggerEls('#view-inicio .kpi',      0);
-  staggerEls('#view-inicio .hub-card', 60);
 }
 
 var PROD_META_DIA = 30000; // meta diaria de producción (unidades)
