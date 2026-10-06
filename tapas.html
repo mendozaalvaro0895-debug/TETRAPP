@@ -207,7 +207,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .lin-prod{display:grid;grid-template-columns:1fr 90px 80px;gap:6px;align-items:center}
 .lin-in-wrap{min-width:0}
 .lin-in-wrap .fi{width:100%;box-sizing:border-box}
-.lin-desc{font-size:11px;color:var(--gray);padding:3px 0 2px;font-weight:500}
+.lin-ta{resize:none;overflow:hidden;line-height:1.35;font-family:var(--font);display:block}
 .lin-comp-title{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--teal);margin:12px 0 4px;padding-top:8px;border-top:1px dashed var(--border)}
 .lin-comp-title span{font-weight:500;color:var(--gray-l);text-transform:none;letter-spacing:0}
 .lin-comp{display:grid;grid-template-columns:78px 1fr auto auto;gap:8px;align-items:center;margin-top:5px}
@@ -1498,6 +1498,19 @@ function normBusqueda(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+// Los cuadros crecen en alto para mostrar el SKU + la descripción completa sin cortarla
+function autoAjustarCamposSku() {
+  document.querySelectorAll('#lineasPedido .lin-ta').forEach(function(t) {
+    t.style.height = 'auto';
+    t.style.height = t.scrollHeight + 2 + 'px';
+  });
+}
+
+// Lo que se ve dentro del cuadro una vez elegido el item: SKU y descripción completa
+function textoCampoSku(sku, desc) {
+  return desc ? sku + ' — ' + desc : sku;
+}
+
 function compDe(l, k) {
   if (!l.comp[k]) l.comp[k] = { sku: '', desc: '', ex: undefined };
   return l.comp[k];
@@ -1513,11 +1526,11 @@ function buildCompRow(l, c) {
   }
   return '<div class="lin-comp">'
     + '<span class="lin-comp-lbl">' + c.lbl + '</span>'
-    + '<div class="lin-in-wrap"><input class="fi" id="lin-in-' + c.k + '" placeholder="🔍 SKU o descripción… (opcional)" value="' + escHtml(st.sku) + '" autocomplete="off"'
-    +   ' oninput="formSkuInput(\'' + c.k + '\',this,true)" onfocus="formSkuInput(\'' + c.k + '\',this,false)" onblur="setTimeout(cerrarFormDrop,200)"></div>'
+    + '<div class="lin-in-wrap"><textarea class="fi lin-ta" rows="1" id="lin-in-' + c.k + '" placeholder="🔍 SKU o descripción… (opcional)" autocomplete="off"'
+    +   ' oninput="formSkuInput(\'' + c.k + '\',this,true)" onfocus="formSkuInput(\'' + c.k + '\',this,false)" onkeydown="if(event.key===\'Enter\')event.preventDefault()" onblur="setTimeout(cerrarFormDrop,200)">'
+    +   escHtml(textoCampoSku(st.sku, st.desc)) + '</textarea></div>'
     + info
-    + '</div>'
-    + (st.desc ? '<div class="lin-desc">📦 ' + escHtml(st.desc) + '</div>' : '');
+    + '</div>';
 }
 
 function renderLineas(focusId) {
@@ -1527,12 +1540,12 @@ function renderLineas(focusId) {
   var exColor = l.existencia === undefined ? 'var(--gray-l)' : (l.existencia >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)');
   cont.innerHTML = '<div style="padding:8px 10px">'
     + '<div class="lin-prod">'
-    +   '<div class="lin-in-wrap"><input class="fi" id="lin-in-prod" placeholder="🔍 SKU, nombre o producto nuevo…" value="' + escHtml(l.sku) + '" autocomplete="off"'
-    +     ' oninput="formSkuInput(\'prod\',this,true)" onfocus="formSkuInput(\'prod\',this,false)" onblur="setTimeout(cerrarFormDrop,200)"></div>'
+    +   '<div class="lin-in-wrap"><textarea class="fi lin-ta" rows="1" id="lin-in-prod" placeholder="🔍 SKU, nombre o producto nuevo…" autocomplete="off"'
+    +     ' oninput="formSkuInput(\'prod\',this,true)" onfocus="formSkuInput(\'prod\',this,false)" onkeydown="if(event.key===\'Enter\')event.preventDefault()" onblur="setTimeout(cerrarFormDrop,200)">'
+    +     escHtml(textoCampoSku(l.sku, l.desc)) + '</textarea></div>'
     +   '<input class="fi" type="number" min="0" placeholder="Cant" value="' + (l.cant || '') + '" onchange="lineas[0].cant=parseInt(this.value)||0;renderLineas();calcular()">'
     +   '<div style="font-size:11px;text-align:right;color:' + exColor + '">' + (l.existencia !== undefined ? l.existencia.toLocaleString() : '—') + '</div>'
     + '</div>'
-    + (l.desc ? '<div class="lin-desc">📦 ' + escHtml(l.desc) + '</div>' : '')
     + '<div class="lin-comp-title">Componentes <span>(opcionales)</span></div>'
     + COMP_FORM.map(function(c) { return buildCompRow(l, c); }).join('')
     + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">'
@@ -1542,6 +1555,7 @@ function renderLineas(focusId) {
     + '</div>'
     + '</div>';
   updateTotals();
+  autoAjustarCamposSku();
   if (focusId) {
     var el = document.getElementById(focusId);
     if (el) { el.focus(); var n = el.value.length; el.setSelectionRange(n, n); }
@@ -1578,6 +1592,9 @@ function formSkuInput(kind, el, escribiendo) {
   var l = lineas[0];
   if (!l) return;
   var val = el.value;
+  autoAjustarCamposSku();
+  // Campo ya elegido (SKU — descripción): al enfocarlo no se vuelve a abrir la lista
+  if (!escribiendo && (kind === 'prod' ? l.desc : compDe(l, kind).desc)) return;
   if (escribiendo) {
     // Texto cambiado a mano: lo elegido antes deja de valer
     var st = kind === 'prod' ? l : compDe(l, kind);
