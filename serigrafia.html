@@ -2585,8 +2585,6 @@ function boardBuildCard(item) {
     (fechaEntregado ? '<span style="color:#15803d;font-weight:700">✅ Entregado: ' + fmtFechaCorta(fechaEntregado) + '</span>' : '') +
     '</div>';
   var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
-  var tiroMax = Math.max(item.tiros || 1, item.tiro_actual || 1);
-  var tiroRow = (item.linea_id && tiroMax > 1) ? buildTiroRow(item, tiroMax) : '';
   var cantLabel = entregado > 0
     ? '<span style="color:#22c55e;font-weight:800">' + entregado.toLocaleString() + '</span>' +
       '<span style="font-weight:400;color:var(--gray-l)"> / </span>' + (item.cant||0).toLocaleString() +
@@ -2629,7 +2627,6 @@ function boardBuildCard(item) {
     cantAndProg +
     buildBaseStockRow(item) +
     fechasRow +
-    tiroRow +
     (item.linea_id ? buildComentarioRow(item) : '') +
     '</div>';
 }
