@@ -1595,6 +1595,77 @@ function periodoEfectivoDe(item) {
   return item.periodoEfectivo ? periodoPorKey(item.periodoEfectivo) : periodoDe(item.createdAt);
 }
 
+// ── Capacidad de línea por mes (el % de cada bloque cliente+mes de "Sin asignar") ──
+// % = tiros realizados de la(s) línea(s) del cliente ÷ (días laborados × META_TIROS_LINEA × nº de líneas).
+// Línea por cliente (regla fija): Darosa → L1 · Sinergia → L2 · resto → promedio de L3 y L4.
+// Días laborados = lunes a sábado sin feriados (dias_feriados), desde PROD_FECHA_PISO y hasta hoy;
+// los tiros solo cuentan en esos días (mismo criterio). Tiros = delta diario del contador
+// (pfcDelta) + velada, igual que Productividad por línea.
+var capMesCache    = {};   // 'YYYY-MM' -> { t, ok, tiros:{1..4}, dias }
+var capMesCargando = {};
+var CAP_TTL_MS     = 120000; // el mes en curso se recarga cada 2 min como máximo
+
+function capLineasDeCliente(cli) {
+  var n = (cli || '').toUpperCase();
+  if (n.indexOf('DAROSA') >= 0)   return [1];
+  if (n.indexOf('SINERGIA') >= 0) return [2];
+  return [3, 4];
+}
+
+async function cargarCapacidadMes(mes) {
+  if (capMesCargando[mes]) return;
+  capMesCargando[mes] = true;
+  var res = { t: Date.now(), ok: false, tiros: { 1: 0, 2: 0, 3: 0, 4: 0 }, dias: 0 };
+  try {
+    var a = parseInt(mes.slice(0, 4)), m = parseInt(mes.slice(5, 7));
+    var ultimo = new Date(a, m, 0).getDate();
+    var r = await db.from('registro_tiros_serig').select('fecha,linea_id,momento,contador')
+      .eq('area', 'serig').gte('fecha', mes + '-01').lte('fecha', mes + '-' + String(ultimo).padStart(2, '0'));
+    if (r.error) throw r.error;
+    var byDL = {}, conDato = {};
+    (r.data || []).forEach(function(l) {
+      conDato[l.fecha] = true;
+      if (!byDL[l.fecha]) byDL[l.fecha] = {};
+      if (!byDL[l.fecha][l.linea_id]) byDL[l.fecha][l.linea_id] = { registros: [], velada: null };
+      if (l.momento === 'velada') { if (!byDL[l.fecha][l.linea_id].velada) byDL[l.fecha][l.linea_id].velada = l; }
+      else byDL[l.fecha][l.linea_id].registros.push(l);
+    });
+    var hoy = fechaHoy();
+    for (var d = 1; d <= ultimo; d++) {
+      var f = mes + '-' + String(d).padStart(2, '0');
+      if (f < PROD_FECHA_PISO || f > hoy) continue;
+      if (new Date(f + 'T12:00:00').getDay() === 0 || feriadosSet[f]) continue;
+      if (f === hoy && !conDato[f]) continue;   // hoy sin ninguna lectura todavía: no suma capacidad
+      res.dias++;
+      [1, 2, 3, 4].forEach(function(lid) {
+        var datos = byDL[f] && byDL[f][lid];
+        if (!datos) return;
+        var delta = pfcDelta(datos.registros);
+        if (delta !== null) res.tiros[lid] += delta;
+        var vel = prodVeladaDelta(datos);
+        if (vel !== null) res.tiros[lid] += vel;
+      });
+    }
+    res.ok = true;
+  } catch (e) { console.error('cargarCapacidadMes:', e); }
+  capMesCache[mes] = res;
+  capMesCargando[mes] = false;
+  renderBoard();
+}
+
+// null = todavía cargando (dispara la carga) o sin datos calculables
+function capPctCliente(cli, mes) {
+  if (!/^\d{4}-\d{2}$/.test(mes || '') || mes === '0000-00') return null;
+  var c = capMesCache[mes];
+  var vencido = c && mes === periodoActualKey() && (Date.now() - c.t) > CAP_TTL_MS;
+  if (!c || vencido) { cargarCapacidadMes(mes); if (!c) return null; }
+  if (!c.ok || c.dias === 0) return null;
+  var lineas = capLineasDeCliente(cli);
+  var tiros = lineas.reduce(function(s, lid) { return s + (c.tiros[lid] || 0); }, 0);
+  var cap   = c.dias * META_TIROS_LINEA * lineas.length;
+  return { pct: Math.round(tiros / cap * 100), tiros: tiros, cap: cap, dias: c.dias, lineas: lineas };
+}
+
 // ── Cierre mensual de fichas "Sin asignar" ────────────────────────
 // periodoCierresCache: { 'CLIENTE§2026-07': {snapshot congelado} }
 var periodoCierresCache = {};
@@ -3227,7 +3298,17 @@ function boardBuildSinBlock(items) {
           var totalEntG = gItems.reduce(function(s,i){ return s+(entregadoMap[i.solId]||0); },0);
           pctEnt    = totalG > 0 ? Math.round(totalEntG / totalG * 100) : 0;
         }
-        var pctClr    = pctEnt >= 100 ? '#bbf7d0' : pctEnt > 0 ? '#fde68a' : 'rgba(255,255,255,.45)';
+        // % de capacidad de la línea (no de pedidos): ver capPctCliente()
+        var capInfo   = capPctCliente(cli, per.key);
+        var capVal    = capInfo ? capInfo.pct : 0;
+        var pctClr    = capVal >= 100 ? '#bbf7d0' : capVal > 0 ? '#fde68a' : 'rgba(255,255,255,.45)';
+        var capTxt    = capInfo ? capInfo.pct + '% cap' : (/^\d{4}-\d{2}$/.test(per.key) && per.key !== '0000-00' ? '…' : '—');
+        var capTitle  = capInfo
+          ? 'Capacidad de ' + (capInfo.lineas.length > 1 ? 'Líneas 3 y 4 (promedio)' : 'Línea ' + capInfo.lineas[0]) + ': ' +
+            capInfo.tiros.toLocaleString() + ' tiros de ' + capInfo.cap.toLocaleString() +
+            ' (' + capInfo.dias + ' días laborados × ' + META_TIROS_LINEA.toLocaleString() + (capInfo.lineas.length > 1 ? ' × 2 líneas' : '') + '). ' +
+            'Entregado vs pedido: ' + pctEnt + '%'
+          : 'Capacidad de la línea: sin datos o calculando';
         // Grid: columna = count de pedidos arriba + und abajo, % en esquina derecha
         var _pill = 'display:inline-block;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:800';
         var _col  = 'display:flex;flex-direction:column;align-items:flex-start;gap:5px';
@@ -3253,7 +3334,7 @@ function boardBuildSinBlock(items) {
                 '<span style="' + _pill + ';background:rgba(185,28,28,.25);color:#fca5a5;border:1px solid rgba(185,28,28,.45)">' + nPendientes + ' ●</span>' +
                 '<span style="' + _und + ';color:#fca5a5">' + undRojo.toLocaleString() + ' und</span>' +
               '</div>' : '') +
-            '<span style="margin-left:auto;font-size:14px;font-weight:800;color:' + pctClr + ';align-self:flex-end">' + pctEnt + '% ent</span>' +
+            '<span title="' + escHtml(capTitle) + '" style="margin-left:auto;font-size:14px;font-weight:800;color:' + pctClr + ';align-self:flex-end">' + capTxt + '</span>' +
           '</div>';
         // Solo calcular tiempo para fichas amarillas (parcial) y rojas (sin entrega) — excluir LISTA y verde
         var horasG = gItems.reduce(function(sum, item) {
