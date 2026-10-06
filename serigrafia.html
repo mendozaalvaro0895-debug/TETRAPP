@@ -2460,7 +2460,6 @@ function boardBuildCard(item) {
       requis.push({ cant: m.cant, fecha: m.fecha, requi: m.requi, linea: '' });
     }
   });
-  var progColor = item.prog >= 80 ? 'var(--green)' : item.prog >= 40 ? 'var(--amber)' : 'var(--serig-m)';
   var badgeBg   = item.estado === 'lista'    ? '#dcfce7'        : item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'parcial' ? '#fef9c3' : '#f1f5f9';
   var badgeClr  = item.estado === 'lista'    ? '#15803d'        : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'parcial' ? '#92400e' : '#64748b';
   var badgeTxt  = item.estado === 'lista'    ? 'COMPLETADO'     : item.estado === 'proceso' ? 'EN PROCESO'     : item.estado === 'parcial' ? 'PARCIAL' : 'NUEVA';
@@ -2476,7 +2475,6 @@ function boardBuildCard(item) {
     (fechaEntregado ? '<span style="color:#15803d;font-weight:700">✅ Entregado: ' + fmtFechaCorta(fechaEntregado) + '</span>' : '') +
     '</div>';
   var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
-  var procRow = item.linea_id ? buildCardProcRow(item) : '';
   var tiroMax = Math.max(item.tiros || 1, item.tiro_actual || 1);
   var tiroRow = (item.linea_id && tiroMax > 1) ? buildTiroRow(item, tiroMax) : '';
   var cantLabel = entregado > 0
@@ -2496,23 +2494,11 @@ function boardBuildCard(item) {
       '</div>'
     : '';
   var cantAndProg = item.linea_id
-    ? '<div style="margin-top:4px;padding:7px 8px;background:var(--bg);border-radius:7px;cursor:pointer;border:1.5px solid var(--border)"' +
-      ' title="Clic para editar progreso"' +
-      ' onclick="event.stopPropagation();editarProgreso(\'' + item.solId + '\',' + item.prog + ',this)">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">' +
+    ? '<div style="margin-top:4px;padding:7px 8px;background:var(--bg);border-radius:7px;border:1.5px solid var(--border)">' +
         '<span style="font-size:12px;font-weight:700">' + cantLabel + '</span>' +
-        '<span style="font-size:12px;font-weight:800;color:' + progColor + '">' + item.prog + '%</span>' +
-      '</div>' +
-      '<div style="background:var(--border);border-radius:3px;height:5px">' +
-        '<div style="background:' + progColor + ';height:5px;border-radius:3px;width:' + item.prog + '%"></div>' +
-      '</div>' +
-      requiRow +
+        requiRow +
       '</div>'
-    : '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">' +
-        '<span style="font-size:12px;font-weight:700">' + cantLabel + '</span>' +
-        (item.prog > 0 ? '<span style="font-size:10px;font-weight:700;color:' + progColor + '">' + item.prog + '%</span>' : '') +
-      '</div>' +
-      (item.prog > 0 ? '<div style="margin-top:5px;background:var(--border);border-radius:3px;height:3px"><div style="background:' + progColor + ';height:3px;border-radius:3px;width:' + item.prog + '%"></div></div>' : '') +
+    : '<div style="margin-top:4px"><span style="font-size:12px;font-weight:700">' + cantLabel + '</span></div>' +
       requiRow;
   var perC     = periodoDe(item.createdAt);
   var esNueva  = perC.key === periodoActualKey();
@@ -2533,7 +2519,6 @@ function boardBuildCard(item) {
     cantAndProg +
     fechasRow +
     tiroRow +
-    procRow +
     (item.linea_id ? buildComentarioRow(item) : '') +
     '</div>';
 }
