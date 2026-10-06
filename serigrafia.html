@@ -716,21 +716,6 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
 
         <!-- Barra de día compartida — afecta Personal+Roles y Asistencia Mensual -->
         <div id="diaBar" style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0 5px">
-          <!-- Mes -->
-          <div style="display:flex;align-items:center;gap:6px">
-            <button class="asist-nav-arr" onclick="navegarMes(-1)" title="Mes anterior" id="mesBtnPrev">‹</button>
-            <span id="mesBarLbl" style="font-size:12px;font-weight:700;color:var(--ink);text-transform:capitalize;min-width:130px;text-align:center"></span>
-            <button class="asist-nav-arr" onclick="navegarMes(1)" title="Mes siguiente" id="mesBtnNext">›</button>
-          </div>
-          <!-- Separador horizontal -->
-          <div style="width:200px;height:1px;background:var(--border)"></div>
-          <!-- Día -->
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center">
-            <button class="asist-nav-arr" onclick="navegarDia(-1)" title="Día anterior" id="diaBtnPrev">‹</button>
-            <span id="diaBarLbl" style="font-size:13px;font-weight:700;color:var(--serig-m);min-width:180px;text-align:center;text-transform:capitalize"></span>
-            <button class="asist-nav-arr" onclick="navegarDia(1)" title="Día siguiente" id="diaBtnNext">›</button>
-            <button class="btn btn-g btn-xs" onclick="irDiaHoy()" id="diaBtnHoy">Hoy</button>
-          </div>
           <!-- Calendario -->
           <div style="display:flex;align-items:center;gap:6px;justify-content:center">
             <input type="date" id="diaBarInput" class="fi" style="font-size:11px;padding:4px 8px;width:150px" onchange="irDiaEspecifico(this.value)">
@@ -2402,31 +2387,13 @@ async function guardarAmbas() {
 function guardarMatrizDia() { return guardarAmbas(); }
 
 function renderDiaBar() {
-  var lbl  = document.getElementById('diaBarLbl');
-  if (!lbl) return;
   var inp  = document.getElementById('diaBarInput');
-  var prev = document.getElementById('diaBtnPrev');
-  var next = document.getElementById('diaBtnNext');
-  var hoyB = document.getElementById('diaBtnHoy');
+  if (!inp) return;
   var modo = document.getElementById('diaBarModoLbl');
   var sub  = document.getElementById('matrizSub');
   var hoy  = fechaHoy();
   var esHoy = posFecha === hoy;
-  var d = new Date(posFecha + 'T12:00:00');
-  lbl.textContent = d.toLocaleDateString('es-GT', { weekday:'long', day:'numeric', month:'long' }) + (esHoy ? ' · HOY' : '');
-  if (inp)  { inp.value = posFecha; inp.max = hoy; inp.min = ASIST_FECHA_MIN; }
-  if (prev) { prev.disabled = posFecha <= ASIST_FECHA_MIN; prev.style.opacity = prev.disabled ? '.35' : ''; }
-  if (next) { next.disabled = esHoy; next.style.opacity = esHoy ? '.35' : ''; }
-  // Controles de mes
-  var mesLbl = document.getElementById('mesBarLbl');
-  var mesPrev = document.getElementById('mesBtnPrev');
-  var mesNext = document.getElementById('mesBtnNext');
-  var mesStr = posFecha.slice(0,7);
-  var hoyMes = hoy.slice(0,7), minMes = ASIST_FECHA_MIN.slice(0,7);
-  if (mesLbl)  mesLbl.textContent = d.toLocaleDateString('es-GT', { month:'long', year:'numeric' });
-  if (mesPrev) { mesPrev.disabled = mesStr <= minMes; mesPrev.style.opacity = mesPrev.disabled ? '.35' : ''; }
-  if (mesNext) { mesNext.disabled = mesStr >= hoyMes; mesNext.style.opacity = mesNext.disabled ? '.35' : ''; }
-  if (hoyB) { hoyB.style.display = esHoy ? 'none' : ''; }
+  inp.value = posFecha; inp.max = hoy; inp.min = ASIST_FECHA_MIN;
   if (modo) modo.textContent = esHoy ? '' : '· editando un día pasado (no cambia lo normal)';
   if (sub)  sub.textContent = esHoy
     ? 'Arrastra cada operador a su rol y línea'
@@ -2449,41 +2416,7 @@ async function aplicarDia() {
   await renderAsistGrid();
 }
 
-function navegarDia(delta) {
-  var d = new Date(posFecha + 'T12:00:00');
-  d.setDate(d.getDate() + delta);
-  var nueva = fechaLocalDe(d);
-  if (nueva > fechaHoy() || nueva < ASIST_FECHA_MIN) return;
-  posFecha = nueva;
-  aplicarDia();
-}
-function irDiaHoy() { posFecha = fechaHoy(); aplicarDia(); }
 function irDiaEspecifico(val) { if (!val) return; posFecha = val; aplicarDia(); }
-
-// Navegación por mes: avanza/retrocede el mes y reposiciona el día dentro de él
-function navegarMes(delta) {
-  var mes = posFecha.slice(0,7);
-  var anio = parseInt(mes.slice(0,4)), m = parseInt(mes.slice(5,7));
-  var d = new Date(anio, m - 1 + delta, 1);
-  var nuevoMes = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-  var hoyMes = fechaHoy().slice(0,7), minMes = ASIST_FECHA_MIN.slice(0,7);
-  if (nuevoMes > hoyMes || nuevoMes < minMes) return;
-  cambiarMesGrid(nuevoMes);
-}
-
-// Cambio de mes: también reposiciona el día activo dentro del mes
-function cambiarMesGrid(mesStr) {
-  var hoy = fechaHoy();
-  var dia = parseInt(posFecha.slice(8)) || 1;
-  var anio = parseInt(mesStr.slice(0,4)), mesN = parseInt(mesStr.slice(5,7));
-  var lastDay = new Date(anio, mesN, 0).getDate();
-  if (dia > lastDay) dia = lastDay;
-  var cand = mesStr + '-' + String(dia).padStart(2,'0');
-  if (cand > hoy) cand = hoy;
-  if (cand < ASIST_FECHA_MIN) cand = ASIST_FECHA_MIN;
-  posFecha = cand;
-  aplicarDia();
-}
 
 // ════════════════════════════════════════════════════════════
 // BOARD DE ASIGNACIÓN DE LÍNEAS
