@@ -195,6 +195,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mov-badge-sal{background:#FFF3D6;color:#92400E;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
 .mov-badge-ing{background:#DCFCE7;color:#166534;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
 .mov-badge-rech{background:#FEE2E2;color:#991B1B;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px}
+.op-chip{padding:3px 8px;background:var(--bg);border:1px solid var(--border);border-radius:20px;font-size:10px;cursor:pointer;transition:all .1s}
+.op-chip.sel-proc{background:var(--teal);border-color:var(--teal);color:#fff}
+.op-chip.auto{cursor:default}
 .sku-wrap{position:relative}
 .sku-drop{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--teal);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:999;max-height:180px;overflow-y:auto;margin-top:2px}
 .sku-drop.open{display:block}
@@ -893,6 +896,12 @@ let inventarioCache = [];
 let personalData = null;
 let perdidaSolicitudActual = null;
 
+const ALL_PROCS_TAPAS = [
+  {val:'armado', lbl:'Armado'}, {val:'banda', lbl:'Banda'},
+  {val:'liner', lbl:'Liner'}, {val:'impresion', lbl:'Impresión'},
+  {val:'encajado', lbl:'Encajado'}
+];
+
 // ── Metas de producción por proceso (und/hora) ───────────────
 // Nota especial: tapa PUSH PULL en Armado → 700/hora
 const METAS = {
@@ -1466,7 +1475,30 @@ var COMP_FORM = [
 ];
 
 function nuevaLineaForm() {
-  return { sku: '', desc: '', cant: 0, procs: [], existencia: undefined, comp: {} };
+  return { sku: '', desc: '', cant: 0, procs: [], procsAuto: [], procsManual: [], existencia: undefined, comp: {} };
+}
+
+// Procesos de la ficha: se activan solos según los componentes elegidos
+// (Base o Contratapa → Armado · Liner → Liner · Banda → Banda); Impresión y
+// Encajado (y cualquier otro) se marcan a mano. l.procs es la lista efectiva.
+function sincronizarProcs(l) {
+  function elegido(k) { return compDe(l, k).ex !== undefined; }
+  var auto = [];
+  if (elegido('base') || elegido('contratapa')) auto.push('armado');
+  if (elegido('liner')) auto.push('liner');
+  if (elegido('banda')) auto.push('banda');
+  l.procsAuto = auto;
+  l.procs = auto.concat(l.procsManual.filter(function(p) { return auto.indexOf(p) < 0; }));
+}
+
+function toggleLineaProc(procVal) {
+  var l = lineas[0];
+  if (!l || l.procsAuto.indexOf(procVal) >= 0) return; // activado por un componente
+  var pos = l.procsManual.indexOf(procVal);
+  if (pos >= 0) l.procsManual.splice(pos, 1);
+  else l.procsManual.push(procVal);
+  renderLineas();
+  calcular();
 }
 
 function abrirForm() {
@@ -1529,6 +1561,7 @@ function renderLineas(focusId) {
   var cont = document.getElementById('lineasPedido');
   var l = lineas[0];
   if (!cont || !l) return;
+  sincronizarProcs(l);
   var exColor = l.existencia === undefined ? 'var(--gray-l)' : (l.existencia >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)');
   cont.innerHTML = '<div style="padding:8px 10px">'
     + '<div class="lin-prod">'
@@ -1540,6 +1573,15 @@ function renderLineas(focusId) {
     + '</div>'
     + '<div class="lin-comp-title">Componentes <span>(opcionales)</span></div>'
     + COMP_FORM.map(function(c) { return buildCompRow(l, c); }).join('')
+    + '<div class="lin-comp-title">Procesos <span>(se activan con los componentes; Impresión y Encajado se marcan a mano)</span></div>'
+    + '<div style="display:flex;gap:5px;flex-wrap:wrap">'
+    + ALL_PROCS_TAPAS.map(function(p) {
+        var auto = l.procsAuto.indexOf(p.val) >= 0;
+        var sel = l.procs.indexOf(p.val) >= 0;
+        return '<div class="op-chip' + (sel ? ' sel-proc' : '') + (auto ? ' auto' : '') + '"'
+          + (auto ? ' title="Activado por un componente"' : ' onclick="toggleLineaProc(\'' + p.val + '\')"') + '>' + p.lbl + '</div>';
+      }).join('')
+    + '</div>'
     + '</div>';
   updateTotals();
   autoAjustarCamposSku();
@@ -1587,7 +1629,7 @@ function formSkuInput(kind, el, escribiendo) {
     var st = kind === 'prod' ? l : compDe(l, kind);
     var habiaSel = kind === 'prod' ? (l.desc || l.existencia !== undefined) : (st.desc || st.ex !== undefined);
     st.sku = val; st.desc = ''; if (kind === 'prod') l.existencia = undefined; else st.ex = undefined;
-    if (habiaSel) { renderLineas('lin-in-' + kind); return; }
+    if (habiaSel) { renderLineas('lin-in-' + kind); calcular(); return; }
   }
   var drop = document.getElementById('linDrop');
   if (!drop) {
@@ -1660,6 +1702,7 @@ async function guardar() {
   }).map(function(c) { return c.lbl; });
   if (sinSku.length) { alert('Elige de la lista el SKU de: ' + sinSku.join(', ') + ' (o deja el campo vacío)'); return; }
 
+  sincronizarProcs(l);
   const codigo = await generarCodigo('tapas');
   const texto  = (l.sku || '').trim();
   const enInv  = inventarioCache.find(function(i) { return i.sku === texto; });
