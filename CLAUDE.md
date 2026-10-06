@@ -628,6 +628,17 @@ probable: `nuevaPersonaDesdeLocker()` en gestion.html (Lockers → clic en un lo
 `filtrarPersonasLocker()` que la persona no existe ya (con otra área/código), queda duplicada.
 Antes de usar "+ Nueva persona" desde un locker, buscar primero por nombre en el cuadro de
 autocompletar del locker; si aparece, usar `seleccionarPersonaLocker()` en vez de crear otra.
+
+⚠️ El código también choca con PERSONAS DE BAJA: una ficha inactiva sigue ocupando su `codigo`
+(el listado oculta inactivos por defecto, así que se ve "libre" y no lo está). Desde oct/2026
+el alta de gestion.html lo previene: `siguienteCodigoLibre(area)` sugiere solo el próximo
+código libre del área (prefijos en `AREA_PREFIJO_CODIGO`: P-/T-/S-/M-/B-/MT-/TO-/OF-, máximo
+usado + 1 sobre TODAS las filas, sin distinguir mayúsculas — evita p-57 vs P-57; 2 dígitos en
+B/M/MT/TO/OF como B-03, sin ceros en P/T/S), `cambiarAreaPersona()` la actualiza al cambiar
+el área mientras no se haya escrito otro código a mano, y `guardarPersona()` avisa QUIÉN tiene
+el código escrito (y si está de baja) en vez de mostrar el error crudo `personal_codigo_key`.
+Las áreas `mantenimiento`/`torno`/`oficina` (agregadas en la reconciliación) ya están también
+en el selector de Área, los filtros, la agrupación de la tabla y los colores por defecto.
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
 - `sql/fix_rls_serig_v2.sql` — reparó registro_tiros_serig RLS + columna hora + CHECK velada
 - `sql/solicitudes_parcial_constraint.sql` (19-ago-2026) — CHECK de estado en `solicitudes`

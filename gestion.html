@@ -322,6 +322,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <button class="seg-btn"            id="seg-area-molino" onclick="setFiltroArea('molino')">⚙️ Molino</button>
           <button class="seg-btn"            id="seg-area-bodega" onclick="setFiltroArea('bodega')">📦 Bodega</button>
           <button class="seg-btn"            id="seg-area-moldes" onclick="setFiltroArea('moldes')">🔧 Moldes</button>
+          <button class="seg-btn"            id="seg-area-mantenimiento" onclick="setFiltroArea('mantenimiento')">🛠 Mantenimiento</button>
+          <button class="seg-btn"            id="seg-area-torno" onclick="setFiltroArea('torno')">🔩 Torno</button>
+          <button class="seg-btn"            id="seg-area-oficina" onclick="setFiltroArea('oficina')">🏢 Oficina</button>
           <input class="fi" id="pBuscar" placeholder="🔍 Buscar nombre o código" oninput="renderPersonalGrid()" style="width:180px">
           <label class="fchk" style="font-size:11px;font-weight:600">
             <input type="checkbox" id="pSoloActivos" checked onchange="renderPersonalGrid()"> Solo activos
@@ -431,13 +434,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
           <div class="fg">
             <div class="fl">Área *</div>
-            <select class="fs" id="mpArea" style="width:100%" onchange="toggleTurnoWrap()">
+            <select class="fs" id="mpArea" style="width:100%" onchange="cambiarAreaPersona()">
               <option value="tapas">🏷 Tapas</option>
               <option value="serig">🎨 Serigrafía</option>
               <option value="produccion">🏭 Producción</option>
               <option value="molino">⚙️ Molino</option>
               <option value="bodega">📦 Bodega</option>
               <option value="moldes">🔧 Moldes</option>
+              <option value="mantenimiento">🛠 Mantenimiento</option>
+              <option value="torno">🔩 Torno</option>
+              <option value="oficina">🏢 Oficina</option>
             </select>
           </div>
         </div>
@@ -1418,7 +1424,7 @@ async function renderKpis() {
 
 function setFiltroArea(area) {
   filtroArea = area;
-  ['todos', 'tapas', 'serig', 'produccion', 'molino', 'bodega', 'moldes'].forEach(function(a) {
+  ['todos', 'tapas', 'serig', 'produccion', 'molino', 'bodega', 'moldes', 'mantenimiento', 'torno', 'oficina'].forEach(function(a) {
     document.getElementById('seg-area-' + a).classList.toggle('seg-active', a === area);
   });
   renderPersonalGrid();
@@ -1455,14 +1461,61 @@ var AREA_GRUPOS = [
   { key: 'produccion', label: '🏭 Producción' },
   { key: 'molino', label: '⚙️ Molino' },
   { key: 'bodega', label: '📦 Bodega' },
-  { key: 'moldes', label: '🔧 Moldes' }
+  { key: 'moldes', label: '🔧 Moldes' },
+  { key: 'mantenimiento', label: '🛠 Mantenimiento' },
+  { key: 'torno', label: '🔩 Torno' },
+  { key: 'oficina', label: '🏢 Oficina' }
 ];
 
 // Color del avatar al CREAR una persona nueva (no se toca en ediciones — ver nota RRHH)
 var AREA_COLOR_DEFAULT = {
   tapas: '#1A6B5B', serig: '#5A2D9E', produccion: '#B07D2A',
-  molino: '#92400E', bodega: '#0E7490', moldes: '#475569'
+  molino: '#92400E', bodega: '#0E7490', moldes: '#475569',
+  mantenimiento: '#B45309', torno: '#334155', oficina: '#1D4ED8'
 };
+
+// Prefijo de código por área — convención ya en uso en `personal` (P-55, T-5, S-16, M-04, B-03,
+// MT-01, TO-01, OF-01). Moldes y Molino comparten la serie M-.
+var AREA_PREFIJO_CODIGO = {
+  tapas: 'T', serig: 'S', produccion: 'P', molino: 'M', bodega: 'B',
+  moldes: 'M', mantenimiento: 'MT', torno: 'TO', oficina: 'OF'
+};
+
+// Próximo código libre del área: máximo número usado con ese prefijo (en cualquier formato,
+// "T5"/"T-5"/"t-5", activos E inactivos — una baja sigue ocupando su código) + 1, y se
+// verifica contra TODOS los códigos sin distinguir mayúsculas (así no repite p-57 vs P-57).
+function siguienteCodigoLibre(area) {
+  var prefijo = AREA_PREFIJO_CODIGO[area] || 'X';
+  var re = new RegExp('^' + prefijo + '-?(\\d+)$', 'i');
+  var max = 0, usados = {};
+  personalTodos.forEach(function(p) {
+    var c = (p.codigo || '').trim();
+    usados[c.toLowerCase()] = true;
+    var m = c.match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  });
+  // B-03 / M-04 / MT-01 / TO-01 / OF-05 van con 2 dígitos; P-55, T-5, S-16 no
+  var dosDigitos = ['B', 'M', 'MT', 'TO', 'OF'].indexOf(prefijo) !== -1;
+  function formato(n) { return prefijo + '-' + (dosDigitos && n < 10 ? '0' + n : n); }
+  var n = max + 1;
+  while (usados[formato(n).toLowerCase()]) n++;
+  return formato(n);
+}
+
+var mpCodigoSugerido = '';
+
+// Cambio de área en el formulario: además del campo Turno, si es una persona NUEVA y el
+// código sigue vacío o es la sugerencia anterior, se actualiza a la sugerencia del área nueva
+// (un código que escribió a mano no se pisa).
+function cambiarAreaPersona() {
+  toggleTurnoWrap();
+  if (mpEditId) return;
+  var inp = document.getElementById('mpCodigo');
+  if (inp.value === '' || inp.value === mpCodigoSugerido) {
+    mpCodigoSugerido = siguienteCodigoLibre(document.getElementById('mpArea').value);
+    inp.value = mpCodigoSugerido;
+  }
+}
 
 var AREA_LBL_MAP = {};
 AREA_GRUPOS.forEach(function(a) { AREA_LBL_MAP[a.key] = a.label; });
@@ -1589,9 +1642,10 @@ function abrirNuevaPersona() {
   document.getElementById('mpTitle').textContent = 'Nueva persona';
   document.getElementById('mpNombre').value = '';
   document.getElementById('mpIniciales').value = '';
-  document.getElementById('mpCodigo').value = '';
-  document.getElementById('mpCodigo').disabled = false;
   document.getElementById('mpArea').value = 'tapas';
+  mpCodigoSugerido = siguienteCodigoLibre('tapas');
+  document.getElementById('mpCodigo').value = mpCodigoSugerido;
+  document.getElementById('mpCodigo').disabled = false;
   document.getElementById('mpTurno').value = '';
   toggleTurnoWrap();
   document.getElementById('mpRolBase').value = 'operador';
@@ -1699,6 +1753,18 @@ async function guardarPersona() {
   if (!iniciales) { showToast('⚠️ Iniciales requeridas', '#B83232'); return; }
   if (!codigo)    { showToast('⚠️ Código requerido', '#B83232'); return; }
 
+  // El código es único en toda la tabla — activos E inactivos (una baja sigue ocupando el suyo)
+  // y sin distinguir mayúsculas. Se avisa quién lo tiene antes de que lo rechace la base.
+  if (!mpEditId) {
+    var dup = personalTodos.find(function(p) { return (p.codigo || '').trim().toLowerCase() === codigo.toLowerCase(); });
+    if (dup) {
+      showToast('⚠️ El código ' + codigo + ' ya lo tiene ' + dup.nombre + (dup.activo ? '' : ' (de baja)') +
+        ' — prueba con ' + siguienteCodigoLibre(area), '#B83232');
+      return;
+    }
+  }
+  var eraEdicion = !!mpEditId;
+
   var payload = {
     nombre: nombre, iniciales: iniciales, area: area, rol: rolBase,
     proceso_hab: proceso, telefono: telefono, fecha_nacimiento: fechaNacimiento, activo: activo, turno_produccion: turnoProduccion,
@@ -1723,9 +1789,13 @@ async function guardarPersona() {
     if (r.error) throw r.error;
     cerrarModalPersona();
     await cargarPersonal();
-    showToast(mpEditId ? '✅ Persona actualizada' : '✅ Persona creada');
+    showToast(eraEdicion ? '✅ Persona actualizada' : '✅ Persona creada');
   } catch (e) {
-    showToast('❌ Error: ' + e.message, '#B83232');
+    if (e && (e.code === '23505' || /personal_codigo_key/.test(e.message || ''))) {
+      showToast('⚠️ Ese código ya está en uso — prueba con ' + siguienteCodigoLibre(area), '#B83232');
+    } else {
+      showToast('❌ Error: ' + e.message, '#B83232');
+    }
   }
 }
 
