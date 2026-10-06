@@ -215,6 +215,70 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .inicio-wrap{flex:1;overflow-y:auto;padding:20px 24px}
 .inicio-dos-col{display:flex;flex-direction:column;gap:16px}
 .inicio-sec{min-width:0}
+/* ── Inicio: alertas de bajo stock (Base / Contratapa) ── */
+.env-wrap{border-radius:10px;border:2px solid #d97706;background:var(--card);overflow:hidden}
+.env-hdr{padding:9px 14px;background:#fffbeb;border-bottom:1px solid #fde68a;display:flex;align-items:center;gap:10px;flex-wrap:nowrap;cursor:pointer;user-select:none}
+.env-wrap.collapsed .env-hdr{border-bottom:none}
+.env-hdr-title{font-family:var(--display);font-size:13px;font-weight:800;color:#92400e;white-space:nowrap}
+.env-hdr-sub{font-size:11px;color:#a16207;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.env-wrap.collapsed .env-hdr-sub{display:none}
+.env-hdr-chev{font-size:11px;color:#92400e;opacity:.6;transition:transform .2s;flex-shrink:0}
+.env-wrap.collapsed .env-hdr-chev{transform:rotate(-90deg)}
+.env-wrap.critico-hay{border-color:#FECACA}
+.env-wrap.critico-hay .env-hdr{background:#FEF2F2;border-bottom-color:#FECACA}
+.env-wrap.critico-hay .env-hdr-title,.env-wrap.critico-hay .env-hdr-chev,.env-wrap.critico-hay .env-hdr-fecha{color:#B83232}
+.env-wrap.critico-hay .env-hdr-sub{color:#991b1b}
+.env-hdr-fecha{font-size:9px;color:#92400e;opacity:.65;white-space:nowrap;font-weight:500;flex-shrink:0}
+.env-refresh{font-size:13px;background:transparent;border:1px solid #d97706;border-radius:6px;padding:2px 7px;cursor:pointer;color:#92400e;line-height:1}
+.env-body{padding:10px 14px 14px;overflow:auto;max-height:440px;transition:max-height .25s ease}
+.env-wrap.collapsed .env-body{max-height:0;padding:0;overflow:hidden}
+.env-wrap.collapsed .env-footer{display:none}
+.env-table{width:100%;border-collapse:collapse;font-size:11px}
+.env-2col{display:grid;grid-template-columns:1fr 1fr;align-items:start}
+.env-2col>div{min-width:0}
+.env-2col>div+div{border-left:1px solid var(--border)}
+.env-table th{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);padding:4px 8px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap;background:var(--bg)}
+.env-table th.r{text-align:right}
+.env-table td{padding:5px 8px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--ink)}
+.env-table td.r{text-align:right;font-family:var(--mono);font-size:10.5px}
+.env-table tr:last-child td{border-bottom:none}
+.env-badge{display:inline-block;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:800;letter-spacing:.3px;white-space:nowrap}
+.env-ok{background:#dcfce7;color:#15803d}
+.env-parcial{background:#fef9c3;color:#92400e}
+.env-cero{background:#fee2e2;color:#991b1b}
+.env-missing{background:#f1f5f9;color:#64748b}
+.env-faltante{font-family:var(--mono);font-size:12px;font-weight:800;color:#b91c1c}
+.env-footer{display:flex;align-items:center;gap:12px;padding:8px 14px;border-top:1px solid var(--border);background:var(--bg2);flex-wrap:wrap}
+.env-footer-kpi{font-size:10px;color:var(--gray);white-space:nowrap}
+.env-footer-kpi b{font-size:13px;color:var(--ink)}
+.env-huecos{margin-top:10px;padding:8px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:10px;color:#991b1b}
+@media(max-width:900px){.env-2col{grid-template-columns:1fr}.env-2col>div+div{border-left:none}}
+
+/* ── Inicio: Fichas de Trabajo (grilla cliente × mes) ── */
+.fich-wrap{border-radius:12px;border:2px solid var(--teal);overflow:hidden;background:var(--card)}
+.fich-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--teal-xl);border-bottom:1px solid var(--teal-l)}
+.fich-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--teal)}
+.fich-count{font-size:11px;color:var(--gray)}
+.fich-body{padding:12px;overflow-x:auto}
+.fich-grid{display:grid;gap:14px;align-items:start}
+.fich-cell{min-width:0}
+.fich-grp-hdr{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:6px 10px;background:var(--bg2);border-radius:8px 8px 0 0;border:1px solid var(--border);border-bottom:none}
+.fich-grp-cli{font-size:12px;font-weight:800;color:var(--ink)}
+.fich-grp-per{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--teal)}
+.fich-grp-n{font-size:10px;color:var(--gray);margin-left:auto;white-space:nowrap}
+.fich-grp-cards{display:flex;flex-direction:column;gap:8px;padding:8px;border:1px solid var(--border);border-radius:0 0 8px 8px;background:var(--bg)}
+.fich-card{background:var(--card);border-radius:8px;border:1px solid var(--border);border-left:5px solid var(--red);padding:9px 11px;cursor:pointer;transition:box-shadow .15s}
+.fich-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.fich-card.tier-1{border-left-color:#E0A800}
+.fich-card.tier-2{border-left-color:#16A34A;background:#F0FDF4}
+.fich-top{display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap}
+.fich-cod{font-family:var(--mono);font-size:11px;font-weight:800;color:var(--teal)}
+.fich-desc{font-size:12px;font-weight:600;margin-top:4px;line-height:1.3}
+.fich-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--gray);margin-top:4px}
+.fich-meta b{color:var(--ink);font-family:var(--mono)}
+.fich-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.fich-chip{font-family:var(--mono);font-size:10px;background:var(--teal-xl);color:var(--teal);border-radius:5px;padding:1px 7px}
+
 
 /* Personal y Roles — termómetro de producción */
 .mtx-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px}
@@ -369,6 +433,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="inicio-wrap">
         <div class="inicio-dos-col">
           <div class="inicio-sec">
+            <div id="alertaBaseTapas"></div>
+          </div>
+          <div class="inicio-sec">
+            <div id="alertaContratapaTapas"></div>
+          </div>
+          <div class="inicio-sec">
             <div id="asistGridTapas"></div>
           </div>
           <div class="inicio-sec">
@@ -376,6 +446,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
           <div class="inicio-sec">
             <div id="prodMensualTapasInicio"></div>
+          </div>
+          <div class="inicio-sec">
+            <div id="fichasTapas"></div>
           </div>
         </div>
       </div>
@@ -870,7 +943,7 @@ async function cargarInventario() {
     var BATCH = 1000;
     while (true) {
       const { data, error } = await db.from('inventario')
-        .select('sku, descripcion, existencia')
+        .select('sku, descripcion, existencia, bodega')
         .eq('activo', true).range(desde, desde + BATCH - 1);
       if (error) throw error;
       todos = todos.concat(data || []);
@@ -918,6 +991,8 @@ async function cargarSolicitudes() {
         id: s.id,
         dbId: s.id,
         id_display: s.codigo,
+        createdAt: s.created_at,
+        periodoEfectivo: s.periodo_efectivo || '',
         area: s.area,
         cliente: s.cliente_nombre,
         area_sol: s.area_solicitante,
@@ -932,7 +1007,10 @@ async function cargarSolicitudes() {
           existencia: l.existencia_snap,
           procs: l.procesos || [],
           operadores: l.operadores_ids || [],
-          sku_base: l.sku_base || ''
+          sku_base: l.sku_base || '',
+          estado: l.estado || '',
+          skuBase: l.sku_base || '',
+          skuContratapa: l.sku_contratapa || ''
         })),
         cant: lineasData.reduce((sum, l) => sum + (l.cantidad || 0), 0),
         fecha_lim: s.fecha_limite || '',
@@ -947,6 +1025,7 @@ async function cargarSolicitudes() {
     
     renderListas();
     refreshKPIs();
+    renderInicioPedidosTapas();
   } catch(e) {
     console.error('Error cargando solicitudes:', e);
     showToast('Error al cargar solicitudes', '#B83232');
@@ -986,11 +1065,11 @@ function renderListas() {
 function estadoPill(estado) {
   const clases = {
     'nueva': 'pill-nueva', 'programada': 'pill-programada',
-    'proceso': 'pill-proceso', 'lista': 'pill-lista', 'entregada': 'pill-entregada'
+    'proceso': 'pill-proceso', 'parcial': 'pill-proceso', 'lista': 'pill-lista', 'entregada': 'pill-entregada'
   };
   const textos = {
     'nueva': '🟡 Nueva', 'programada': '📅 Programada',
-    'proceso': '🟢 En proceso', 'lista': '✅ Lista', 'entregada': '📦 Entregada'
+    'proceso': '🟢 En proceso', 'parcial': '🟡 Parcial', 'lista': '✅ Lista', 'entregada': '📦 Entregada'
   };
   return `<span class="pill ${clases[estado] || 'pill-nueva'}">${textos[estado] || escHtml(estado)}</span>`;
 }
@@ -1584,7 +1663,7 @@ function switchTab(tab) {
 
   if (tab === 'personal')       renderPersonal();
   if (tab === 'movimientos')    cargarMovimientos();
-  if (tab === 'inicio')         { cargarTermometro(); cargarAsistenciaTapas(); renderProdMensualTapas('inicio'); }
+  if (tab === 'inicio')         { renderInicioPedidosTapas(); cargarTermometro(); cargarAsistenciaTapas(); renderProdMensualTapas('inicio'); }
   if (tab === 'productividad')  cargarProductividad();
   if (tab === 'trazabilidad')   cargarTrazabilidad();
 }
@@ -1720,6 +1799,297 @@ function renderTermometro() {
     : '<div class="empty">📭 No hay operarios activos en Tapas</div>';
   html += '</div>';
   wrap.innerHTML = html;
+}
+
+// ══ INICIO — ALERTAS DE BAJO STOCK (Base / Contratapa) ═══════
+// Mismo patrón que "Bajo Stock — Envases Base" de Serigrafía: suma lo que piden las
+// fichas vivas por SKU de componente, descuenta lo que ya salió de Bodega para esas
+// mismas fichas y lo compara contra la existencia (B2). Los componentes se especifican
+// en cada ficha (solicitud_lineas): `sku_base` (ya existe) y `sku_contratapa`.
+var ESTADOS_VIVOS_TAPAS = ['nueva', 'proceso', 'parcial'];
+var COMPONENTES_ALERTA = [
+  { tipo: 'base',       campo: 'skuBase',       titulo: 'Base',       icono: '📦', slot: 'alertaBaseTapas',       huecos: true  },
+  { tipo: 'contratapa', campo: 'skuContratapa', titulo: 'Contratapa', icono: '🔘', slot: 'alertaContratapaTapas', huecos: false }
+];
+
+function fichaViva(s) { return ESTADOS_VIVOS_TAPAS.indexOf(s.estado) >= 0; }
+
+// Busca un SKU en inventario dando prioridad a Bodega 2 (igual que serigrafia.html)
+function invB2DeTapas(sku) {
+  return inventarioCache.find(function(i) { return i.sku === sku && (!i.bodega || i.bodega === 'B2'); })
+      || inventarioCache.find(function(i) { return i.sku === sku; })
+      || null;
+}
+
+// Unidades que YA salieron de Bodega para las fichas vivas, por SKU
+async function cargarSalidasFichasVivas() {
+  var ids = solicitudes.filter(fichaViva).map(function(s) { return s.dbId; });
+  var mapa = {};
+  if (!ids.length) return mapa;
+  try {
+    var r = await db.from('movimientos_materiales')
+      .select('solicitud_id, sku_original, cantidad')
+      .eq('tipo', 'salida_bodega').in('solicitud_id', ids);
+    if (!r.error && r.data) {
+      r.data.forEach(function(m) {
+        var k = m.sku_original || '';
+        if (k) mapa[k] = (mapa[k] || 0) + (m.cantidad || 0);
+      });
+    }
+  } catch(e) { /* sin salidas: se calcula sobre el total pedido */ }
+  return mapa;
+}
+
+function fmtNumTapas(n) { return n === null || n === undefined ? '—' : n.toLocaleString(); }
+
+function badgeAlertaTapas(r) {
+  if (r.stock === null) return '<span class="env-badge env-missing">❓ sin SKU</span>';
+  if (r.faltante === 0) return '<span class="env-badge env-ok">✅ alcanza</span>';
+  if (r.stock === 0)    return '<span class="env-badge env-cero">🔴 sin stock</span>';
+  return '<span class="env-badge env-parcial">🟡 parcial</span>';
+}
+
+function buildFilaAlertaTapas(r) {
+  var pedTxt = r.pedidos.map(function(p) { return p.codigo + ' · ' + p.cliente + ' (' + p.cant.toLocaleString() + ')'; }).join('\n');
+  return '<tr>'
+    + '<td style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--teal);white-space:nowrap">' + escHtml(r.sku) + '</td>'
+    + '<td style="white-space:normal;line-height:1.3">' + escHtml(r.desc) + '</td>'
+    + '<td class="r" title="' + escHtml(pedTxt) + '">' + r.pedidos.length + '</td>'
+    + '<td class="r"><b>' + fmtNumTapas(r.neto) + '</b></td>'
+    + '<td class="r" style="color:' + (r.stock === 0 ? '#b91c1c' : r.stock === null ? '#9ca3af' : '#374151') + '">' + fmtNumTapas(r.stock) + '</td>'
+    + '<td class="r">' + (r.faltante > 0 ? '<span class="env-faltante">' + fmtNumTapas(r.faltante) + '</span>' : '<span style="color:#9ca3af">—</span>') + '</td>'
+    + '<td>' + badgeAlertaTapas(r) + '</td>'
+    + '</tr>';
+}
+
+function buildTablaAlertaTapas(arr) {
+  return '<table class="env-table"><thead><tr>'
+    + '<th>SKU</th><th>Descripción</th><th class="r">Ped.</th><th class="r">Neto pend.</th>'
+    + '<th class="r">Stock B2</th><th class="r">Pedir</th><th>Estado</th>'
+    + '</tr></thead><tbody>' + arr.map(buildFilaAlertaTapas).join('') + '</tbody></table>';
+}
+
+// Una fila por SKU de componente, con las fichas vivas que lo piden
+function calcularFilasAlertaTapas(comp, salidas) {
+  var mapa = {};
+  solicitudes.forEach(function(s) {
+    if (!fichaViva(s)) return;
+    s.lineas.forEach(function(l) {
+      if ((l.estado || s.estado) === 'lista') return;
+      var k = String(l[comp.campo] || '').trim();
+      if (!k) return;
+      if (!mapa[k]) mapa[k] = { sku: k, total: 0, pedidos: {} };
+      mapa[k].total += (l.cant || 0);
+      if (!mapa[k].pedidos[s.id]) mapa[k].pedidos[s.id] = { codigo: s.id_display || s.id.slice(0, 8), cliente: s.cliente || '—', cant: 0 };
+      mapa[k].pedidos[s.id].cant += (l.cant || 0);
+    });
+  });
+  var rows = Object.keys(mapa).map(function(k) {
+    var e = mapa[k];
+    var neto = Math.max(e.total - (salidas[k] || 0), 0);
+    var inv = invB2DeTapas(k);
+    var stock = inv ? (inv.existencia || 0) : null;
+    return {
+      sku: k, desc: (inv && inv.descripcion) || '—',
+      pedidos: Object.keys(e.pedidos).map(function(id) { return e.pedidos[id]; }),
+      neto: neto, stock: stock,
+      faltante: stock === null ? neto : Math.max(neto - stock, 0)
+    };
+  });
+  // 🔴 sin stock → 🟡 parcial → ✅ alcanza → ❓ sin SKU
+  function tier(r) {
+    if (r.stock === 0 && r.faltante > 0) return 0;
+    if (r.faltante > 0) return 1;
+    if (r.stock !== null) return 2;
+    return 3;
+  }
+  rows.sort(function(a, b) {
+    var ta = tier(a), tb = tier(b);
+    if (ta !== tb) return ta - tb;
+    return ta < 2 ? b.faltante - a.faltante : b.neto - a.neto;
+  });
+  return rows;
+}
+
+function buildAlertaComponenteTapas(comp, rows) {
+  var mesHdr = new Date(fechaHoy() + 'T12:00:00').toLocaleString('es-GT', { month: 'long', year: 'numeric' });
+  var nFalt = rows.filter(function(r) { return r.faltante > 0; }).length;
+  var nOk = rows.filter(function(r) { return r.faltante === 0 && r.stock !== null; }).length;
+  var totFalt = rows.reduce(function(s, r) { return s + r.faltante; }, 0);
+  var totNeto = rows.reduce(function(s, r) { return s + r.neto; }, 0);
+  var critico = rows.some(function(r) { return r.stock === 0 && r.faltante > 0; });
+  var ahora = new Date();
+  var fechaInv = 'Inv. B2 · ' + String(ahora.getDate()).padStart(2, '0') + '/' + String(ahora.getMonth() + 1).padStart(2, '0') + '/' + ahora.getFullYear();
+
+  var cuerpo;
+  if (!rows.length) {
+    cuerpo = '<table class="env-table"><tbody><tr><td style="text-align:center;padding:16px;color:var(--gray);font-style:italic">'
+      + 'Sin fichas activas con ' + comp.titulo.toLowerCase() + ' asignada</td></tr></tbody></table>';
+  } else {
+    var mitad = Math.ceil(rows.length / 2);
+    cuerpo = '<div class="env-2col"><div>' + buildTablaAlertaTapas(rows.slice(0, mitad)) + '</div>'
+      + '<div>' + buildTablaAlertaTapas(rows.slice(mitad)) + '</div></div>';
+  }
+
+  var huecosHtml = '';
+  if (comp.huecos) {
+    var huecos = [];
+    solicitudes.forEach(function(s) {
+      if (!fichaViva(s)) return;
+      s.lineas.forEach(function(l) {
+        if ((l.estado || s.estado) === 'lista') return;
+        if (!String(l[comp.campo] || '').trim()) huecos.push((s.id_display || s.id.slice(0, 8)) + ' · ' + (s.cliente || '?'));
+      });
+    });
+    if (huecos.length) {
+      huecosHtml = '<div class="env-huecos">⚠️ <b>' + huecos.length + ' línea' + (huecos.length !== 1 ? 's' : '') + ' sin ' + comp.titulo.toLowerCase()
+        + '</b> — no entran en el cálculo. <span style="color:#9ca3af">' + escHtml(huecos.slice(0, 3).join(', ')) + (huecos.length > 3 ? ' +más…' : '') + '</span></div>';
+    }
+  }
+
+  var colapsado = false;
+  try { colapsado = localStorage.getItem('alerta_tapas_' + comp.tipo + '_collapsed') === '1'; } catch(e) {}
+
+  return '<div class="env-wrap' + (critico ? ' critico-hay' : '') + (colapsado ? ' collapsed' : '') + '">'
+    + '<div class="env-hdr" onclick="toggleAlertaTapas(event,\'' + comp.tipo + '\')">'
+    +   '<span style="font-size:17px">' + comp.icono + '</span>'
+    +   '<span class="env-hdr-title">Bajo Stock — ' + comp.titulo + ' para Tapas</span>'
+    +   '<span class="env-hdr-sub">Fichas activas · vs B2 · ' + escHtml(mesHdr) + '</span>'
+    +   '<span class="env-hdr-fecha">' + fechaInv + '</span>'
+    +   '<button class="env-refresh" onclick="event.stopPropagation();refrescarAlertasTapas(this)" title="Recargar inventario">↻</button>'
+    +   '<span class="env-hdr-chev" style="margin-left:auto">▾</span>'
+    + '</div>'
+    + '<div class="env-body">' + cuerpo + huecosHtml + '</div>'
+    + '<div class="env-footer">'
+    +   '<span class="env-footer-kpi"><b>' + rows.length + '</b> ' + comp.titulo.toLowerCase() + 's</span>'
+    +   '<span class="env-footer-kpi" style="color:#b91c1c"><b>' + nFalt + '</b> con faltante</span>'
+    +   '<span class="env-footer-kpi" style="color:#15803d"><b>' + nOk + '</b> ✅ alcanzan</span>'
+    +   '<span class="env-footer-kpi"><b>' + fmtNumTapas(totNeto) + '</b> neto pend.</span>'
+    +   '<span class="env-footer-kpi"><b>' + fmtNumTapas(totFalt) + '</b> und a pedir</span>'
+    + '</div>'
+    + '</div>';
+}
+
+function toggleAlertaTapas(ev, tipo) {
+  var wrap = ev.currentTarget.closest('.env-wrap');
+  if (!wrap) return;
+  wrap.classList.toggle('collapsed');
+  try { localStorage.setItem('alerta_tapas_' + tipo + '_collapsed', wrap.classList.contains('collapsed') ? '1' : '0'); } catch(e) {}
+}
+
+async function renderAlertasTapas() {
+  if (!document.getElementById('alertaBaseTapas')) return;
+  var salidas = await cargarSalidasFichasVivas();
+  COMPONENTES_ALERTA.forEach(function(comp) {
+    var el = document.getElementById(comp.slot);
+    if (el) el.innerHTML = buildAlertaComponenteTapas(comp, calcularFilasAlertaTapas(comp, salidas));
+  });
+}
+
+async function refrescarAlertasTapas(btn) {
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+  await cargarInventario();
+  await renderAlertasTapas();
+}
+
+// ══ INICIO — FICHAS DE TRABAJO (grilla cliente × mes) ════════
+// Mismas solicitudes de la pestaña Pedidos (area='tapas'), ordenadas como el "Sin asignar"
+// de Serigrafía: cada cliente es una columna y cada mes una fila, de modo que un mismo mes
+// queda alineado entre clientes. Mes = periodo_efectivo (override manual) o mes de creación,
+// en hora de Guatemala. Las fichas "lista" solo se muestran en el mes en curso.
+var MESES_FICHA_L = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+function periodoFichaTapas(s) {
+  var key = s.periodoEfectivo;
+  if (!key) {
+    var d = new Date(s.createdAt);
+    if (isNaN(d.getTime())) return { key: '0000-00', largo: 'SIN FECHA' };
+    key = new Date(d.getTime() - 6 * 3600 * 1000).toISOString().slice(0, 7);
+  }
+  var y = key.slice(0, 4), m = parseInt(key.slice(5, 7), 10) - 1;
+  return { key: key, largo: (MESES_FICHA_L[m] || '—') + ' ' + y };
+}
+
+function tierFichaTapas(s) { return s.estado === 'lista' ? 2 : (s.estado === 'parcial' ? 1 : 0); }
+
+function buildFichaCardTapas(s) {
+  var tier = tierFichaTapas(s);
+  var comps = '';
+  var l0 = s.lineas[0] || {};
+  if (l0.skuBase)       comps += '<span class="fich-chip">📦 ' + escHtml(l0.skuBase) + '</span>';
+  if (l0.skuContratapa) comps += '<span class="fich-chip">🔘 ' + escHtml(l0.skuContratapa) + '</span>';
+  return '<div class="fich-card tier-' + tier + '" onclick="abrirFichaTapas(\'' + escHtml(s.id) + '\')">'
+    + '<div class="fich-top"><span class="fich-cod">' + escHtml(s.id_display || s.id.slice(0, 8)) + '</span>'
+    +   '<span>' + estadoPill(s.estado) + ' ' + prioridadPill(s.prio) + '</span></div>'
+    + '<div class="fich-desc">' + escHtml(s.sku) + ' — ' + escHtml(s.desc) + '</div>'
+    + '<div class="fich-meta"><b>' + s.cant.toLocaleString() + ' und</b><span>🗓 ' + escHtml(s.fecha_lim || '—') + '</span></div>'
+    + (comps ? '<div class="fich-chips">' + comps + '</div>' : '')
+    + (s.prog > 0 ? '<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:' + s.prog + '%"></div></div><div class="pr-pct">' + s.prog + '%</div></div>' : '')
+    + '</div>';
+}
+
+function abrirFichaTapas(id) {
+  switchTab('tapas');
+  mostrarDetalle(id);
+}
+
+function renderFichasTapas() {
+  var wrap = document.getElementById('fichasTapas');
+  if (!wrap) return;
+  var perHoy = periodoFichaTapas({ createdAt: new Date().toISOString() }).key;
+
+  var grupos = {}, grupoKeys = [];
+  solicitudes.forEach(function(s) {
+    var per = periodoFichaTapas(s);
+    if (s.estado === 'lista' && per.key !== perHoy) return;
+    var cli = s.cliente || '—';
+    var gk = cli + '§' + per.key;
+    if (!grupos[gk]) { grupos[gk] = { cli: cli, per: per, items: [] }; grupoKeys.push(gk); }
+    grupos[gk].items.push(s);
+  });
+
+  var colKeys = [], colSeen = {}, rowKeys = [], rowSeen = {};
+  grupoKeys.forEach(function(gk) {
+    var g = grupos[gk];
+    if (!colSeen[g.cli]) { colSeen[g.cli] = true; colKeys.push(g.cli); }
+    if (!rowSeen[g.per.key]) { rowSeen[g.per.key] = true; rowKeys.push(g.per.key); }
+  });
+  colKeys.sort(function(a, b) { return a.localeCompare(b); });
+  rowKeys.sort(function(a, b) { return a < b ? 1 : -1; }); // mes más reciente primero
+
+  var celdas = '';
+  rowKeys.forEach(function(rk, ri) {
+    colKeys.forEach(function(ck, ci) {
+      var g = grupos[ck + '§' + rk];
+      if (!g) return; // sin fichas de ese cliente ese mes: celda en blanco
+      var items = g.items.slice().sort(function(a, b) {
+        return tierFichaTapas(a) - tierFichaTapas(b) || String(a.createdAt).localeCompare(String(b.createdAt));
+      });
+      var und = items.reduce(function(sum, it) { return sum + it.cant; }, 0);
+      celdas += '<div class="fich-cell" style="grid-column:' + (ci + 1) + ';grid-row:' + (ri + 1) + '">'
+        + '<div class="fich-grp-hdr"><span class="fich-grp-cli">' + escHtml(g.cli) + '</span>'
+        +   '<span class="fich-grp-per">' + escHtml(g.per.largo) + '</span>'
+        +   '<span class="fich-grp-n">' + items.length + ' ficha' + (items.length !== 1 ? 's' : '') + ' · ' + und.toLocaleString() + ' und</span></div>'
+        + '<div class="fich-grp-cards">' + items.map(buildFichaCardTapas).join('') + '</div>'
+        + '</div>';
+    });
+  });
+
+  var total = solicitudes.length;
+  wrap.innerHTML = '<div class="fich-wrap">'
+    + '<div class="fich-hdr"><span class="fich-title">📋 Fichas de Trabajo</span>'
+    +   '<span class="fich-count">' + grupoKeys.reduce(function(n, gk) { return n + grupos[gk].items.length; }, 0) + ' de ' + total + '</span>'
+    +   '<button class="btn btn-t btn-sm" style="margin-left:auto" onclick="abrirForm()">+ Nueva Solicitud</button></div>'
+    + '<div class="fich-body">'
+    + (colKeys.length
+        ? '<div class="fich-grid" style="grid-template-columns:repeat(' + colKeys.length + ',minmax(300px,380px))">' + celdas + '</div>'
+        : '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay fichas de trabajo</div>')
+    + '</div></div>';
+}
+
+function renderInicioPedidosTapas() {
+  renderFichasTapas();
+  renderAlertasTapas();
 }
 
 // ══ INICIO — ASISTENCIA MENSUAL ══════════════════════════════
