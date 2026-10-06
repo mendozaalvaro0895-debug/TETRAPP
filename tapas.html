@@ -412,17 +412,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <span class="tbadge tb-teal" id="cnt-tapas">0</span>
     </div>
     <div class="tabs-r">
+      <button class="btn btn-g btn-sm" onclick="imprimirFichasTapas()" title="Imprimir fichas activas por cliente">🖨 Imprimir</button>
       <button class="btn btn-t btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>
-      <a href="comandas.html" class="btn btn-g btn-sm" style="text-decoration:none">📋 Comandas</a>
-      <div style="position:relative">
-        <button class="btn btn-g btn-sm" id="movDropBtn" onclick="toggleMovDrop(event)">⬆⬇ Movimiento ▾</button>
-        <div id="movDrop" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:#1A1A19;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:5px;min-width:210px;box-shadow:0 8px 24px rgba(0,0,0,.45);z-index:999">
-          <div onclick="movDropSelect('salida')"   style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:7px;color:rgba(255,255,255,.85);font-size:12px;font-weight:600;cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,.09)'" onmouseout="this.style.background=''">📤 Salida de Bodega</div>
-          <div onclick="movDropSelect('ingreso')"  style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:7px;color:rgba(255,255,255,.85);font-size:12px;font-weight:600;cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,.09)'" onmouseout="this.style.background=''">📦 Ingreso PT</div>
-          <div style="height:1px;background:rgba(255,255,255,.1);margin:3px 6px"></div>
-          <div onclick="movDropSelect('rechazos')" style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:7px;color:rgba(255,255,255,.85);font-size:12px;font-weight:600;cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,.09)'" onmouseout="this.style.background=''">⛔ Registrar Rechazo</div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -2092,6 +2083,122 @@ function renderInicioPedidosTapas() {
   renderAlertasTapas();
 }
 
+// ══ IMPRIMIR — FICHAS DE TRABAJO ACTIVAS (PDF por cliente) ════
+// Todas las fichas vivas (nueva / proceso / parcial), agrupadas por cliente A→Z. Dentro de
+// cada cliente: rojo → amarillo → verde, y por antigüedad. "Entregado" = suma de ingresos
+// a PT (movimientos_materiales entrada_pt) de cada ficha. Mismo mecanismo que Serigrafía:
+// ventana nueva + window.print() (el navegador la guarda como PDF).
+async function imprimirFichasTapas() {
+  var w = window.open('', '_blank'); // se abre ya, dentro del clic, para que no lo bloquee el navegador
+  if (!w) { showToast('Activa las ventanas emergentes para exportar', '#92400e'); return; }
+  w.document.write('<p style="font-family:Arial;padding:20px">Generando PDF…</p>');
+
+  var activas = solicitudes.filter(fichaViva);
+  if (!activas.length) { w.close(); showToast('No hay fichas activas para imprimir', '#92400e'); return; }
+
+  var entregado = {};
+  try {
+    var r = await db.from('movimientos_materiales').select('solicitud_id, cantidad')
+      .eq('tipo', 'entrada_pt').in('solicitud_id', activas.map(function(s) { return s.dbId; }));
+    (r.data || []).forEach(function(m) { entregado[m.solicitud_id] = (entregado[m.solicitud_id] || 0) + (m.cantidad || 0); });
+  } catch(e) { /* sin ingresos: se muestra solo la cantidad pedida */ }
+
+  var TIER = [
+    { bg: '#fee2e2', clr: '#991b1b', lbl: '🔴 ROJO' },
+    { bg: '#fef3c7', clr: '#92400e', lbl: '🟡 AMARILLO' },
+    { bg: '#dcfce7', clr: '#166534', lbl: '🟢 VERDE' }
+  ];
+  var ESTADO = { nueva: 'NUEVA', proceso: 'EN PROCESO', parcial: 'PARCIAL', lista: 'COMPLETADO' };
+
+  function filaFicha(s) {
+    var ent = entregado[s.dbId] || 0;
+    var entTxt = ent > 0 ? ent.toLocaleString() + ' / ' + s.cant.toLocaleString() : s.cant.toLocaleString();
+    var desc = s.lineas.length
+      ? s.lineas.map(function(l) { return (l.sku ? escHtml(l.sku) + ' · ' : '') + escHtml(l.desc || ''); }).join('<br>')
+      : escHtml(s.desc || '—');
+    var comps = s.lineas.map(function(l) {
+      var c = [];
+      if (l.skuBase) c.push('Base ' + escHtml(l.skuBase));
+      if (l.skuContratapa) c.push('Contratapa ' + escHtml(l.skuContratapa));
+      return c.join(' · ');
+    }).filter(Boolean).join('<br>');
+    var t = TIER[tierFichaTapas(s)];
+    return '<tr>'
+      + '<td class="cod">' + escHtml(s.id_display || s.id.slice(0, 8)) + '</td>'
+      + '<td>' + desc + '</td>'
+      + '<td class="sm">' + (comps || '—') + '</td>'
+      + '<td class="r"><b>' + entTxt + '</b></td>'
+      + '<td class="c">' + escHtml(s.fecha_lim || '—') + '</td>'
+      + '<td class="c">' + (s.prog > 0 ? s.prog + '%' : '—') + '</td>'
+      + '<td class="c"><span class="tag" style="background:' + t.bg + ';color:' + t.clr + '">' + t.lbl + ' · ' + (ESTADO[s.estado] || escHtml(s.estado)) + '</span></td>'
+      + '</tr>';
+  }
+
+  var porCliente = {};
+  activas.forEach(function(s) {
+    var c = s.cliente || '(Sin cliente)';
+    if (!porCliente[c]) porCliente[c] = [];
+    porCliente[c].push(s);
+  });
+  var clientes = Object.keys(porCliente).sort(function(a, b) { return a.localeCompare(b); });
+
+  var cuenta = [0, 0, 0];
+  activas.forEach(function(s) { cuenta[tierFichaTapas(s)]++; });
+  var totalUnd = activas.reduce(function(sum, s) { return sum + s.cant; }, 0);
+
+  var seccion = clientes.map(function(cli) {
+    var items = porCliente[cli].slice().sort(function(a, b) {
+      return tierFichaTapas(a) - tierFichaTapas(b) || String(a.createdAt).localeCompare(String(b.createdAt));
+    });
+    var und = items.reduce(function(sum, s) { return sum + s.cant; }, 0);
+    var ent = items.reduce(function(sum, s) { return sum + (entregado[s.dbId] || 0); }, 0);
+    var pct = und > 0 ? Math.round(ent / und * 100) : 0;
+    return '<div class="sec"><h2>' + escHtml(cli) + ' <span class="badge">' + items.length + ' ficha' + (items.length !== 1 ? 's' : '')
+      + ' · ' + und.toLocaleString() + ' und · ' + pct + '% entregado</span></h2>'
+      + '<table><thead><tr><th>Código</th><th>Descripción</th><th>Componentes</th><th class="r">Cant. (entreg. / pedida)</th>'
+      + '<th class="c">Fecha límite</th><th class="c">Prog.</th><th class="c">Estado</th></tr></thead><tbody>'
+      + items.map(filaFicha).join('') + '</tbody></table></div>';
+  }).join('');
+
+  var fecha = new Date().toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Fichas de Trabajo — Tapas</title><style>'
+    + '@page{size:A4 portrait;margin:12mm}'
+    + 'body{font-family:Arial,sans-serif;font-size:10px;color:#111;margin:0}'
+    + '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + 'h1{font-size:16px;margin:0 0 2px;color:#1e293b}'
+    + 'h2{font-size:12px;margin:0 0 5px;color:#1A6B5B;border-bottom:2px solid #1A6B5B;padding-bottom:3px}'
+    + '.badge{font-size:9px;font-weight:400;color:#6b7280;background:#f3f4f6;border-radius:3px;padding:1px 6px;margin-left:6px}'
+    + '.resumen{display:flex;gap:20px;margin:8px 0 14px;font-size:9px;color:#6b7280}'
+    + '.resumen strong{font-size:13px;color:#111;display:block}'
+    + 'table{border-collapse:collapse;width:100%;margin-bottom:4px}'
+    + 'th{background:#f8fafc;font-size:8px;font-weight:700;text-align:left;padding:4px 6px;border:1px solid #e2e8f0}'
+    + 'td{padding:4px 6px;border:1px solid #e2e8f0;vertical-align:top;font-size:9px;color:#374151}'
+    + 'tr:nth-child(even) td{background:#fafafa}'
+    + '.r{text-align:right}.c{text-align:center}.sm{font-size:8px}'
+    + '.cod{font-family:monospace;font-weight:700;color:#1A6B5B;white-space:nowrap}'
+    + '.tag{border-radius:3px;padding:1px 6px;font-size:8px;font-weight:800;white-space:nowrap}'
+    + '.sec{margin-bottom:14px;page-break-inside:avoid}'
+    + '.footer{margin-top:16px;font-size:8px;color:#9ca3af;border-top:1px solid #e2e8f0;padding-top:6px}'
+    + '</style></head><body>'
+    + '<h1>Tetraplastic · Tapas — Fichas de Trabajo Activas</h1>'
+    + '<div style="font-size:9px;color:#6b7280">Generado: ' + fecha + ' · Ordenadas por cliente</div>'
+    + '<div class="resumen">'
+    +   '<div><strong>' + activas.length + '</strong>Fichas activas</div>'
+    +   '<div><strong>' + clientes.length + '</strong>Clientes</div>'
+    +   '<div><strong>' + totalUnd.toLocaleString() + '</strong>Unidades</div>'
+    +   '<div><strong style="color:#991b1b">' + cuenta[0] + '</strong>🔴 Rojo</div>'
+    +   '<div><strong style="color:#92400e">' + cuenta[1] + '</strong>🟡 Amarillo</div>'
+    + '</div>'
+    + seccion
+    + '<div class="footer">TETRAPP · Tetraplastic Guatemala</div>'
+    + '<script>window.onload=function(){window.print();}<\/script>'
+    + '</body></html>';
+
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
 // ══ INICIO — ASISTENCIA MENSUAL ══════════════════════════════
 // Tabla compartida asistencia_diaria (area='tapas'), igual patrón que
 // Serigrafía pero sin el roster diario de roles/líneas (no aplica a Tapas).
@@ -3164,26 +3271,6 @@ function movRegistrar() {
   if (movVistaActual === 'rechazos') { abrirModalRechazo(); }
   else                               { abrirModalMov(movVistaActual); }
 }
-
-// ── Dropdown rápido en tabs-r ─────────────────────────────────
-function toggleMovDrop(e) {
-  e.stopPropagation();
-  var d = document.getElementById('movDrop');
-  if (!d) return;
-  d.style.display = d.style.display === 'none' ? 'block' : 'none';
-}
-
-function movDropSelect(tipo) {
-  var d = document.getElementById('movDrop');
-  if (d) d.style.display = 'none';
-  if (tipo === 'rechazos') { abrirModalRechazo(); }
-  else                     { abrirModalMov(tipo); }
-}
-
-document.addEventListener('click', function() {
-  var d = document.getElementById('movDrop');
-  if (d) d.style.display = 'none';
-});
 
 // ── Helpers ──────────────────────────────────────────────────
 function getSkuDesc(sku) {
