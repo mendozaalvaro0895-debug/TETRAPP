@@ -2443,6 +2443,30 @@ function fmtFechaCorta(iso) {
   return d.length === 3 ? d[2] + '/' + d[1] + '/' + d[0] : iso;
 }
 
+// Minificha con el stock (Bodega 2) del envase base de la ficha, comparado contra
+// lo que pide ESTA ficha. Fuente de stock: invB2De() — la misma del bloque de envases.
+function buildBaseStockRow(item) {
+  if (!item.linea_id || !item.skuBase) return '';
+  var inv   = invB2De(item.skuBase);
+  var stock = inv ? (inv.existencia || 0) : null;
+  var necesita = item.cant || 0;
+  var clr, bg, chip;
+  if (stock === null)           { clr = '#64748b'; bg = '#f1f5f9'; chip = '❓ sin dato B2'; }
+  else if (stock === 0)         { clr = '#991b1b'; bg = '#fee2e2'; chip = '🔴 sin stock'; }
+  else if (stock < necesita)    { clr = '#92400e'; bg = '#fef9c3'; chip = '🟡 insuficiente'; }
+  else                          { clr = '#15803d'; bg = '#dcfce7'; chip = '✅ alcanza'; }
+  var desc = (inv && inv.descripcion) ? inv.descripcion : '';
+  return '<div style="margin-top:5px;padding:5px 8px;background:' + bg + ';border-left:3px solid ' + clr + ';border-radius:6px;font-size:10px;line-height:1.35"' +
+    ' title="' + escHtml(desc) + '">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">' +
+      '<span style="font-weight:700;color:' + clr + '">📦 Envase base · <span style="font-family:var(--mono)">' + escHtml(item.skuBase) + '</span></span>' +
+      '<span style="font-weight:800;color:' + clr + ';white-space:nowrap">' + chip + '</span>' +
+    '</div>' +
+    '<div style="color:var(--ink);margin-top:1px">Stock B2: <b>' + (stock === null ? '—' : stock.toLocaleString()) + '</b> und' +
+      (stock !== null && necesita ? ' <span style="color:var(--gray)">· pide ' + necesita.toLocaleString() + '</span>' : '') + '</div>' +
+  '</div>';
+}
+
 function boardBuildCard(item) {
   // Entregas parciales vinculadas a este pedido — busca en lineas[] por solId
   var entregado = 0;
@@ -2517,6 +2541,7 @@ function boardBuildCard(item) {
     '<div style="font-size:12px;font-weight:700;color:var(--ink);line-height:1.2;margin-bottom:2px">' + item.cliente + '</div>' +
     '<div style="font-size:11px;line-height:1.4;margin-bottom:4px;word-break:break-word">' + descTxt + '</div>' +
     cantAndProg +
+    buildBaseStockRow(item) +
     fechasRow +
     tiroRow +
     (item.linea_id ? buildComentarioRow(item) : '') +
@@ -3385,6 +3410,7 @@ function renderBoard() {
           cliente:   s.cliente,
           sku:       l.sku  || '',
           desc:      l.desc || '',
+          skuBase:   (l.sku_base || '').trim(),
           cant:      l.cant || 0,
           linea_id:  l.linea_id || 0,
           prog:      s.prog || 0,
@@ -6297,6 +6323,7 @@ async function refrescarInventarioEnvases(btn) {
   if (btn) { btn.textContent = '…'; btn.disabled = true; }
   await cargarInventario();
   await renderConsolidadoEnvases();
+  renderBoard();
 }
 
 // Busca un SKU en inventario dando prioridad a Bodega 2 (envases / PT).
