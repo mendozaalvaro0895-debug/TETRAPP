@@ -203,6 +203,30 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sku-item{padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--bg);font-size:12px}
 .sku-item:last-child{border-bottom:none}
 .sku-item:hover{background:var(--teal-xl)}
+/* ── Formulario de solicitud: línea única + componentes ── */
+.lin-prod{display:grid;grid-template-columns:1fr 90px 80px;gap:6px;align-items:center}
+.lin-in-wrap{min-width:0}
+.lin-in-wrap .fi{width:100%;box-sizing:border-box}
+.lin-desc{font-size:11px;color:var(--gray);padding:3px 0 2px;font-weight:500}
+.lin-comp-title{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--teal);margin:12px 0 4px;padding-top:8px;border-top:1px dashed var(--border)}
+.lin-comp-title span{font-weight:500;color:var(--gray-l);text-transform:none;letter-spacing:0}
+.lin-comp{display:grid;grid-template-columns:78px 1fr auto auto;gap:8px;align-items:center;margin-top:5px}
+.lin-comp-lbl{font-size:10px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px}
+.lin-stk{font-size:10px;color:var(--gray);white-space:nowrap}
+.lin-falta{font-size:9px;font-weight:700;color:var(--red);text-transform:uppercase;white-space:nowrap}
+.lin-drop{display:none;position:fixed;background:#fff;border:1.5px solid var(--teal);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.18);z-index:10050;max-height:280px;overflow-y:auto}
+.lin-drop.open{display:block}
+.lin-count{padding:5px 12px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);background:var(--bg);position:sticky;top:0}
+.lin-grp{padding:5px 12px;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+.lin-grp-ok{background:#DCFCE7;color:#166534}
+.lin-grp-no{background:#FFF3D6;color:#7A4800}
+.lin-item{padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--bg)}
+.lin-item:hover{background:var(--teal-xl)}
+.lin-item-sku{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--teal)}
+.lin-item-sku span{font-family:var(--font);font-weight:500;color:var(--gray);font-size:10px}
+.lin-item-desc{font-size:11px;color:var(--gray)}
+.lin-vacio{padding:10px 12px;font-size:11px;color:var(--gray);font-style:italic}
+
 .sku-code{font-family:var(--mono);font-weight:700;color:var(--teal);font-size:11px;margin-bottom:2px}
 .sku-desc{color:var(--ink);font-size:11px}
 
@@ -618,19 +642,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </select>
         </div>
         <div class="fg">
-          <div class="fl">Área solicitante</div>
-          <select class="fs" id="fArea">
-            <option value="Ventas">Ventas</option>
-            <option value="Otro">Otro</option>
-          </select>
+          <div class="fl">Fecha de ingreso</div>
+          <input class="fi" id="fIngreso" type="date" disabled title="Se registra sola, con la fecha de hoy">
         </div>
       </div>
 
       <div class="fr">
-        <div class="fg">
-          <div class="fl">Fecha límite</div>
-          <input class="fi" id="fFecha" type="date">
-        </div>
         <div class="fg">
           <div class="fl">Prioridad</div>
           <select class="fs" id="fPrioSelect">
@@ -643,19 +660,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       </div>
 
       <div class="fg full">
-        <div class="fl">Líneas de pedido</div>
-        <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;overflow:hidden">
-          <div style="display:grid;grid-template-columns:110px 1fr 90px 80px 28px;gap:6px;padding:7px 10px;background:var(--bg2);border-bottom:1px solid var(--border)">
-            <div style="font-size:9px;font-weight:700">SKU</div>
-            <div style="font-size:9px;font-weight:700">Descripción</div>
+        <div class="fl">Línea de pedido</div>
+        <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px">
+          <div style="display:grid;grid-template-columns:1fr 90px 80px;gap:6px;padding:7px 10px;background:var(--bg2);border-bottom:1px solid var(--border);border-radius:8px 8px 0 0">
+            <div style="font-size:9px;font-weight:700">Producto (SKU o nombre)</div>
             <div style="font-size:9px;font-weight:700;text-align:right">Cantidad</div>
             <div style="font-size:9px;font-weight:700;text-align:right">Stock</div>
-            <div></div>
           </div>
           <div id="lineasPedido"></div>
-          <div style="padding:6px 10px;border-top:1px solid var(--border)">
-            <button type="button" class="btn btn-g btn-xs" onclick="addLinea()" id="btnAddLinea">+ Agregar línea</button>
-          </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:16px;margin-top:6px">
           <span>Total: <strong id="totalUnid" style="font-family:var(--mono)">0</strong> und</span>
@@ -934,7 +946,7 @@ async function cargarInventario() {
     var BATCH = 1000;
     while (true) {
       const { data, error } = await db.from('inventario')
-        .select('sku, descripcion, existencia, bodega')
+        .select('sku, descripcion, existencia, bodega, facturable')
         .eq('activo', true).range(desde, desde + BATCH - 1);
       if (error) throw error;
       todos = todos.concat(data || []);
@@ -1001,10 +1013,12 @@ async function cargarSolicitudes() {
           sku_base: l.sku_base || '',
           estado: l.estado || '',
           skuBase: l.sku_base || '',
-          skuContratapa: l.sku_contratapa || ''
+          skuContratapa: l.sku_contratapa || '',
+          skuLiner: l.sku_liner || '',
+          skuBanda: l.sku_banda || ''
         })),
         cant: lineasData.reduce((sum, l) => sum + (l.cantidad || 0), 0),
-        fecha_lim: s.fecha_limite || '',
+        ingreso: s.created_at ? new Date(new Date(s.created_at).getTime() - 6 * 3600 * 1000).toISOString().slice(0, 10) : '',
         prio: s.prioridad,
         estado: s.estado,
         prog: s.progreso_pct || 0,
@@ -1043,7 +1057,7 @@ function renderListas() {
       </div>
       <div class="sc-meta">
         <span class="sc-qty">${s.cant.toLocaleString()} und</span>
-        <span class="sc-date">🗓 ${escHtml(s.fecha_lim || '—')}</span>
+        <span class="sc-date">🗓 ${escHtml(s.ingreso || '—')}</span>
         <span class="sc-date">⏱ ${calcularHoras(s.cant, 1, s.lineas.flatMap(l => l.procs || [])).toFixed(1)}h</span>
       </div>
       ${s.prog > 0 ? `<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:${s.prog}%"></div></div><div class="pr-pct">${s.prog}%</div></div>` : ''}
@@ -1284,13 +1298,13 @@ async function mostrarDetalle(id) {
         <div class="dc-h">Líneas del pedido</div>
         <div class="dc-b">
           <table class="dt">
-            <thead><tr><th>SKU PT</th><th>Descripción</th><th>Envase Base</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock</th></tr></thead>
+            <thead><tr><th>SKU PT</th><th>Descripción</th><th>Componentes</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock</th></tr></thead>
             <tbody>
               ${s.lineas.map(l => `
                 <tr>
                   <td style="font-family:var(--mono)">${escHtml(l.sku || '—')}</td>
                   <td>${escHtml(l.desc || '—')}</td>
-                  <td style="font-family:var(--mono);color:var(--gray)">${escHtml(l.sku_base || '—')}</td>
+                  <td style="font-family:var(--mono);color:var(--gray);font-size:11px">${textoComponentes(l) || '—'}</td>
                   <td style="text-align:right">${(l.cant || 0).toLocaleString()}</td>
                   <td style="text-align:right;color:${(l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)'}">${(l.existencia || 0).toLocaleString()}</td>
                 </tr>
@@ -1448,59 +1462,165 @@ async function confirmarBorrar(id) {
 }
 
 // ══ FORMULARIO ══════════════════════════════════════════════
+// Una sola línea de pedido (producto autorrellenable, como en Serigrafía) + 4 componentes
+// opcionales: Base, Contratapa, Liner y Banda, cada uno con su propio buscador de SKU.
+// Solo son obligatorios Cliente y Cantidad. Los componentes se guardan en solicitud_lineas
+// (sku_base ya existía; sku_contratapa / sku_liner / sku_banda — sql/solicitud_lineas_componentes_tapas_v1.sql).
+var COMP_FORM = [
+  { k: 'base',       campo: 'sku_base',       lbl: 'Base' },
+  { k: 'contratapa', campo: 'sku_contratapa', lbl: 'Contratapa' },
+  { k: 'liner',      campo: 'sku_liner',      lbl: 'Liner' },
+  { k: 'banda',      campo: 'sku_banda',      lbl: 'Banda' }
+];
+
+function nuevaLineaForm() {
+  return { sku: '', desc: '', cant: 0, procs: [], existencia: undefined, comp: {} };
+}
+
 function abrirForm() {
-  lineas = [];
-  addLinea();
+  lineas = [nuevaLineaForm()];
   document.getElementById('fCli').value = '';
   document.getElementById('fNotas').value = '';
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
-  document.getElementById('fFecha').value = d.toISOString().split('T')[0];
+  document.getElementById('fIngreso').value = fechaHoy();
+  document.getElementById('fPrioSelect').value = 'normal';
+  renderLineas();
   document.getElementById('overlay').classList.add('open');
   calcular();
 }
 
 function cerrarForm() {
+  cerrarFormDrop();
   document.getElementById('overlay').classList.remove('open');
 }
 
-function addLinea() {
-  if (lineas.length >= 5) return;
-  lineas.push({ sku: '', desc: '', cant: 0, procs: [], existencia: undefined, sku_base: '' });
-  renderLineas();
+// Sin tildes y en minúsculas — "elíptica" encuentra "eliptica" y viceversa
+function normBusqueda(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-function removeLinea(idx) {
-  lineas.splice(idx, 1);
+function compDe(l, k) {
+  if (!l.comp[k]) l.comp[k] = { sku: '', desc: '', ex: undefined };
+  return l.comp[k];
+}
+
+function buildCompRow(l, c) {
+  var st = compDe(l, c.k);
+  var info = '';
+  if (st.ex !== undefined) {
+    var falta = (l.cant || 0) - st.ex;
+    info = '<span class="lin-stk">Stock <b style="color:' + (falta <= 0 ? 'var(--green)' : 'var(--amber)') + '">' + st.ex.toLocaleString() + '</b></span>'
+      + (falta > 0 && l.cant > 0 ? '<span class="lin-falta">Faltante: ' + falta.toLocaleString() + '</span>' : '');
+  }
+  return '<div class="lin-comp">'
+    + '<span class="lin-comp-lbl">' + c.lbl + '</span>'
+    + '<div class="lin-in-wrap"><input class="fi" id="lin-in-' + c.k + '" placeholder="🔍 SKU o descripción… (opcional)" value="' + escHtml(st.sku) + '" autocomplete="off"'
+    +   ' oninput="formSkuInput(\'' + c.k + '\',this,true)" onfocus="formSkuInput(\'' + c.k + '\',this,false)" onblur="setTimeout(cerrarFormDrop,200)"></div>'
+    + info
+    + '</div>'
+    + (st.desc ? '<div class="lin-desc">📦 ' + escHtml(st.desc) + '</div>' : '');
+}
+
+function renderLineas(focusId) {
+  var cont = document.getElementById('lineasPedido');
+  var l = lineas[0];
+  if (!cont || !l) return;
+  var exColor = l.existencia === undefined ? 'var(--gray-l)' : (l.existencia >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)');
+  cont.innerHTML = '<div style="padding:8px 10px">'
+    + '<div class="lin-prod">'
+    +   '<div class="lin-in-wrap"><input class="fi" id="lin-in-prod" placeholder="🔍 SKU, nombre o producto nuevo…" value="' + escHtml(l.sku) + '" autocomplete="off"'
+    +     ' oninput="formSkuInput(\'prod\',this,true)" onfocus="formSkuInput(\'prod\',this,false)" onblur="setTimeout(cerrarFormDrop,200)"></div>'
+    +   '<input class="fi" type="number" min="0" placeholder="Cant" value="' + (l.cant || '') + '" onchange="lineas[0].cant=parseInt(this.value)||0;renderLineas();calcular()">'
+    +   '<div style="font-size:11px;text-align:right;color:' + exColor + '">' + (l.existencia !== undefined ? l.existencia.toLocaleString() : '—') + '</div>'
+    + '</div>'
+    + (l.desc ? '<div class="lin-desc">📦 ' + escHtml(l.desc) + '</div>' : '')
+    + '<div class="lin-comp-title">Componentes <span>(opcionales)</span></div>'
+    + COMP_FORM.map(function(c) { return buildCompRow(l, c); }).join('')
+    + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">'
+    + ALL_PROCS_TAPAS.map(function(p) {
+        return '<div class="op-chip ' + (l.procs.indexOf(p.val) >= 0 ? 'sel-proc' : '') + '" onclick="toggleLineaProc(0,\'' + p.val + '\')" style="font-size:10px">' + p.lbl + '</div>';
+      }).join('')
+    + '</div>'
+    + '</div>';
+  updateTotals();
+  if (focusId) {
+    var el = document.getElementById(focusId);
+    if (el) { el.focus(); var n = el.value.length; el.setSelectionRange(n, n); }
+  }
+}
+
+// ── Buscador de SKU del formulario ────────────────────────────
+// Todas las coincidencias (cada palabra por separado, sin tildes), FACTURABLES PRIMERO.
+// facturable null cuenta como facturable, igual que el bot.
+function buildFormDropHtml(kind, query) {
+  var toks = normBusqueda(query).split(/[^a-z0-9]+/).filter(Boolean);
+  if (!toks.length) return '';
+  var res = inventarioCache.filter(function(i) {
+    var texto = normBusqueda((i.sku || '') + ' ' + (i.descripcion || ''));
+    return toks.every(function(t) { return texto.indexOf(t) !== -1; });
+  });
+  if (!res.length) {
+    return '<div class="lin-vacio">Sin coincidencias' + (kind === 'prod' ? ' — se guardará como producto nuevo' : '') + '</div>';
+  }
+  var fact = res.filter(function(i) { return i.facturable !== false; });
+  var noFact = res.filter(function(i) { return i.facturable === false; });
+  function item(i) {
+    return '<div class="lin-item" onmousedown="formSkuSelect(\'' + kind + '\',\'' + escHtml(String(i.sku).replace(/'/g, '')) + '\')">'
+      + '<div class="lin-item-sku">' + escHtml(i.sku) + '<span>Stock ' + (i.existencia || 0).toLocaleString() + '</span></div>'
+      + '<div class="lin-item-desc">' + escHtml(i.descripcion || '') + '</div></div>';
+  }
+  var html = '<div class="lin-count">' + res.length + ' coincidencia' + (res.length === 1 ? '' : 's') + '</div>';
+  if (fact.length) html += '<div class="lin-grp lin-grp-ok">✅ Facturables · ' + fact.length + '</div>' + fact.map(item).join('');
+  if (noFact.length) html += '<div class="lin-grp lin-grp-no">⚠️ No facturables · ' + noFact.length + '</div>' + noFact.map(item).join('');
+  return html;
+}
+
+function formSkuInput(kind, el, escribiendo) {
+  var l = lineas[0];
+  if (!l) return;
+  var val = el.value;
+  if (escribiendo) {
+    // Texto cambiado a mano: lo elegido antes deja de valer
+    var st = kind === 'prod' ? l : compDe(l, kind);
+    var habiaSel = kind === 'prod' ? (l.desc || l.existencia !== undefined) : (st.desc || st.ex !== undefined);
+    st.sku = val; st.desc = ''; if (kind === 'prod') l.existencia = undefined; else st.ex = undefined;
+    if (habiaSel) { renderLineas('lin-in-' + kind); return; }
+  }
+  var drop = document.getElementById('linDrop');
+  if (!drop) {
+    drop = document.createElement('div');
+    drop.id = 'linDrop';
+    drop.className = 'lin-drop';
+    document.body.appendChild(drop);
+  }
+  var html = val.trim().length >= 2 ? buildFormDropHtml(kind, val) : '';
+  if (!html) { drop.classList.remove('open'); return; }
+  drop.innerHTML = html;
+  var r = el.getBoundingClientRect();
+  drop.style.left = r.left + 'px';
+  drop.style.width = Math.max(r.width, 300) + 'px';
+  var abajo = window.innerHeight - r.bottom;
+  if (abajo < 200 && r.top > abajo) { drop.style.top = 'auto'; drop.style.bottom = (window.innerHeight - r.top + 2) + 'px'; }
+  else { drop.style.bottom = 'auto'; drop.style.top = (r.bottom + 2) + 'px'; }
+  drop.classList.add('open');
+}
+
+function cerrarFormDrop() {
+  var drop = document.getElementById('linDrop');
+  if (drop) drop.classList.remove('open');
+}
+
+function formSkuSelect(kind, sku) {
+  var item = invB2DeTapas(sku);
+  var l = lineas[0];
+  if (!item || !l) return;
+  if (kind === 'prod') {
+    l.sku = item.sku; l.desc = item.descripcion || ''; l.existencia = item.existencia || 0;
+  } else {
+    l.comp[kind] = { sku: item.sku, desc: item.descripcion || '', ex: item.existencia || 0 };
+  }
+  cerrarFormDrop();
   renderLineas();
   calcular();
-}
-
-function renderLineas() {
-  const cont = document.getElementById('lineasPedido');
-  if (!cont) return;
-  
-  cont.innerHTML = lineas.map((l, i) => `
-    <div style="border-bottom:1px solid var(--border);padding:8px 10px">
-      <div style="display:grid;grid-template-columns:110px 1fr 90px 80px 28px;gap:6px;margin-bottom:5px">
-        <input class="fi" placeholder="SKU PT" value="${escHtml(l.sku)}" onchange="lineas[${i}].sku=this.value;buscarExistencia(${i},this.value)">
-        <input class="fi" placeholder="Descripción" value="${escHtml(l.desc)}" onchange="lineas[${i}].desc=this.value">
-        <input class="fi" type="number" placeholder="Cant" value="${l.cant || ''}" onchange="lineas[${i}].cant=parseInt(this.value)||0;calcular()">
-        <div style="font-size:11px;text-align:right;color:${(l.existencia || 0) >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)'}">${l.existencia !== undefined ? l.existencia.toLocaleString() : '—'}</div>
-        <button onclick="removeLinea(${i})" style="background:var(--red-l);border:none;border-radius:5px;cursor:pointer">✕</button>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
-        <span style="font-size:9px;font-weight:700;color:var(--gray-l);white-space:nowrap;text-transform:uppercase;letter-spacing:.4px">Envase base SKU</span>
-        <input class="fi" placeholder="SKU materia prima…" value="${escHtml(l.sku_base || '')}" style="font-size:11px;padding:3px 6px;flex:1;max-width:200px" oninput="lineas[${i}].sku_base=this.value">
-      </div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap">
-        ${ALL_PROCS_TAPAS.map(p => `
-          <div class="op-chip ${l.procs.includes(p.val) ? 'sel-proc' : ''}" onclick="toggleLineaProc(${i},'${p.val}')" style="font-size:10px">${p.lbl}</div>
-        `).join('')}
-      </div>
-    </div>
-  `).join('');
-  updateTotals();
 }
 
 function toggleLineaProc(idx, procVal) {
@@ -1509,18 +1629,6 @@ function toggleLineaProc(idx, procVal) {
   if (pos >= 0) arr.splice(pos, 1);
   else arr.push(procVal);
   renderLineas();
-  calcular();
-}
-
-async function buscarExistencia(idx, sku) {
-  if (!sku) return;
-  if (inventarioCache.length === 0) await cargarInventario();
-  const item = inventarioCache.find(i => i.sku === sku);
-  if (item) {
-    lineas[idx].existencia = item.existencia || 0;
-    lineas[idx].desc = item.descripcion;
-    renderLineas();
-  }
   calcular();
 }
 
@@ -1546,47 +1654,64 @@ function calcular() {
 async function guardar() {
   const cliente = document.getElementById('fCli').value;
   if (!cliente) { alert('Selecciona un cliente'); return; }
-  
-  const lineasValidas = lineas.filter(l => l.cant > 0);
-  if (lineasValidas.length === 0) { alert('Agrega al menos una línea con cantidad'); return; }
-  
+
+  const l = lineas[0];
+  if (!l || !(l.cant > 0)) { alert('Indica la cantidad'); return; }
+
+  // Los componentes deben ser SKUs reales de inventario (las alertas de stock los buscan por SKU)
+  var sinSku = COMP_FORM.filter(function(c) {
+    var s = compDe(l, c.k).sku.trim();
+    return s && !inventarioCache.some(function(i) { return i.sku === s; });
+  }).map(function(c) { return c.lbl; });
+  if (sinSku.length) { alert('Elige de la lista el SKU de: ' + sinSku.join(', ') + ' (o deja el campo vacío)'); return; }
+
   const codigo = await generarCodigo('tapas');
-  
+  const texto  = (l.sku || '').trim();
+  const enInv  = inventarioCache.find(function(i) { return i.sku === texto; });
+
+  const cabecera = {
+    codigo, area: 'tapas',
+    cliente_nombre: cliente,
+    fecha_limite: fechaHoy(), // la ficha ya no pide fecha límite: queda la fecha de ingreso
+    prioridad: document.getElementById('fPrioSelect').value,
+    estado: 'nueva',
+    progreso_pct: 0,
+    notas: document.getElementById('fNotas').value
+  };
+
+  const linea = {
+    orden: 1,
+    sku: enInv ? enInv.sku : '',
+    descripcion: enInv ? (enInv.descripcion || '') : texto,
+    cantidad: l.cant, existencia_snap: l.existencia || 0,
+    procesos: l.procs || [], operadores_ids: []
+  };
+  COMP_FORM.forEach(function(c) { var s = compDe(l, c.k).sku.trim(); if (s) linea[c.campo] = s; });
+
+  let solId = null;
   try {
-    const { data: sol, error: err1 } = await db
-      .from('solicitudes')
-      .insert({
-        codigo, area: 'tapas',
-        cliente_nombre: cliente,
-        area_solicitante: document.getElementById('fArea').value,
-        fecha_limite: document.getElementById('fFecha').value,
-        prioridad: document.getElementById('fPrioSelect').value,
-        estado: 'nueva',
-        progreso_pct: 0,
-        notas: document.getElementById('fNotas').value
-      })
-      .select()
-      .single();
-    
-    if (err1) throw err1;
-    
-    if (lineasValidas.length > 0) {
-      const lineasInsert = lineasValidas.map((l, i) => ({
-        solicitud_id: sol.id, orden: i + 1,
-        sku: l.sku, descripcion: l.desc,
-        cantidad: l.cant, existencia_snap: l.existencia || 0,
-        procesos: l.procs || [], operadores_ids: [],
-        ...(l.sku_base ? { sku_base: l.sku_base } : {})
-      }));
-      await db.from('solicitud_lineas').insert(lineasInsert);
+    let r = await db.from('solicitudes').insert(cabecera).select().single();
+    // area_solicitante ya no se pide; si la base todavía la exige, se manda el valor de siempre
+    if (r.error && String(r.error.message).indexOf('area_solicitante') >= 0) {
+      r = await db.from('solicitudes').insert(Object.assign({ area_solicitante: 'Ventas' }, cabecera)).select().single();
     }
-    
+    if (r.error) throw r.error;
+    solId = r.data.id;
+
+    const rl = await db.from('solicitud_lineas').insert(Object.assign({ solicitud_id: solId }, linea));
+    if (rl.error) {
+      await db.from('solicitudes').delete().eq('id', solId); // no dejar una ficha sin línea
+      solId = null;
+      throw rl.error;
+    }
+
     cerrarForm();
     await cargarSolicitudes();
-    showToast(`✅ ${codigo} guardada`);
+    showToast('✅ ' + codigo + ' guardada');
   } catch(e) {
     console.error('Error guardando:', e);
-    alert('Error al guardar: ' + e.message);
+    var falta = /column|schema cache/i.test(String(e.message)) ? '\n\nFalta correr sql/solicitud_lineas_componentes_tapas_v1.sql en Supabase.' : '';
+    alert('Error al guardar: ' + e.message + falta);
   }
 }
 
@@ -2009,14 +2134,26 @@ function buildFichaCardTapas(s) {
   var l0 = s.lineas[0] || {};
   if (l0.skuBase)       comps += '<span class="fich-chip">📦 ' + escHtml(l0.skuBase) + '</span>';
   if (l0.skuContratapa) comps += '<span class="fich-chip">🔘 ' + escHtml(l0.skuContratapa) + '</span>';
+  if (l0.skuLiner)      comps += '<span class="fich-chip">◎ ' + escHtml(l0.skuLiner) + '</span>';
+  if (l0.skuBanda)      comps += '<span class="fich-chip">▭ ' + escHtml(l0.skuBanda) + '</span>';
   return '<div class="fich-card tier-' + tier + '" onclick="abrirFichaTapas(\'' + escHtml(s.id) + '\')">'
     + '<div class="fich-top"><span class="fich-cod">' + escHtml(s.id_display || s.id.slice(0, 8)) + '</span>'
     +   '<span>' + estadoPill(s.estado) + ' ' + prioridadPill(s.prio) + '</span></div>'
     + '<div class="fich-desc">' + escHtml(s.sku) + ' — ' + escHtml(s.desc) + '</div>'
-    + '<div class="fich-meta"><b>' + s.cant.toLocaleString() + ' und</b><span>🗓 ' + escHtml(s.fecha_lim || '—') + '</span></div>'
+    + '<div class="fich-meta"><b>' + s.cant.toLocaleString() + ' und</b><span>🗓 ' + escHtml(s.ingreso || '—') + '</span></div>'
     + (comps ? '<div class="fich-chips">' + comps + '</div>' : '')
     + (s.prog > 0 ? '<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:' + s.prog + '%"></div></div><div class="pr-pct">' + s.prog + '%</div></div>' : '')
     + '</div>';
+}
+
+// "Base X · Contratapa Y · Liner Z · Banda W" (solo los que tiene la línea)
+function textoComponentes(l) {
+  var c = [];
+  if (l.skuBase) c.push('Base ' + escHtml(l.skuBase));
+  if (l.skuContratapa) c.push('Contratapa ' + escHtml(l.skuContratapa));
+  if (l.skuLiner) c.push('Liner ' + escHtml(l.skuLiner));
+  if (l.skuBanda) c.push('Banda ' + escHtml(l.skuBanda));
+  return c.join(' · ');
 }
 
 function abrirFichaTapas(id) {
@@ -2116,19 +2253,14 @@ async function imprimirFichasTapas() {
     var desc = s.lineas.length
       ? s.lineas.map(function(l) { return (l.sku ? escHtml(l.sku) + ' · ' : '') + escHtml(l.desc || ''); }).join('<br>')
       : escHtml(s.desc || '—');
-    var comps = s.lineas.map(function(l) {
-      var c = [];
-      if (l.skuBase) c.push('Base ' + escHtml(l.skuBase));
-      if (l.skuContratapa) c.push('Contratapa ' + escHtml(l.skuContratapa));
-      return c.join(' · ');
-    }).filter(Boolean).join('<br>');
+    var comps = s.lineas.map(textoComponentes).filter(Boolean).join('<br>');
     var t = TIER[tierFichaTapas(s)];
     return '<tr>'
       + '<td class="cod">' + escHtml(s.id_display || s.id.slice(0, 8)) + '</td>'
       + '<td>' + desc + '</td>'
       + '<td class="sm">' + (comps || '—') + '</td>'
       + '<td class="r"><b>' + entTxt + '</b></td>'
-      + '<td class="c">' + escHtml(s.fecha_lim || '—') + '</td>'
+      + '<td class="c">' + escHtml(s.ingreso || '—') + '</td>'
       + '<td class="c">' + (s.prog > 0 ? s.prog + '%' : '—') + '</td>'
       + '<td class="c"><span class="tag" style="background:' + t.bg + ';color:' + t.clr + '">' + t.lbl + ' · ' + (ESTADO[s.estado] || escHtml(s.estado)) + '</span></td>'
       + '</tr>';
@@ -2156,7 +2288,7 @@ async function imprimirFichasTapas() {
     return '<div class="sec"><h2>' + escHtml(cli) + ' <span class="badge">' + items.length + ' ficha' + (items.length !== 1 ? 's' : '')
       + ' · ' + und.toLocaleString() + ' und · ' + pct + '% entregado</span></h2>'
       + '<table><thead><tr><th>Código</th><th>Descripción</th><th>Componentes</th><th class="r">Cant. (entreg. / pedida)</th>'
-      + '<th class="c">Fecha límite</th><th class="c">Prog.</th><th class="c">Estado</th></tr></thead><tbody>'
+      + '<th class="c">Ingreso</th><th class="c">Prog.</th><th class="c">Estado</th></tr></thead><tbody>'
       + items.map(filaFicha).join('') + '</tbody></table></div>';
   }).join('');
 
@@ -3195,12 +3327,6 @@ async function init() {
 
   // Poblar select de operadores en modal rechazo
   poblarSelectOperadoresRechazo();
-
-  // Fecha por defecto
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
-  const fechaInput = document.getElementById('fFecha');
-  if (fechaInput) fechaInput.value = d.toISOString().split('T')[0];
 
   tick();
   setInterval(tick, 30000);
