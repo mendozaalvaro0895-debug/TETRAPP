@@ -834,7 +834,7 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
     <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-productividad">
       <div class="ph" style="flex-wrap:wrap;gap:8px;justify-content:flex-start">
         <div><div class="ph-title">Productividad · Serigrafía</div>
-          <div class="ph-sub" id="prodSubLbl">Impresión · Meta por línea: 10,000 tiros/día</div>
+          <div class="ph-sub" id="prodSubLbl">Impresión · Meta por línea: L1-L2 10,000 · L3-L4 8,000 tiros/día</div>
         </div>
         <div style="display:flex;gap:4px;align-self:center">
           <button class="seg-btn seg-active" id="pseg-impresion" onclick="switchProdSub('impresion')">🖨 Impresión</button>
@@ -1596,7 +1596,7 @@ function periodoEfectivoDe(item) {
 }
 
 // ── Capacidad de línea por mes (el % de cada bloque cliente+mes de "Sin asignar") ──
-// % = tiros realizados de la(s) línea(s) del cliente ÷ (días laborados × META_TIROS_LINEA × nº de líneas).
+// % = tiros realizados de la(s) línea(s) del cliente ÷ (días laborados × meta diaria de esa línea; metaTirosLinea).
 // Línea por cliente (regla fija): Darosa → L1 · Sinergia → L2 · resto → promedio de L3 y L4.
 // Días laborados = lunes a sábado sin feriados (dias_feriados), desde PROD_FECHA_PISO y hasta hoy;
 // los tiros solo cuentan en esos días (mismo criterio). Tiros = delta diario del contador
@@ -1662,7 +1662,7 @@ function capPctCliente(cli, mes) {
   if (!c.ok || c.dias === 0) return null;
   var lineas = capLineasDeCliente(cli);
   var tiros = lineas.reduce(function(s, lid) { return s + (c.tiros[lid] || 0); }, 0);
-  var cap   = c.dias * META_TIROS_LINEA * lineas.length;
+  var cap   = lineas.reduce(function(sum, lid) { return sum + c.dias * metaTirosLinea(lid); }, 0);
   return { pct: Math.round(tiros / cap * 100), tiros: tiros, cap: cap, dias: c.dias, lineas: lineas };
 }
 
@@ -3303,7 +3303,7 @@ function boardBuildSinBlock(items) {
         var capTitle  = capInfo
           ? 'Capacidad de ' + (capInfo.lineas.length > 1 ? 'Líneas 3 y 4 (promedio)' : 'Línea ' + capInfo.lineas[0]) + ': ' +
             capInfo.tiros.toLocaleString() + ' tiros de ' + capInfo.cap.toLocaleString() +
-            ' (' + capInfo.dias + ' días laborados × ' + META_TIROS_LINEA.toLocaleString() + (capInfo.lineas.length > 1 ? ' × 2 líneas' : '') + '). ' +
+            ' (' + capInfo.dias + ' días laborados × ' + (capInfo.lineas.length > 1 ? '2 líneas × ' : '') + metaTirosLinea(capInfo.lineas[0]).toLocaleString() + ' tiros/día). ' +
             'Entregado vs pedido: ' + pctEnt + '%'
           : 'Capacidad de la línea: sin datos o calculando';
         // Grid: columna = count de pedidos arriba + und abajo, % en esquina derecha
@@ -8634,7 +8634,10 @@ function actualizarKPIsMov(data) {
 }
 
 // ── Productividad: tiros de máquina por línea/diseño ──────────
-var META_TIROS_LINEA = 10000;
+var META_TIROS_LINEA = 10000;   // meta diaria de L1 y L2 (y valor por defecto)
+// Meta diaria de tiros POR LÍNEA: L3 y L4 (polietilenos, variedad de diseños) tienen una meta menor.
+var META_TIROS_POR_LINEA = { 1: 10000, 2: 10000, 3: 8000, 4: 8000 };
+function metaTirosLinea(lid) { return META_TIROS_POR_LINEA[lid] || META_TIROS_LINEA; }
 var META_FLAM_DIA    = 10000;
 // Piso de cálculo: los conteos/meta de los KPIs de resumen arrancan desde esta
 // fecha (para que todas las líneas midan sobre la misma base). Las fichas de
@@ -8718,7 +8721,8 @@ function pfcDelta(registros) {
 function buildPfcVeladaCard(vld, esMaster) {
   var opTag = vld && vld.operador_nombre ? '<span style="float:right;font-weight:600;opacity:.75">👤 ' + escHtml(vld.operador_nombre) + '</span>' : '';
   var vCnt = vld.contador || 0;
-  var pct  = vCnt && META_TIROS_LINEA ? Math.min(100, Math.round((vCnt / META_TIROS_LINEA) * 100)) : 0;
+  var metaL = metaTirosLinea(vld.linea_id);
+  var pct  = vCnt && metaL ? Math.min(100, Math.round((vCnt / metaL) * 100)) : 0;
   var dc   = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--serig-m)' : 'var(--amber)';
   return '<div class="pfc pfc-velada">' +
     '<div class="pfc-hdr">🌙 Velada' + opTag + '</div>' +
@@ -8776,7 +8780,7 @@ function buildPfcFechaCard(fecha, datos, esMaster, lineaId) {
   var opNom = primer && primer.operador_nombre ? primer.operador_nombre : '';
   var opTag = opNom ? '<span style="float:right;font-weight:600;opacity:.75">👤 ' + escHtml(opNom) + '</span>' : '';
   var delta = pfcDelta(regs);
-  var pct = delta !== null ? Math.min(100, Math.round((delta / META_TIROS_LINEA) * 100)) : 0;
+  var pct = delta !== null ? Math.min(100, Math.round((delta / metaTirosLinea(lineaId)) * 100)) : 0;
   var dc = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--serig-m)' : 'var(--amber)';
   var mainCard = '';
   if (regs.length) {
@@ -8832,12 +8836,12 @@ function buildProdLegend(datasets) {
   if (!el) return;
   var normales = datasets.filter(function(d){ return d._kind === 'dia'; });
   var veladas  = datasets.filter(function(d){ return d._kind === 'velada'; });
-  var meta     = datasets.find(function(d){ return d._kind === 'meta'; });
+  var metas    = datasets.filter(function(d){ return d._kind === 'meta'; });
   var stCol = 'display:flex;flex-direction:column;align-items:flex-start;padding:2px 10px';
   var stItem = 'display:flex;align-items:center;gap:5px;font-size:11px;font-family:\'DM Sans\',sans-serif;padding:2px 0;white-space:nowrap;color:var(--ink)';
   function svgCircle(c){ return '<svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="'+c+'"/></svg>'; }
   function svgDiamond(c){ return '<svg width="10" height="10" style="flex-shrink:0"><rect x="1.5" y="1.5" width="7" height="7" fill="#fff" stroke="'+c+'" stroke-width="1.5" transform="rotate(45 5 5)"/></svg>'; }
-  function svgDash(){ return '<svg width="24" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="24" y2="5" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="5,3"/></svg>'; }
+  function svgDash(c){ return '<svg width="24" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="24" y2="5" stroke="' + (c || '#EF4444') + '" stroke-width="1.5" stroke-dasharray="5,3"/></svg>'; }
   var cols = normales.map(function(d, i) {
     var v = veladas[i]; var col = d.borderColor;
     return '<div style="'+stCol+'">'
@@ -8846,10 +8850,10 @@ function buildProdLegend(datasets) {
            : '<div style="'+stItem+';visibility:hidden">—</div>')
       + '</div>';
   });
-  if (meta) {
-    cols.push('<div style="'+stCol+'">'
-      + '<div style="'+stItem+'">'+svgDash()+'<span>'+escHtml(meta.label)+'</span></div>'
-      + '</div>');
+  if (metas.length) {
+    cols.push('<div style="'+stCol+'">' + metas.map(function(m) {
+      return '<div style="'+stItem+'">'+svgDash(m._col)+'<span>'+escHtml(m.label)+'</span></div>';
+    }).join('') + '</div>');
   }
   el.innerHTML = cols.join('');
 }
@@ -9015,16 +9019,20 @@ async function renderProductividadChart(periodo) {
     });
   });
 
-  datasets.push({
-    label: 'Meta (' + META_TIROS_LINEA.toLocaleString() + '/día)',
-    _kind: 'meta', order: 0,
-    data: todasFechas.map(function(){ return META_TIROS_LINEA; }),
-    borderColor: '#EF4444',
-    borderWidth: 1.5,
-    borderDash: [7,4],
-    pointRadius: 0,
-    fill: false,
-    tension: 0
+  // Una línea de meta por cada valor distinto (L1-L2 y L3-L4)
+  [{ lbl: 'L1-L2', lids: [1, 2], col: '#EF4444' }, { lbl: 'L3-L4', lids: [3, 4], col: '#F59E0B' }].forEach(function(g) {
+    var m = metaTirosLinea(g.lids[0]);
+    datasets.push({
+      label: 'Meta ' + g.lbl + ' (' + m.toLocaleString() + '/día)',
+      _kind: 'meta', _col: g.col, order: 0,
+      data: todasFechas.map(function(){ return m; }),
+      borderColor: g.col,
+      borderWidth: 1.5,
+      borderDash: [7,4],
+      pointRadius: 0,
+      fill: false,
+      tension: 0
+    });
   });
 
   container.style.display = '';
@@ -9118,11 +9126,11 @@ async function renderProductividadChart(periodo) {
             },
             label: function(ctx) {
               var ds = ctx.dataset || {};
-              if (ds._kind === 'meta') return '  Meta: ' + META_TIROS_LINEA.toLocaleString();
+              if (ds._kind === 'meta') return '  ' + ds.label;
               var v = ctx.parsed.y;
               if (v === null || v === undefined) return '';
               if (ds._kind === 'velada') return '  🌙 ' + ds._nombre + ' velada: ' + v.toLocaleString();
-              var pct = Math.round((v / META_TIROS_LINEA) * 100);
+              var pct = Math.round((v / metaTirosLinea(ds._linea)) * 100);
               var ic  = pct >= 100 ? '✅' : pct >= 60 ? '🟡' : '🔴';
               return '  ' + ds._nombre + ': ' + v.toLocaleString() + ' (' + pct + '%) ' + ic;
             },
@@ -9175,7 +9183,7 @@ function prodShowDayPanel(idx, nativeEvt) {
         '<span style="font-weight:700">' + escHtml(ln.nombre) + '</span><span>— sin registro</span></div>';
     }
     var delta = pfcDelta(d.registros);
-    var pct = delta !== null ? Math.round((delta / META_TIROS_LINEA) * 100) : null;
+    var pct = delta !== null ? Math.round((delta / metaTirosLinea(ln.id)) * 100) : null;
     var vd = prodVeladaDelta(d);
     var envase = _prodChartProds[f] && _prodChartProds[f][ln.id];
     var coment = (prodComentarioCache[f + '|' + ln.id] || {}).comentario;
@@ -9223,7 +9231,7 @@ function prodShowDayPanel(idx, nativeEvt) {
 var prodSubActual = 'impresion';
 
 var PROD_SUB_LBL = {
-  impresion: 'Impresión · Meta por línea: 10,000 tiros/día',
+  impresion: 'Impresión · Meta por línea: L1-L2 10,000 · L3-L4 8,000 tiros/día',
   flameado:  'Flameado · Bolsas por operario',
   empaque:   'Empaque · Unidades por operario'
 };
@@ -10171,7 +10179,7 @@ async function renderProductividad() {
       var vel = prodVeladaDelta(datos);
       if (vel !== null) totalTiros += vel;
     });
-    var metaMes = diasConData * META_TIROS_LINEA;
+    var metaMes = diasConData * metaTirosLinea(ln.id);
     var pct = metaMes > 0 ? Math.min(100, Math.round((totalTiros / metaMes) * 100)) : 0;
     var color = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--serig-m)' : totalTiros > 0 ? 'var(--amber)' : 'var(--gray-l)';
     return '<div class="kpi">' +
