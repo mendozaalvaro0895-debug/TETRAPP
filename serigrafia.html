@@ -376,7 +376,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-chip:hover{box-shadow:0 2px 8px rgba(0,0,0,.14);transform:translateY(-1px);border-color:var(--serig-m)}
 .mtx-chip.dragging{opacity:.4}
 .mtx-ava{width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:8px;font-weight:800;flex-shrink:0}
-.mtx-grid{display:grid;grid-template-columns:84px repeat(4,minmax(0,1fr));gap:5px}
+.mtx-grid{display:grid;grid-template-columns:84px repeat(5,minmax(0,1fr));gap:5px}
 .mtx-hcell{font-size:10px;font-weight:800;color:var(--serig-m);text-transform:uppercase;letter-spacing:.4px;padding:2px;display:flex;align-items:center;justify-content:center}
 .mtx-hcell.left{justify-content:flex-start}
 .mtx-hcell.noche{background:#1e1b4b;color:#e0e7ff;border-radius:6px;padding:3px 6px}
@@ -440,6 +440,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-grow-item{display:flex;align-items:center;gap:5px;flex:1}
 .mtx-grow-item .mtx-rolcell{width:84px;flex-shrink:0}
 .mtx-cell-g{flex:1}
+.mtx-cell-emp{grid-column:6;grid-row:2 / span 3}
 
 
 /* ── PRODUCCIÓN MENSUAL ───────────────────────────────────── */
@@ -1943,6 +1944,8 @@ var MATRIZ_ROLES_GLOBAL = [
   { key: 'auxiliar',   lbl: 'Auxiliar',   ico: '🤝' },
   { key: 'empaque',    lbl: 'Empaque',    ico: '📦' }
 ];
+// Empaque se muestra como 5ª columna del grid (sigue siendo un rol general: sin línea)
+var MATRIZ_COL_EMPAQUE = { key: 'empaque', lbl: 'Empaque', ico: '📦' };
 // Equivalencia matriz → rol en la página Personal (proceso_hab / ROLES_SERIG)
 var MATRIZ_TO_PROCESO = {
   flameador:  'Flameador',
@@ -2168,6 +2171,7 @@ function renderMatriz() {
   var html = '<div class="mtx-grid">';
   html += '<div class="mtx-hcell left">Tarea</div>';
   for (var h = 1; h <= 4; h++) html += '<div class="mtx-hcell">Línea ' + h + '</div>';
+  html += '<div class="mtx-hcell">' + MATRIZ_COL_EMPAQUE.ico + ' ' + MATRIZ_COL_EMPAQUE.lbl + '</div>';
   MATRIZ_ROLES.forEach(function(rol) {
     html += '<div class="mtx-rolcell">' + rol.ico + ' ' + rol.lbl + '</div>';
     for (var li = 1; li <= 4; li++) {
@@ -2180,10 +2184,16 @@ function renderMatriz() {
         ' ondrop="matrizDrop(event,\'' + key + '\')">' + chips + '</div>';
     }
   });
+  var chipsEmp = (m[MATRIZ_COL_EMPAQUE.key] || []).map(function(c) { return matrizChip(c); }).join('');
+  html += '<div class="mtx-cell mtx-cell-emp" id="mtx-' + MATRIZ_COL_EMPAQUE.key + '"' +
+    ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
+    ' ondragleave="this.classList.remove(\'drag-over\')"' +
+    ' ondrop="matrizDrop(event,\'' + MATRIZ_COL_EMPAQUE.key + '\')">' + chipsEmp + '</div>';
   html += '</div>';
-  // Roles generales (no por línea): Supervisor + Auxiliar lado a lado
+  // Roles generales (no por línea): Supervisor + Auxiliar lado a lado (Empaque ya es columna del grid)
   html += '<div class="mtx-global-row">';
   MATRIZ_ROLES_GLOBAL.forEach(function(rol) {
+    if (rol.key === MATRIZ_COL_EMPAQUE.key) return;
     var chips = (m[rol.key] || []).map(function(c) { return matrizChip(c); }).join('');
     html += '<div class="mtx-grow-item">' +
       '<div class="mtx-rolcell">' + rol.ico + ' ' + rol.lbl + '</div>' +
