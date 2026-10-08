@@ -179,6 +179,24 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
     termComandas — la query de cargarTermometro ahora también trae `proceso`), ordenado
     de mayor a menor unidades para ver de un vistazo en qué proceso tiene más experiencia
     cada operario (quién arma más, quién tiene más horas de flameado/impresión, etc.).
+    DESPLEGABLE EN DOS BLOQUES (oct/2026, `buildTermDetalle`; en pantalla angosta se apilan):
+    · 📅 PRODUCCIÓN DIARIA (`buildTermDiario`): una barra por día del mes con el total del día
+      (compacto "4.5k") — sirve para ver si algún día alguien NO subió producción. Estado de cada
+      día en `estadoDiaTerm()` (el orden importa): fuera del período (antes de `fecha_inicio`/
+      después de `fecha_baja`) → produjo (>0 und en comanda APROBADA, aunque sea domingo) →
+      domingo/feriado (`feriadosSet`) → futuro → "por aprobar" (solo hay comandas pendientes,
+      ámbar) → ausente (`asistencia_diaria` area='tapas', cargada en `cargarTermometro` →
+      `termAsistencia`) → hoy (en curso, no se marca) → **sin registro** (rojo, número del día
+      en negrita + lista "Sin registro: día 6, 17" + resumen "N días · promedio X und/día").
+      ⚠️ Supuesto: solo domingo y feriado son no laborables — el sábado SÍ cuenta como día de
+      trabajo (igual que la grilla de Asistencia); si alguien no trabaja sábados saldrá "sin
+      registro". Usa `termComandasTodas` (incluye pendientes/rechazadas) además de `termComandas`.
+    · 🎯 PRODUCTIVIDAD Y HABILIDAD (`buildTermProductividad`): "Por proceso" (lo de antes) +
+      "Por tapa y proceso" (`agruparPorTapaYProceso`: `comanda_tareas.tapa_sku`/`tapa_desc` ×
+      proceso, mayor a menor) = en qué tapa y proceso acumula experiencia. `tapa_sku` es
+      OPCIONAL en el formulario de registro-tapas.html (en TODOS los procesos, incluidos Apoyo
+      Serigrafía/Revisado/Otra tarea), así que lo que se registró sin tapa sale agrupado como
+      "Sin tapa registrada". La copia del termómetro en registro-tapas.html NO se actualizó.
   3) "📦 Producción mensual — Ingreso PT": CLON del mismo gráfico de la pestaña
     Productividad (mismo renderProdMensualTapas, mismo mecanismo Acumulado/Comparar/
     navegación ◀▶ — ver detalle completo en view-productividad más abajo), en el
