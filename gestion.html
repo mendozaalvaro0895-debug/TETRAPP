@@ -111,6 +111,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .pill-pendiente{background:var(--amber-l);color:var(--amber)}
 .pill-aprobado{background:var(--green-l);color:var(--green)}
 .pill-rechazado{background:var(--red-l);color:var(--red)}
+.pill-vacante{background:var(--amber-l);color:var(--amber)}
 
 /* LOCKERS */
 .lockers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px;padding:16px}
@@ -161,6 +162,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .p-table tr.p-row{cursor:pointer;transition:background .12s}
 .p-table tr.p-row:hover{background:var(--gest-l)}
 .p-table tr.p-row.inactivo{opacity:.55}
+.p-table tr.p-row.vacante{background:var(--amber-l)}
+.p-table tr.p-row.vacante:hover{background:#FFE9B3}
+.p-table tr.p-row.vacante td{border-bottom-style:dashed}
+.p-table tr.p-row.vacante td:first-child{font-weight:800;font-style:italic;color:var(--amber)}
+.p-table tr.p-row.vacante .p-row-avatar{background:transparent;color:var(--amber);border:1.5px dashed var(--amber)}
+.vac-cerrar{margin-left:8px;font-size:10px;font-style:normal;font-weight:700;color:var(--gray);cursor:pointer;padding:1px 6px;border-radius:10px;border:1px solid var(--border);background:var(--card)}
+.vac-cerrar:hover{color:var(--red);border-color:var(--red)}
 .p-table tr.p-row.supervisor{background:#4338CA0D}
 .p-table tr.p-row.supervisor:hover{background:var(--gest-l)}
 .p-table tr.p-row.supervisor td:first-child{font-weight:800}
@@ -486,12 +494,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
           <div class="fg">
             <div class="fl">Fecha de baja</div>
-            <input class="fi" id="mpFechaBaja" type="date" style="width:100%" onchange="if(this.value)document.getElementById('mpActivo').checked=false">
+            <input class="fi" id="mpFechaBaja" type="date" style="width:100%" onchange="if(this.value)document.getElementById('mpActivo').checked=false;actualizarVacanteWrap()">
           </div>
         </div>
         <div class="fg full">
           <label class="fchk">
-            <input type="checkbox" id="mpActivo" checked> Persona activa
+            <input type="checkbox" id="mpActivo" checked onchange="actualizarVacanteWrap()"> Persona activa
+          </label>
+        </div>
+        <div class="fg full" id="mpVacanteWrap" style="display:none">
+          <label class="fchk">
+            <input type="checkbox" id="mpVacante"> Dejar la plaza vacante (sigue visible en el listado, sin nombre)
           </label>
         </div>
       </div>
@@ -1438,10 +1451,15 @@ function renderPersonalGrid() {
 
   var lista = personalTodos.filter(function(p) {
     if (filtroArea !== 'todos' && p.area !== filtroArea) return false;
-    if (soloActivos && !p.activo) return false;
+    var esVacante = esPlazaVacante(p, soloActivos);
+    if (soloActivos && !p.activo && !esVacante) return false;
     if (q) {
-      var hay = (p.nombre || '').toLowerCase().indexOf(q) !== -1 ||
-                (p.codigo || '').toLowerCase().indexOf(q) !== -1;
+      // Una plaza vacante no tiene nombre ni código a la vista: solo se encuentra por
+      // "vacante" o por su proceso/rol (ej. "flameador").
+      var hay = esVacante
+        ? ('vacante ' + (p.proceso_hab || '')).toLowerCase().indexOf(q) !== -1
+        : ((p.nombre || '').toLowerCase().indexOf(q) !== -1 ||
+           (p.codigo || '').toLowerCase().indexOf(q) !== -1);
       if (!hay) return false;
     }
     return true;
@@ -1452,7 +1470,14 @@ function renderPersonalGrid() {
       '<div style="font-size:32px;margin-bottom:8px">🧑‍🤝‍🧑</div>No hay personas que coincidan con el filtro.</div>';
     return;
   }
-  g.innerHTML = '<div class="p-table-wrap">' + buildPersonalTable(lista) + '</div>';
+  g.innerHTML = '<div class="p-table-wrap">' + buildPersonalTable(lista, soloActivos) + '</div>';
+}
+
+// Plaza vacante = ficha de baja que se marcó "dejar la plaza vacante" (personal.plaza_vacante).
+// Solo se muestra como fila anónima en la vista "Solo activos"; con esa casilla apagada se ve
+// la ficha de baja normal, con nombre (es el histórico).
+function esPlazaVacante(p, soloActivos) {
+  return !!p.plaza_vacante && !p.activo && !!soloActivos;
 }
 
 var AREA_GRUPOS = [
@@ -1545,16 +1570,20 @@ function ordenProduccionPorTurno(a, b) {
   return (a.rol === 'supervisor' ? 0 : 1) - (b.rol === 'supervisor' ? 0 : 1);
 }
 
-function buildGrupoBloque(key, label, grupo) {
+function buildGrupoBloque(key, label, grupo, anonVac) {
   var colapsado = !!gruposColapsados[key];
   var chevron = colapsado ? '▸' : '▾';
+  var vacantes = grupo.filter(function(p) { return esPlazaVacante(p, anonVac); }).length;
+  var contador = (grupo.length - vacantes) + (vacantes
+    ? ' <span class="pill pill-vacante" style="margin-left:6px">' + vacantes + (vacantes === 1 ? ' vacante' : ' vacantes') + '</span>'
+    : '');
   var html = '<tbody><tr class="p-group" onclick="toggleGrupoArea(\'' + key + '\')">' +
-    '<td colspan="' + P_TABLE_COLS + '">' + chevron + ' ' + label + ' · ' + grupo.length + '</td></tr></tbody>';
-  if (!colapsado) html += '<tbody>' + grupo.map(buildPersonalRow).join('') + '</tbody>';
+    '<td colspan="' + P_TABLE_COLS + '">' + chevron + ' ' + label + ' · ' + contador + '</td></tr></tbody>';
+  if (!colapsado) html += '<tbody>' + grupo.map(function(p) { return buildPersonalRow(p, anonVac); }).join('') + '</tbody>';
   return html;
 }
 
-function buildPersonalTable(lista) {
+function buildPersonalTable(lista, anonVac) {
   var html = '<table class="p-table"><colgroup>' +
     '<col class="c-persona"><col class="c-codigo"><col class="c-edad"><col class="c-numero">' +
     '<col class="c-inicio"><col class="c-talla"><col class="c-rol"><col class="c-turno"><col class="c-estado">' +
@@ -1570,23 +1599,41 @@ function buildPersonalTable(lista) {
     var grupo = lista.filter(function(p) { return p.area === a.key; }).sort(comparador);
     vistos[a.key] = true;
     if (!grupo.length) return;
-    html += buildGrupoBloque(a.key, a.label, grupo);
+    html += buildGrupoBloque(a.key, a.label, grupo, anonVac);
   });
   var otros = lista.filter(function(p) { return !vistos[p.area]; }).sort(ordenSupervisorPrimero);
-  if (otros.length) html += buildGrupoBloque('otras', 'Otras áreas', otros);
+  if (otros.length) html += buildGrupoBloque('otras', 'Otras áreas', otros, anonVac);
   html += '</table>';
   return html;
 }
 
 var TURNO_PRODUCCION_LBL = { alex: 'Turno Alex', gabino: 'Turno Gabino' };
 
-function buildPersonalRow(p) {
+// Fila de una plaza vacante: sin nombre ni datos personales (es la plaza, no la persona que
+// la dejó) — solo rol/proceso, turno y área (por el grupo). Clic = cubrirla con alguien nuevo
+// (precarga área/rol/proceso/turno); ✕ = cerrar la vacante sin cubrirla.
+function buildFilaVacante(p, rolTxt, turnoTxt) {
+  var guion = '<span class="falta-none">—</span>';
+  return '<tr class="p-row vacante" onclick="cubrirVacante(\'' + p.id + '\')" title="Clic para cubrir esta plaza con una persona nueva">' +
+    '<td><span class="p-row-avatar">＋</span>VACANTE' +
+      '<span class="vac-cerrar" onclick="event.stopPropagation();cerrarVacante(\'' + p.id + '\')" title="Cerrar la vacante (la plaza ya no se necesita)">✕ cerrar</span></td>' +
+    '<td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td>' +
+    '<td>' + escHtml(rolTxt) + '</td>' +
+    '<td>' + escHtml(turnoTxt) + '</td>' +
+    '<td><span class="pill pill-vacante">Vacante</span></td>' +
+    '<td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td>' +
+  '</tr>';
+}
+
+function buildPersonalRow(p, anonVac) {
   var iniciales = escHtml(p.iniciales || (p.nombre ? p.nombre.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase() : '?'));
   var rolTxt = p.rol === 'supervisor' ? 'Supervisor' : (p.proceso_hab || 'Operador');
   var turnoTxt = p.area === 'produccion'
     ? (TURNO_PRODUCCION_LBL[p.turno_produccion] || '—')
     : (p.area === 'tapas' || p.area === 'serig') ? 'Matutino' : '—';
-  var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-activo' : 'pill-inactivo') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>';
+  if (esPlazaVacante(p, anonVac)) return buildFilaVacante(p, rolTxt, turnoTxt);
+  var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-activo' : 'pill-inactivo') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>' +
+    (p.plaza_vacante && !p.activo ? ' <span class="pill pill-vacante" title="Esta baja dejó la plaza como vacante">plaza vacante</span>' : '');
   var lockerChip = p.locker
     ? '<span class="op-mini ok">🗄️ ' + escHtml(p.locker) + '</span>'
     : '<span class="op-mini warn">🗄️ Pendiente</span>';
@@ -1623,6 +1670,14 @@ function buildPersonalRow(p) {
 // MODAL PERSONA — abrir / cerrar / tabs internos
 // ════════════════════════════════════════════════════════════
 var mpEditId = null;
+var mpCubrirVacanteId = null; // id de la ficha de baja cuya plaza vacante se está cubriendo con el alta en curso
+
+// La casilla "dejar la plaza vacante" solo tiene sentido si la persona queda de baja.
+function actualizarVacanteWrap() {
+  var deBaja = !document.getElementById('mpActivo').checked || !!document.getElementById('mpFechaBaja').value;
+  document.getElementById('mpVacanteWrap').style.display = deBaja ? 'block' : 'none';
+  if (!deBaja) document.getElementById('mpVacante').checked = false;
+}
 
 function switchMpTab(tab) {
   ['gen', 'rrhh', 'capacitaciones', 'permisos', 'faltas', 'incidentes', 'bonos'].forEach(function(t) {
@@ -1639,6 +1694,8 @@ function toggleTurnoWrap() {
 
 function abrirNuevaPersona() {
   mpEditId = null;
+  mpCubrirVacanteId = null;
+  document.getElementById('mpVacante').checked = false;
   document.getElementById('mpTitle').textContent = 'Nueva persona';
   document.getElementById('mpNombre').value = '';
   document.getElementById('mpIniciales').value = '';
@@ -1656,6 +1713,7 @@ function abrirNuevaPersona() {
   document.getElementById('mpActivo').checked = true;
   document.getElementById('mpFechaInicio').value = fechaHoy();
   document.getElementById('mpFechaBaja').value = '';
+  actualizarVacanteWrap();
   document.getElementById('mpLocker').value = '';
   document.getElementById('mpTalla').value = '';
   document.getElementById('mpTallaBotas').value = '';
@@ -1675,6 +1733,7 @@ function abrirPerfil(id) {
   var p = personalTodos.find(function(x) { return String(x.id) === String(id); });
   if (!p) return;
   mpEditId = p.id;
+  mpCubrirVacanteId = null;
   document.getElementById('mpTitle').textContent = p.nombre;
   document.getElementById('mpNombre').value = p.nombre || '';
   document.getElementById('mpIniciales').value = p.iniciales || '';
@@ -1691,6 +1750,8 @@ function abrirPerfil(id) {
   document.getElementById('mpActivo').checked = !!p.activo;
   document.getElementById('mpFechaInicio').value = p.fecha_inicio || '';
   document.getElementById('mpFechaBaja').value = p.fecha_baja || '';
+  actualizarVacanteWrap();
+  document.getElementById('mpVacante').checked = !!p.plaza_vacante && document.getElementById('mpVacanteWrap').style.display === 'block';
   document.getElementById('mpLocker').value = p.locker || '';
   document.getElementById('mpTalla').value = p.talla_uniforme || '';
   document.getElementById('mpTallaBotas').value = p.talla_botas || '';
@@ -1730,6 +1791,7 @@ function abrirPerfilEnFaltas(id) {
 function cerrarModalPersona() {
   document.getElementById('modalPersona').classList.remove('open');
   mpEditId = null;
+  mpCubrirVacanteId = null;
 }
 function cerrarSiOverlayPersona(e) {
   if (e.target === document.getElementById('modalPersona')) cerrarModalPersona();
@@ -1764,6 +1826,7 @@ async function guardarPersona() {
     }
   }
   var eraEdicion = !!mpEditId;
+  var cubrirId = mpCubrirVacanteId; // cerrarModalPersona() lo limpia; se necesita después del insert
 
   var payload = {
     nombre: nombre, iniciales: iniciales, area: area, rol: rolBase,
@@ -1777,6 +1840,13 @@ async function guardarPersona() {
     notas_rrhh: (document.getElementById('mpNotasRrhh').value || '').trim() || null
   };
 
+  // plaza_vacante solo viaja en el payload cuando hace falta (se marca, o se desmarca a alguien
+  // que la tenía) — así guardar a cualquier otra persona sigue funcionando aunque la columna
+  // nueva (sql/personal_plaza_vacante_v1.sql) todavía no exista en la base.
+  var vacante = !activo && document.getElementById('mpVacante').checked;
+  var personaActual = mpEditId ? personalTodos.find(function(x) { return String(x.id) === String(mpEditId); }) : null;
+  if (vacante || (personaActual && personaActual.plaza_vacante)) payload.plaza_vacante = vacante;
+
   try {
     var r;
     if (mpEditId) {
@@ -1787,15 +1857,49 @@ async function guardarPersona() {
       r = await db.from('personal').insert(payload);
     }
     if (r.error) throw r.error;
+    // Alta que cubre una vacante: la plaza deja de estar vacante
+    if (cubrirId) {
+      var rc = await db.from('personal').update({ plaza_vacante: false }).eq('id', cubrirId);
+      if (rc.error) console.warn('No se pudo cerrar la vacante cubierta:', rc.error);
+    }
     cerrarModalPersona();
     await cargarPersonal();
-    showToast(eraEdicion ? '✅ Persona actualizada' : '✅ Persona creada');
+    showToast(cubrirId ? '✅ Vacante cubierta — persona creada' : (eraEdicion ? '✅ Persona actualizada' : '✅ Persona creada'));
   } catch (e) {
     if (e && (e.code === '23505' || /personal_codigo_key/.test(e.message || ''))) {
       showToast('⚠️ Ese código ya está en uso — prueba con ' + siguienteCodigoLibre(area), '#B83232');
+    } else if (e && /plaza_vacante/.test(e.message || '')) {
+      showToast('⚠️ Falta correr sql/personal_plaza_vacante_v1.sql en Supabase para usar plazas vacantes', '#B83232');
     } else {
       showToast('❌ Error: ' + e.message, '#B83232');
     }
+  }
+}
+
+// Clic en una plaza vacante: abre el alta con área/rol/proceso/turno de la plaza ya puestos;
+// al guardar, la vacante se cierra sola (guardarPersona → cubrirId).
+function cubrirVacante(id) {
+  var v = personalTodos.find(function(x) { return String(x.id) === String(id); });
+  if (!v) return;
+  abrirNuevaPersona();
+  mpCubrirVacanteId = v.id;
+  document.getElementById('mpTitle').textContent = 'Cubrir vacante';
+  document.getElementById('mpArea').value = v.area || 'tapas';
+  cambiarAreaPersona(); // turno visible si es Producción + código sugerido para esa área
+  document.getElementById('mpRolBase').value = v.rol === 'supervisor' ? 'supervisor' : 'operador';
+  document.getElementById('mpProceso').value = v.proceso_hab || '';
+  if (v.area === 'produccion') document.getElementById('mpTurno').value = v.turno_produccion || '';
+}
+
+async function cerrarVacante(id) {
+  if (!confirm('¿Cerrar esta vacante? La plaza deja de mostrarse en el listado (la ficha de baja se conserva).')) return;
+  try {
+    var r = await db.from('personal').update({ plaza_vacante: false }).eq('id', id);
+    if (r.error) throw r.error;
+    await cargarPersonal();
+    showToast('✅ Vacante cerrada');
+  } catch (e) {
+    showToast('❌ Error: ' + e.message, '#B83232');
   }
 }
 

@@ -402,6 +402,21 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   El/la supervisor(a) de cada grupo se ordena SIEMPRE primero dentro de su área
   (`ordenSupervisorPrimero()`, orden estable — el resto conserva activo desc/nombre asc) y se
   distingue con "★ " antes del nombre + fondo tenue + nombre en negrita (`tr.p-row.supervisor`).
+  PLAZAS VACANTES (oct/2026, `personal.plaza_vacante`, `sql/personal_plaza_vacante_v1.sql`
+  = SQL pendiente #31): al dar de baja a alguien, el formulario (Datos generales) muestra la
+  casilla "Dejar la plaza vacante" (`actualizarVacanteWrap()`, solo visible si la persona queda
+  inactiva). Esa ficha de baja, con la marca, se pinta en el listado "Solo activos" como una
+  fila anónima `VACANTE` (`buildFilaVacante()` — rol/proceso, turno y área de quien se fue,
+  SIN nombre/código/edad/teléfono/locker) y el encabezado del grupo suma "N vacantes".
+  `esPlazaVacante(p, soloActivos)` es la única condición (marca + inactivo + "Solo activos"
+  prendido): con "Solo activos" apagado se ve la ficha de baja normal con nombre + chip "plaza
+  vacante". Es una marca EXPLÍCITA a propósito — `personal` tiene decenas de bajas históricas
+  que NO deben salir como vacantes. Clic en la fila = `cubrirVacante(id)` (abre el alta con
+  área/rol/proceso/turno precargados, `mpCubrirVacanteId`; al guardar, `guardarPersona()` apaga
+  la marca de la ficha vieja); "✕ cerrar" = `cerrarVacante(id)` (la plaza ya no se necesita).
+  El buscador solo encuentra vacantes por "vacante" o por su proceso (no tienen nombre a la
+  vista). `plaza_vacante` solo viaja en el payload cuando se marca/desmarca, así guardar a
+  cualquier otra persona no se rompe si el SQL aún no corrió.
   ⚠️ Producción usa un comparador aparte (`ordenProduccionPorTurno()`, elegido en
   `buildPersonalTable()` solo para `a.key==='produccion'`): agrupa primero por
   `turno_produccion` (Gabino, luego Alex — mismo orden que la hoja de asistencia de planta;
@@ -641,6 +656,10 @@ Notas críticas:
 29. `sql/solicitud_lineas_componentes_tapas_v1.sql` (oct/2026) — columnas `sku_contratapa`, `sku_liner`, `sku_banda` (y `sku_base` por si faltara) en `solicitud_lineas`. Sin correrlo, el formulario de Tapas no puede guardar una ficha que lleve Contratapa, Liner o Banda.
 
 30. `sql/comandas_aprobacion_v1.sql` (oct/2026) — columnas de aprobación en `comandas` (estado_aprobacion/aprobado_por/aprobado_en/motivo_rechazo). Sin correrlo: no se puede aprobar/rechazar (el botón avisa) y todo cuenta como aprobado.
+
+31. `sql/personal_plaza_vacante_v1.sql` (oct/2026) — columna `plaza_vacante` en `personal` +
+    deja marcada como vacante la plaza de Lesly Rojas (Serigrafía, `t-18`, dada de baja). Sin
+    correrlo, la casilla "Dejar la plaza vacante" avisa que falta el SQL y no guarda.
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
