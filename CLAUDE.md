@@ -179,6 +179,7 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
     termComandas — la query de cargarTermometro ahora también trae `proceso`), ordenado
     de mayor a menor unidades para ver de un vistazo en qué proceso tiene más experiencia
     cada operario (quién arma más, quién tiene más horas de flameado/impresión, etc.).
+    Desde oct/2026 el desplegable (buildTermDetalle) son DOS columnas: izquierda = 📅 Producción diaria (gráfico de barras por día + resumen + leyenda) y, debajo, ⚙️ Producción por proceso en BARRAS con su % del total (buildTermProcesos); derecha = 🎯 Productividad y habilidad (solo POR TAPA Y PROCESO, que es la lista larga). El desglose por proceso se movió a la izquierda para aprovechar el espacio libre bajo el gráfico diario.
     DESPLEGABLE EN DOS BLOQUES (oct/2026, `buildTermDetalle`; en pantalla angosta se apilan):
     · 📅 PRODUCCIÓN DIARIA (`buildTermDiario`): una barra por día del mes con el total del día
       (compacto "4.5k") — sirve para ver si algún día alguien NO subió producción. Estado de cada
