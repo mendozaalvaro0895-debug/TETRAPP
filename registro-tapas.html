@@ -53,10 +53,38 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .term-row-open .term-bar-wrap{background:#fff}
 .term-bar{background:#1A6B5B;height:100%;border-radius:20px;transition:width .5s ease}
 .term-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:#1A6B5B;white-space:nowrap;text-align:right;min-width:72px}
-.term-detalle{padding:2px 6px 10px 16px;display:flex;flex-direction:column;gap:4px;background:#EBF7F4;border-radius:0 0 8px 8px}
-.term-detalle-row{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#3A3A38;max-width:300px}
-.term-detalle-row span:last-child{font-family:'DM Mono',monospace;font-weight:700;color:#1A6B5B}
+.term-detalle{padding:8px 10px 12px 12px;display:flex;flex-direction:column;gap:16px;background:#EBF7F4;border-radius:0 0 8px 8px}
+.term-detalle-row{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#3A3A38;max-width:340px}
+.term-detalle-row span:last-child{font-family:'DM Mono',monospace;font-weight:700;color:#1A6B5B;white-space:nowrap;flex-shrink:0}
 .term-detalle-vacio{font-size:11px;color:#9A9A98;font-style:italic}
+.td-bloque{min-width:0}
+.td-titulo{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#6B6B6A;margin-bottom:8px}
+.td-sub{font-size:10px;font-weight:700;color:#9A9A98;margin:10px 0 4px}
+.dg{display:flex;align-items:flex-end;gap:2px;height:78px;border-bottom:1px solid #C8EDE7}
+.dg-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.dg-val{font-family:'DM Mono',monospace;font-size:7px;color:#1A6B5B;line-height:1.2;margin-bottom:2px;white-space:nowrap}
+.dg-bar{width:100%;max-width:22px;border-radius:3px 3px 0 0;background:#1A6B5B}
+.dg-bar.falta{background:#FEE2E2;border:1px dashed #B83232;height:16px}
+.dg-bar.pend{background:#B87200;height:16px}
+.dg-bar.aus{background:#D8D6D0;height:8px}
+.dg-bar.hoy{background:transparent;border:1px dashed #1A6B5B;height:10px}
+.dg-dias{display:flex;gap:2px;margin-top:3px}
+.dg-d{flex:1;min-width:0;text-align:center;font-size:8px;color:#6B6B6A}
+.dg-d.falta{color:#B83232;font-weight:800}
+.dg-d.nolab,.dg-d.futuro,.dg-d.fuera{color:#9A9A98;opacity:.55}
+.dg-resumen{font-size:11px;color:#6B6B6A;margin-top:8px;line-height:1.6}
+.dg-resumen b.mal{color:#B83232}
+.dg-resumen b.bien{color:#1A6B5B}
+.dg-leyenda{display:flex;flex-wrap:wrap;gap:10px;font-size:9px;color:#9A9A98;margin-top:4px}
+.dg-leyenda i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:3px;vertical-align:-1px}
+.td-lista{max-height:196px;overflow-y:auto;padding-right:4px}
+.td-fila{display:grid;grid-template-columns:84px minmax(0,1fr) auto;gap:8px;align-items:baseline;font-size:11px;padding:3px 0;border-bottom:1px dashed #C8EDE7}
+.td-proc{color:#6B6B6A;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-tapa{color:#0C0C0B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.td-tapa.sin{color:#9A9A98;font-style:italic}
+.td-und{font-family:'DM Mono',monospace;font-weight:700;color:#1A6B5B;white-space:nowrap}
+@media (max-width:520px){.dg-val{display:none}.dg,.dg-dias{gap:1px}.dg-d{font-size:7px;letter-spacing:-.5px}}
+.field input.err{border-color:#B83232;background:#FEF2F2}
 .op-sel-tag{font-size:9px;font-weight:800;letter-spacing:1px;color:#1A6B5B;margin-top:6px}
 
 /* FORM */
@@ -236,7 +264,7 @@ function getCapacidad(proceso, metodo) {
 async function cargarOperarios() {
   try {
     var r = await db.from('personal')
-      .select('codigo, nombre, iniciales, color_hex, rol')
+      .select('codigo, nombre, iniciales, color_hex, rol, fecha_inicio, fecha_baja')
       .eq('area', 'tapas').eq('activo', true).order('codigo');
     if (r.error) throw r.error;
     var todos = r.data || [];
@@ -293,8 +321,14 @@ function buildOpCard(op) {
 // ── Personal y Roles: producción del mes por persona ──────────
 // Mismo bloque que Tapas → Inicio: la barra es relativa a quien más lleva (100%),
 // y al tocar un nombre se despliega el desglose por proceso.
-var termComandas = [];
+var termComandas = [];          // solo las aprobadas (las que suman)
+var termComandasTodas = [];     // todas las del mes, para distinguir "por aprobar" de "sin registro"
+var termAsistencia = {};        // { codigo: { 'YYYY-MM-DD': estado } } — puede quedar vacío si no hay permiso de lectura
+var feriadosSet = {};           // { 'YYYY-MM-DD': true }
 var termExpandidoCodigo = null;
+
+// Sin la columna (o anterior a la aprobación) = aprobada, igual que en el resto de la app
+function comandaCuenta(c) { return !c.estado_aprobacion || c.estado_aprobacion === 'aprobada'; }
 
 function fechaGT() {
   return new Date(Date.now() - 6 * 3600 * 1000).toISOString().slice(0, 10);
@@ -333,13 +367,193 @@ async function cargarTermometro() {
     var ultimo = new Date(parseInt(hoy.slice(0, 4), 10), parseInt(hoy.slice(5, 7), 10), 0).getDate();
     var hasta = hoy.slice(0, 8) + (ultimo < 10 ? '0' : '') + ultimo;
     var r = await db.from('comandas')
-      .select('*, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
+      .select('*, comanda_tareas(proceso, cantidad, unidades_completadas, estado, tapa_sku, tapa_desc)')
       .gte('fecha', desde).lte('fecha', hasta);
     if (r.error) throw r.error;
-    // Solo suman las comandas aprobadas (sin la columna o anteriores a la aprobación = aprobadas)
-    termComandas = (r.data || []).filter(function(c) { return !c.estado_aprobacion || c.estado_aprobacion === 'aprobada'; });
+    // Solo suman las comandas aprobadas
+    termComandasTodas = r.data || [];
+    termComandas = termComandasTodas.filter(comandaCuenta);
+
+    // Asistencia y feriados del mes: permiten distinguir "no subió producción" de "ausente" o "domingo/feriado".
+    // Si el rol no tiene permiso de lectura, el detalle sigue funcionando sin esa distinción.
+    termAsistencia = {};
+    feriadosSet = {};
+    try {
+      var ra = await db.from('asistencia_diaria').select('fecha,operador_codigo,estado')
+        .eq('area', 'tapas').eq('turno', 'dia').gte('fecha', desde).lte('fecha', hasta);
+      (ra.data || []).forEach(function(row) {
+        if (!termAsistencia[row.operador_codigo]) termAsistencia[row.operador_codigo] = {};
+        termAsistencia[row.operador_codigo][row.fecha] = row.estado;
+      });
+    } catch(e) { termAsistencia = {}; }
+    try {
+      var rf = await db.from('dias_feriados').select('fecha').gte('fecha', desde).lte('fecha', hasta);
+      (rf.data || []).forEach(function(row) { feriadosSet[row.fecha] = true; });
+    } catch(e) { feriadosSet = {}; }
+
     renderTermometro();
   } catch(e) { console.error('cargarTermometro:', e); }
+}
+
+// ── Detalle desplegable de cada persona: dos bloques ───────────
+// 1) Producción diaria del mes (¿algún día sin registro?)  2) Productividad / habilidad
+// (por proceso y por tapa+proceso). Mismo detalle que Tapas → Inicio → Personal y Roles.
+
+// { 'YYYY-MM-DD': { und, cuenta, pend } } de UNA persona. `cuenta` = hay una comanda aprobada ese
+// día; `pend` = solo hay comandas por aprobar (no suman, pero sí hubo registro).
+function diarioDeOperario(codigo) {
+  var m = {};
+  termComandasTodas.forEach(function(c) {
+    if ((c.operario_id || '—') !== codigo) return;
+    var d = m[c.fecha] || (m[c.fecha] = { und: 0, cuenta: false, pend: false });
+    if (comandaCuenta(c)) {
+      d.cuenta = true;
+      (c.comanda_tareas || []).forEach(function(t) {
+        if (t.estado === 'Terminada') d.und += undDeTarea(t);
+      });
+    } else if (c.estado_aprobacion === 'pendiente') {
+      d.pend = true;
+    }
+  });
+  return m;
+}
+
+// Estado de un día del calendario para una persona (orden importa: producir un domingo cuenta).
+function estadoDiaTerm(fecha, info, asis, o, hoy) {
+  if (o.fecha_inicio && fecha < o.fecha_inicio) return 'fuera';
+  if (o.fecha_baja && fecha > o.fecha_baja) return 'fuera';
+  if (info && info.cuenta && info.und > 0) return 'prod';
+  var dow = new Date(fecha + 'T12:00:00').getDay();
+  if (dow === 0 || feriadosSet[fecha]) return 'nolab';
+  if (fecha > hoy) return 'futuro';
+  if (info && info.pend) return 'pend';
+  if (asis && asis[fecha] === 'ausente') return 'aus';
+  if (fecha === hoy) return 'hoy';
+  return 'falta';
+}
+
+function compactoUnd(n) {
+  return n >= 1000 ? (Math.round(n / 100) / 10).toString().replace(/\.0$/, '') + 'k' : String(n);
+}
+
+function buildTermDiario(o) {
+  var hoy = fechaGT();
+  var ym = hoy.slice(0, 7);
+  var ultimo = new Date(parseInt(hoy.slice(0, 4), 10), parseInt(hoy.slice(5, 7), 10), 0).getDate();
+  var dias = diarioDeOperario(o.codigo);
+  var asis = termAsistencia[o.codigo] || {};
+
+  var estados = [], maxDia = 0, total = 0, conReg = 0, faltantes = [], pendientes = 0;
+  for (var d = 1; d <= ultimo; d++) {
+    var fecha = ym + '-' + (d < 10 ? '0' : '') + d;
+    var info = dias[fecha];
+    var st = estadoDiaTerm(fecha, info, asis, o, hoy);
+    estados.push({ d: d, fecha: fecha, st: st, und: info ? info.und : 0 });
+    if (st === 'prod') { conReg++; total += info.und; if (info.und > maxDia) maxDia = info.und; }
+    else if (st === 'falta') faltantes.push(d);
+    else if (st === 'pend') pendientes++;
+  }
+
+  var cols = estados.map(function(e) {
+    var titulo = 'Día ' + e.d + ' · ';
+    var barra = '', val = '';
+    if (e.st === 'prod') {
+      var h = Math.max(5, Math.round((e.und / maxDia) * 52));
+      barra = '<div class="dg-bar" style="height:' + h + 'px"></div>';
+      val = '<div class="dg-val">' + compactoUnd(e.und) + '</div>';
+      titulo += e.und.toLocaleString() + ' und';
+    } else if (e.st === 'falta') {
+      var aEse = asis[e.fecha];
+      barra = '<div class="dg-bar falta"></div>';
+      titulo += 'SIN registro de producción' + (aEse ? ' (asistencia: ' + aEse + ')' : ' (sin asistencia marcada)');
+    } else if (e.st === 'pend') {
+      barra = '<div class="dg-bar pend"></div>';
+      titulo += 'registro por aprobar (aún no suma)';
+    } else if (e.st === 'aus') {
+      barra = '<div class="dg-bar aus"></div>';
+      titulo += 'ausente';
+    } else if (e.st === 'hoy') {
+      barra = '<div class="dg-bar hoy"></div>';
+      titulo += 'hoy, en curso';
+    } else if (e.st === 'nolab') {
+      titulo += feriadosSet[e.fecha] ? 'feriado' : 'domingo';
+    } else if (e.st === 'fuera') {
+      titulo += 'fuera de su período (ingreso/baja)';
+    } else {
+      titulo += 'aún no llega';
+    }
+    return '<div class="dg-col" title="' + escHtml(titulo) + '">' + val + barra + '</div>';
+  }).join('');
+  var etiquetas = estados.map(function(e) {
+    return '<div class="dg-d ' + e.st + '">' + e.d + '</div>';
+  }).join('');
+
+  var resumen;
+  if (!conReg && !faltantes.length) {
+    resumen = '<b>Sin registros este mes todavía.</b>';
+  } else {
+    resumen = 'Registró producción <b class="' + (faltantes.length ? '' : 'bien') + '">' + conReg + ' día' + (conReg === 1 ? '' : 's') + '</b>'
+      + (conReg ? ' · promedio <b>' + Math.round(total / conReg).toLocaleString() + ' und/día</b>' : '')
+      + (faltantes.length ? '<br><b class="mal">Sin registro: día' + (faltantes.length === 1 ? ' ' : 's ') + faltantes.join(', ') + '</b>' : '')
+      + (pendientes ? '<br>' + pendientes + ' día' + (pendientes === 1 ? '' : 's') + ' con registro por aprobar' : '');
+  }
+
+  return '<div class="td-titulo">📅 Producción diaria</div>'
+    + '<div class="dg">' + cols + '</div><div class="dg-dias">' + etiquetas + '</div>'
+    + '<div class="dg-resumen">' + resumen + '</div>'
+    + '<div class="dg-leyenda"><span><i style="background:#1A6B5B"></i>produjo</span>'
+    + '<span><i style="background:#FEE2E2;border:1px dashed #B83232"></i>sin registro</span>'
+    + '<span><i style="background:#D8D6D0"></i>ausente</span>'
+    + '<span><i style="background:#B87200"></i>por aprobar</span></div>';
+}
+
+// Unidades por tapa (SKU) y proceso — la "habilidad" real: en qué tapa y proceso acumula experiencia.
+// Las tareas anteriores a que la tapa fuera obligatoria quedan juntas como "Sin tapa registrada".
+function agruparPorTapaYProceso(codigo) {
+  var map = {};
+  termComandas.forEach(function(c) {
+    if ((c.operario_id || '—') !== codigo) return;
+    (c.comanda_tareas || []).forEach(function(t) {
+      if (t.estado !== 'Terminada') return;
+      var proc = t.proceso || 'Otra tarea';
+      var sku = (t.tapa_sku || '').trim();
+      var desc = (t.tapa_desc || '').trim();
+      var llave = proc + '|' + (sku || desc.toLowerCase());
+      var etiqueta = sku ? ((desc && desc.indexOf(sku) === -1) ? sku + ' — ' + desc : (desc || sku)) : desc;
+      if (!map[llave]) map[llave] = { proceso: proc, tapa: etiqueta, und: 0 };
+      map[llave].und += undDeTarea(t);
+    });
+  });
+  return Object.keys(map).map(function(k) { return map[k]; })
+    .sort(function(a, b) { return b.und - a.und; });
+}
+
+function buildTermHabilidadFila(f) {
+  return '<div class="td-fila"><span class="td-proc" title="' + escHtml(f.proceso) + '">' + escHtml(f.proceso) + '</span>'
+    + (f.tapa
+        ? '<span class="td-tapa" title="' + escHtml(f.tapa) + '">' + escHtml(f.tapa) + '</span>'
+        : '<span class="td-tapa sin">Sin tapa registrada</span>')
+    + '<span class="td-und">' + f.und.toLocaleString() + ' und</span></div>';
+}
+
+function buildTermProductividad(o) {
+  var procs = procesosDeOperario(o.codigo);
+  var procKeys = Object.keys(procs).sort(function(a, b) { return procs[b] - procs[a]; });
+  var tapas = agruparPorTapaYProceso(o.codigo);
+  var html = '<div class="td-titulo">🎯 Productividad y habilidad</div>';
+  if (!procKeys.length) return html + '<div class="term-detalle-vacio">Sin tareas registradas este mes</div>';
+  html += '<div class="td-sub">POR PROCESO</div>'
+    + procKeys.map(function(p) { return buildTermDetalleRow(p, procs[p]); }).join('')
+    + '<div class="td-sub">POR TAPA Y PROCESO · ' + tapas.length + '</div>'
+    + '<div class="td-lista">' + tapas.map(buildTermHabilidadFila).join('') + '</div>';
+  return html;
+}
+
+function buildTermDetalle(o) {
+  return '<div class="term-detalle">'
+    + '<div class="td-bloque">' + buildTermDiario(o) + '</div>'
+    + '<div class="td-bloque">' + buildTermProductividad(o) + '</div>'
+    + '</div>';
 }
 
 function toggleTermDetalle(codigo) {
@@ -359,13 +573,7 @@ function buildTermometroRow(o, maxUnd) {
     + '<div class="term-bar-wrap"><div class="term-bar" style="width:' + pct + '%"></div></div>'
     + '<div class="term-val">' + o.und.toLocaleString() + ' und</div>'
     + '</div>';
-  if (abierto) {
-    var procs = procesosDeOperario(o.codigo);
-    var keys = Object.keys(procs).sort(function(a, b) { return procs[b] - procs[a]; });
-    html += '<div class="term-detalle">' + (keys.length
-      ? keys.map(function(p) { return buildTermDetalleRow(p, procs[p]); }).join('')
-      : '<div class="term-detalle-vacio">Sin tareas registradas este mes</div>') + '</div>';
-  }
+  if (abierto) html += buildTermDetalle(o);
   return html;
 }
 
@@ -373,13 +581,15 @@ function renderTermometro() {
   var wrap = document.getElementById('termometroWrap');
   if (!wrap || !operarios.length) return;
   var und = unidadesPorOperario();
-  var ops = operarios.map(function(p) { return { codigo: p.codigo, nombre: p.nombre, und: und[p.codigo] || 0 }; })
+  var ops = operarios.map(function(p) {
+    return { codigo: p.codigo, nombre: p.nombre, und: und[p.codigo] || 0, fecha_inicio: p.fecha_inicio || null, fecha_baja: p.fecha_baja || null };
+  })
     .sort(function(a, b) { return b.und - a.und; });
   var maxUnd = ops.length ? ops[0].und : 0;
   var mes = new Date(fechaGT() + 'T12:00:00').toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
   wrap.innerHTML = '<div class="mtx-wrap">'
     + '<div class="mtx-hdr"><span class="mtx-hdr-title">👥 Personal y Roles</span>'
-    + '<span class="mtx-hdr-sub">Producción de ' + escHtml(mes) + ' por operario · toca un nombre para ver el desglose por proceso</span></div>'
+    + '<span class="mtx-hdr-sub">Producción de ' + escHtml(mes) + ' por operario · toca un nombre para ver su producción diaria y su habilidad por proceso y tapa</span></div>'
     + ops.map(function(o) { return buildTermometroRow(o, maxUnd); }).join('')
     + '</div>';
 }
@@ -442,9 +652,9 @@ function buildTareaCard(n) {
     + '</div>'
     + '<div class="field" id="tarea_' + n + '_otro_wrap" style="display:none;margin-bottom:10px"><label>Especifica la tarea</label>'
     +   '<input type="text" id="tarea_' + n + '_otro" placeholder="Describe la tarea realizada…"></div>'
-    + '<div class="field" style="margin-bottom:10px"><label>Tapa trabajada</label>'
+    + '<div class="field" style="margin-bottom:10px"><label>Tapa o envase trabajado *</label>'
     +   '<div class="ac-wrap">'
-    +     '<input type="text" id="tarea_' + n + '_tapa" placeholder="Escribe SKU o descripción…" autocomplete="off" oninput="acBuscar(\'tarea_' + n + '_tapa\',\'tarea_' + n + '_drop\',this.value)" data-sku="">'
+    +     '<input type="text" id="tarea_' + n + '_tapa" placeholder="Busca SKU o descripción y elige" autocomplete="off" oninput="acBuscar(\'tarea_' + n + '_tapa\',\'tarea_' + n + '_drop\',this.value)" data-sku="">'
     +     '<div class="ac-drop" id="tarea_' + n + '_drop"></div>'
     +   '</div>'
     + '</div>'
@@ -497,6 +707,9 @@ function buildAcItem(inputId, dropId, item) {
 function acBuscar(inputId, dropId, query) {
   var drop = document.getElementById(dropId);
   if (!drop) return;
+  // Al teclear de nuevo, la elección anterior ya no vale: hay que elegir de la lista
+  var inp = document.getElementById(inputId);
+  if (inp) { inp.dataset.sku = ''; inp.classList.remove('err'); }
   if (!query || query.length < 2) { drop.style.display = 'none'; return; }
   var toks = acNorm(query).split(/[^a-z0-9]+/).filter(Boolean);
   if (!toks.length) { drop.style.display = 'none'; return; }
@@ -529,6 +742,7 @@ function acElegir(inputId, dropId, sku, desc) {
   if (inp) {
     inp.value = sku + ' — ' + desc;
     inp.dataset.sku = sku;
+    inp.classList.remove('err');
   }
   var drop = document.getElementById(dropId);
   if (drop) drop.style.display = 'none';
@@ -554,8 +768,10 @@ function recopilarTareas() {
     var cantidad = parseInt((document.getElementById('tarea_' + n + '_cant') || {}).value || 0) || 0;
     var metodo = (document.getElementById('tarea_' + n + '_met') || {}).value || 'manual';
     var cap = getCapacidad(proceso, metodo);
-    if (cantidad > 0 || proceso) {
+    // Una tarjeta sin cantidad no es una tarea: no se guarda ni se le exige tapa
+    if (cantidad > 0) {
       tareas.push({
+        n: n,
         proceso: proceso,
         tapa_desc: tapaInp ? tapaInp.value : '',
         tapa_sku: (tapaInp && tapaInp.dataset.sku) || '',
@@ -578,8 +794,31 @@ async function guardarRegistro() {
   if (!fecha) { showToast('⚠️ Selecciona la fecha', '#B83232'); return; }
 
   var tareas = recopilarTareas();
-  var tareasConCant = tareas.filter(function(t){ return t.cantidad > 0; });
-  if (!tareasConCant.length) { showToast('⚠️ Agrega al menos una tarea con cantidad', '#B83232'); return; }
+  if (!tareas.length) { showToast('⚠️ Agrega al menos una tarea con cantidad', '#B83232'); return; }
+
+  // La tapa (o envase) es obligatoria en TODA tarea: sin ella no se puede medir qué tan
+  // rápido ni en qué producto trabaja cada persona. Debe venir de la lista (SKU real);
+  // si el catálogo no cargó, se acepta el texto escrito para no bloquear el registro.
+  var catalogoListo = inventarioCache.length > 0;
+  var sinTapa = tareas.filter(function(t) {
+    return catalogoListo ? !t.tapa_sku : !String(t.tapa_desc || '').trim();
+  });
+  if (sinTapa.length) {
+    var primera = document.getElementById('tarea_' + sinTapa[0].n + '_tapa');
+    sinTapa.forEach(function(t) {
+      var inp = document.getElementById('tarea_' + t.n + '_tapa');
+      if (inp) inp.classList.add('err');
+    });
+    if (primera) {
+      primera.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      primera.focus();
+    }
+    var hayTexto = catalogoListo && String(sinTapa[0].tapa_desc || '').trim();
+    showToast(hayTexto
+      ? '⚠️ Elige la tapa de la lista desplegable (tarea ' + sinTapa[0].n + ')'
+      : '⚠️ Indica la tapa o envase trabajado en la tarea ' + sinTapa[0].n, '#B83232');
+    return;
+  }
 
   var totalPT = tareas.reduce(function(s, t){ return s + t.cantidad; }, 0);
 

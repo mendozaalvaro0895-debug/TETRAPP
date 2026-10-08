@@ -84,6 +84,7 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
 .tarea-row td { padding:5px 4px; vertical-align:middle; border-bottom:1px solid #F0EDE8; }
 .tarea-row:last-child td { border-bottom:none; }
 .tarea-row select, .tarea-row input { border:1.5px solid #C8C6C0; border-radius:8px; padding:7px 8px; font-size:12px; width:100%; }
+.tarea-row input.err { border-color:#B83232; background:#FEF2F2; }
 .estado-sel, .metodo-sel { border:1.5px solid #C8C6C0; border-radius:8px; padding:6px 8px; font-size:12px; background:#fff; cursor:pointer; }
 .metodo-sel { font-size:11px; width:100%; }
 .metodo-sel.maquina { border-color:#1A6B5B; background:#EBF7F4; color:#0D4035; font-weight:700; }
@@ -926,6 +927,9 @@ function acItemHtml(i, fnName, n) {
 async function buscarSKURow(n, query) {
   const drop = document.getElementById(`row_${n}_drop`);
   if (!drop) return;
+  // Al teclear de nuevo, la elección anterior ya no vale: hay que elegir de la lista
+  const inp = document.getElementById(`row_${n}_tapa`);
+  if (inp) { inp.dataset.sku = ''; inp.classList.remove('err'); }
   if (!query || query.length < 2) { drop.style.display = 'none'; return; }
   const html = acListaHtml(await getInventario(), query, i => acItemHtml(i, 'seleccionarTapa', n));
   if (!html) { drop.style.display = 'none'; return; }
@@ -938,6 +942,7 @@ function seleccionarTapa(n, sku, desc) {
   if (inp) {
     inp.value = sku + ' — ' + desc;
     inp.dataset.sku = sku;
+    inp.classList.remove('err');
   }
   const drop = document.getElementById(`row_${n}_drop`);
   if (drop) drop.style.display = 'none';
@@ -1060,6 +1065,7 @@ async function guardar() {
     const cap = getCapacidad(proceso, metodo);
     if (cantidad > 0 || proceso) {
       tareas.push({
+        n: n,
         proceso: proceso,
         tapa_desc: tapaInput?.value || '',
         tapa_sku: tapaInput?.dataset?.sku || '',
@@ -1077,7 +1083,23 @@ async function guardar() {
     showToast('❌ Agrega al menos una tarea', '#B83232');
     return;
   }
-  
+
+  // La tapa (o envase) es obligatoria en toda tarea Terminada: sin ella no se puede medir
+  // qué tan rápido ni en qué producto trabaja cada persona. Debe venir de la lista (SKU real);
+  // si el catálogo no cargó, se acepta el texto escrito para no bloquear el guardado.
+  const catalogoListo = (await getInventario()).length > 0;
+  const sinTapa = tareas.filter(t => t.estado === 'Terminada' && t.cantidad > 0
+    && (catalogoListo ? !t.tapa_sku : !String(t.tapa_desc || '').trim()));
+  if (sinTapa.length) {
+    sinTapa.forEach(t => document.getElementById(`row_${t.n}_tapa`)?.classList.add('err'));
+    const primera = document.getElementById(`row_${sinTapa[0].n}_tapa`);
+    if (primera) { primera.scrollIntoView({ behavior: 'smooth', block: 'center' }); primera.focus(); }
+    showToast(catalogoListo && String(sinTapa[0].tapa_desc || '').trim()
+      ? '❌ Elige la tapa de la lista desplegable (tarea terminada sin SKU)'
+      : '❌ Indica la tapa o envase de cada tarea terminada', '#B83232');
+    return;
+  }
+
   const op = getOperarioById(operarioId);
   const totalPT = tareas.filter(t => t.estado === 'Terminada').reduce((s, t) => s + t.cantidad, 0);
   
@@ -1383,6 +1405,10 @@ async function guardarImportacion() {
     showToast('❌ No hay tareas válidas (falta proceso o cantidad) para guardar', '#B83232');
     return;
   }
+  // Aviso (no bloqueo): un reporte de WhatsApp trae muchas líneas en texto libre. Las que queden sin
+  // SKU se guardan igual, pero no se podrán medir por tapa en Personal y Roles.
+  const sinSku = gruposValidos.reduce((s, g) => s + g.tareas.filter(t => t.cantidad > 0 && t.proceso && !t.sku).length, 0);
+  if (sinSku && !confirm(sinSku + ' tarea(s) no tienen SKU de tapa asignado (insignia roja "sin SKU").\n\nSe guardarán, pero no se podrán medir por tapa.\n\n¿Guardar de todos modos?')) return;
   const btn = document.getElementById('btnGuardarImportacion');
   btn.disabled = true; btn.textContent = '⏳ Guardando...';
   let comandasCreadas = 0, tareasCreadas = 0;

@@ -76,7 +76,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | `serigrafia.html` | Módulo admin Serigrafía: Inicio (board) + Movimientos + Productividad + Personal |
 | `registro-serigrafia.html` | Formulario móvil rol `operativo_serig`: Flameado / Impresión / Empaque |
 | `comandas.html` | Registro de producción diaria por operario (vista admin) + "📥 Importar reporte WhatsApp" (oct/2026, lotes multi-operario/multi-día) |
-| `registro-tapas.html` | Formulario móvil rol `operativo`/`supervisor_tapas`: comanda concluida, correlativo CMD-### vía trigger DB. Datos del día = solo fecha (hora_inicio/cierre quedan null; supervisor se adjunta solo desde `personal`). Pantalla de selección: lista a TODO el personal activo de Tapas (supervisión primero, ficha destacada) y, debajo, el bloque "Personal y Roles" (copia del de Tapas → Inicio: barra relativa al líder del mes, clic en un nombre despliega el desglose por proceso; visible para todos). Se probó un termómetro por ficha contra meta fija de 10,000 und/día y se descartó. Autocompletar de tapa: todas las coincidencias, por palabras sin tildes, facturables primero |
+| `registro-tapas.html` | Formulario móvil rol `operativo`/`supervisor_tapas`: comanda concluida, correlativo CMD-### vía trigger DB. Datos del día = solo fecha (hora_inicio/cierre quedan null; supervisor se adjunta solo desde `personal`). Pantalla de selección: lista a TODO el personal activo de Tapas (supervisión primero, ficha destacada) y, debajo, el bloque "Personal y Roles" (copia del de Tapas → Inicio: barra relativa al líder del mes, clic en un nombre despliega el MISMO detalle de dos bloques que Tapas → Inicio — 📅 producción diaria + 🎯 productividad y habilidad por tapa, ver abajo; visible para todos). Campo "Tapa o envase trabajado *" OBLIGATORIO en cada tarea con cantidad (se elige de la lista; tarjetas con cantidad 0 se ignoran, no se guardan). Se probó un termómetro por ficha contra meta fija de 10,000 und/día y se descartó. Autocompletar de tapa: todas las coincidencias, por palabras sin tildes, facturables primero |
 | `dashboard.html` | KPIs ejecutivos globales |
 | `ventas.html` | Ventas y Financiero: Resumen · Productos · Clientes · Rotación · Importar facturación (Excel/CSV cols A-R) · toggle IVA |
 | `produccion.html` | Sopladoras: Ingreso PDF/manual (pdf.js) · Reporte Semanal (pivote máquina×SKU) · Mensual. Asigna máquina Y operario por fila (`personal` area='produccion') |
@@ -193,10 +193,19 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
       registro". Usa `termComandasTodas` (incluye pendientes/rechazadas) además de `termComandas`.
     · 🎯 PRODUCTIVIDAD Y HABILIDAD (`buildTermProductividad`): "Por proceso" (lo de antes) +
       "Por tapa y proceso" (`agruparPorTapaYProceso`: `comanda_tareas.tapa_sku`/`tapa_desc` ×
-      proceso, mayor a menor) = en qué tapa y proceso acumula experiencia. `tapa_sku` es
-      OPCIONAL en el formulario de registro-tapas.html (en TODOS los procesos, incluidos Apoyo
-      Serigrafía/Revisado/Otra tarea), así que lo que se registró sin tapa sale agrupado como
-      "Sin tapa registrada". La copia del termómetro en registro-tapas.html NO se actualizó.
+      proceso, mayor a menor) = en qué tapa y proceso acumula experiencia. DESDE oct/2026 la
+      tapa (o envase) es OBLIGATORIA en toda tarea con cantidad: registro-tapas.html la exige
+      elegida de la lista (SKU real; si el catálogo no cargó acepta el texto), y comandas.html
+      la exige en las tareas "Terminada" del editor manual (en el importador de WhatsApp es solo
+      un aviso/confirmación: las líneas sin SKU se guardan igual). Lo registrado ANTES de esa
+      regla, o por el bot de WhatsApp (que sigue ofreciendo "0) Sin SKU"), sale agrupado como
+      "Sin tapa registrada". registro-tapas.html tiene su PROPIA copia de este mismo desplegable
+      (mismas funciones `buildTermDetalle`/`buildTermDiario`/`agruparPorTapaYProceso`, CSS en
+      hex porque ese archivo no usa variables) — cualquier cambio acá hay que replicarlo allá.
+      ⚠️ En registro-tapas.html lo ve TODO el personal de Tapas (rol operativo/supervisor_tapas),
+      así que cada quien ve los días "sin registro" de sus compañeros. La asistencia
+      (`asistencia_diaria`) y los feriados se leen en try/catch: si ese rol no tiene permiso de
+      lectura, el detalle sigue funcionando pero un día "ausente" saldrá como "sin registro".
   3) "📦 Producción mensual — Ingreso PT": CLON del mismo gráfico de la pestaña
     Productividad (mismo renderProdMensualTapas, mismo mecanismo Acumulado/Comparar/
     navegación ◀▶ — ver detalle completo en view-productividad más abajo), en el
@@ -545,6 +554,12 @@ operario+fecha, N `comanda_tareas`):
    proceso o cantidad≤0 (se excluyen silenciosamente, no bloquean el resto del lote) e
    inserta una `comandas`+N `comanda_tareas` por grupo, reusando `getCapacidad()` ya
    existente — sin duplicar la fórmula de capacidad/horas_efectivas del editor manual.
+   TAPA OBLIGATORIA (oct/2026): antes de guardar, si hay líneas sin SKU (insignia roja "sin SKU")
+   `guardarImportacion()` pide confirmación con el conteo — aviso, no bloqueo (un reporte trae
+   muchas líneas en texto libre). En cambio el editor manual (`guardar()`) SÍ bloquea: toda tarea
+   en estado "Terminada" con cantidad>0 necesita un SKU elegido de la lista (borde rojo `.err` +
+   foco en la primera); "Asignada"/"En proceso" no lo exigen todavía. ⚠️ Al editar una comanda
+   vieja con tareas Terminadas sin SKU, hay que asignarlo para poder guardar.
 ⚠️ De paso se corrigió un hardcode que quedó de cuando Heidy (T0, inactiva) era supervisora:
   `guardar()` escribía siempre `supervisor_id:'T0', supervisor_nombre:'Heidy'` y el `<select
   id="fSupervisor">` tenía la opción fija "Heidy" — ambos ahora se resuelven en vivo contra
