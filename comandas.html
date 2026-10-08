@@ -113,6 +113,20 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
 .sb-asignada  { background:#FFF3D6; color:#7A4800; }
 .sb-proceso   { background:#DBEAFE; color:#1A3B8B; }
 .sb-terminada { background:#DCFCE7; color:#166534; }
+.pend-cnt:not(:empty) { background:#F5B94A; color:#4A2F00; border-radius:10px; padding:0 6px; margin-left:3px; font-size:10px; }
+.modo-btn.active .pend-cnt:not(:empty) { background:#fff; color:#1A6B5B; }
+.ap-badge { display:inline-block; font-size:9px; font-weight:800; padding:1px 7px; border-radius:10px; margin-left:6px; vertical-align:middle; }
+.ap-pendiente { background:#FFF3D6; color:#7A4800; }
+.ap-aprobada { background:#DCFCE7; color:#166534; }
+.ap-rechazada { background:#FEE2E2; color:#991B1B; }
+.ap-banner { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:12px; font-weight:600; border:1.5px solid; }
+.ap-banner.ap-pendiente { border-color:#B87200; }
+.ap-banner.ap-aprobada { border-color:#166534; }
+.ap-banner.ap-rechazada { border-color:#B83232; }
+.ap-btn { border:none; border-radius:8px; padding:7px 14px; font-size:12px; font-weight:700; cursor:pointer; }
+.ap-btn-ok { background:#166534; color:#fff; }
+.ap-btn-no { background:#B83232; color:#fff; }
+.ap-btn-neutro { background:#fff; color:#3A3A38; border:1.5px solid #C8C6C0; }
 .ac-wrap { position:relative; }
 .ac-drop { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid #1A6B5B; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.12); z-index:999; max-height:45vh; overflow-y:auto; margin-top:2px; }
 .ac-item { padding:8px 12px; cursor:pointer; border-bottom:1px solid #F0EDE8; font-size:12px; }
@@ -224,6 +238,7 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="modo-btn active" id="modoFecha" onclick="setModo('fecha')">📅 Por fecha</button>
         <button class="modo-btn" id="modoOperario" onclick="setModo('operario')">👤 Por operario</button>
+        <button class="modo-btn" id="modoPend" onclick="setModo('pendientes')">⏳ Por aprobar <span class="pend-cnt" id="pendCnt"></span></button>
       </div>
       <div id="filtroFechaWrap" class="fecha-row">
         <input type="date" class="fecha-input" id="filtroFecha" onchange="cargarComandasPorFecha()">
@@ -238,12 +253,21 @@ body { font-family:'DM Sans',sans-serif; background:#F7F6F2; color:#0C0C0B; min-
           <button class="btn-nueva" style="flex:0;padding:0 12px" onclick="cargarPorOperario()">🔍</button>
         </div>
       </div>
-      <input type="text" class="buscar" id="busqueda" placeholder="Buscar..." oninput="onSearchInput()">
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <input type="text" class="buscar" id="busqueda" placeholder="Buscar..." oninput="onSearchInput()" style="margin-top:0;flex:1">
+        <select class="buscar" id="filtroEstado" onchange="renderLista()" style="margin-top:0;width:auto" title="Filtrar por estado de aprobación">
+          <option value="todas">Todas</option>
+          <option value="pendiente">⏳ Pendientes</option>
+          <option value="aprobada">✅ Aprobadas</option>
+          <option value="rechazada">⛔ Rechazadas</option>
+        </select>
+      </div>
     </div>
     <div class="kpi-strip">
       <div class="kpi-box"><div class="kpi-v" id="kCmd">0</div><div class="kpi-l">Comandas</div></div>
-      <div class="kpi-box"><div class="kpi-v" id="kUnd">0</div><div class="kpi-l">Unidades PT</div></div>
+      <div class="kpi-box"><div class="kpi-v" id="kUnd">0</div><div class="kpi-l">Und PT aprobadas</div></div>
       <div class="kpi-box"><div class="kpi-v" id="kProm">0</div><div class="kpi-l">Promedio/op</div></div>
+      <div class="kpi-box"><div class="kpi-v" id="kPend" style="color:#F5B94A">0</div><div class="kpi-l">Por aprobar</div></div>
     </div>
     <div class="cmd-list" id="cmdList"><div class="empty">Selecciona una fecha para ver las comandas</div></div>
   </div>
@@ -311,7 +335,7 @@ let supervisorTapasActual = null;
 let impGrupos = [];
 let impRowSeq = 0;
 
-const PROCS_LIST = ['Armado','Banda','Liner','Impresión','Encajado','Flameado','Otra tarea'];
+const PROCS_LIST = ['Armado','Banda','Liner','Impresión','Encajado','Flameado','Revisado (cavidad, deformidad o mancha)','Limpiar pestaña','Apoyo Serigrafía','Apoyo Producción','Otra tarea'];
 const ESTADOS_TAREA = ['Asignada','En proceso','Terminada'];
 
 const CAPACIDADES = {
@@ -405,10 +429,110 @@ function setModo(modo) {
   modoActual = modo;
   document.getElementById('modoFecha').classList.toggle('active', modo === 'fecha');
   document.getElementById('modoOperario').classList.toggle('active', modo === 'operario');
+  document.getElementById('modoPend').classList.toggle('active', modo === 'pendientes');
   document.getElementById('filtroFechaWrap').style.display = modo === 'fecha' ? 'flex' : 'none';
   document.getElementById('filtroOperarioWrap').style.display = modo === 'operario' ? 'block' : 'none';
   if (modo === 'operario') { poblarSelectorOperarios(); cargarPorOperario(); }
+  else if (modo === 'pendientes') { cargarPendientes(); }
   else { cargarComandasPorFecha(); }
+}
+
+// ── Aprobación de comandas ──────────────────────────────────────
+// Lo que registran operarios/supervisión/bot nace 'pendiente' y solo cuenta en termómetros,
+// Productividad y Dashboard una vez 'aprobada'. Una comanda sin la columna (SQL aún sin
+// correr) o anterior a la aprobación se trata como aprobada.
+function estadoAprob(c) { return (c && c.estado_aprobacion) || 'aprobada'; }
+
+function aprobadorActual() {
+  return (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || 'master';
+}
+
+function badgeAprob(c) {
+  const e = estadoAprob(c);
+  const txt = { pendiente: '⏳ Pendiente', aprobada: '✅ Aprobada', rechazada: '⛔ Rechazada' }[e] || e;
+  return `<span class="ap-badge ap-${e}">${txt}</span>`;
+}
+
+async function cargarPendientes() {
+  try {
+    const { data, error } = await db.from('comandas').select('*, comanda_tareas(*)')
+      .eq('estado_aprobacion', 'pendiente').order('fecha', { ascending: false }).limit(300);
+    if (error) throw error;
+    comandas = data || [];
+    renderLista(); actualizarKPIs();
+  } catch(e) {
+    console.error(e); comandas = []; renderLista(); actualizarKPIs();
+    showToast('No se pudo cargar: ' + (/estado_aprobacion/.test(e.message || '') ? 'falta correr sql/comandas_aprobacion_v1.sql' : e.message), '#B83232');
+  }
+}
+
+// Contador de pendientes (de cualquier fecha) en el botón "Por aprobar"
+async function refrescarContadorPendientes() {
+  try {
+    const { count, error } = await db.from('comandas').select('id', { count: 'exact', head: true }).eq('estado_aprobacion', 'pendiente');
+    if (error) throw error;
+    document.getElementById('pendCnt').textContent = count > 0 ? String(count) : '';
+  } catch(e) { document.getElementById('pendCnt').textContent = ''; }
+}
+
+async function recargarListaActual() {
+  if (modoActual === 'operario') await cargarPorOperario();
+  else if (modoActual === 'pendientes') await cargarPendientes();
+  else await cargarComandasPorFecha();
+  refrescarContadorPendientes();
+}
+
+async function cambiarEstadoComanda(id, nuevo) {
+  const upd = { estado_aprobacion: nuevo, aprobado_por: aprobadorActual(), aprobado_en: new Date().toISOString(), motivo_rechazo: null };
+  if (nuevo === 'rechazada') {
+    const motivo = prompt('Motivo del rechazo (obligatorio):');
+    if (motivo === null) return;
+    if (!motivo.trim()) { showToast('❌ El motivo es obligatorio para rechazar', '#B83232'); return; }
+    upd.motivo_rechazo = motivo.trim();
+  }
+  if (nuevo === 'pendiente') { upd.aprobado_por = null; upd.aprobado_en = null; }
+  try {
+    const { error } = await db.from('comandas').update(upd).eq('id', id);
+    if (error) throw error;
+    showToast({ aprobada: '✅ Comanda aprobada', rechazada: '⛔ Comanda rechazada', pendiente: '↩ Vuelta a pendiente' }[nuevo]);
+    const c = comandas.find(x => x.id === id);
+    if (c) Object.assign(c, upd);
+    await recargarListaActual();
+    const actual = comandas.find(x => x.id === id);
+    if (actual) mostrarDetalleComanda(actual);
+    else { comandaActual = null; showPanel('welcome'); }
+  } catch(e) {
+    console.error(e);
+    showToast('❌ ' + (/estado_aprobacion|aprobado_|motivo_rechazo/.test(e.message || '') ? 'Falta correr sql/comandas_aprobacion_v1.sql en Supabase' : e.message), '#B83232');
+  }
+}
+
+// Lo que carga el master desde acá (formulario manual e importador) nace aprobado: ya lo revisó.
+// Si el SQL de aprobación aún no se corrió, se reintenta sin esos campos para no bloquear el guardado.
+async function insertarComanda(cab) {
+  const extra = { estado_aprobacion: 'aprobada', aprobado_por: aprobadorActual(), aprobado_en: new Date().toISOString() };
+  let r = await db.from('comandas').insert(Object.assign({}, cab, extra)).select();
+  if (r.error && /estado_aprobacion|aprobado_/.test(r.error.message || '')) {
+    r = await db.from('comandas').insert(cab).select();
+  }
+  return r;
+}
+
+// Franja de estado + botones en el detalle
+function buildBannerAprob(c) {
+  const e = estadoAprob(c);
+  const id = escHtml(c.id);
+  const cuando = c.aprobado_en ? new Date(c.aprobado_en).toLocaleString('es-GT') : '';
+  if (e === 'pendiente') {
+    return `<div class="ap-banner ap-pendiente" style="background:#FFF8EA"><span>⏳ <strong>Pendiente de aprobación</strong> — todavía no cuenta en termómetros ni Productividad</span>
+      <span style="display:flex;gap:8px"><button class="ap-btn ap-btn-ok" onclick="cambiarEstadoComanda('${id}','aprobada')">✅ Aprobar</button><button class="ap-btn ap-btn-no" onclick="cambiarEstadoComanda('${id}','rechazada')">⛔ Rechazar</button></span></div>`;
+  }
+  if (e === 'rechazada') {
+    return `<div class="ap-banner ap-rechazada" style="background:#FEF2F2"><span>⛔ <strong>Rechazada</strong>${c.aprobado_por ? ' por ' + escHtml(c.aprobado_por) : ''}${cuando ? ' · ' + escHtml(cuando) : ''}<br>Motivo: ${escHtml(c.motivo_rechazo || '—')}</span>
+      <span style="display:flex;gap:8px"><button class="ap-btn ap-btn-ok" onclick="cambiarEstadoComanda('${id}','aprobada')">✅ Aprobar</button><button class="ap-btn ap-btn-neutro" onclick="cambiarEstadoComanda('${id}','pendiente')">↩ A pendiente</button></span></div>`;
+  }
+  return `<div class="ap-banner ap-aprobada" style="background:#F0FDF4"><span>✅ <strong>Aprobada</strong>${c.aprobado_por ? ' por ' + escHtml(c.aprobado_por) : ''}${cuando ? ' · ' + escHtml(cuando) : ''}</span>
+      <span style="display:flex;gap:8px"><button class="ap-btn ap-btn-neutro" onclick="cambiarEstadoComanda('${id}','pendiente')">↩ A pendiente</button><button class="ap-btn ap-btn-no" onclick="cambiarEstadoComanda('${id}','rechazada')">⛔ Rechazar</button></span></div>`;
 }
 
 async function poblarSelectorOperarios() {
@@ -483,9 +607,14 @@ function renderLista() {
   const busq = document.getElementById('busqueda').value.toLowerCase();
   let items = comandas;
   if (busq) items = items.filter(c => (c.operario_nombre || '').toLowerCase().includes(busq));
+  const fe = document.getElementById('filtroEstado')?.value || 'todas';
+  if (fe !== 'todas') items = items.filter(c => estadoAprob(c) === fe);
   const lista = document.getElementById('cmdList');
   if (!items.length) {
-    lista.innerHTML = `<div class="empty">${modoActual === 'operario' ? 'Sin comandas para este operario.' : 'No hay comandas para esta fecha.'}</div>`;
+    const msg = fe !== 'todas' ? 'Ninguna comanda con ese estado en esta lista.'
+      : modoActual === 'pendientes' ? 'No hay comandas por aprobar. 🎉'
+      : modoActual === 'operario' ? 'Sin comandas para este operario.' : 'No hay comandas para esta fecha.';
+    lista.innerHTML = `<div class="empty">${msg}</div>`;
     return;
   }
   lista.innerHTML = items.map(c => {
@@ -498,8 +627,8 @@ function renderLista() {
     return `<div class="cmd-item ${isActive ? 'active' : ''}" onclick="verComanda('${escHtml(c.id)}')">
       <div class="cmd-av" style="background:${escHtml(color)}">${escHtml(ini)}</div>
       <div style="flex:1;min-width:0">
-        <div class="cmd-name">${escHtml(c.operario_nombre || '—')}</div>
-        <div class="cmd-meta">${modoActual === 'operario' ? `📅 ${escHtml(c.fecha || '—')} · ` : ''}${escHtml(c.correlativo || '—')} · ${tareas.length} tareas · Sup: ${escHtml(c.supervisor_nombre || '—')}</div>
+        <div class="cmd-name">${escHtml(c.operario_nombre || '—')}${badgeAprob(c)}</div>
+        <div class="cmd-meta">${modoActual !== 'fecha' ? `📅 ${escHtml(c.fecha || '—')} · ` : ''}${escHtml(c.correlativo || '—')} · ${tareas.length} tareas · Sup: ${escHtml(c.supervisor_nombre || '—')}</div>
       </div>
       <div class="cmd-und">${totalUnd.toLocaleString()}<small>und PT</small></div>
     </div>`;
@@ -508,11 +637,13 @@ function renderLista() {
 
 function actualizarKPIs() {
   const total = comandas.length;
-  const totalUnd = comandas.reduce((s, c) => s + ((c.comanda_tareas || []).filter(t => t.estado === 'Terminada').reduce((a, t) => a + (t.cantidad || 0), 0)), 0);
-  const prom = total > 0 ? Math.round(totalUnd / total) : 0;
+  const aprobadas = comandas.filter(c => estadoAprob(c) === 'aprobada');
+  const totalUnd = aprobadas.reduce((s, c) => s + ((c.comanda_tareas || []).filter(t => t.estado === 'Terminada').reduce((a, t) => a + (t.cantidad || 0), 0)), 0);
+  const prom = aprobadas.length > 0 ? Math.round(totalUnd / aprobadas.length) : 0;
   document.getElementById('kCmd').textContent = total;
   document.getElementById('kUnd').textContent = totalUnd.toLocaleString();
   document.getElementById('kProm').textContent = prom.toLocaleString();
+  document.getElementById('kPend').textContent = comandas.filter(c => estadoAprob(c) === 'pendiente').length;
 }
 
 // ============================================
@@ -565,6 +696,7 @@ function mostrarDetalleComanda(c) {
         <button class="btn btn-del" onclick="borrarComanda('${escHtml(c.id)}')">🗑 Eliminar</button>
       </div>
     </div>
+    ${buildBannerAprob(c)}
     <div class="total-bar" style="margin-bottom:14px">
       <div><div class="total-bar-lbl">Total unidades PT del día</div></div>
       <div class="total-bar-val">${totalPT.toLocaleString()} und</div>
@@ -621,7 +753,7 @@ async function borrarComanda(id) {
     await db.from('comandas').delete().eq('id', id);
     showToast('🗑 Comanda eliminada');
     comandaActual = null;
-    await cargarComandasPorFecha();
+    await recargarListaActual();
     showPanel('welcome');
   } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
 }
@@ -669,7 +801,10 @@ function hideLoading() {
 function addTareaRow(datos = {}) {
   rowCount++;
   const n = rowCount;
-  const procsOpts = PROCS_LIST.map(p => `<option value="${p}" ${datos.proceso === p ? 'selected' : ''}>${p}</option>`).join('');
+  // Si la tarea trae un proceso fuera de la lista (ej. "Otra tarea: detalle" del formulario móvil),
+  // se conserva como opción: sin esto el <select> caía en "Armado" y al guardar lo cambiaba en silencio
+  const procsLista = (datos.proceso && PROCS_LIST.indexOf(datos.proceso) < 0) ? PROCS_LIST.concat([datos.proceso]) : PROCS_LIST;
+  const procsOpts = procsLista.map(p => `<option value="${escHtml(p)}" ${datos.proceso === p ? 'selected' : ''}>${escHtml(p)}</option>`).join('');
   const estadoClass = (datos.estado || 'Asignada').toLowerCase().replace(' ', '');
   const estadoOpts = ESTADOS_TAREA.map(e => `<option value="${e}" ${(datos.estado || 'Asignada') === e ? 'selected' : ''}>${e}</option>`).join('');
   
@@ -967,7 +1102,7 @@ async function guardar() {
       cmdId = editandoId;
       await db.from('comanda_tareas').delete().eq('comanda_id', cmdId);
     } else {
-      const { data, error } = await db.from('comandas').insert(cabecera).select();
+      const { data, error } = await insertarComanda(cabecera);
       if (error) throw error;
       cmdId = data[0].id;
     }
@@ -1267,7 +1402,7 @@ async function guardarImportacion() {
         total_unidades: totalUnd,
         observaciones: 'Importado de reporte WhatsApp',
       };
-      const { data, error } = await db.from('comandas').insert(cabecera).select();
+      const { data, error } = await insertarComanda(cabecera);
       if (error) throw error;
       const cmdId = data[0].id;
       const tareasData = tareasOk.map((t, i) => {
@@ -1325,10 +1460,14 @@ async function inicializar() {
   if (comandaId) {
     await cargarComandasPorFecha();
     await cargarYMostrarComandaPorId(comandaId);
+  } else if (urlParams.get('modo') === 'pendientes') {
+    setModo('pendientes');
+    showPanel('welcome');
   } else {
     await cargarComandasPorFecha();
     showPanel('welcome');
   }
+  refrescarContadorPendientes();
   
   document.addEventListener('click', e => {
     if (!e.target.closest('.ac-wrap') && !e.target.closest('.ac-drop')) {

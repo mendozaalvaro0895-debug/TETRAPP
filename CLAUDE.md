@@ -108,7 +108,7 @@ Orden de pestañas (mismo que serigrafia.html + Pedidos como 7ma):
 view-inicio      ORDEN ACTUAL (oct/2026, calcado de serigrafia.html): Alertas Base · Alertas Contratapa · Asistencia · Personal y Roles · Producción mensual · Fichas de Trabajo.
   Los 3 bloques del detalle de abajo (Asistencia, Personal y Roles, Producción mensual) siguen igual.
   ALERTAS "Bajo Stock — Base/Contratapa" (renderAlertasTapas; copia del bloque "Envases Base" de serigrafia.html, sin PDF ni float de pedidos): por cada SKU de componente suma lo que piden las fichas VIVAS (nueva/proceso/parcial, líneas no "lista"), descuenta lo que ya salió de Bodega para esas fichas (movimientos_materiales salida_bodega por solicitud_id), y compara contra existencia de inventario (Bodega 2 con prioridad) → "Pedir" = faltante. Lee `solicitud_lineas.sku_base` (ya existía como "SKU materia prima") y `solicitud_lineas.sku_contratapa` (se captura en el formulario "Nueva solicitud · Tapas"; ⚠️ la columna se crea con sql/solicitud_lineas_componentes_tapas_v1.sql — SQL pendiente #29; hasta correrlo, guardar una ficha con Contratapa/Liner/Banda falla y el formulario avisa). 1 unidad de componente por unidad de tapa. Bloque Base lista además las líneas sin base ("huecos").
-  BARRA SUPERIOR (oct/2026, igual que serigrafia.html): solo "🖨 Imprimir" (imprimirFichasTapas: PDF de TODAS las fichas activas nueva/proceso/parcial, agrupadas por cliente A→Z, con entregado/pedida desde movimientos_materiales entrada_pt) + "+ Nueva Solicitud". Se quitaron el enlace a Comandas y el dropdown "Movimiento": registrar salida/ingreso/rechazo se hace desde la pestaña Movimientos (movRegistrar). ⚠️ comandas.html ya no tiene enlace directo desde Tapas (sigue accesible por los KPI de Pedidos, dashboard.html y URL directa).
+  BARRA SUPERIOR (oct/2026, igual que serigrafia.html): solo "🖨 Imprimir" (imprimirFichasTapas: PDF de TODAS las fichas activas nueva/proceso/parcial, agrupadas por cliente A→Z, con entregado/pedida desde movimientos_materiales entrada_pt) + "+ Nueva Solicitud". Se quitaron el enlace a Comandas y el dropdown "Movimiento": registrar salida/ingreso/rechazo se hace desde la pestaña Movimientos (movRegistrar). comandas.html se abre desde la pestaña "📋 Comandas" de la barra de pestañas (con contador de pendientes por aprobar).
   FORMULARIO "Nueva solicitud · Tapas" (abrirForm/guardar, oct/2026): Cliente + Fecha de ingreso (automática, solo lectura = hoy GT; se guarda también en fecha_limite para no depender de si esa columna admite null — ya no hay "fecha límite" ni "Área solicitante") + Prioridad + UNA línea de pedido con buscador de SKU como el de Serigrafía (todas las coincidencias por palabras sin tildes, FACTURABLES PRIMERO con encabezados; texto libre = producto nuevo sin SKU) + 4 componentes opcionales con su propio buscador: Base (sku_base), Contratapa (sku_contratapa), Liner (sku_liner), Banda (sku_banda). Liner y Banda se buscan y toman su stock de Bodega 7 (tabla insumos_b7, insumosB7Cache; sin grupos de facturable), el resto de inventario (B2). Solo Cliente y Cantidad son obligatorios; un componente escrito debe ser un SKU real de inventario. Si falla el insert de la línea se borra la ficha (no queda una ficha sin línea). Alertas de bajo stock hoy solo para Base y Contratapa (Liner/Banda se guardan pero no tienen alerta todavía). PROCESOS (sincronizarProcs): los chips Armado/Banda/Liner/Impresión/Encajado se ACTIVAN SOLOS según los componentes elegidos — Base o Contratapa → Armado · Liner → Liner · Banda → Banda (chip fijo, no se apaga a mano); Impresión y Encajado (o cualquier otro) se marcan a mano. Se guardan en solicitud_lineas.procesos y alimentan el "Cálculo automático" (meta = la menor de los procesos activos; sin procesos, 1,200 und/h).
   FICHAS DE TRABAJO (renderFichasTapas): mismas solicitudes area=tapas de la pestaña Pedidos, en grilla cliente (columna) × mes (fila, más reciente primero) como el "Sin asignar" de serigrafia.html. Mes = periodo_efectivo o mes de creación en hora GT (calendario, SIN el corte del día 28 de Serigrafía); las fichas "lista" solo se muestran en el mes en curso. Borde de color por estado (rojo/amarillo/verde); clic abre el detalle en Pedidos (abrirFichaTapas → mostrarDetalle). No hay drag-drop ni cierre mensual (no aplica a Tapas).
 view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigrafia.html"):
@@ -472,6 +472,27 @@ Pantallas: `scrTarea(0)` → Impresión / Flameado / Empaque → `scrOk*`.
 
 ---
 
+## comandas.html — Historial y aprobación de ingresos (oct/2026)
+Acceso desde Tapas: pestaña "📋 Comandas" en la barra (irAComandas) con insignia ámbar "N por aprobar"
+(refrescarPendientesComandas); con pendientes abre directo `comandas.html?modo=pendientes`.
+Es el HISTÓRICO de cada ingreso: tres modos en la columna izquierda — 📅 Por fecha · 👤 Por operario
+(rango de fechas) · ⏳ Por aprobar (cola de TODAS las fechas, con contador) — más filtro de estado
+(Todas/Pendientes/Aprobadas/Rechazadas) y buscador; el detalle de cada comanda se edita (✏️) o elimina (🗑).
+APROBACIÓN (`sql/comandas_aprobacion_v1.sql`, SQL pendiente #30): `comandas.estado_aprobacion`
+('pendiente'|'aprobada'|'rechazada') + `aprobado_por`/`aprobado_en`/`motivo_rechazo`. Lo que registran
+operarios/supervisión (registro-tapas.html) y el bot de WhatsApp (`bot_insertar_comanda_tapas`) nace
+PENDIENTE (default de la columna); lo que carga el master desde comandas.html (formulario manual e
+importador) nace APROBADO (`insertarComanda()`, que reintenta sin esos campos si el SQL aún no corrió).
+El existente al correr el SQL queda aprobado (la columna se crea con default 'aprobada' y luego se cambia
+a 'pendiente'). En el detalle: banner de estado + ✅ Aprobar / ⛔ Rechazar (pide motivo, obligatorio) /
+↩ A pendiente (`cambiarEstadoComanda`). Solo master escribe el estado (política update_master).
+SOLO CUENTAN LAS APROBADAS en: termómetro de tapas.html y de registro-tapas.html, Productividad,
+KPI de comandas de hoy y dashboard.html — filtro cliente `comandaCuenta(c)` (sin columna = aprobada, así
+nada se rompe si el SQL no se ha corrido); las queries traen `select('*, comanda_tareas(...)')` para eso.
+Los KPI de comandas.html también suman solo aprobadas ("Und PT aprobadas") y muestran "Por aprobar".
+⚠️ El editor ahora conoce los procesos nuevos (Revisado, Limpiar pestaña, Apoyo Serigrafía/Producción)
+y conserva cualquier proceso fuera de lista (ej. "Otra tarea: detalle"); antes lo cambiaba a "Armado" al guardar.
+
 ## comandas.html — Importar reporte WhatsApp (oct/2026)
 Botón "📥 Importar reporte WhatsApp" (junto a "+ Nueva") abre `overlayImportar`, flujo de 2
 pasos sobre el mismo modelo comanda+tareas que ya usa el editor manual (una comanda =
@@ -618,6 +639,8 @@ Notas críticas:
     y 5 personas de Oficina/Administración — incluido el propio Álvaro).
 
 29. `sql/solicitud_lineas_componentes_tapas_v1.sql` (oct/2026) — columnas `sku_contratapa`, `sku_liner`, `sku_banda` (y `sku_base` por si faltara) en `solicitud_lineas`. Sin correrlo, el formulario de Tapas no puede guardar una ficha que lleve Contratapa, Liner o Banda.
+
+30. `sql/comandas_aprobacion_v1.sql` (oct/2026) — columnas de aprobación en `comandas` (estado_aprobacion/aprobado_por/aprobado_en/motivo_rechazo). Sin correrlo: no se puede aprobar/rechazar (el botón avisa) y todo cuenta como aprobado.
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos

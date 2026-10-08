@@ -71,6 +71,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .tdot{width:8px;height:8px;border-radius:50%}
 .tbadge{background:var(--bg);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;color:var(--gray)}
 .tbadge.tb-teal{background:var(--teal-xl);color:var(--teal)}
+.tbadge.tb-amber{background:#F5B94A;color:#4A2F00}
 .tabs-r{flex:1;display:flex;justify-content:flex-end;gap:8px}
 
 /* BUTTONS */
@@ -430,6 +431,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="tab" id="tab-productividad" onclick="switchTab('productividad')">📈 Productividad</div>
     <div class="tab" id="tab-trazabilidad" onclick="switchTab('trazabilidad')">🔗 Trazabilidad</div>
     <div class="tab" id="tab-personal" onclick="switchTab('personal')">👥 Personal</div>
+    <div class="tab" id="tab-comandas" onclick="irAComandas()" title="Historial de ingresos del personal: revisar, editar, aprobar o rechazar">📋 Comandas <span class="tbadge tb-amber" id="cnt-comandas" style="display:none"></span></div>
     <div class="tab" id="tab-dash" onclick="window.location.href='dashboard.html'">📊 Dashboard</div>
     <div class="tab" id="tab-tapas" onclick="switchTab('tapas')">
       <div class="tdot" style="background:var(--teal)"></div>
@@ -1032,6 +1034,7 @@ async function cargarSolicitudes() {
     renderListas();
     refreshKPIs();
     renderInicioPedidosTapas();
+    refrescarPendientesComandas();
   } catch(e) {
     console.error('Error cargando solicitudes:', e);
     showToast('Error al cargar solicitudes', '#B83232');
@@ -1155,11 +1158,38 @@ async function refreshKPIs() {
   await cargarKPIComandas();
 }
 
+// Una comanda cuenta (termómetros, Productividad, KPIs) solo si está aprobada. Sin la columna
+// (SQL de aprobación aún sin correr) o anterior a la aprobación = aprobada.
+function comandaCuenta(c) {
+  return !c.estado_aprobacion || c.estado_aprobacion === 'aprobada';
+}
+
+// Pestaña "Comandas": lleva a comandas.html (historial + aprobar/rechazar/editar) con el contador
+// de ingresos del personal que esperan aprobación. Con pendientes abre directo la cola "Por aprobar".
+var comandasPendientes = 0;
+function irAComandas() {
+  window.location.href = comandasPendientes > 0 ? 'comandas.html?modo=pendientes' : 'comandas.html';
+}
+
+async function refrescarPendientesComandas() {
+  var badge = document.getElementById('cnt-comandas');
+  try {
+    var r = await db.from('comandas').select('id', { count: 'exact', head: true }).eq('estado_aprobacion', 'pendiente');
+    if (r.error) throw r.error;
+    comandasPendientes = r.count || 0;
+  } catch(e) { comandasPendientes = 0; }
+  if (badge) {
+    badge.textContent = comandasPendientes + ' por aprobar';
+    badge.style.display = comandasPendientes > 0 ? '' : 'none';
+  }
+}
+
 async function cargarKPIComandas() {
   try {
     const hoy = fechaHoy();
-    const { data } = await db.from('comandas').select('total_unidades, operario_id').eq('fecha', hoy);
-    if (!data) return;
+    const res = await db.from('comandas').select('*').eq('fecha', hoy);
+    if (!res.data) return;
+    const data = res.data.filter(comandaCuenta);
     const totalUnd = data.reduce((s,c) => s + (c.total_unidades||0), 0);
     const opCount = new Set(data.map(c => c.operario_id)).size;
     const elUnd = document.getElementById('kt-cmd-und');
@@ -1915,10 +1945,10 @@ async function cargarTermometro() {
   var r = rangoMes();
   try {
     var res = await db.from('comandas')
-      .select('operario_id, operario_nombre, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
+      .select('*, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
       .gte('fecha', r.desde).lte('fecha', r.hasta);
     if (res.error) throw res.error;
-    termComandas = res.data || [];
+    termComandas = (res.data || []).filter(comandaCuenta);
   } catch(e) {
     console.error('cargarTermometro:', e);
     termComandas = [];
@@ -3769,11 +3799,11 @@ async function cargarProductividad() {
   var r = rangoMes((document.getElementById('prodMes') || {}).value);
   try {
     var res = await db.from('comandas')
-      .select('id, fecha, operario_id, operario_nombre, hora_inicio, hora_cierre, comanda_tareas(proceso, cantidad, unidades_completadas, estado, horas_efectivas)')
+      .select('*, comanda_tareas(proceso, cantidad, unidades_completadas, estado, horas_efectivas)')
       .gte('fecha', r.desde).lte('fecha', r.hasta)
       .order('fecha', { ascending: false });
     if (res.error) throw res.error;
-    prodComandas = res.data || [];
+    prodComandas = (res.data || []).filter(comandaCuenta);
     renderProductividad();
   } catch(e) {
     console.error('cargarProductividad:', e);

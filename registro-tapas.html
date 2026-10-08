@@ -333,10 +333,11 @@ async function cargarTermometro() {
     var ultimo = new Date(parseInt(hoy.slice(0, 4), 10), parseInt(hoy.slice(5, 7), 10), 0).getDate();
     var hasta = hoy.slice(0, 8) + (ultimo < 10 ? '0' : '') + ultimo;
     var r = await db.from('comandas')
-      .select('operario_id, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
+      .select('*, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
       .gte('fecha', desde).lte('fecha', hasta);
     if (r.error) throw r.error;
-    termComandas = r.data || [];
+    // Solo suman las comandas aprobadas (sin la columna o anteriores a la aprobación = aprobadas)
+    termComandas = (r.data || []).filter(function(c) { return !c.estado_aprobacion || c.estado_aprobacion === 'aprobada'; });
     renderTermometro();
   } catch(e) { console.error('cargarTermometro:', e); }
 }

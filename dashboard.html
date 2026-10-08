@@ -386,11 +386,12 @@ async function cargarComandas() {
   try {
     const { data } = await db
       .from('comandas')
-      .select('id, fecha, correlativo, operario_id, operario_nombre, supervisor_nombre, total_unidades, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
+      .select('*, comanda_tareas(proceso, cantidad, unidades_completadas, estado)')
       .gte('fecha', desde)
       .lte('fecha', hasta)
       .order('fecha', { ascending: false });
-    comandas = data || [];
+    // Solo cuentan las comandas aprobadas (sin la columna o anteriores a la aprobación = aprobadas)
+    comandas = (data || []).filter(c => !c.estado_aprobacion || c.estado_aprobacion === 'aprobada');
     renderizar();
   } catch(e) { console.error(e); comandas = []; renderizar(); }
 }
