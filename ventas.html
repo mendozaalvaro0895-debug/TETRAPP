@@ -1065,7 +1065,7 @@ function renderAporteArea(filas, total) {
     var fam = ((v.descripcion_familia || v.familia || '')).trim().toUpperCase();
     var area = clasificarArea(sku, fam);
     if (!area) return;
-    var q = qVal(v.total_quetzales || 0);
+    var q = v.total_quetzales || 0; // sin IVA: fmtQ() lo aplica al mostrar
     porArea[area] += q;
     if (!porAreaProds[area][sku]) porAreaProds[area][sku] = { q: 0, u: 0, desc: v.descripcion || sku, clientes: {} };
     porAreaProds[area][sku].q += q;
@@ -1154,7 +1154,7 @@ function renderFamilias(filas, total) {
     var cli = (v.cliente || '').trim();
     if (cli) {
       if (!PROD_CLIENTES_MAP[sku].clientes[cli]) PROD_CLIENTES_MAP[sku].clientes[cli] = { q: 0, u: 0 };
-      PROD_CLIENTES_MAP[sku].clientes[cli].q += qVal(v.total_quetzales || 0);
+      PROD_CLIENTES_MAP[sku].clientes[cli].q += (v.total_quetzales || 0); // sin IVA: fmtQ() lo aplica al mostrar
       PROD_CLIENTES_MAP[sku].clientes[cli].u += (v.total_unidades || 0);
     }
   });
@@ -2753,7 +2753,7 @@ function generarReporte() {
     var fam = ((v.descripcion_familia || v.familia || '')).trim().toUpperCase();
     var area = clasificarArea(sku, fam);
     if (!area) return;
-    var qv = qVal(v.total_quetzales || 0);
+    var qv = v.total_quetzales || 0; // sin IVA: fmtQ() lo aplica al mostrar
     porAreaQ[area] = (porAreaQ[area] || 0) + qv;
     if (!areaProdData[area]) areaProdData[area] = {};
     if (!areaProdData[area][sku]) areaProdData[area][sku] = { q:0, u:0, desc: v.descripcion||sku, cliMap:{} };
@@ -2821,7 +2821,7 @@ function generarReporte() {
     var cli = v.cliente||'—'; var sku = (v.sku||'').trim();
     if (!cliProdsRpt[cli]) cliProdsRpt[cli] = {};
     if (!cliProdsRpt[cli][sku]) cliProdsRpt[cli][sku] = { q:0, u:0, desc:v.descripcion||sku };
-    cliProdsRpt[cli][sku].q += qVal(v.total_quetzales||0);
+    cliProdsRpt[cli][sku].q += (v.total_quetzales||0); // sin IVA, igual que porCli
     cliProdsRpt[cli][sku].u += (v.total_unidades||0);
   });
 
