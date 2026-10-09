@@ -54,20 +54,56 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .term-bar{background:#1A6B5B;height:100%;border-radius:20px;transition:width .5s ease}
 .term-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:#1A6B5B;white-space:nowrap;text-align:right;min-width:72px}
 .term-detalle{padding:8px 10px 12px 12px;display:flex;flex-direction:column;gap:16px;background:#EBF7F4;border-radius:0 0 8px 8px}
-.term-detalle-row{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#3A3A38;max-width:340px}
-.term-detalle-row span:last-child{font-family:'DM Mono',monospace;font-weight:700;color:#1A6B5B;white-space:nowrap;flex-shrink:0}
 .term-detalle-vacio{font-size:11px;color:#9A9A98;font-style:italic}
 .td-bloque{min-width:0}
 .td-titulo{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#6B6B6A;margin-bottom:8px}
-.td-sub{font-size:10px;font-weight:700;color:#9A9A98;margin:10px 0 4px}
-.dg{display:flex;align-items:flex-end;gap:2px;height:78px;border-bottom:1px solid #C8EDE7}
+.dg{position:relative;display:flex;align-items:flex-end;gap:2px;height:210px;border-bottom:1px solid #C8EDE7}
+.dg-meta{position:absolute;left:0;right:0;border-top:2px dashed #B83232;pointer-events:none;z-index:2}
+.dg-meta span{position:absolute;right:0;bottom:2px;font-size:9px;font-weight:700;color:#B83232;background:rgba(235,247,244,.9);padding:0 4px;border-radius:3px;white-space:nowrap}
 .dg-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.dg-col.clic{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.dg-col.clic:hover .dg-bar{filter:brightness(1.18)}
 .dg-val{font-family:'DM Mono',monospace;font-size:7px;color:#1A6B5B;line-height:1.2;margin-bottom:2px;white-space:nowrap}
 .dg-bar{width:100%;max-width:22px;border-radius:3px 3px 0 0;background:#1A6B5B}
-.dg-bar.falta{background:#FEE2E2;border:1px dashed #B83232;height:16px}
-.dg-bar.pend{background:#B87200;height:16px}
-.dg-bar.aus{background:#D8D6D0;height:8px}
-.dg-bar.hoy{background:transparent;border:1px dashed #1A6B5B;height:10px}
+.dg-bar.falta{background:#FEE2E2;border:1px dashed #B83232;height:28px}
+.dg-bar.pend{background:#B87200;height:28px}
+.dg-bar.aus{background:#D8D6D0;height:12px}
+.dg-bar.hoy{background:transparent;border:1px dashed #1A6B5B;height:14px}
+.td-hint{font-weight:500;text-transform:none;letter-spacing:0;color:#9A9A98}
+.tp-fila{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:11px;padding:3px 4px;margin:0 -4px}
+.tp-fila.clic{cursor:pointer;border-radius:6px;-webkit-tap-highlight-color:transparent}
+.tp-fila.clic:hover{background:#F7F6F2}
+.tp-fila.abierto{background:#fff}
+.tp-nom{color:#0C0C0B;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tp-chev{display:inline-block;width:13px;color:#1A6B5B;font-size:10px}
+.tp-barra{height:10px;background:#fff;border-radius:6px;overflow:hidden}
+.tp-fila.abierto .tp-barra{background:#EBF7F4}
+.tp-fill{height:100%;background:#1A6B5B;border-radius:6px}
+.tp-und{font-family:'DM Mono',monospace;font-weight:700;color:#1A6B5B;white-space:nowrap}
+.tp-und i{font-style:normal;font-weight:500;color:#9A9A98;margin-left:5px}
+.tp-regs{margin:2px 0 8px 12px;padding:2px 10px;border-left:2px solid #C8EDE7;max-height:240px;overflow-y:auto}
+.tp-reg{display:grid;grid-template-columns:70px minmax(0,1fr) auto;gap:8px;align-items:baseline;font-size:11px;padding:3px 0;border-bottom:1px dashed #C8EDE7}
+.tp-reg-f{font-family:'DM Mono',monospace;font-size:10px;color:#6B6B6A;white-space:nowrap}
+.tp-reg-t{color:#0C0C0B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-reg-t.sin{color:#9A9A98;font-style:italic}
+.tp-reg-u{font-family:'DM Mono',monospace;font-weight:700;color:#1A6B5B;white-space:nowrap}
+.tp-regs-pie{font-size:9px;color:#9A9A98;padding-top:4px;text-align:right}
+.hi-lista{max-height:340px;overflow-y:auto;padding-right:4px;border-top:1px solid #C8EDE7}
+.hi-reg{padding:6px 0;border-bottom:1px solid #C8EDE7}
+.hi-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px}
+.hi-f{font-family:'DM Mono',monospace;font-size:10px;color:#6B6B6A;white-space:nowrap}
+.hi-cmd{font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:#1A6B5B}
+.hi-badge{font-size:9px;font-weight:800;border-radius:10px;padding:1px 7px;white-space:nowrap}
+.hi-badge.ok{background:#DCFCE7;color:#166534}
+.hi-badge.pend{background:#FFF3D6;color:#7A4800}
+.hi-badge.rech{background:#FEE2E2;color:#991B1B}
+.hi-total{margin-left:auto;font-family:'DM Mono',monospace;font-weight:700;color:#1A6B5B;white-space:nowrap}
+.hi-motivo{font-size:10px;color:#B83232;margin:2px 0 0 2px}
+.hi-t{display:grid;grid-template-columns:78px minmax(0,1fr) auto;gap:8px;align-items:baseline;font-size:10.5px;padding:1px 0 1px 6px;color:#6B6B6A}
+.hi-t-p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.hi-t-x{color:#0C0C0B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hi-t-x i{color:#9A9A98}
+.hi-t-u{font-family:'DM Mono',monospace;font-weight:700;color:#1A6B5B;white-space:nowrap}
 .dg-dias{display:flex;gap:2px;margin-top:3px}
 .dg-d{flex:1;min-width:0;text-align:center;font-size:8px;color:#6B6B6A}
 .dg-d.falta{color:#B83232;font-weight:800}
@@ -77,12 +113,6 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .dg-resumen b.bien{color:#1A6B5B}
 .dg-leyenda{display:flex;flex-wrap:wrap;gap:10px;font-size:9px;color:#9A9A98;margin-top:4px}
 .dg-leyenda i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:3px;vertical-align:-1px}
-.td-lista{max-height:196px;overflow-y:auto;padding-right:4px}
-.td-fila{display:grid;grid-template-columns:84px minmax(0,1fr) auto;gap:8px;align-items:baseline;font-size:11px;padding:3px 0;border-bottom:1px dashed #C8EDE7}
-.td-proc{color:#6B6B6A;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.td-tapa{color:#0C0C0B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.td-tapa.sin{color:#9A9A98;font-style:italic}
-.td-und{font-family:'DM Mono',monospace;font-weight:700;color:#1A6B5B;white-space:nowrap}
 @media (max-width:520px){.dg-val{display:none}.dg,.dg-dias{gap:1px}.dg-d{font-size:7px;letter-spacing:-.5px}}
 .field input.err{border-color:#B83232;background:#FEF2F2}
 .op-sel-tag{font-size:9px;font-weight:800;letter-spacing:1px;color:#1A6B5B;margin-top:6px}
@@ -436,6 +466,10 @@ function compactoUnd(n) {
   return n >= 1000 ? (Math.round(n / 100) / 10).toString().replace(/\.0$/, '') + 'k' : String(n);
 }
 
+// Meta diaria por persona (línea punteada del gráfico) y alto máximo de barra (el gráfico mide 210px)
+var META_DIA_GRAFICO = 15000;
+var ALTO_BARRAS_DIA = 180;
+
 function buildTermDiario(o) {
   var hoy = fechaGT();
   var ym = hoy.slice(0, 7);
@@ -454,11 +488,15 @@ function buildTermDiario(o) {
     else if (st === 'pend') pendientes++;
   }
 
+  // La escala llega siempre hasta la meta, así la línea punteada queda en su altura real
+  var escalaDia = Math.max(maxDia, META_DIA_GRAFICO);
+  var lineaMeta = '<div class="dg-meta" style="bottom:' + Math.round(META_DIA_GRAFICO / escalaDia * ALTO_BARRAS_DIA) + 'px"><span>Meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>';
+
   var cols = estados.map(function(e) {
     var titulo = 'Día ' + e.d + ' · ';
     var barra = '', val = '';
     if (e.st === 'prod') {
-      var h = Math.max(5, Math.round((e.und / maxDia) * 52));
+      var h = Math.max(5, Math.round((e.und / escalaDia) * ALTO_BARRAS_DIA));
       barra = '<div class="dg-bar" style="height:' + h + 'px"></div>';
       val = '<div class="dg-val">' + compactoUnd(e.und) + '</div>';
       titulo += e.und.toLocaleString() + ' und';
@@ -482,7 +520,9 @@ function buildTermDiario(o) {
     } else {
       titulo += 'aún no llega';
     }
-    return '<div class="dg-col" title="' + escHtml(titulo) + '">' + val + barra + '</div>';
+    var clic = (e.st === 'prod' || e.st === 'pend');
+    return '<div class="dg-col' + (clic ? ' clic' : '') + '" title="' + escHtml(titulo + (clic ? ' · toca para ver el detalle' : '')) + '"'
+      + (clic ? ' data-cod="' + escHtml(o.codigo) + '" data-fecha="' + e.fecha + '" onclick="verDetalleDiaOperario(this, event)"' : '') + '>' + val + barra + '</div>';
   }).join('');
   var etiquetas = estados.map(function(e) {
     return '<div class="dg-d ' + e.st + '">' + e.d + '</div>';
@@ -498,71 +538,177 @@ function buildTermDiario(o) {
       + (pendientes ? '<br>' + pendientes + ' día' + (pendientes === 1 ? '' : 's') + ' con registro por aprobar' : '');
   }
 
-  return '<div class="td-titulo">📅 Producción diaria</div>'
-    + '<div class="dg">' + cols + '</div><div class="dg-dias">' + etiquetas + '</div>'
+  return '<div class="td-titulo">📅 Producción diaria <span class="td-hint">· toca una barra para ver su detalle</span></div>'
+    + '<div class="dg">' + cols + lineaMeta + '</div><div class="dg-dias">' + etiquetas + '</div>'
     + '<div class="dg-resumen">' + resumen + '</div>'
     + '<div class="dg-leyenda"><span><i style="background:#1A6B5B"></i>produjo</span>'
     + '<span><i style="background:#FEE2E2;border:1px dashed #B83232"></i>sin registro</span>'
     + '<span><i style="background:#D8D6D0"></i>ausente</span>'
-    + '<span><i style="background:#B87200"></i>por aprobar</span></div>';
+    + '<span><i style="background:#B87200"></i>por aprobar</span>'
+    + '<span><i style="background:none;border-top:2px dashed #B83232;height:0;width:14px;vertical-align:3px"></i>meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>';
 }
 
-// Unidades por tapa (SKU) y proceso — la "habilidad" real: en qué tapa y proceso acumula experiencia.
-// Las tareas anteriores a que la tapa fuera obligatoria quedan juntas como "Sin tapa registrada".
-function agruparPorTapaYProceso(codigo) {
-  var map = {};
+// Texto "SKU — descripción" de una tarea (o solo la descripción si no hay SKU)
+function etiquetaTapaTarea(t) {
+  var sku = (t.tapa_sku || '').trim();
+  var desc = (t.tapa_desc || '').trim();
+  return sku ? ((desc && desc.indexOf(sku) === -1) ? sku + ' — ' + desc : (desc || sku)) : desc;
+}
+
+// Popup con lo que UNA persona registró UN día (toque en una barra de Producción diaria).
+// Muestra las comandas con su estado y sus tareas; aquí solo se consulta (aprobar/editar es del master).
+function verDetalleDiaOperario(el, event) {
+  if (event) event.stopPropagation();
+  var codigo = el.getAttribute('data-cod'), fecha = el.getAttribute('data-fecha');
+  var cmds = termComandasTodas.filter(function(c) { return (c.operario_id || '—') === codigo && c.fecha === fecha; })
+    .sort(function(a, b) { return String(a.created_at || '').localeCompare(String(b.created_at || '')); });
+  var fechaLabel = new Date(fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'long', day: 'numeric', month: 'long' });
+  fechaLabel = fechaLabel.charAt(0).toUpperCase() + fechaLabel.slice(1);
+
+  var ESTADO = { pendiente: ['#7A4800', '#FFF3D6', '⏳ Por aprobar'], rechazada: ['#991B1B', '#FEE2E2', '⛔ Rechazada'] };
+  var total = 0;
+  var html = cmds.map(function(c) {
+    var e = ESTADO[c.estado_aprobacion] || ['#166534', '#DCFCE7', '✅ Aprobada'];
+    var tareas = (c.comanda_tareas || []).filter(function(t) { return t.estado === 'Terminada'; });
+    var sub = tareas.reduce(function(s, t) { return s + undDeTarea(t); }, 0);
+    if (comandaCuenta(c)) total += sub;
+    var filas = tareas.map(function(t) {
+      var tapa = etiquetaTapaTarea(t);
+      return '<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-bottom:1px solid #E0DED8">'
+        + '<span style="font-size:10px;font-weight:700;color:#6B6B6A;flex-shrink:0;width:70px;padding-top:1px">' + escHtml(t.proceso || 'Otra tarea') + '</span>'
+        + '<span style="font-size:11px;color:#0C0C0B;flex:1;line-height:1.3">' + (tapa ? escHtml(tapa) : '<i style="color:#9A9A98">Sin tapa registrada</i>') + '</span>'
+        + '<span style="font-size:11px;font-weight:700;color:#0C0C0B;flex-shrink:0;white-space:nowrap">' + undDeTarea(t).toLocaleString() + ' und</span></div>';
+    }).join('');
+    return '<div style="margin-bottom:10px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">'
+      +   '<span style="font-size:11px;font-weight:700;color:#1A6B5B;font-family:\'DM Mono\',monospace">' + escHtml(c.correlativo || 'Comanda') + '</span>'
+      +   '<span style="font-size:9px;font-weight:800;border-radius:10px;padding:1px 7px;background:' + e[1] + ';color:' + e[0] + '">' + e[2] + '</span>'
+      +   '<span style="margin-left:auto;font-size:12px;font-weight:800;color:#0C0C0B">' + sub.toLocaleString() + ' und</span></div>'
+      + (c.estado_aprobacion === 'rechazada' && c.motivo_rechazo ? '<div style="font-size:10px;color:#B83232;margin-bottom:2px">Motivo: ' + escHtml(c.motivo_rechazo) + '</div>' : '')
+      + (filas || '<div style="font-size:11px;color:#9A9A98;font-style:italic">Sin tareas terminadas</div>') + '</div>';
+  }).join('') || '<div style="font-size:12px;color:#9A9A98;font-style:italic;padding:6px 0">Sin registros ese día</div>';
+
+  var existente = document.getElementById('prodDiaPopupTapas');
+  if (existente) existente.remove();
+  var pop = document.createElement('div');
+  pop.id = 'prodDiaPopupTapas';
+  pop.style.cssText = 'position:fixed;z-index:9999;background:#fff;border:1.5px solid #1A6B5B;border-radius:10px;padding:14px 16px;width:min(440px,calc(100vw - 16px));max-height:min(380px,80vh);overflow-y:auto;box-shadow:0 8px 28px rgba(0,0,0,.22)';
+  var x = event ? Math.min(event.clientX, window.innerWidth - 456) : 8;
+  var y = event ? Math.min(event.clientY + 8, window.innerHeight - 400) : 60;
+  pop.style.left = Math.max(8, x) + 'px'; pop.style.top = Math.max(8, y) + 'px';
+  pop.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #EBE9E4">'
+    + '<div style="font-size:13px;font-weight:800;color:#0C0C0B">' + escHtml(fechaLabel) + '</div>'
+    + '<div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;font-weight:800;color:#1A6B5B">' + total.toLocaleString() + ' und aprobadas</span>'
+    + '<button onclick="document.getElementById(\'prodDiaPopupTapas\').remove()" style="background:none;border:none;font-size:17px;cursor:pointer;color:#9A9A98;line-height:1;padding:0 2px">✕</button></div></div>'
+    + html;
+  document.body.appendChild(pop);
+  setTimeout(function() {
+    document.addEventListener('click', function closeDiaOp(e2) {
+      var p2 = document.getElementById('prodDiaPopupTapas');
+      if (!p2 || !p2.contains(e2.target)) { if (p2) p2.remove(); document.removeEventListener('click', closeDiaOp); }
+    });
+  }, 60);
+}
+
+// Ingresos (tareas terminadas y aprobadas) de UN proceso de UNA persona, en orden cronológico.
+function registrosDeProceso(codigo, proceso) {
+  var regs = [];
   termComandas.forEach(function(c) {
     if ((c.operario_id || '—') !== codigo) return;
     (c.comanda_tareas || []).forEach(function(t) {
-      if (t.estado !== 'Terminada') return;
-      var proc = t.proceso || 'Otra tarea';
-      var sku = (t.tapa_sku || '').trim();
-      var desc = (t.tapa_desc || '').trim();
-      var llave = proc + '|' + (sku || desc.toLowerCase());
-      var etiqueta = sku ? ((desc && desc.indexOf(sku) === -1) ? sku + ' — ' + desc : (desc || sku)) : desc;
-      if (!map[llave]) map[llave] = { proceso: proc, tapa: etiqueta, und: 0 };
-      map[llave].und += undDeTarea(t);
+      if (t.estado !== 'Terminada' || (t.proceso || 'Otra tarea') !== proceso) return;
+      regs.push({ fecha: c.fecha, cmd: c.correlativo || '', creada: c.created_at || '', tapa: etiquetaTapaTarea(t), und: undDeTarea(t) });
     });
   });
-  return Object.keys(map).map(function(k) { return map[k]; })
-    .sort(function(a, b) { return b.und - a.und; });
+  regs.sort(function(a, b) {
+    return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : String(a.creada).localeCompare(String(b.creada));
+  });
+  return regs;
 }
 
-function buildTermHabilidadFila(f) {
-  return '<div class="td-fila"><span class="td-proc" title="' + escHtml(f.proceso) + '">' + escHtml(f.proceso) + '</span>'
-    + (f.tapa
-        ? '<span class="td-tapa" title="' + escHtml(f.tapa) + '">' + escHtml(f.tapa) + '</span>'
-        : '<span class="td-tapa sin">Sin tapa registrada</span>')
-    + '<span class="td-und">' + f.und.toLocaleString() + ' und</span></div>';
+// Qué procesos están desplegados: 'codigo|proceso' → true. Varios pueden estar abiertos a la vez.
+var termProcAbiertos = {};
+
+function toggleTermProceso(el) {
+  var k = el.getAttribute('data-cod') + '|' + el.getAttribute('data-proc');
+  if (termProcAbiertos[k]) delete termProcAbiertos[k]; else termProcAbiertos[k] = true;
+  renderTermometro();
 }
 
-function buildTermProductividad(o) {
+function buildRegistroProceso(r) {
+  var d = new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  return '<div class="tp-reg" title="' + escHtml(r.cmd) + '"><span class="tp-reg-f">' + escHtml(d) + '</span>'
+    + (r.tapa
+        ? '<span class="tp-reg-t" title="' + escHtml(r.tapa) + '">' + escHtml(r.tapa) + '</span>'
+        : '<span class="tp-reg-t sin">Sin tapa registrada</span>')
+    + '<span class="tp-reg-u">' + r.und.toLocaleString() + ' und</span></div>';
+}
+
+// Unidades del mes por proceso, en barras con su % del total; al tocar un proceso se despliegan sus ingresos.
+function buildTermProcesos(o) {
   var procs = procesosDeOperario(o.codigo);
-  var procKeys = Object.keys(procs).sort(function(a, b) { return procs[b] - procs[a]; });
-  var tapas = agruparPorTapaYProceso(o.codigo);
-  var html = '<div class="td-titulo">🎯 Productividad y habilidad</div>';
-  if (!procKeys.length) return html + '<div class="term-detalle-vacio">Sin tareas registradas este mes</div>';
-  html += '<div class="td-sub">POR PROCESO</div>'
-    + procKeys.map(function(p) { return buildTermDetalleRow(p, procs[p]); }).join('')
-    + '<div class="td-sub">POR TAPA Y PROCESO · ' + tapas.length + '</div>'
-    + '<div class="td-lista">' + tapas.map(buildTermHabilidadFila).join('') + '</div>';
-  return html;
+  var keys = Object.keys(procs).sort(function(a, b) { return procs[b] - procs[a]; });
+  var titulo = '<div class="td-titulo">⚙️ Producción por proceso <span class="td-hint">· toca un proceso para ver sus ingresos</span></div>';
+  if (!keys.length) return titulo + '<div class="term-detalle-vacio">Sin tareas registradas este mes</div>';
+  var max = procs[keys[0]];
+  var total = keys.reduce(function(s, k) { return s + procs[k]; }, 0);
+  return titulo + keys.map(function(p) {
+    var ancho = max > 0 ? Math.max(3, Math.round(procs[p] / max * 100)) : 0;
+    var parte = total > 0 ? Math.round(procs[p] / total * 100) : 0;
+    var abierto = !!termProcAbiertos[o.codigo + '|' + p];
+    var html = '<div class="tp-fila clic' + (abierto ? ' abierto' : '') + '" data-cod="' + escHtml(o.codigo) + '" data-proc="' + escHtml(p) + '" onclick="toggleTermProceso(this)">'
+      + '<span class="tp-nom" title="' + escHtml(p) + '"><span class="tp-chev">' + (abierto ? '▾' : '▸') + '</span>' + escHtml(p) + '</span>'
+      + '<div class="tp-barra"><div class="tp-fill" style="width:' + ancho + '%"></div></div>'
+      + '<span class="tp-und">' + procs[p].toLocaleString() + ' und<i>' + parte + '%</i></span></div>';
+    if (abierto) {
+      var regs = registrosDeProceso(o.codigo, p);
+      html += '<div class="tp-regs">' + regs.map(buildRegistroProceso).join('')
+        + '<div class="tp-regs-pie">' + regs.length + ' ingreso' + (regs.length === 1 ? '' : 's') + ' · por fecha</div></div>';
+    }
+    return html;
+  }).join('');
+}
+
+// Historial de ingresos: TODAS las comandas que esa persona registró en el mes (aprobadas, por aprobar
+// y rechazadas), la más reciente primero, con sus tareas.
+function buildTermHistorial(o) {
+  var regs = termComandasTodas.filter(function(c) { return (c.operario_id || '—') === o.codigo; })
+    .sort(function(a, b) {
+      return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : String(b.created_at || '').localeCompare(String(a.created_at || ''));
+    });
+  var titulo = '<div class="td-titulo" style="margin-top:18px">📜 Historial de ingresos · ' + regs.length + '</div>';
+  if (!regs.length) return titulo + '<div class="term-detalle-vacio">Sin ingresos este mes</div>';
+  var ESTADO = { pendiente: ['pend', '⏳ Por aprobar'], rechazada: ['rech', '⛔ Rechazada'] };
+  return titulo + '<div class="hi-lista">' + regs.map(function(c) {
+    var e = ESTADO[c.estado_aprobacion] || ['ok', '✅ Aprobada'];
+    var tareas = (c.comanda_tareas || []).filter(function(t) { return t.estado === 'Terminada'; });
+    var total = tareas.reduce(function(s, t) { return s + undDeTarea(t); }, 0);
+    var d = new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    var lineas = tareas.map(function(t) {
+      var tapa = etiquetaTapaTarea(t);
+      return '<div class="hi-t"><span class="hi-t-p">' + escHtml(t.proceso || 'Otra tarea') + '</span>'
+        + '<span class="hi-t-x" title="' + escHtml(tapa) + '">' + (tapa ? escHtml(tapa) : '<i>Sin tapa registrada</i>') + '</span>'
+        + '<span class="hi-t-u">' + undDeTarea(t).toLocaleString() + '</span></div>';
+    }).join('');
+    return '<div class="hi-reg"><div class="hi-top"><span class="hi-f">' + escHtml(d) + '</span>'
+      + '<span class="hi-cmd">' + escHtml(c.correlativo || 'comanda') + '</span>'
+      + '<span class="hi-badge ' + e[0] + '">' + e[1] + '</span>'
+      + '<span class="hi-total">' + total.toLocaleString() + ' und</span></div>'
+      + (c.estado_aprobacion === 'rechazada' && c.motivo_rechazo ? '<div class="hi-motivo">Motivo: ' + escHtml(c.motivo_rechazo) + '</div>' : '')
+      + lineas + '</div>';
+  }).join('') + '</div>';
 }
 
 function buildTermDetalle(o) {
   return '<div class="term-detalle">'
     + '<div class="td-bloque">' + buildTermDiario(o) + '</div>'
-    + '<div class="td-bloque">' + buildTermProductividad(o) + '</div>'
+    + '<div class="td-bloque">' + buildTermProcesos(o) + buildTermHistorial(o) + '</div>'
     + '</div>';
 }
 
 function toggleTermDetalle(codigo) {
   termExpandidoCodigo = (termExpandidoCodigo === codigo) ? null : codigo;
   renderTermometro();
-}
-
-function buildTermDetalleRow(proceso, und) {
-  return '<div class="term-detalle-row"><span>' + escHtml(proceso) + '</span><span>' + und.toLocaleString() + ' und</span></div>';
 }
 
 function buildTermometroRow(o, maxUnd) {
