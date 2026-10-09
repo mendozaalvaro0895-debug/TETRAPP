@@ -693,7 +693,8 @@ Notas críticas:
 
 30. `sql/comandas_aprobacion_v1.sql` (oct/2026) — columnas de aprobación en `comandas` (estado_aprobacion/aprobado_por/aprobado_en/motivo_rechazo). Sin correrlo: no se puede aprobar/rechazar (el botón avisa) y todo cuenta como aprobado.
 
-31. `sql/personal_plaza_vacante_v1.sql` (oct/2026) — columna `plaza_vacante` en `personal` +
+31. ✅ YA CORRIDO (confirmado 9-oct-2026: Elizabeth Oliva P-41 y Lesly Rojas t-18 salen marcadas) —
+    `sql/personal_plaza_vacante_v1.sql` (oct/2026) — columna `plaza_vacante` en `personal` +
     deja marcada como vacante la plaza de Lesly Rojas (Serigrafía, `t-18`, dada de baja). Sin
     correrlo, la casilla "Dejar la plaza vacante" avisa que falta el SQL y no guarda.
 
