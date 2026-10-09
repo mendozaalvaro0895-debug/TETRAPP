@@ -3429,7 +3429,9 @@ function boardBuildSinBlock(items) {
 }
 
 function boardBuildLane(laneId, items, label, active) {
-  var total   = items.reduce(function(s,i){ return s + (i.cant||0); }, 0);
+  var nHechas = items.filter(function(i){ return i.estado === 'lista'; }).length;
+  var pend    = items.filter(function(i){ return i.estado !== 'lista'; });
+  var total   = pend.reduce(function(s,i){ return s + (i.cant||0); }, 0);
   var procIts = items.filter(function(i){ return i.estado === 'proceso' || i.estado === 'parcial'; });
   var avg     = procIts.length > 0
     ? Math.round(procIts.reduce(function(s,i){ return s+i.prog; },0)/procIts.length)
@@ -3437,7 +3439,11 @@ function boardBuildLane(laneId, items, label, active) {
   var hdrBg  = active ? 'var(--serig-l)' : '#f8f8f8';
   var hdrClr = active ? 'var(--serig-m)' : 'var(--gray-l)';
   var therm  = '';
-  var cards  = ordenarLaneItems(laneId, items).map(function(it) {
+  var ordenados = ordenarLaneItems(laneId, items);
+  // Las completadas (verde) al final de la línea
+  ordenados = ordenados.filter(function(i){ return i.estado !== 'lista'; })
+    .concat(ordenados.filter(function(i){ return i.estado === 'lista'; }));
+  var cards  = ordenados.map(function(it) {
     var key = laneCardKey(it);
     return '<div class="lane-card-wrap" data-key="' + key + '"' +
       ' ondragover="laneCardDragOver(event)"' +
@@ -3454,15 +3460,32 @@ function boardBuildLane(laneId, items, label, active) {
       '<div style="display:flex;justify-content:space-between;align-items:center">' +
         '<span style="font-size:12px;font-weight:800;color:' + hdrClr + '">' + label +
           (active ? '' : ' <span style="font-size:9px;font-weight:700;color:var(--gray-l)">(inactiva)</span>') + '</span>' +
-        '<span style="font-size:10px;background:white;color:var(--gray);border-radius:10px;padding:1px 7px;font-weight:600">' + items.length + '</span>' +
+        '<span style="font-size:10px;background:white;color:var(--gray);border-radius:10px;padding:1px 7px;font-weight:600">' + pend.length + '</span>' +
       '</div>' +
-      (total > 0 ? '<div style="font-size:10px;color:' + hdrClr + ';margin-top:1px">' + total.toLocaleString() + ' und</div>' : '') +
+      (total > 0 ? '<div style="font-size:10px;color:' + hdrClr + ';margin-top:1px">' + total.toLocaleString() + ' und' +
+        (nHechas ? ' <span style="color:#15803d;font-weight:700">· ✓ ' + nHechas + ' completada' + (nHechas > 1 ? 's' : '') + '</span>' : '') + '</div>'
+        : (nHechas ? '<div style="font-size:10px;color:#15803d;font-weight:700;margin-top:1px">✓ ' + nHechas + ' completada' + (nHechas > 1 ? 's' : '') + '</div>' : '')) +
       therm +
     '</div>' +
     '<div class="board-cards-wrap" id="bc-' + laneId + '">' +
       (cards || '<div class="board-empty-lane">— vacía —</div>') +
     '</div>' +
     '</div>';
+}
+
+// Ficha COMPLETADA que sigue asignada a una línea: se muestra (en verde, al final de su línea)
+// durante el mes en que se completó. Mes de completado = fecha de su última entrega vinculada;
+// sin entregas (cierre manual), el mes efectivo de la ficha.
+function fichaCompletadaEsteMes(s) {
+  var ult = '';
+  (getEntregasManuales() || []).forEach(function(m) {
+    var liga = (m.lineas && m.lineas.length)
+      ? m.lineas.some(function(l) { return l.solId === s.id; })
+      : m.solId === s.id;
+    if (liga && m.fecha && m.fecha > ult) ult = m.fecha;
+  });
+  var key = ult ? periodoDe(ult).key : mesSol(s);
+  return key === periodoActualKey();
 }
 
 function renderBoard() {
@@ -3474,7 +3497,8 @@ function renderBoard() {
     var esActiva       = ['nueva','proceso','parcial'].indexOf(s.estado) >= 0;
     var tieneLineaAsig = s.lineas.some(function(l){ return l.linea_id; });
     var esListaSin     = s.estado === 'lista' && !tieneLineaAsig;
-    if (!esActiva && !esListaSin) return;
+    var esListaEnLinea = s.estado === 'lista' && tieneLineaAsig && fichaCompletadaEsteMes(s);
+    if (!esActiva && !esListaSin && !esListaEnLinea) return;
     var sTiros = s.tiros || Math.max.apply(null, (s.lineas.length ? s.lineas.map(function(l){ return l.tiros || 1; }) : [1]));
     if (s.lineas.length === 0) {
       items.push({
