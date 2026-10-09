@@ -370,6 +370,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .hi-badge.ok{background:#DCFCE7;color:#166534}
 .hi-badge.pend{background:#FFF3D6;color:#7A4800}
 .hi-badge.rech{background:#FEE2E2;color:#991B1B}
+.hi-ap{display:inline-flex;gap:4px}
+.hi-ap button{border:none;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)}
+.hi-ap-ok{background:#166534;color:#fff}
+.hi-ap-ok:hover{background:#0F4F28}
+.hi-ap-no{background:#fff;color:#B83232;border:1px solid #B83232!important}
+.hi-ap-no:hover{background:#FEE2E2}
 .hi-total{margin-left:auto;font-family:var(--mono);font-weight:700;color:var(--teal);white-space:nowrap}
 .hi-motivo{font-size:10px;color:var(--red);margin:2px 0 0 2px}
 .hi-t{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:8px;align-items:baseline;font-size:10.5px;padding:1px 0 1px 6px;color:var(--gray)}
@@ -2152,6 +2158,49 @@ function buildTermDiario(o) {
     + '<span><i style="background:none;border-top:2px dashed var(--red);height:0;width:14px;vertical-align:3px"></i>meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>';
 }
 
+// Aprobar / rechazar una comanda pendiente directo desde el historial o el popup del día.
+// Mismo efecto que en comandas.html (estado + quién + cuándo + motivo si se rechaza), pero sin salir
+// de Inicio: se actualiza la memoria y se repinta Personal y Roles sin volver a consultar.
+function botonesAprobarHtml(c) {
+  if (c.estado_aprobacion !== 'pendiente') return '';
+  var id = escHtml(String(c.id));
+  return '<span class="hi-ap">'
+    + '<button class="hi-ap-ok" onclick="cambiarEstadoComandaTapas(\'' + id + '\',\'aprobada\',event)" title="Aprobar: desde ahora suma en termómetros y Productividad">✅ Aprobar</button>'
+    + '<button class="hi-ap-no" onclick="cambiarEstadoComandaTapas(\'' + id + '\',\'rechazada\',event)" title="Rechazar (pide un motivo)">⛔ Rechazar</button></span>';
+}
+
+async function cambiarEstadoComandaTapas(id, nuevo, ev) {
+  if (ev) ev.stopPropagation();
+  var upd = {
+    estado_aprobacion: nuevo,
+    aprobado_por: (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || 'master',
+    aprobado_en: new Date().toISOString(),
+    motivo_rechazo: null
+  };
+  if (nuevo === 'rechazada') {
+    var motivo = prompt('Motivo del rechazo (obligatorio):');
+    if (motivo === null) return;
+    if (!motivo.trim()) { showToast('❌ El motivo es obligatorio para rechazar', '#B83232'); return; }
+    upd.motivo_rechazo = motivo.trim();
+  }
+  try {
+    var r = await db.from('comandas').update(upd).eq('id', id);
+    if (r.error) throw r.error;
+    var c = termComandasTodas.find(function(x) { return String(x.id) === String(id); });
+    if (c) Object.assign(c, upd);
+    termComandas = termComandasTodas.filter(comandaCuenta);
+    termProcesosPorOperario = agruparPorOperarioYProceso(termComandas);
+    var pop = document.getElementById('prodDiaPopupTapas');
+    if (pop) pop.remove();
+    renderTermometro();
+    refrescarPendientesComandas();
+    showToast(nuevo === 'aprobada' ? '✅ Comanda aprobada' : '⛔ Comanda rechazada');
+  } catch(e) {
+    console.error('cambiarEstadoComandaTapas:', e);
+    showToast('❌ ' + (/estado_aprobacion|aprobado_|motivo_rechazo/.test(e.message || '') ? 'Falta correr sql/comandas_aprobacion_v1.sql en Supabase' : e.message), '#B83232');
+  }
+}
+
 // Popup con el detalle de lo que UNA persona registró UN día (clic en una barra de Producción diaria):
 // cada comanda con su estado y sus tareas. Mismo estilo que el popup del gráfico mensual de ingreso PT.
 function verDetalleDiaOperario(el, event) {
@@ -2180,7 +2229,7 @@ function verDetalleDiaOperario(el, event) {
     return '<div style="margin-bottom:10px">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">'
       +   '<a href="comandas.html?id=' + encodeURIComponent(c.id) + '" target="_blank" title="Abrir en Comandas" style="font-size:11px;font-weight:700;color:var(--teal);text-decoration:none;font-family:var(--mono)">' + escHtml(c.correlativo || 'Comanda') + ' ↗</a>'
-      +   '<span style="font-size:9px;font-weight:800;border-radius:10px;padding:1px 7px;background:' + e[1] + ';color:' + e[0] + '">' + e[2] + '</span>'
+      +   '<span style="font-size:9px;font-weight:800;border-radius:10px;padding:1px 7px;background:' + e[1] + ';color:' + e[0] + '">' + e[2] + '</span>' + botonesAprobarHtml(c)
       +   '<span style="margin-left:auto;font-size:12px;font-weight:800;color:var(--ink)">' + sub.toLocaleString() + ' und</span></div>'
       + (c.estado_aprobacion === 'rechazada' && c.motivo_rechazo ? '<div style="font-size:10px;color:var(--red);margin-bottom:2px">Motivo: ' + escHtml(c.motivo_rechazo) + '</div>' : '')
       + (filas || '<div style="font-size:11px;color:var(--gray-l);font-style:italic">Sin tareas terminadas</div>') + '</div>';
@@ -2299,7 +2348,7 @@ function buildTermHistorial(o) {
     }).join('');
     return '<div class="hi-reg"><div class="hi-top"><span class="hi-f">' + escHtml(d) + '</span>'
       + '<a class="hi-cmd" href="comandas.html?id=' + encodeURIComponent(c.id) + '" target="_blank" title="Abrir en Comandas para revisar, editar o aprobar">' + escHtml(c.correlativo || 'comanda') + ' ↗</a>'
-      + '<span class="hi-badge ' + e[0] + '">' + e[1] + '</span>'
+      + '<span class="hi-badge ' + e[0] + '">' + e[1] + '</span>' + botonesAprobarHtml(c)
       + '<span class="hi-total">' + total.toLocaleString() + ' und</span></div>'
       + (c.estado_aprobacion === 'rechazada' && c.motivo_rechazo ? '<div class="hi-motivo">Motivo: ' + escHtml(c.motivo_rechazo) + '</div>' : '')
       + lineas + '</div>';
