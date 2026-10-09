@@ -1023,6 +1023,8 @@ var SKU_AREA_OVERRIDES = {};
 
 function clasificarArea(sku, fam) {
   if (sku && SKU_AREA_OVERRIDES[sku]) return SKU_AREA_OVERRIDES[sku];
+  // SICAF factura con un dígito extra al final del SKU de inventario (ventas 101621 = inventario 10162)
+  if (sku && sku.length > 1 && SKU_AREA_OVERRIDES[sku.slice(0, -1)]) return SKU_AREA_OVERRIDES[sku.slice(0, -1)];
   if (sku && SERIG_SKUS && SERIG_SKUS.has(sku)) return 'Serigrafía';
   return AREA_FAM_MAP[fam] || null;
 }
@@ -2441,8 +2443,10 @@ var SERIG_BASE_REVERSE = {}; // { baseSku: [serigSku1, serigSku2, ...] }
 
 async function cargarSerigSkus() {
   try {
+    // Solo fichas de Serigrafía: Tapas usa las mismas tablas y sus SKU no deben contar como Serigrafía
     var r = await db.from('solicitud_lineas')
-      .select('sku,sku_base')
+      .select('sku,sku_base,solicitudes!inner(area)')
+      .eq('solicitudes.area', 'serig')
       .not('sku', 'is', null)
       .not('sku', 'eq', '');
     SERIG_SKUS = new Set();

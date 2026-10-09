@@ -1,47 +1,34 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- diagnostico_tapas_area_ventas_v1.sql
--- Lista todos los SKUs de familia TAPA/BASE/CONTRATAPA/LINER que aparecen en
--- ventas, cruzados contra su presencia en el flujo de Tapas (solicitudes).
--- Propósito: identificar cuáles nunca pasaron por maquila y deben quedar como
--- area_ventas = 'produccion'.
---
--- Cómo usar:
---   1. Correr este SELECT en Supabase → SQL Editor.
---   2. Revisar la columna "en_tapas": si es 0, el SKU nunca tuvo solicitud
---      de trabajo en el área de Tapas → candidato a 'produccion'.
---   3. Confirmar con Álvaro y agregar los SKUs confirmados al UPDATE de abajo.
 -- ─────────────────────────────────────────────────────────────────────────────
 
+-- PASO 1: Ver descripciones de los SKUs con null en ventas
+-- Corre esto primero para identificar los de descripción desconocida
+-- descripcion_familia vive en `ventas` (no en `inventario`); se parte de la lista de SKUs
+-- con LEFT JOIN para que aparezcan también los que no existen en inventario.
 SELECT
-  v.sku,
-  i.descripcion,
-  i.area_ventas                                          AS area_actual,
-  v.descripcion_familia                                  AS familia,
-  COUNT(DISTINCT v.id)                                   AS facturas,
-  ROUND(SUM(v.total_quetzales)::numeric, 0)              AS total_q,
-  SUM(v.total_unidades)                                  AS total_und,
-  COUNT(DISTINCT sl.id)                                  AS en_tapas  -- 0 = nunca pasó por solicitud de Tapas
-FROM ventas v
-LEFT JOIN inventario i
-       ON i.sku = v.sku
-LEFT JOIN solicitud_lineas sl
-       ON sl.sku = v.sku
-WHERE v.descripcion_familia IN ('TAPA', 'BASE', 'CONTRATAPA', 'LINER')
-  AND (i.area_ventas IS NULL)          -- solo los que aún no tienen override
-GROUP BY v.sku, i.descripcion, i.area_ventas, v.descripcion_familia
-ORDER BY total_q DESC;
+  s.sku,
+  i.descripcion                                        AS desc_inventario,
+  i.area_ventas,
+  string_agg(DISTINCT v.descripcion,         ' | ')    AS desc_ventas,
+  string_agg(DISTINCT v.descripcion_familia, ' | ')    AS familia_ventas
+FROM (VALUES
+  ('106511'),('107036'),('104952'),('107464'),
+  ('101243'),('101868'),('107776'),('104141'),
+  ('104581'),('105781'),('109091'),('101621')
+) AS s(sku)
+LEFT JOIN inventario i ON i.sku = s.sku
+LEFT JOIN ventas     v ON v.sku = s.sku
+GROUP BY s.sku, i.descripcion, i.area_ventas
+ORDER BY s.sku;
 
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Una vez revisada la lista, completar los SKUs confirmados aquí y correr:
--- ─────────────────────────────────────────────────────────────────────────────
-/*
-UPDATE inventario
-SET area_ventas = 'produccion'
-WHERE sku IN (
-  '106811',   -- TAPA ROLL ON BLANCA 90ML ME04819
-  '10690',    -- TAPA PARA ROLL-ON FROSTEADA COD.201776
-  -- agrega aquí los demás que identifiques con en_tapas = 0
-  ''
-);
-*/
+-- PASO 2 — YA CORRIDO 2026-10-09 (confirmado por Alvaro).
+-- SICAF factura con un dígito extra al final del SKU de inventario (ventas 101621 = inventario
+-- 10162). ventas.html → clasificarArea() ahora prueba el SKU exacto y, si no hay área fijada,
+-- el SKU sin el último dígito; por eso el área se fija en el SKU de 5 dígitos de inventario.
+UPDATE inventario SET area_ventas = 'produccion' WHERE sku = '10162' AND area_ventas IS NULL;
+UPDATE inventario SET area_ventas = 'tapas'
+WHERE sku IN ('10124','10186','10414','10458','10495','10651','10909') AND area_ventas IS NULL;
+-- Efecto colateral aceptado: ventas 106825 (tapa roll on negra) pasa a Producción porque su par
+-- de inventario 10682 ya estaba marcado 'produccion'.
