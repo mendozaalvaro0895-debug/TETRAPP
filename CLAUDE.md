@@ -393,6 +393,16 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   nombre/código · toggle solo activos.
   `area` acepta 'tapas'/'serig'/'produccion'/'molino'/'bodega'/'moldes'. Molino, Bodega y
   Moldes TODAVÍA NO tienen módulo propio en la app — este registro de personal es la base
+BARRA DE INDICADORES (arriba de las pestañas, `renderKpis()`; oct/2026): Total activos ·
+  Producción Turno Gabino · Producción Turno Alex · Serigrafía · Tapas · Otras áreas (= todo lo
+  que no es Tapas/Serigrafía/Producción; el mouse encima muestra el desglose). Solo cuenta
+  personas ACTIVAS, vía `conteoActivosPorArea()` (única fuente, también del popup). CLIC en
+  "Total activos" → `abrirModalKpiTotal()`: popup con área + cantidad (Producción con sus
+  turnos Gabino/Alex y "Sin turno asignado" si alguien no tiene `turno_produccion`) y el total.
+  Se QUITARON a pedido de Álvaro Permisos pendientes, EPP pendiente y Faltas sin justificar
+  (ya no se consulta `rrhh_permisos` para la barra; las faltas pendientes siguen visibles en la
+  tabla y en el perfil → Faltas).
+
   para cuando se construyan, ninguna otra página los lee todavía (mismo caso que
   produccion.html con 'produccion': el módulo real llegó después que el registro de personal).
   ⚠️ `personal` tiene un CHECK constraint `personal_area_check` creado manual en el dashboard

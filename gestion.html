@@ -91,6 +91,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .kpi-l{font-size:8.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--gray);margin-bottom:2px}
 .kpi-v{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--ink);line-height:1.1}
 .kpi-s{font-size:8px;color:var(--gray-l);margin-top:1px}
+.kpi.kpi-click{cursor:pointer;border:1px solid transparent;transition:border-color .15s,background .15s}
+.kpi.kpi-click:hover{border-color:var(--gest-m);background:var(--card)}
+.kpi-hint{font-size:8px;color:var(--gray-l)}
+.kt-fila{display:flex;justify-content:space-between;align-items:baseline;padding:8px 2px;border-bottom:1px solid var(--border);font-size:13px}
+.kt-fila b{font-family:var(--mono);font-size:14px}
+.kt-sub{padding:5px 2px 5px 22px;font-size:12px;color:var(--gray)}
+.kt-sub b{font-size:12px}
+.kt-total{border-bottom:none;border-top:2px solid var(--border);margin-top:2px;font-weight:800}
 
 /* PAGE HEADER (por vista) */
 .ph{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;gap:8px}
@@ -306,12 +314,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 
   <div class="kpi-strip" id="kpiStrip">
-    <div class="kpi"><div class="kpi-l">Total activos</div><div class="kpi-v" id="kTotal">—</div></div>
-    <div class="kpi"><div class="kpi-l">Tapas</div><div class="kpi-v" id="kTapas">—</div></div>
+    <div class="kpi kpi-click" onclick="abrirModalKpiTotal()" title="Clic para ver el detalle por área"><div class="kpi-l">Total activos <span class="kpi-hint">▾</span></div><div class="kpi-v" id="kTotal">—</div></div>
+    <div class="kpi"><div class="kpi-l">Producción Turno Gabino</div><div class="kpi-v" id="kGabino">—</div></div>
+    <div class="kpi"><div class="kpi-l">Producción Turno Alex</div><div class="kpi-v" id="kAlex">—</div></div>
     <div class="kpi"><div class="kpi-l">Serigrafía</div><div class="kpi-v" id="kSerig">—</div></div>
-    <div class="kpi"><div class="kpi-l">Permisos pendientes</div><div class="kpi-v" id="kPermisos">—</div></div>
-    <div class="kpi"><div class="kpi-l">EPP pendiente</div><div class="kpi-v" id="kEpp">—</div></div>
-    <div class="kpi"><div class="kpi-l">Faltas sin justificar</div><div class="kpi-v" id="kFaltas">—</div></div>
+    <div class="kpi"><div class="kpi-l">Tapas</div><div class="kpi-v" id="kTapas">—</div></div>
+    <div class="kpi" id="kOtrasWrap"><div class="kpi-l">Otras áreas</div><div class="kpi-v" id="kOtras">—</div></div>
   </div>
 
   <div class="views">
@@ -825,6 +833,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <button class="btn btn-g" onclick="cerrarModalLocker()">Cancelar</button>
       <button class="btn btn-s" onclick="guardarLocker()">Guardar</button>
     </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MODAL DETALLE TOTAL ACTIVOS ═════════ -->
+<div class="overlay" id="modalKpiTotal" onclick="cerrarSiOverlayKpiTotal(event)">
+  <div class="modal" style="max-width:380px">
+    <div class="mh">
+      <div class="mh-title">Personal activo por área</div>
+      <button class="m-close" onclick="cerrarModalKpiTotal()">✕</button>
+    </div>
+    <div class="mb" style="padding:12px 20px 18px" id="ktLista"></div>
   </div>
 </div>
 
@@ -1417,23 +1436,74 @@ async function guardarLocker() {
   }
 }
 
-async function renderKpis() {
-  var activos = personalTodos.filter(function(p) { return p.activo; });
-  document.getElementById('kTotal').textContent = activos.length;
-  document.getElementById('kTapas').textContent = activos.filter(function(p) { return p.area === 'tapas'; }).length;
-  document.getElementById('kSerig').textContent = activos.filter(function(p) { return p.area === 'serig'; }).length;
-  document.getElementById('kEpp').textContent = activos.filter(function(p) { return !p.epp_asignado; }).length;
+// Personas ACTIVAS por área (y por turno en Producción). Una sola fuente para la barra de
+// indicadores y para el popup de "Total activos", así los números siempre cuadran entre sí.
+function conteoActivosPorArea() {
+  var c = { total: 0, areas: {}, gabino: 0, alex: 0, sinTurno: 0 };
+  personalTodos.forEach(function(p) {
+    if (!p.activo) return;
+    c.total++;
+    c.areas[p.area] = (c.areas[p.area] || 0) + 1;
+    if (p.area === 'produccion') {
+      if (p.turno_produccion === 'gabino') c.gabino++;
+      else if (p.turno_produccion === 'alex') c.alex++;
+      else c.sinTurno++;
+    }
+  });
+  return c;
+}
 
-  var totalFaltasPend = 0;
-  Object.keys(FALTAS_RESUMEN).forEach(function(pid) { totalFaltasPend += FALTAS_RESUMEN[pid].pendientes; });
-  document.getElementById('kFaltas').textContent = totalFaltasPend;
+// Barra superior: Total activos (clic = desglose por área) · Producción por turno · Serigrafía ·
+// Tapas · Otras áreas (todo lo que no es Tapas/Serigrafía/Producción: molino, bodega, moldes,
+// mantenimiento, torno, oficina). Permisos/EPP/Faltas se quitaron de acá a pedido de Álvaro.
+function renderKpis() {
+  var c = conteoActivosPorArea();
+  var n = function(k) { return c.areas[k] || 0; };
+  var otras = c.total - n('tapas') - n('serig') - n('produccion');
+  document.getElementById('kTotal').textContent = c.total;
+  document.getElementById('kGabino').textContent = c.gabino;
+  document.getElementById('kAlex').textContent = c.alex;
+  document.getElementById('kSerig').textContent = n('serig');
+  document.getElementById('kTapas').textContent = n('tapas');
+  document.getElementById('kOtras').textContent = otras;
+  // Pasar el mouse sobre "Otras áreas" muestra de qué áreas sale ese número
+  var det = AREA_GRUPOS.filter(function(a) { return a.key !== 'tapas' && a.key !== 'serig' && a.key !== 'produccion' && n(a.key); })
+    .map(function(a) { return a.label + ': ' + n(a.key); });
+  document.getElementById('kOtrasWrap').title = det.length ? det.join('\n') : 'Sin personal activo en otras áreas';
+}
 
-  try {
-    var rp = await db.from('rrhh_permisos').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente');
-    document.getElementById('kPermisos').textContent = (rp.count != null) ? rp.count : '—';
-  } catch (e) {
-    document.getElementById('kPermisos').textContent = '—';
-  }
+function abrirModalKpiTotal() {
+  var c = conteoActivosPorArea();
+  var fila = function(label, num, extraClase) {
+    return '<div class="kt-fila' + (extraClase || '') + '"><span>' + label + '</span><b>' + num + '</b></div>';
+  };
+  var html = '';
+  var vistos = {};
+  AREA_GRUPOS.forEach(function(a) {
+    vistos[a.key] = true;
+    var num = c.areas[a.key] || 0;
+    if (!num) return;
+    html += fila(a.label, num);
+    if (a.key === 'produccion') {
+      if (c.gabino) html += fila('Turno Gabino', c.gabino, ' kt-sub');
+      if (c.alex) html += fila('Turno Alex', c.alex, ' kt-sub');
+      if (c.sinTurno) html += fila('Sin turno asignado', c.sinTurno, ' kt-sub');
+    }
+  });
+  Object.keys(c.areas).forEach(function(k) {
+    if (!vistos[k]) html += fila(escHtml(k), c.areas[k]);
+  });
+  html += fila('Total activos', c.total, ' kt-total');
+  document.getElementById('ktLista').innerHTML = html;
+  document.getElementById('modalKpiTotal').classList.add('open');
+}
+
+function cerrarModalKpiTotal() {
+  document.getElementById('modalKpiTotal').classList.remove('open');
+}
+
+function cerrarSiOverlayKpiTotal(ev) {
+  if (ev.target.id === 'modalKpiTotal') cerrarModalKpiTotal();
 }
 
 function setFiltroArea(area) {
