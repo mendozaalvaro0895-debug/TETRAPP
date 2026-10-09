@@ -167,6 +167,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .p-table tr.p-row.vacante td{border-bottom-style:dashed}
 .p-table tr.p-row.vacante td:first-child{font-weight:800;font-style:italic;color:var(--amber)}
 .p-table tr.p-row.vacante .p-row-avatar{background:transparent;color:var(--amber);border:1.5px dashed var(--amber)}
+.vac-antes{display:block;margin:2px 0 0 36px;font-size:10px;font-weight:500;font-style:normal;color:var(--gray);opacity:.6}
 .vac-cerrar{margin-left:8px;font-size:10px;font-style:normal;font-weight:700;color:var(--gray);cursor:pointer;padding:1px 6px;border-radius:10px;border:1px solid var(--border);background:var(--card)}
 .vac-cerrar:hover{color:var(--red);border-color:var(--red)}
 .p-table tr.p-row.supervisor{background:#4338CA0D}
@@ -504,7 +505,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
         <div class="fg full" id="mpVacanteWrap" style="display:none">
           <label class="fchk">
-            <input type="checkbox" id="mpVacante"> Dejar la plaza vacante (sigue visible en el listado, sin nombre)
+            <input type="checkbox" id="mpVacante"> Dejar la plaza vacante (sigue visible en el listado; quién se fue se ve en pequeño)
           </label>
         </div>
       </div>
@@ -1454,10 +1455,10 @@ function renderPersonalGrid() {
     var esVacante = esPlazaVacante(p, soloActivos);
     if (soloActivos && !p.activo && !esVacante) return false;
     if (q) {
-      // Una plaza vacante no tiene nombre ni código a la vista: solo se encuentra por
-      // "vacante" o por su proceso/rol (ej. "flameador").
+      // Una plaza vacante se encuentra por "vacante", por su proceso/rol (ej. "flameador")
+      // o por el nombre de quien se fue (se ve en chico en la fila). El código no se muestra.
       var hay = esVacante
-        ? ('vacante ' + (p.proceso_hab || '')).toLowerCase().indexOf(q) !== -1
+        ? ('vacante ' + (p.proceso_hab || '') + ' ' + (p.nombre || '')).toLowerCase().indexOf(q) !== -1
         : ((p.nombre || '').toLowerCase().indexOf(q) !== -1 ||
            (p.codigo || '').toLowerCase().indexOf(q) !== -1);
       if (!hay) return false;
@@ -1609,14 +1610,18 @@ function buildPersonalTable(lista, anonVac) {
 
 var TURNO_PRODUCCION_LBL = { alex: 'Turno Alex', gabino: 'Turno Gabino' };
 
-// Fila de una plaza vacante: sin nombre ni datos personales (es la plaza, no la persona que
-// la dejó) — solo rol/proceso, turno y área (por el grupo). Clic = cubrirla con alguien nuevo
-// (precarga área/rol/proceso/turno); ✕ = cerrar la vacante sin cubrirla.
+// Fila de una plaza vacante: sin datos personales (es la plaza, no la persona que la dejó) —
+// rol/proceso, turno y área (por el grupo). Lo único que recuerda a la persona es una línea
+// chica y translúcida "Antes: nombre · baja fecha" bajo VACANTE (`.vac-antes`), para saber
+// quién se fue sin que compita con la plaza. Clic = cubrirla con alguien nuevo (precarga
+// área/rol/proceso/turno); ✕ = cerrar la vacante sin cubrirla.
 function buildFilaVacante(p, rolTxt, turnoTxt) {
   var guion = '<span class="falta-none">—</span>';
+  var antes = 'Antes: ' + (p.nombre || 'sin nombre') + (p.fecha_baja ? ' · baja ' + p.fecha_baja : '');
   return '<tr class="p-row vacante" onclick="cubrirVacante(\'' + p.id + '\')" title="Clic para cubrir esta plaza con una persona nueva">' +
     '<td><span class="p-row-avatar">＋</span>VACANTE' +
-      '<span class="vac-cerrar" onclick="event.stopPropagation();cerrarVacante(\'' + p.id + '\')" title="Cerrar la vacante (la plaza ya no se necesita)">✕ cerrar</span></td>' +
+      '<span class="vac-cerrar" onclick="event.stopPropagation();cerrarVacante(\'' + p.id + '\')" title="Cerrar la vacante (la plaza ya no se necesita)">✕ cerrar</span>' +
+      '<span class="vac-antes">' + escHtml(antes) + '</span></td>' +
     '<td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td>' +
     '<td>' + escHtml(rolTxt) + '</td>' +
     '<td>' + escHtml(turnoTxt) + '</td>' +

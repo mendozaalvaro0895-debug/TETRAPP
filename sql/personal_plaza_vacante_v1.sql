@@ -4,9 +4,10 @@
 -- Al dar de baja a alguien, gestion.html → Personal → Datos generales
 -- ofrece "Dejar la plaza vacante": la ficha de baja queda con
 -- plaza_vacante = true y, en el listado "Solo activos", se muestra
--- como una fila anónima "VACANTE" (rol/proceso, turno y área de la
--- persona que se fue, sin nombre ni datos personales) para ver de un
--- vistazo qué espacios hay que cubrir. Clic en la fila = cubrirla con
+-- como una fila "VACANTE" (rol/proceso, turno y área de la persona que
+-- se fue, sin datos personales; solo una línea chica y translúcida
+-- "Antes: nombre · baja fecha") para ver de un vistazo qué espacios hay
+-- que cubrir. Clic en la fila = cubrirla con
 -- una persona nueva (la vacante se cierra sola al guardar); "✕ cerrar"
 -- = la plaza ya no se necesita.
 --

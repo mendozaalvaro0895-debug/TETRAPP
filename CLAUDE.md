@@ -434,16 +434,18 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   = SQL pendiente #31): al dar de baja a alguien, el formulario (Datos generales) muestra la
   casilla "Dejar la plaza vacante" (`actualizarVacanteWrap()`, solo visible si la persona queda
   inactiva). Esa ficha de baja, con la marca, se pinta en el listado "Solo activos" como una
-  fila anónima `VACANTE` (`buildFilaVacante()` — rol/proceso, turno y área de quien se fue,
-  SIN nombre/código/edad/teléfono/locker) y el encabezado del grupo suma "N vacantes".
+  fila `VACANTE` (`buildFilaVacante()` — rol/proceso, turno y área de quien se fue; SIN
+  código/edad/teléfono/locker) y el encabezado del grupo suma "N vacantes". Quién se fue se
+  ve SOLO como una línea chica y translúcida bajo VACANTE (`.vac-antes`, opacity .6):
+  "Antes: <nombre> · baja <fecha_baja>" — a pedido de Álvaro, para no perder la referencia.
   `esPlazaVacante(p, soloActivos)` es la única condición (marca + inactivo + "Solo activos"
   prendido): con "Solo activos" apagado se ve la ficha de baja normal con nombre + chip "plaza
   vacante". Es una marca EXPLÍCITA a propósito — `personal` tiene decenas de bajas históricas
   que NO deben salir como vacantes. Clic en la fila = `cubrirVacante(id)` (abre el alta con
   área/rol/proceso/turno precargados, `mpCubrirVacanteId`; al guardar, `guardarPersona()` apaga
   la marca de la ficha vieja); "✕ cerrar" = `cerrarVacante(id)` (la plaza ya no se necesita).
-  El buscador solo encuentra vacantes por "vacante" o por su proceso (no tienen nombre a la
-  vista). `plaza_vacante` solo viaja en el payload cuando se marca/desmarca, así guardar a
+  El buscador encuentra vacantes por "vacante", por su proceso o por el nombre de quien se
+  fue (el código no se muestra ni se busca). `plaza_vacante` solo viaja en el payload cuando se marca/desmarca, así guardar a
   cualquier otra persona no se rompe si el SQL aún no corrió.
   ⚠️ Producción usa un comparador aparte (`ordenProduccionPorTurno()`, elegido en
   `buildPersonalTable()` solo para `a.key==='produccion'`): agrupa primero por
