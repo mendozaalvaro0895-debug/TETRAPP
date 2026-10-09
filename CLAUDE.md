@@ -807,6 +807,16 @@ Las 4 copias (misma lógica, autónomas por arquitectura):
 5. **Git siempre a ambas ramas**: `git push origin master && git push origin master:main`
 6. **Verificar referencias eliminadas**: tras borrar IDs o funciones, grep para confirmar que no quedan usos huérfanos.
 7. **var sobre const/let** en funciones globales de tapas.html (evitar errores de redeclaración entre módulos cargados múltiples veces).
+9. **Varias sesiones de Claude comparten este mismo directorio y la misma rama** (Gestión, Seguridad,
+   Ventas, Tapas, Serigrafía…), así que lo "sin commitear" que aparece en `git status` puede ser de otra
+   sesión. Siempre: (a) correr `git status` y `git diff --stat` antes de commitear y dejar lo que no
+   sea tuyo; (b) NUNCA `git add .` / `git add -A` / `git commit -a` — stagear por NOMBRE de archivo, y si
+   un archivo compartido (CLAUDE.md) trae cambios ajenos, stagear solo tu bloque con
+   `git apply --cached --unidiff-zero` sobre un parche de tu hunk; (c) agregar al mensaje del commit una
+   línea `Sesión: <título de la sesión>` justo antes del trailer `Co-Authored-By` — así
+   `git log` responde de dónde vino cada cambio (el autor siempre sale "Alvaro Mendoza" y el trailer
+   solo distingue el modelo); (d) no versionar `BOM_Componentes_Tapas.xlsx` ni archivos de datos de
+   negocio sin preguntar. Esta regla se carga al INICIAR una sesión: las que ya estaban abiertas no la ven.
 8. **Fecha "hoy" SIEMPRE con `fechaHoy()`** — NUNCA `new Date().toISOString().slice(0,10)`: devuelve fecha UTC y Guatemala es UTC-6, después de las 18:00 marca el día siguiente. `toISOString()` solo válido sobre fechas ancladas a mediodía o para timestamps completos.
 
 ---
