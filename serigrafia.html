@@ -2701,7 +2701,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
   var esNueva3  = perC3.key === periodoActualKey();
   var badgeAgo3 = perC3.key === '0000-00' ? ''
     : '<span class="badge-ago' + (esNueva3 ? '' : ' badge-ago-old') + '" title="Período ' + perC3.largo + '">' + perC3.corto + '</span>';
-  var trasladado3 = item.periodoEfectivo && item.periodoEfectivo !== perC3.key;
+  var trasladado3 = !item.restaurada && item.periodoEfectivo && item.periodoEfectivo !== perC3.key;
   var badgeTraslado3 = trasladado3
     ? '<span class="badge-traslado" title="Pendiente de ' + perC3.largo + ', trasladado al mes actual">↩ de ' + perC3.corto + '</span>'
     : '';
@@ -2715,6 +2715,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
       '<span style="font-family:var(--mono);font-size:10px;font-weight:800;color:' + (isComplete ? '#15803d' : 'var(--serig-m)') + ';flex-shrink:0">' + escHtml(item.solCodigo) + '</span>' +
       badgeAgo3 +
       badgeTraslado3 +
+      (item.restaurada && item.linea_id ? '<span title="Línea donde se trabajó" style="background:#fff;color:#15803d;border:1px solid #86efac;border-radius:4px;padding:1px 5px;font-size:9px;font-weight:800;flex-shrink:0">L' + escHtml(String(item.linea_id)) + '</span>' : '') +
       '<span onclick="event.stopPropagation();abrirEstadoSin(event,\'' + item.solId + '\',\'' + (item.lineaDbId || '') + '\')" title="Cambiar estado" style="background:' + badgeBg + ';color:' + badgeClr + ';border:1.5px solid ' + badgeBdr + ';border-radius:5px;padding:3px 8px;font-size:9px;font-weight:800;flex-shrink:0;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.10);letter-spacing:.3px;display:inline-flex;align-items:center;gap:4px">' + badgeTxt + ' <span style="font-size:8px;opacity:.7">▾</span></span>' +
       '<span style="flex:1"></span>' +
       '<span style="flex-shrink:0;text-align:right;white-space:nowrap">' + cantHtml + '</span>' +
@@ -3180,8 +3181,9 @@ function sinGrupoDrop(e, targetCliente) {
 }
 
 function boardBuildSinBlock(items) {
-  var total = items.reduce(function(s,i){ return s + (i.cant||0); }, 0);
-  var countTxt = items.length + (total > 0 ? ' · ' + total.toLocaleString() + ' und' : '');
+  var propios = items.filter(function(i){ return !i.restaurada; });
+  var total = propios.reduce(function(s,i){ return s + (i.cant||0); }, 0);
+  var countTxt = propios.length + (total > 0 ? ' · ' + total.toLocaleString() + ' und' : '');
 
   // Agrupar por cliente + período (ya vienen ordenados FIFO dentro de cada grupo).
   // Separar por período aísla el % entregado: los pedidos nuevos no diluyen el
@@ -3476,7 +3478,7 @@ function boardBuildLane(laneId, items, label, active) {
 // Ficha COMPLETADA que sigue asignada a una línea: se muestra (en verde, al final de su línea)
 // durante el mes en que se completó. Mes de completado = fecha de su última entrega vinculada;
 // sin entregas (cierre manual), el mes efectivo de la ficha.
-function fichaCompletadaEsteMes(s) {
+function fechaUltimaEntrega(s) {
   var ult = '';
   (getEntregasManuales() || []).forEach(function(m) {
     var liga = (m.lineas && m.lineas.length)
@@ -3484,8 +3486,14 @@ function fichaCompletadaEsteMes(s) {
       : m.solId === s.id;
     if (liga && m.fecha && m.fecha > ult) ult = m.fecha;
   });
-  var key = ult ? periodoDe(ult).key : mesSol(s);
-  return key === periodoActualKey();
+  return ult;
+}
+function periodoCompletadaKey(s) {
+  var ult = fechaUltimaEntrega(s);
+  return ult ? periodoDe(ult).key : mesSol(s);
+}
+function fichaCompletadaEsteMes(s) {
+  return periodoCompletadaKey(s) === periodoActualKey();
 }
 
 function renderBoard() {
@@ -3493,11 +3501,27 @@ function renderBoard() {
   var contLines = document.getElementById('boardLines');
   if (!contSin || !contLines) return;
   var items = [];
+  var sinExtra = [];   // completadas de meses anteriores (se ven en Sin asignar)
   solicitudes.forEach(function(s) {
     var esActiva       = ['nueva','proceso','parcial'].indexOf(s.estado) >= 0;
     var tieneLineaAsig = s.lineas.some(function(l){ return l.linea_id; });
     var esListaSin     = s.estado === 'lista' && !tieneLineaAsig;
     var esListaEnLinea = s.estado === 'lista' && tieneLineaAsig && fichaCompletadaEsteMes(s);
+    // Completada en un mes ANTERIOR y aún asignada a una línea: no cabe en el tablero de líneas;
+    // se muestra en "Sin asignar" (solo vista, sin tocar datos), en el mes en que se completó.
+    if (s.estado === 'lista' && tieneLineaAsig && !esListaEnLinea) {
+      var perRest = s.periodo_efectivo || periodoCompletadaKey(s);
+      s.lineas.forEach(function(l) {
+        sinExtra.push({
+          lineaDbId: l.id, solId: s.id, solCodigo: s.id_display || s.id.slice(0,8),
+          cliente: s.cliente, sku: l.sku || '', desc: l.desc || '', skuBase: (l.sku_base || '').trim(),
+          cant: l.cant || 0, linea_id: l.linea_id || 0, prog: s.prog || 0, estado: 'lista',
+          procEstado: procEstadoEfectivo(s), tiros: 1, tiro_actual: 1, notas: s.notas || '',
+          createdAt: s.created_at || '', periodoEfectivo: perRest, restaurada: true
+        });
+      });
+      return;
+    }
     if (!esActiva && !esListaSin && !esListaEnLinea) return;
     var sTiros = s.tiros || Math.max.apply(null, (s.lineas.length ? s.lineas.map(function(l){ return l.tiros || 1; }) : [1]));
     if (s.lineas.length === 0) {
@@ -3562,7 +3586,7 @@ function renderBoard() {
     if (ca > cb) return 1;
     return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
   });
-  contSin.innerHTML = boardBuildSinBlock(lanes[0]);
+  contSin.innerHTML = boardBuildSinBlock(lanes[0].concat(sinExtra));
   var html = '';
   LINEAS_PRODUCCION.forEach(function(ln) {
     html += boardBuildLane(ln.id, lanes[ln.id] || [], ln.nombre, ln.activa);
