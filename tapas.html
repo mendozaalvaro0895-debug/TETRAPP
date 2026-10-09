@@ -311,14 +311,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .mtx-hdr-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--teal)}
 .mtx-hdr-sub{font-size:11px;color:var(--gray-l)}
-.term-row{display:grid;grid-template-columns:190px 1fr auto;align-items:center;gap:10px;padding:9px 6px;cursor:pointer;border-radius:8px;border-top:1px solid var(--bg);transition:background .12s}
-.term-row:hover{background:var(--bg)}
-.term-row-open{background:var(--teal-xl)}
+.term-row{display:grid;grid-template-columns:190px 1fr auto;align-items:center;gap:10px;padding:9px 12px;margin-top:6px;cursor:pointer;border-radius:8px;border:1.5px solid #C8C6C0;background:#fff;transition:border-color .12s,box-shadow .12s}
+.term-row:hover{border-color:var(--teal);box-shadow:0 1px 6px rgba(26,107,91,.18)}
+.term-row-open{border-color:var(--teal);border-bottom-left-radius:0;border-bottom-right-radius:0;box-shadow:none!important}
+.term-row-open .term-nombre{color:var(--teal);font-weight:800}
+.term-chev{display:inline-block;width:14px;color:var(--teal);font-size:10px}
 .term-nombre{font-size:12px;font-weight:600;color:var(--ink);line-height:1.3}
 .term-bar-wrap{background:var(--bg);border-radius:20px;height:14px;overflow:hidden}
 .term-bar{background:var(--teal);height:100%;border-radius:20px;transition:width .5s ease}
 .term-val{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--teal);white-space:nowrap;text-align:right;min-width:72px}
-.term-detalle{padding:8px 10px 14px;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px}
+.term-detalle{padding:12px 12px 14px;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px;border:1.5px solid var(--teal);border-top:none;border-radius:0 0 8px 8px;background:#F6FBF9}
 .td-bloque{min-width:0}
 .td-titulo{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);margin-bottom:8px}
 .dg{position:relative;display:flex;align-items:flex-end;gap:4px;height:210px;border-bottom:1px solid var(--bg2)}
@@ -360,6 +362,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .tp-reg-t.sin{color:var(--gray-l);font-style:italic}
 .tp-reg-u{font-family:var(--mono);font-weight:700;color:var(--teal);white-space:nowrap}
 .tp-regs-pie{font-size:9px;color:var(--gray-l);padding-top:4px;text-align:right}
+.hi-toggle{display:block;margin-top:18px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);user-select:none}
+.hi-toggle:hover,.hi-toggle.abierto{border-color:var(--teal);color:var(--teal)}
+.hi-toggle.abierto{border-bottom-left-radius:0;border-bottom-right-radius:0}
+.hi-toggle + .hi-lista{border:1.5px solid var(--teal);border-top:none;border-radius:0 0 8px 8px;padding:0 8px;background:#fff}
 .hi-lista{max-height:340px;overflow-y:auto;padding-right:4px;border-top:1px solid var(--bg2)}
 .hi-reg{padding:6px 0;border-bottom:1px solid var(--bg2)}
 .hi-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px}
@@ -2326,13 +2332,26 @@ function buildTermProcesos(o) {
 // Historial de ingresos: TODAS las comandas que registró esa persona en el mes (aprobadas, por
 // aprobar y rechazadas), la más reciente primero, con sus tareas. El enlace ↗ abre la comanda
 // en comandas.html para revisarla, editarla o aprobarla.
+// Historial colapsado por defecto; el encabezado es el botón que lo despliega. Estado por persona.
+var termHistAbierto = {};
+
+function toggleTermHistorial(el) {
+  var k = el.getAttribute('data-cod');
+  if (termHistAbierto[k]) delete termHistAbierto[k]; else termHistAbierto[k] = true;
+  renderTermometro();
+}
+
 function buildTermHistorial(o) {
   var regs = termComandasTodas.filter(function(c) { return (c.operario_id || '—') === o.codigo; })
     .sort(function(a, b) {
       return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : String(b.created_at || '').localeCompare(String(a.created_at || ''));
     });
-  var titulo = '<div class="td-titulo" style="margin-top:18px">📜 Historial de ingresos · ' + regs.length + '</div>';
-  if (!regs.length) return titulo + '<div class="term-detalle-vacio">Sin ingresos este mes</div>';
+  if (!regs.length) return '<div class="td-titulo" style="margin-top:18px">📜 Historial de ingresos · 0</div><div class="term-detalle-vacio">Sin ingresos este mes</div>';
+  var abierto = !!termHistAbierto[o.codigo];
+  var titulo = '<div class="hi-toggle' + (abierto ? ' abierto' : '') + '" data-cod="' + escHtml(o.codigo) + '" onclick="toggleTermHistorial(this)">'
+    + '<span class="tp-chev">' + (abierto ? '▾' : '▸') + '</span>📜 Historial de ingresos · ' + regs.length
+    + ' <span class="td-hint">· ' + (abierto ? 'clic para ocultar' : 'clic para ver todos los ingresos') + '</span></div>';
+  if (!abierto) return titulo;
   var ESTADO = { pendiente: ['pend', '⏳ Por aprobar'], rechazada: ['rech', '⛔ Rechazada'] };
   return titulo + '<div class="hi-lista">' + regs.map(function(c) {
     var e = ESTADO[c.estado_aprobacion] || ['ok', '✅ Aprobada'];
@@ -2372,7 +2391,7 @@ function buildTermometroRow(o, maxUnd) {
   var abierto = termExpandidoCodigo === o.codigo;
   var codEsc = o.codigo.replace(/'/g, "\\'");
   var html = '<div class="term-row' + (abierto ? ' term-row-open' : '') + '" onclick="toggleTermDetalle(\'' + codEsc + '\')">'
-    + '<div class="term-nombre">' + escHtml(o.nombre) + '</div>'
+    + '<div class="term-nombre"><span class="term-chev">' + (abierto ? '▾' : '▸') + '</span>' + escHtml(o.nombre) + '</div>'
     + '<div class="term-bar-wrap"><div class="term-bar" style="width:' + pct + '%"></div></div>'
     + '<div class="term-val">' + o.und.toLocaleString() + ' und</div>'
     + '</div>';
