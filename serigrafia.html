@@ -6124,8 +6124,8 @@ function agregarLineaEntregado(descVal, skuVal, cantVal, clienteVal, solIdVal, l
       '<div class="sku-drop-s" id="e-sku-drop-' + i + '"></div>' +
     '</div>' +
     '<input id="eCant-' + i + '" type="number" min="1" placeholder="Cant." style="' + bSty + '" value="' + (cantVal || '') + '">' +
-    '<select id="eLp-' + i + '" title="Línea de producción" style="' + bSty + ';background:var(--card);color:var(--text)">' +
-      '<option value=""' + (!lineaProdVal ? ' selected' : '') + '>— L —</option>' +
+    '<select id="eLp-' + i + '" title="Línea de producción (obligatoria)" onchange="this.style.outline=\'\'" style="' + bSty + ';background:var(--card);color:var(--text)">' +
+      '<option value=""' + (!lineaProdVal ? ' selected' : '') + '>— L * —</option>' +
       '<option value="1"' + (lineaProdVal === '1' ? ' selected' : '') + '>L1</option>' +
       '<option value="2"' + (lineaProdVal === '2' ? ' selected' : '') + '>L2</option>' +
       '<option value="3"' + (lineaProdVal === '3' ? ' selected' : '') + '>L3</option>' +
@@ -6268,6 +6268,7 @@ async function guardarEntregadoManual() {
       if (!cliv) { showToast('⚠️ Seleccioná el cliente en producto ' + (ri + 1), '#92400e'); if (cliEl) { cliEl.style.outline='2px solid #dc2626'; cliEl.focus(); } return; }
       if (!dv)   { showToast('⚠️ Completá la descripción del producto ' + (ri + 1), '#92400e'); if (dInp) { dInp.style.borderColor='#dc2626'; dInp.focus(); } return; }
       if (!cv || cv < 1) { showToast('⚠️ Cantidad inválida en producto ' + (ri + 1), '#92400e'); if (cInp) { cInp.style.borderColor='#dc2626'; cInp.focus(); } return; }
+      if (!lpv)  { showToast('⚠️ Asigná la línea de producción (L1-L4) en producto ' + (ri + 1), '#92400e'); if (lpEl) { lpEl.style.outline='2px solid #dc2626'; lpEl.focus(); } return; }
       var solv  = eEntregadoSolIds[idx] || '';
       var solS  = solv ? solicitudes.find(function(x) { return x.id === solv; }) : null;
       lineas.push({ cliente: cliv, sku: eEntregadoSkus[idx] || '', desc: dv, cant: cv, solId: solv || '', solCodigo: solS ? (solS.id_display || '') : '', linea: lpv || '' });

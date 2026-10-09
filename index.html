@@ -857,7 +857,13 @@ function ciFilaAccion(d, di, l, li) {
   }).join('');
   var extra = '';
   if (l.accion === 'serig_entrega') {
-    extra = '<input type="text" placeholder="Cliente…" value="' + escHtml(l.cliente || '') + '" onchange="ciSetCampo(' + di + ',' + li + ',\'cliente\',this.value)" style="width:110px">';
+    extra = '<input type="text" placeholder="Cliente…" value="' + escHtml(l.cliente || '') + '" onchange="ciSetCampo(' + di + ',' + li + ',\'cliente\',this.value)" style="width:110px"> ' +
+      '<select title="Línea de producción (obligatoria)" onchange="ciSetCampo(' + di + ',' + li + ',\'linea\',this.value)" style="width:72px">' +
+        '<option value="">Línea *</option>' +
+        ['1', '2', '3', '4'].map(function(n) {
+          return '<option value="' + n + '"' + (String(l.linea) === n ? ' selected' : '') + '>L' + n + '</option>';
+        }).join('') +
+      '</select>';
   } else if (l.accion === 'prod_completar') {
     extra = ciExtraProduccion(d, di, li, l);
   } else if (l.reconciliacion) {
@@ -938,10 +944,11 @@ async function ciGuardarLinea(d, l) {
   }
 
   if (l.accion === 'serig_entrega') {
+    if (!l.linea) throw new Error('Falta elegir la línea de producción');
     var r2 = await db.from('entregas_serig').insert({
       requi: d.documento, cliente: l.cliente || '—', cant: l.cantidad, fecha: d.fecha || fechaHoyLocal(),
       nota: d.descripcion || null, sol_id: null, sol_codigo: '',
-      lineas: [{ cliente: l.cliente || '—', sku: l.codigo, desc: l.producto, cant: l.cantidad, solId: '', solCodigo: '' }]
+      lineas: [{ cliente: l.cliente || '—', sku: l.codigo, desc: l.producto, cant: l.cantidad, solId: '', solCodigo: '', linea: String(l.linea) }]
     });
     if (r2.error) throw r2.error;
     return;
