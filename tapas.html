@@ -325,6 +325,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .dg-meta{position:absolute;left:0;right:0;border-top:2px dashed var(--red);pointer-events:none;z-index:2}
 .dg-meta span{position:absolute;right:0;bottom:2px;font-size:9px;font-weight:700;color:var(--red);background:rgba(255,255,255,.85);padding:0 4px;border-radius:3px;white-space:nowrap}
 .dg-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.dg-col.clic{cursor:pointer}
+.dg-col.clic:hover .dg-bar{filter:brightness(1.18)}
 .dg-val{font-family:var(--mono);font-size:9px;color:var(--teal);line-height:1.2;margin-bottom:2px;white-space:nowrap}
 .dg-bar{width:100%;max-width:30px;border-radius:3px 3px 0 0;background:var(--teal)}
 .dg-bar.falta{background:var(--red-l);border:1px dashed var(--red);height:28px}
@@ -2122,7 +2124,9 @@ function buildTermDiario(o) {
     } else {
       titulo += 'aún no llega';
     }
-    return '<div class="dg-col" title="' + escHtml(titulo) + '">' + val + barra + '</div>';
+    var clic = (e.st === 'prod' || e.st === 'pend');
+    return '<div class="dg-col' + (clic ? ' clic' : '') + '" title="' + escHtml(titulo + (clic ? ' · clic para ver el detalle' : '')) + '"'
+      + (clic ? ' data-cod="' + escHtml(o.codigo) + '" data-fecha="' + e.fecha + '" onclick="verDetalleDiaOperario(this, event)"' : '') + '>' + val + barra + '</div>';
   }).join('');
   var etiquetas = estados.map(function(e) {
     return '<div class="dg-d ' + e.st + '">' + e.d + '</div>';
@@ -2146,6 +2150,62 @@ function buildTermDiario(o) {
     + '<span><i style="background:var(--bg2)"></i>ausente</span>'
     + '<span><i style="background:var(--amber)"></i>por aprobar</span>'
     + '<span><i style="background:none;border-top:2px dashed var(--red);height:0;width:14px;vertical-align:3px"></i>meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>';
+}
+
+// Popup con el detalle de lo que UNA persona registró UN día (clic en una barra de Producción diaria):
+// cada comanda con su estado y sus tareas. Mismo estilo que el popup del gráfico mensual de ingreso PT.
+function verDetalleDiaOperario(el, event) {
+  if (event) event.stopPropagation();
+  var codigo = el.getAttribute('data-cod'), fecha = el.getAttribute('data-fecha');
+  var cmds = termComandasTodas.filter(function(c) { return (c.operario_id || '—') === codigo && c.fecha === fecha; })
+    .sort(function(a, b) { return String(a.created_at || '').localeCompare(String(b.created_at || '')); });
+  var fechaLabel = new Date(fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'long', day: 'numeric', month: 'long' });
+  fechaLabel = fechaLabel.charAt(0).toUpperCase() + fechaLabel.slice(1);
+
+  var ESTADO = { pendiente: ['#7A4800', '#FFF3D6', '⏳ Por aprobar'], rechazada: ['#991B1B', '#FEE2E2', '⛔ Rechazada'] };
+  var total = 0;
+  var html = cmds.map(function(c) {
+    var e = ESTADO[c.estado_aprobacion] || ['#166534', '#DCFCE7', '✅ Aprobada'];
+    var tareas = (c.comanda_tareas || []).filter(function(t) { return t.estado === 'Terminada'; });
+    var sub = tareas.reduce(function(s, t) { return s + (t.unidades_completadas || t.cantidad || 0); }, 0);
+    if (comandaCuenta(c)) total += sub;
+    var filas = tareas.map(function(t) {
+      var sku = (t.tapa_sku || '').trim(), desc = (t.tapa_desc || '').trim();
+      var tapa = sku ? ((desc && desc.indexOf(sku) === -1) ? sku + ' — ' + desc : (desc || sku)) : desc;
+      return '<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)">'
+        + '<span style="font-size:10px;font-weight:700;color:var(--gray);flex-shrink:0;width:70px;padding-top:1px">' + escHtml(t.proceso || 'Otra tarea') + '</span>'
+        + '<span style="font-size:11px;color:var(--ink);flex:1;line-height:1.3">' + (tapa ? escHtml(tapa) : '<i style="color:var(--gray-l)">Sin tapa registrada</i>') + '</span>'
+        + '<span style="font-size:11px;font-weight:700;color:var(--ink);flex-shrink:0;white-space:nowrap">' + (t.unidades_completadas || t.cantidad || 0).toLocaleString() + ' und</span></div>';
+    }).join('');
+    return '<div style="margin-bottom:10px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">'
+      +   '<a href="comandas.html?id=' + encodeURIComponent(c.id) + '" target="_blank" title="Abrir en Comandas" style="font-size:11px;font-weight:700;color:var(--teal);text-decoration:none;font-family:var(--mono)">' + escHtml(c.correlativo || 'Comanda') + ' ↗</a>'
+      +   '<span style="font-size:9px;font-weight:800;border-radius:10px;padding:1px 7px;background:' + e[1] + ';color:' + e[0] + '">' + e[2] + '</span>'
+      +   '<span style="margin-left:auto;font-size:12px;font-weight:800;color:var(--ink)">' + sub.toLocaleString() + ' und</span></div>'
+      + (c.estado_aprobacion === 'rechazada' && c.motivo_rechazo ? '<div style="font-size:10px;color:var(--red);margin-bottom:2px">Motivo: ' + escHtml(c.motivo_rechazo) + '</div>' : '')
+      + (filas || '<div style="font-size:11px;color:var(--gray-l);font-style:italic">Sin tareas terminadas</div>') + '</div>';
+  }).join('') || '<div style="font-size:12px;color:var(--gray-l);font-style:italic;padding:6px 0">Sin registros ese día</div>';
+
+  var existente = document.getElementById('prodDiaPopupTapas');
+  if (existente) existente.remove();
+  var pop = document.createElement('div');
+  pop.id = 'prodDiaPopupTapas';
+  pop.style.cssText = 'position:fixed;z-index:9999;background:var(--card);border:1.5px solid var(--teal);border-radius:10px;padding:14px 16px;min-width:300px;max-width:440px;max-height:380px;overflow-y:auto;box-shadow:0 8px 28px rgba(0,0,0,.22)';
+  var x = event ? Math.min(event.clientX, window.innerWidth - 460) : window.innerWidth / 2 - 220;
+  var y = event ? Math.min(event.clientY + 8, window.innerHeight - 400) : window.innerHeight / 2 - 190;
+  pop.style.left = Math.max(8, x) + 'px'; pop.style.top = Math.max(8, y) + 'px';
+  pop.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid var(--bg2)">'
+    + '<div style="font-size:13px;font-weight:800;color:var(--ink)">' + escHtml(fechaLabel) + '</div>'
+    + '<div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;font-weight:800;color:var(--teal)">' + total.toLocaleString() + ' und aprobadas</span>'
+    + '<button onclick="document.getElementById(\'prodDiaPopupTapas\').remove()" style="background:none;border:none;font-size:17px;cursor:pointer;color:var(--gray-l);line-height:1;padding:0 2px">✕</button></div></div>'
+    + html;
+  document.body.appendChild(pop);
+  setTimeout(function() {
+    document.addEventListener('click', function closeDiaOp(e2) {
+      var p2 = document.getElementById('prodDiaPopupTapas');
+      if (!p2 || !p2.contains(e2.target)) { if (p2) p2.remove(); document.removeEventListener('click', closeDiaOp); }
+    });
+  }, 60);
 }
 
 // Ingresos (tareas terminadas y aprobadas) de UN proceso de UN operario, en orden cronológico.
