@@ -445,7 +445,6 @@ function toast(msg, tipo) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(function(){ el.className = 'toast'; }, 2800);
 }
-function showToast(msg) { toast(msg); }
 
 function switchTab(tab) {
   ['inicio','existencias','movimientos','personal'].forEach(function(t){
@@ -1036,9 +1035,6 @@ function cambiarPag(dir) {
 
 /* ── Badge de importación diaria (AM/PM) — leído por index.html ── */
 function invKey() { return 'tetra_inv_' + fechaHoy(); }
-function invCount() {
-  try { return (JSON.parse(localStorage.getItem(invKey()) || '{"count":0}').count) || 0; } catch(e) { return 0; }
-}
 function registrarImportDiario() {
   try {
     var d = JSON.parse(localStorage.getItem(invKey()) || '{"count":0}');

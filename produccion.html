@@ -1442,7 +1442,7 @@ async function procesarImgFile(file) {
     });
     var resp = await fetch('/api/parse-doc', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': HEADERS.Authorization },
       body: JSON.stringify({ image_base64: base64, mime_type: file.type || 'image/png', tipo: 'ingreso' })
     });
     if (!resp.ok) {

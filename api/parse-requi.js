@@ -6,49 +6,21 @@
 // Devuelve:  { documentos: [{ bodega, documento, prefijo, numero, fecha,
 //              descripcion, referencia, lineas:[{codigo,producto,cantidad,
 //              costo_unitario,valor_total}] }], warnings }
-//
-// A diferencia de api/parse-doc.js (CORS abierto sin auth — pendiente en
-// CLAUDE.md), este endpoint SÍ valida que quien llama sea un usuario
-// autenticado con rol master antes de gastar tokens de Claude.
+// Solo rol master (valida la sesión con api/_auth.js antes de gastar tokens de Claude).
 // ════════════════════════════════════════════════════════════════
 
 const Anthropic = require('@anthropic-ai/sdk');
-const { createClient } = require('@supabase/supabase-js');
-
-const SUPA_URL = 'https://rohdxjuuvpgrhevfsrye.supabase.co';
-const SUPA_KEY = 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i';
-
-async function esMaster(token) {
-  if (!token) return false;
-  try {
-    // Con Authorization en los headers globales, las consultas .from(...) viajan
-    // con el JWT del usuario (no el anon) — sin esto, el RLS de `perfiles` las
-    // bloquea silenciosamente y esto siempre da "no autorizado".
-    const db = createClient(SUPA_URL, SUPA_KEY, {
-      global: { headers: { Authorization: `Bearer ${token}` } }
-    });
-    const { data: userData, error: userErr } = await db.auth.getUser(token);
-    if (userErr || !userData || !userData.user) return false;
-    const { data: perfil, error: perfilErr } = await db
-      .from('perfiles').select('rol').eq('user_id', userData.user.id).single();
-    if (perfilErr || !perfil) return false;
-    return perfil.rol === 'master';
-  } catch (e) {
-    return false;
-  }
-}
+const { rolDeSesion, mimeImagen } = require('./_auth');
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST')    { res.status(405).end('Method Not Allowed'); return; }
 
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.replace(/^Bearer\s+/i, '');
-  if (!(await esMaster(token))) {
-    res.status(401).json({ error: 'No autorizado' });
+  const sesion = await rolDeSesion(req);
+  if (sesion.rol !== 'master') {
+    res.status(sesion.rol ? 403 : 401).json({ error: sesion.rol ? 'Se requiere rol master' : (sesion.error || 'No autorizado') });
     return;
   }
 
@@ -126,7 +98,7 @@ Respondé SOLO con JSON válido, sin markdown, sin texto adicional:
             type: 'image',
             source: {
               type: 'base64',
-              media_type: mime_type || 'image/png',
+              media_type: mimeImagen(mime_type),
               data: image_base64
             }
           },

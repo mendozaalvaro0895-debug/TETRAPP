@@ -2353,10 +2353,6 @@ async function matrizDrop(e, targetKey) {
 // MATRIZ POR DÍA — carga/guardado de posiciones y barra de día
 // ════════════════════════════════════════════════════════════
 
-function fechaLocalDe(d) {
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-}
-
 // Carga posiciones (matriz_dia_serig) + estados de asistencia (asistencia_diaria) del día.
 // Las posiciones viven en su PROPIA tabla, separadas de la asistencia: congelar el
 // roster completo de un día NO marca a nadie presente/ausente.
@@ -2467,7 +2463,6 @@ async function guardarAmbas() {
     }, 2000);
   }
 }
-function guardarMatrizDia() { return guardarAmbas(); }
 
 function renderDiaBar() {
   var inp  = document.getElementById('diaBarInput');
@@ -2728,78 +2723,6 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
   '</div>';
 }
 
-function buildTiroRow(item, total) {
-  var actual = item.tiro_actual || 1;
-  var btns = '';
-  for (var t = 1; t <= (total || 3); t++) {
-    var isActive = t === actual;
-    btns += '<div onclick="event.stopPropagation();cambiarTiroActual(\'' + item.solId + '\',' + t + ')" ' +
-      'style="padding:3px 11px;border-radius:4px;font-size:10px;font-weight:800;cursor:pointer;' +
-      (isActive ? 'background:var(--serig-m);color:#fff' : 'background:var(--bg);color:var(--gray-l);border:1px solid var(--border)') + '">' +
-      'T' + t + '</div>';
-  }
-  return '<div style="display:flex;gap:4px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border)">' +
-    '<span style="font-size:9px;color:var(--gray-l);font-weight:700;margin-right:2px">TIRO</span>' +
-    btns + '</div>';
-}
-
-function editarProgreso(solId, currentProg, el) {
-  var old = document.getElementById('prog-popover');
-  if (old) { var wasMe = old._solId === solId; old.remove(); if (wasMe) return; }
-  var pop = document.createElement('div');
-  pop.id = 'prog-popover';
-  pop._solId = solId;
-  var presets = [0, 25, 50, 75, 100];
-  var btnsHtml = presets.map(function(p) {
-    var active = p === currentProg;
-    return '<button onclick="guardarProgreso(\'' + solId + '\',' + p + ')" ' +
-      'style="flex:1;padding:5px 2px;border:none;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;' +
-      (active ? 'background:var(--serig-m);color:#fff' : 'background:var(--bg);color:var(--ink);border:1px solid var(--border)') + '">' +
-      p + '%</button>';
-  }).join('');
-  pop.innerHTML =
-    '<div style="font-size:10px;font-weight:700;color:var(--gray);margin-bottom:7px">✏️ Progreso manual</div>' +
-    '<div style="display:flex;gap:3px;margin-bottom:8px">' + btnsHtml + '</div>' +
-    '<div style="display:flex;gap:6px;align-items:center">' +
-      '<input type="number" id="prog-inp" min="0" max="100" value="' + currentProg + '" ' +
-        'style="flex:1;padding:5px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:700;text-align:center;width:50px" ' +
-        'onkeydown="if(event.key===\'Enter\')guardarProgreso(\'' + solId + '\',parseInt(this.value)||0)">' +
-      '<span style="font-size:11px;color:var(--gray)">%</span>' +
-      '<button onclick="guardarProgreso(\'' + solId + '\',parseInt(document.getElementById(\'prog-inp\').value)||0)" ' +
-        'style="padding:5px 12px;background:var(--serig-m);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700">OK</button>' +
-    '</div>';
-  pop.style.cssText = 'position:fixed;background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:12px;z-index:9000;box-shadow:0 6px 20px rgba(0,0,0,.18);width:220px';
-  var rect = el.getBoundingClientRect();
-  pop.style.top  = Math.min(rect.bottom + 6, window.innerHeight - 160) + 'px';
-  pop.style.left = Math.min(rect.left, window.innerWidth - 236) + 'px';
-  document.body.appendChild(pop);
-  setTimeout(function() { var inp = document.getElementById('prog-inp'); if (inp) { inp.focus(); inp.select(); } }, 50);
-  setTimeout(function() {
-    function closePop(e) { if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener('click', closePop); } }
-    document.addEventListener('click', closePop);
-  }, 100);
-}
-
-async function guardarProgreso(solId, prog) {
-  var pop = document.getElementById('prog-popover');
-  if (pop) pop.remove();
-  prog = Math.max(0, Math.min(100, prog || 0));
-  var s = solicitudes.find(function(x) { return x.id === solId; });
-  if (!s) return;
-  // No degradar un cierre manual ni una entrega parcial ya registrada
-  var nuevoEstado = prog >= 100 ? 'lista'
-                  : (s.estado === 'lista' || s.estado === 'parcial') ? s.estado
-                  : prog > 0 ? 'proceso' : s.estado;
-  try {
-    var r = await db.from('solicitudes').update({ progreso_pct: prog, estado: nuevoEstado }).eq('id', s.dbId);
-    if (r.error) throw r.error;
-    s.prog = prog; s.estado = nuevoEstado;
-    renderBoard();
-    refreshKPIs();
-    showToast('✅ Progreso: ' + prog + '%');
-  } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
-}
-
 async function editarTirosSolicitud(solId, totalTiros) {
   var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!s) return;
@@ -2892,19 +2815,6 @@ async function guardarComentario(solId, texto) {
   } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
 }
 
-async function cambiarTiroActual(solId, tiroNum) {
-  var s = solicitudes.find(function(x) { return x.id === solId; });
-  if (!s) return;
-  var nuevasNotas = encodeMeta(0, s.tiros || 1, 0, s.notas || '', s.proc_estado || '', tiroNum);
-  try {
-    var r = await db.from('solicitudes').update({ notas: nuevasNotas }).eq('id', s.dbId);
-    if (r.error) throw r.error;
-    s.tiro_actual = tiroNum;
-    renderBoard();
-    showToast('✅ Tiro ' + tiroNum + ' activo');
-  } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
-}
-
 // Estado por proceso: cadena de 4 dígitos (0=pendiente, 1=activo, 2=completado)
 // Ej: "2100" = Flameado hecho, Impresión en curso, Secado/Empaque pendientes.
 function deriveProcFromProg(prog) {
@@ -2922,58 +2832,6 @@ function procEstadoEfectivo(s) {
   if (pe.length === 4) return pe;
   var derived = deriveProcFromProg(s.prog);
   return (pe + derived.slice(pe.length)); // completa con derivado si faltan dígitos
-}
-
-var PROC_CLS = ['pending', 'active', 'done'];
-
-// Fila de procesos clicable por pedido (multi-selección, solo si está en una línea)
-function buildCardProcRow(item) {
-  var pe = item.procEstado || '0000';
-  var parts = [];
-  for (var i = 0; i < PROCESOS_SEQ.length; i++) {
-    var st = parseInt(pe.charAt(i)) || 0;
-    parts.push('<div class="proc-node proc-' + PROC_CLS[st] + '" title="' + PROCESOS_SEQ[i].lbl + '"' +
-      ' onclick="event.stopPropagation();toggleProcesoPedido(\'' + item.solId + '\',' + i + ')"' +
-      ' style="padding:3px 0;flex:1;justify-content:center;font-size:13px;gap:0;cursor:pointer">' +
-      PROCESOS_SEQ[i].ico + '</div>');
-  }
-  return '<div class="proceso-pipeline" style="gap:3px;margin-top:7px;padding-top:7px;border-top:1px dashed var(--border)">' +
-    parts.join('') + '</div>';
-}
-
-async function toggleProcesoPedido(solId, procIdx) {
-  var s = solicitudes.find(function(x){ return x.id === solId; });
-  if (!s) return;
-  // Ciclo de 3 estados: pendiente → activo → completado → pendiente
-  var pe = procEstadoEfectivo(s).split('');
-  pe[procIdx] = String(((parseInt(pe[procIdx]) || 0) + 1) % 3);
-  var nuevoProc = pe.join('');
-
-  var doneCount = (nuevoProc.match(/2/g) || []).length;
-  var anyMarked = /[12]/.test(nuevoProc);
-  var prog = Math.round(doneCount / PROCESOS_SEQ.length * 100);
-  // No pisar un cierre manual ('lista') ni una entrega parcial ya registrada
-  var nuevoEstado = s.estado === 'lista' ? 'lista'
-                  : doneCount === PROCESOS_SEQ.length ? 'lista'
-                  : s.estado === 'parcial' ? 'parcial'
-                  : anyMarked ? 'proceso'
-                  : 'nueva';
-
-  var nuevasNotas = encodeMeta(0, s.tiros || 1, 0, s.notas || '', nuevoProc, s.tiro_actual || 1);
-  try {
-    var r = await db.from('solicitudes')
-      .update({ notas: nuevasNotas, estado: nuevoEstado, progreso_pct: prog })
-      .eq('id', s.dbId);
-    if (r.error) throw r.error;
-    s.proc_estado = nuevoProc; s.prog = prog; s.estado = nuevoEstado;
-    renderInicio();
-    refreshKPIs();
-    var estTxt = ['pendiente', 'en curso', 'completado'][parseInt(nuevoProc.charAt(procIdx))];
-    showToast('✅ ' + (s.id_display || '') + ' · ' + PROCESOS_SEQ[procIdx].lbl + ': ' + estTxt);
-  } catch(e) {
-    console.error('toggleProcesoPedido:', e);
-    showToast('❌ Error al marcar proceso', '#B83232');
-  }
 }
 
 var sinGrupoArrastre = null;
@@ -4722,7 +4580,7 @@ async function renderAsistGrid() {
       (esAnt ? ' ag-th-anterior' : '') + (f === ultimoDiaAnterior ? ' ag-divider-th' : '');
     var lbl  = esAnt ? (dn + '<span class="ag-th-mes">' + MESES_PER_C[parseInt(f.slice(5,7),10)-1] + '</span>') : dn;
     var clk  = (f <= hoy && f >= ASIST_FECHA_MIN) ? ' onclick="irDiaEspecifico(\'' + f + '\')" style="cursor:pointer"' : '';
-    var tit  = esFeriadoTh ? (feriadosSet[f] + ' · clic derecho para quitar feriado') : 'Ver este día en Personal y Roles · clic derecho para marcar feriado';
+    var tit  = esFeriadoTh ? (escHtml(feriadosSet[f]) + ' · clic derecho para quitar feriado') : 'Ver este día en Personal y Roles · clic derecho para marcar feriado';
     var ctx  = ' oncontextmenu="event.preventDefault();toggleFeriado(\'' + f + '\')"';
     return '<th class="' + cls + '"' + clk + ctx + ' title="' + tit + '">' + lbl + '</th>';
   }).join('');
@@ -4771,7 +4629,7 @@ async function renderAsistGrid() {
           var cod = p.codigo.replace(/'/g, "\\'");
           var notaPend = esPendiente ? ' · Aún no se toma asistencia' : (est === 'pendiente' ? ' · Sin registrar (ej. antes de ingresar)' : '');
           var domTrabajado = esFinde && daysByP[f] === 'presente';
-          var motivoFinde = esFeriadoCell ? (' · ' + feriadosSet[f] + ' (no cuenta)') : (dow === 0 ? ' · Domingo (no cuenta)' : '');
+          var motivoFinde = esFeriadoCell ? (' · ' + escHtml(feriadosSet[f]) + ' (no cuenta)') : (dow === 0 ? ' · Domingo (no cuenta)' : '');
           var justifByCF  = justifCache ? (justifCache.byCodigoFecha[p.codigo] || {}) : {};
           var justifEntry = justifByCF[f];
           var esJustif    = justifEntry && (justifEntry.texto || justifEntry.fotoUrl);
@@ -5129,18 +4987,6 @@ async function exportarAsistGridPDF() {
     }
     return pos.slice(0,4).toUpperCase();
   }
-  function colorRol(pos) {
-    if (pos === null || pos === undefined) return '#f8fafc';
-    if (pos === 'supervisor') return '#2563eb';
-    if (pos === 'auxiliar')   return '#6b7280';
-    if (pos === 'empaque')    return '#0d9488';
-    if (pos === '')           return '#e2e8f0';
-    var r = pos.split('-')[0];
-    if (r === 'flameador') return '#d97706';
-    if (r === 'imprime')   return '#7c3aed';
-    if (r === 'recibe')    return '#16a34a';
-    return '#64748b';
-  }
 
   var personas  = (personalData && personalData.serig ? personalData.serig : []).filter(function(p){ return p.activo; });
   var plazaFija = personas.filter(function(p){ return (p.proceso_hab||'') !== 'Prestado'; });
@@ -5222,26 +5068,6 @@ async function exportarAsistGridPDF() {
           lbl = rolLbl; // presente o domtrab: muestra el rol
         }
         html += '<td style="background:' + bg + ';color:#fff;font-size:6.5px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
-      });
-      html += '</tr>';
-    });
-    return html;
-  }
-
-  function buildRolesRowsArr(lista, diasActArr, secLabel) {
-    var html = '';
-    if (secLabel) html += '<tr><td colspan="' + (diasActArr.length+1) + '" style="background:#f1f5f9;font-size:7px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;padding:3px 6px;border:1px solid #cbd5e1">' + secLabel + '</td></tr>';
-    lista.forEach(function(p) {
-      var diasOp = matrizByOpDia[p.codigo] || {};
-      html += '<tr><td style="font-size:8px;font-weight:600;padding:3px 6px;white-space:nowrap;border:1px solid #cbd5e1;min-width:110px">' + escHtml(p.nombre || p.codigo) + '</td>';
-      diasActArr.forEach(function(f) {
-        var dow = new Date(f+'T12:00:00').getDay();
-        var esFin = dow === 0;
-        var pos = Object.prototype.hasOwnProperty.call(diasOp, f) ? diasOp[f] : null;
-        var bg  = esFin ? '#475569' : (pos !== null ? colorRol(pos) : '#f8fafc');
-        var lbl = esFin ? '' : abrevRol(pos);
-        var clr = (esFin || (pos !== null && pos !== '')) ? '#fff' : '#94a3b8';
-        html += '<td style="background:' + bg + ';color:' + clr + ';font-size:6.5px;font-weight:700;text-align:center;padding:2px 0;border:1px solid #cbd5e1">' + lbl + '</td>';
       });
       html += '</tr>';
     });
@@ -10654,7 +10480,7 @@ function _enviarParseDoc(imgEl, tipo, lblId) {
 
   fetch('/api/parse-doc', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Authorization': HEADERS.Authorization },
     body: JSON.stringify({ image_base64: b64, mime_type: 'image/jpeg', tipo: tipo })
   })
   .then(function(r) { return r.json(); })
@@ -11064,22 +10890,6 @@ function cerrarMovSSkuDrop(i) {
   if (d) d.classList.remove('open');
 }
 
-
-function seleccionarMovSSol(solId, i) {
-  var s = solicitudes.find(function(x) { return x.id === solId; });
-  if (!s) return;
-  movSSolIds[i] = solId;
-  var inp = document.getElementById('movSSol-' + i);
-  if (inp) inp.value = (s.id_display || '') + ' · ' + (s.cliente || '').slice(0, 14);
-  cerrarMovSSolDrop(i);
-  var cliEl = document.getElementById('movSCli-' + i);
-  if (cliEl && s.cliente) cliEl.value = s.cliente;
-}
-
-function cerrarMovSSolDrop(i) {
-  var d = document.getElementById('movS-sol-drop-' + i);
-  if (d) d.classList.remove('open');
-}
 
 async function confirmarMovSerig() {
   var requi = (document.getElementById('movSRequi').value || '').trim();

@@ -3000,7 +3000,7 @@ function renderAsistGridTapas() {
     var esDivider = f === ultimoDiaAntes || f === ultimoDiaMes;
     var cls = 'ag-th' + ((dow === 0 || esFeriado) ? ' finde' : '') + (f === hoy ? ' hoy' : '')
       + (esMargen ? ' ag-th-margen' : '') + (esDivider ? ' ag-divider-th' : '');
-    var tit = esFeriado ? (feriadosSet[f] + ' · clic derecho para quitar feriado') : 'Clic derecho para marcar feriado';
+    var tit = esFeriado ? (escHtml(feriadosSet[f]) + ' · clic derecho para quitar feriado') : 'Clic derecho para marcar feriado';
     var subLbl = esMargen ? MESES_ABBR[parseInt(f.slice(5, 7), 10) - 1] : DOW_ABBR[dow];
     return '<th class="' + cls + '" oncontextmenu="event.preventDefault();toggleFeriado(\'' + f + '\')" title="' + tit + '">' + dn + '<span class="ag-th-dow">' + subLbl + '</span></th>';
   }).join('');
@@ -3035,7 +3035,7 @@ function renderAsistGridTapas() {
         var est = daysByP[f] || (esFinde ? 'finde' : 'pendiente');
         var lbl = est === 'ausente' ? '✗' : est === 'tarde' ? '!' : est === 'velada' ? '🌙' : '';
         var domTrab = esFinde && daysByP[f] === 'presente';
-        var motivo = esFeriado ? (' · ' + feriadosSet[f]) : (dow === 0 ? ' · Domingo' : '');
+        var motivo = esFeriado ? (' · ' + escHtml(feriadosSet[f])) : (dow === 0 ? ' · Domingo' : '');
         var justifByCF = justifCacheTapas ? (justifCacheTapas.byCodigoFecha[p.codigo] || {}) : {};
         var justifEntry = justifByCF[f];
         var esJustif = justifEntry && (justifEntry.texto || justifEntry.fotoUrl);

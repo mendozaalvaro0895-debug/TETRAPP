@@ -1,18 +1,29 @@
 // ════════════════════════════════════════════════════════════════
 // TETRAPP — Lector de documentos por imagen (Claude Vision)
 // Endpoint: POST /api/parse-doc
+// Header:   Authorization: Bearer <access_token de sesión — rol master u operativo_prod>
 // Body JSON: { image_base64: "...", mime_type: "image/jpeg", tipo: "salida"|"ingreso" }
 // Devuelve: { requi, fecha, descripcion, productos: [{sku, desc, cant}], warnings }
+// Lo usan produccion.html (master + operativo_prod) y serigrafia.html (master).
 // ════════════════════════════════════════════════════════════════
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { rolDeSesion, mimeImagen } = require('./_auth');
+
+const ROLES_PERMITIDOS = ['master', 'operativo_prod'];
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST')    { res.status(405).end('Method Not Allowed'); return; }
+
+  const sesion = await rolDeSesion(req);
+  if (!sesion.rol) { res.status(401).json({ error: sesion.error || 'No autorizado' }); return; }
+  if (ROLES_PERMITIDOS.indexOf(sesion.rol) === -1) {
+    res.status(403).json({ error: 'Sin permiso para leer documentos con IA' });
+    return;
+  }
 
   const { image_base64, mime_type, tipo } = req.body || {};
   if (!image_base64) {
@@ -75,7 +86,7 @@ Reglas: cantidad siempre entero · omitir filas de subtotal/total · si un campo
             type: 'image',
             source: {
               type: 'base64',
-              media_type: mime_type || 'image/png',
+              media_type: mimeImagen(mime_type),
               data: image_base64
             }
           },

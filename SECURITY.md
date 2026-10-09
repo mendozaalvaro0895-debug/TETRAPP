@@ -3,7 +3,7 @@
 **Empresa:** Tetraplastic · Guatemala  
 **Sistema:** Control Digital de Producción y Procesos  
 **Responsable:** Álvaro Mendoza (Administrador)  
-**Última revisión:** 2026-07-03 (blindaje v1.0 + autenticación)
+**Última revisión:** 2026-10-09 (auditoría: endpoints de IA con sesión obligatoria + XSS feriados)
 
 ---
 
@@ -20,6 +20,8 @@
 | CSP | Content-Security-Policy en `vercel.json` (solo self + Supabase + CDNs) | ✅ |
 | Protección de interfaz | X-Frame-Options DENY · frame-ancestors 'none' · nosniff | ✅ |
 | Permisos de browser | Permissions-Policy: cámara/mic/geo/pago bloqueados | ✅ |
+| Endpoints de IA (`api/parse-*`) | Sesión obligatoria + rol vía `api/_auth.js` (no se gastan tokens de Claude sin login) | ✅ (oct/2026) |
+| Bot WhatsApp (`api/whatsapp.js`) | Firma `X-Twilio-Signature` HMAC-SHA1, fail-closed · allowlist `TETRA_WA_ALLOW` | ✅ (requiere `TWILIO_AUTH_TOKEN` en Vercel) |
 
 ---
 
@@ -29,7 +31,12 @@
 Sin sesión        →  redirigido a login.html · la API no responde nada (RLS)
 visor@tetrapp.app →  ve todo, no puede editar NADA (RLS + bloqueo de fetch en cliente)
 master@tetrapp.app→  acceso total (Álvaro Mendoza)
+operativo / supervisor_tapas → encerrados en registro-tapas.html · solo INSERT de comandas
+operativo_serig   →  encerrado en registro-serigrafia.html · solo INSERT de sus registros
+operativo_prod    →  ve todo en lectura · escribe solo produccion_diaria y el Recetario
 ```
+Detalle y tablas exactas por rol: CLAUDE.md § "Roles de acceso". Los roles de planta
+están exentos del cierre de sesión por inactividad (pantallas compartidas en planta).
 
 - La protección REAL vive en las políticas RLS de Supabase. El bloqueo del
   frontend (banner "Modo Visual" + intercepción de fetch) es solo experiencia
@@ -52,8 +59,11 @@ anon/public key  →  frontend HTML (seguro exponerla: sin sesión no da acceso 
 service_role key →  NUNCA en código frontend · solo backend/scripts internos
 ```
 
-- La anon key vive en `shared/auth.js` y `login.html` (único lugar en el código).
-- Rotación: Supabase Dashboard → API Keys → Regenerate → actualizar esos 2 archivos.
+- La anon key vive en `shared/auth.js` y `login.html` (y como respaldo en `api/_auth.js`).
+- Rotación: Supabase Dashboard → API Keys → Regenerate → actualizar esos archivos.
+- Secretos del servidor SOLO como variables de entorno de Vercel (nunca en el repo):
+  `ANTHROPIC_API_KEY`, `SUPA_SERVICE_KEY` (solo la usa el bot), `TWILIO_AUTH_TOKEN`,
+  `TETRA_WA_ALLOW`, `TWILIO_WEBHOOK_URL`.
 
 ---
 
@@ -67,6 +77,9 @@ service_role key →  NUNCA en código frontend · solo backend/scripts internos
   - Toda tabla nueva queda protegida por el patrón de políticas de
     sql/seguridad_v1.sql — correr la sección D para la tabla nueva
   - Los fetch crudos a la API deben usar HEADERS (auth.js lo mantiene con el token)
+  - Todo endpoint nuevo en api/ que gaste tokens o lea datos: validar sesión con
+    rolDeSesion() de api/_auth.js y enviar Authorization: HEADERS.Authorization desde el front
+  - escHtml() también en atributos (title="", value="") — no solo en el contenido
 
 ❌ NO HACER:
   - Declarar SUPA_URL/SUPA_KEY/db/HEADERS en las páginas (vienen de auth.js)
@@ -84,11 +97,13 @@ service_role key →  NUNCA en código frontend · solo backend/scripts internos
 - **RLS**: por rol en todas las tablas (`sql/seguridad_v1.sql`)
 - **anon**: sin privilegios sobre tablas, vistas, secuencias ni funciones
 - **RPCs** `descontar_inventario`/`aumentar_inventario`: security invoker, solo authenticated
+  (descontar recorta en 0; aumentar crea el SKU si no existe — ver CLAUDE.md § RPCs atómicas)
 - **Signups públicos**: OFF
 
 ### Vercel (tetrapp.vercel.app)
-- Headers de seguridad + CSP en `vercel.json`
-- Deploy auto desde rama `main`
+- Headers de seguridad + CSP en `vercel.json` (incluye `worker-src` para pdf.js)
+- Funciones serverless en `api/` (ver CLAUDE.md § Funciones serverless); secretos por env vars
+- Deploy auto desde rama `main` — cada push a main sale directo a producción
 
 ---
 
@@ -116,8 +131,8 @@ Reportar incidentes a: **mendozaalvaro0895@gmail.com**
 
 | Fase | Mejora | Prioridad |
 |---|---|---|
-| Siguiente | Corregir bugs de trazabilidad (#1 y #2 de CLAUDE.md) | 🔴 Alta |
-| Siguiente | `ajustarExistencia()` → usar RPCs atómicas (bug #3) | 🔴 Alta |
-| Fase 3 | Roles adicionales: supervisor / operador con permisos parciales | 🟡 Media |
+| Siguiente | Confirmar `TWILIO_AUTH_TOKEN` en Vercel env vars | 🔴 Alta |
+| Siguiente | Ajuste de inventario de la Central de Ingreso: RPC atómica que permita negativos | 🟡 Media |
 | Fase 3 | Log de auditoría: quién cambió qué y cuándo | 🟡 Media |
-| Fase 3 | Cloudflare delante de Vercel (rate limiting por IP) | 🟢 Futura |
+| Fase 3 | Límite de uso (rate limiting) en `api/parse-*` vía Vercel Firewall | 🟢 Futura |
+| ✅ Hecho | `ajustarExistencia()` de tapas/serigrafía usa RPCs atómicas · roles operativos con permisos parciales · endpoints de IA con sesión · RLS activo en TODAS las tablas públicas (verificado 2026-10-09, incluida `rechazos`) | — |

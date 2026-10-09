@@ -5,18 +5,13 @@
 // Devuelve: { filas: [{ operario_texto, fecha, dia_texto, cantidad, proceso,
 //             descripcion, metodo, proceso_dudoso }], warnings: [] }
 //
-// A diferencia de api/parse-doc.js (CORS abierto, sin auth — pendiente de
-// gatear, ver CLAUDE.md), este endpoint exige el access_token de la sesión
-// de Supabase del que llama y verifica rol='master' en `perfiles` ANTES de
-// llamar a Claude, para que nadie pueda gastar tokens golpeando el endpoint
-// sin estar logueado como master en TETRAPP.
-//
+// Solo rol master (valida la sesión con api/_auth.js antes de llamar a Claude).
 // Uso: comandas.html → botón "Importar reporte WhatsApp" → pega el texto
 // crudo del reporte, el navegador llama aquí con su propio token de sesión.
 // ════════════════════════════════════════════════════════════════
 
 const Anthropic = require('@anthropic-ai/sdk');
-const { createClient } = require('@supabase/supabase-js');
+const { rolDeSesion } = require('./_auth');
 
 function buildPrompt(texto, fechaRef) {
   return `Eres el asistente de TETRAPP que interpreta reportes diarios de producción de la planta de Tapas (Tetraplastic, Guatemala), reenviados desde WhatsApp.
@@ -76,38 +71,14 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST')    { res.status(405).end('Method Not Allowed'); return; }
 
   try {
-    const authHeader = req.headers['authorization'] || '';
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    if (!token) {
-      res.status(401).json({ error: 'Falta sesión' });
+    const sesion = await rolDeSesion(req);
+    if (!sesion.rol) {
+      console.error('[parse-reporte-tapas] sesión rechazada:', sesion.error);
+      res.status(401).json({ error: sesion.error || 'No autorizado' });
       return;
     }
-
-    // Chequeo de rol: corre COMO el usuario que llama (igual que shared/auth.js en el
-    // navegador), no con la service key — `perfiles` nunca le dio grants directos a
-    // service_role (es tabla sensible de auth, el resto de páginas solo la leen vía RLS
-    // con el token del propio usuario). Así este chequeo no depende de permisos nuevos.
-    const db = createClient(
-      process.env.SUPA_URL,
-      process.env.SUPA_KEY || 'sb_publishable_PayfE36QRzwOnP6zA2TDSQ_oj4vnB5i',
-      { global: { headers: { Authorization: 'Bearer ' + token } } }
-    );
-
-    const { data: userData, error: userErr } = await db.auth.getUser(token);
-    if (userErr || !userData || !userData.user) {
-      console.error('[parse-reporte-tapas] getUser falló:', userErr && userErr.message);
-      res.status(401).json({ error: 'Sesión inválida', detalle: userErr ? userErr.message : null });
-      return;
-    }
-
-    const { data: perfil, error: perfilErr } = await db.from('perfiles').select('rol').eq('user_id', userData.user.id).single();
-    if (perfilErr || !perfil || perfil.rol !== 'master') {
-      console.error('[parse-reporte-tapas] chequeo de rol falló. user_id:', userData.user.id,
-        '| error:', perfilErr && perfilErr.message, '| perfil:', perfil);
-      res.status(403).json({
-        error: 'Sin permiso — se requiere rol master',
-        detalle: perfilErr ? perfilErr.message : (perfil ? ('rol actual: ' + perfil.rol) : 'no se encontró perfil para este usuario'),
-      });
+    if (sesion.rol !== 'master') {
+      res.status(403).json({ error: 'Sin permiso — se requiere rol master', detalle: 'rol actual: ' + sesion.rol });
       return;
     }
 

@@ -51,8 +51,18 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
   Personal → Faltas, sin pantalla nueva.
   ⚠️ Valida firma `X-Twilio-Signature` (HMAC-SHA1, fail-closed) — sin `TWILIO_AUTH_TOKEN` rechaza TODO POST.
   Env: ANTHROPIC_API_KEY, SUPA_URL, SUPA_SERVICE_KEY, TWILIO_AUTH_TOKEN (obligatorio), TWILIO_WEBHOOK_URL, TETRA_WA_ALLOW.
+- `api/_auth.js` — helper compartido (NO es endpoint: Vercel no publica archivos con prefijo `_`).
+  `rolDeSesion(req)` valida el `Authorization: Bearer <access_token>` y devuelve el rol de
+  `perfiles` consultando COMO el propio usuario (`perfiles` no tiene grants para service_role).
+  `mimeImagen(m)` limita `mime_type` a png/jpeg/webp/gif. Lo usan los 3 endpoints de parseo.
+  El front manda el token con `HEADERS.Authorization` (auth.js lo renueva en cada refresh).
 - `api/parse-doc.js` — parsea foto de requi con Claude Vision → JSON {requi, fecha, productos[]}.
-  ⚠️ PENDIENTE: CORS `*` + sin auth → gasto de tokens de Claude. Falta gatear con JWT de sesión.
+  Gateado (oct/2026): rol `master` u `operativo_prod` (401 sin sesión, 403 otro rol). Lo llaman
+  produccion.html (screenshot de Ingreso) y serigrafia.html (lector de requis), sin CORS abierto.
+- `api/parse-requi.js` — Central de Ingreso de index.html: lee una página/captura de reporte SICAF
+  ("Salidas/Ingresos a Bodega", puede traer varios documentos) con Claude Vision (Sonnet, stream,
+  max_tokens 32000) → `{documentos:[{bodega, documento, prefijo, numero, fecha, descripcion,
+  referencia, lineas:[...]}], warnings}`. Solo `master`. maxDuration 120s en vercel.json.
 - `api/parse-reporte-tapas.js` (oct/2026) — parsea el TEXTO de los reportes diarios que los
   supervisores de Tapas mandan por WhatsApp (formato real: un operario por bloque, sub-
   encabezados opcionales de día "Martes"/"Miércoles", líneas "cantidad + texto libre" que
@@ -60,10 +70,8 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
   fecha, dia_texto, cantidad, proceso, descripcion, metodo, proceso_dudoso}], warnings:[]}`.
   Resuelve nombres de día de la semana a fecha real contra `fecha_referencia` (más cercana
   y anterior o igual, nunca futura). Si no reconoce el proceso de una línea, deja
-  `proceso:""` + `proceso_dudoso:true` en vez de adivinar. A diferencia de `parse-doc.js`,
-  este SÍ está gateado desde el día uno: exige `Authorization: Bearer <access_token>` de la
-  sesión de Supabase del que llama y verifica `rol='master'` en `perfiles` antes de llamar a
-  Claude (Haiku). Consumido solo por comandas.html → "📥 Importar reporte WhatsApp" (ver
+  `proceso:""` + `proceso_dudoso:true` en vez de adivinar. Solo `master` (vía `api/_auth.js`)
+  antes de llamar a Claude (Haiku). Consumido solo por comandas.html → "📥 Importar reporte WhatsApp" (ver
   abajo) — no hay flujo que inserte directo desde WhatsApp para este formato de reporte por
   lotes (es demasiado grande/variado para el flujo de confirmación SI/NO de una sola tarea
   que ya usa `api/whatsapp.js`); Álvaro sigue copiando el texto a mano del chat a la app.
@@ -71,7 +79,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 ### Módulos activos
 | Archivo | Descripción |
 |---|---|
-| `index.html` | Fachada principal — 8 cards de módulo |
+| `index.html` | Fachada principal — 8 cards de módulo + **Central de Ingreso** (sube PDF/imagen de reportes SICAF; pdf.js lee por página, 4 en paralelo, conserva lo ya leído si una página falla → `api/parse-requi.js`; clasifica cada documento por prefijo según `.claude/docs/contexto-bot-requis.md` y graba en `entregas_serig`/`movimientos_materiales`/`movimientos_insumos`/`produccion_diaria`, o ajusta existencia en `insumos_b7`/`inventario`). Solo funciona para master (el endpoint rechaza a otros roles). ⚠️ El ajuste de existencia es select+update NO atómico y permite quedar en negativo — no se pasó a `descontar_inventario` porque esa RPC recorta en 0 y ocultaría descuadres contra SICAF |
 | `tapas.html` | Módulo completo Tapas: hub (Personal y Roles + Asistencia Mensual) + movimientos (salidas/ingresos/rechazos) + productividad + trazabilidad + personal + pedidos |
 | `serigrafia.html` | Módulo admin Serigrafía: Inicio (board) + Movimientos + Productividad + Personal |
 | `registro-serigrafia.html` | Formulario móvil rol `operativo_serig`: Flameado / Impresión / Empaque |
@@ -79,7 +87,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | `registro-tapas.html` | Formulario móvil rol `operativo`/`supervisor_tapas`: comanda concluida, correlativo CMD-### vía trigger DB. Datos del día = solo fecha (hora_inicio/cierre quedan null; supervisor se adjunta solo desde `personal`). Pantalla de selección: lista a TODO el personal activo de Tapas (supervisión primero, ficha destacada) y, debajo, el bloque "Personal y Roles" (copia del de Tapas → Inicio: barra relativa al líder del mes, clic en un nombre despliega el ESPEJO del detalle de Tapas → Inicio — funciones copiadas en este HTML: 📅 producción diaria con línea de meta 10,000 y popup por barra, ⚙️ producción por proceso desplegable con sus ingresos y 📜 historial de ingresos, ver abajo; visible para todos. SOLO CONSULTA: sin botones de aprobar/rechazar ni enlaces a comandas.html porque el rol operativo está enjaulado aquí; todo cambio de diseño de ese desplegable debe replicarse en ambos archivos). Campo "Tapa o envase trabajado *" OBLIGATORIO en cada tarea con cantidad (se elige de la lista; tarjetas con cantidad 0 se ignoran, no se guardan). Se probó un termómetro por ficha contra meta fija de 10,000 und/día y se descartó. Autocompletar de tapa: todas las coincidencias, por palabras sin tildes, facturables primero |
 | `dashboard.html` | KPIs ejecutivos globales |
 | `ventas.html` | Ventas y Financiero: Resumen · Productos · Clientes · Rotación · Importar facturación (Excel/CSV cols A-R) · toggle IVA |
-| `produccion.html` | Sopladoras: Ingreso PDF/manual (pdf.js) · Reporte Semanal (pivote máquina×SKU) · Mensual. Asigna máquina Y operario por fila (`personal` area='produccion') |
+| `produccion.html` | Sopladoras, 3 pestañas: **Inicio** (`renderInicio`: modo Fichas por máquina —con foto en `img/maquinas/maqN.png`, ver README de esa carpeta— o Tabla, `switchInicioModo`; período Día/Semana/Mes con fecha compartida, `switchInicioVista`, Mes por default — reemplaza a los viejos Reporte Semanal y Mensual) · **Ingreso** PDF/manual (pdf.js) o screenshot (`api/parse-doc.js`) · **Recetario** (catálogo `insumos_b7` paginado para no truncar; editable por master y `operativo_prod`). Asigna máquina Y operario por fila (`personal` area='produccion') |
 | `gestion.html` | Gestión de Personal y Planta: tabla unificada tapas+serig+producción+molino+bodega+moldes sobre la misma tabla `personal` + RRHH (locker/EPP/talla) + permisos/incidentes/faltas/capacitaciones/bonos + Lockers + Planta (mejoras_planta, CRUD simple por tarjetas). Master-only. |
 | `bodega.html` | Bodega — Inicio (KPIs) · **Existencias** (ex-`inventario.html`, integrado sep/2026: catálogo Bodega 02/05/07, tablas `inventario`+`insumos_b7`, importación Excel, alertas de bajo stock) · Movimientos (`movimientos_insumos`, área='bodega', destino de los prefijos SICAF `MPI`/`MPS`) · Personal. `inventario.html` ahora es solo un redirect a `bodega.html#existencias` (no borrado, por si hay bookmarks/PWA viejos). |
 | `molino.html` | Molienda/mezcla/distribución de materia prima a máquina: mismo patrón que bodega.html (Inicio · Movimientos `área='molino'` · Personal). Alcance MVP — no modela todavía fórmulas ni distribución por máquina, ver `.claude/docs/contexto-bot-requis.md`. |
@@ -385,14 +393,6 @@ view-planta: tarjetas de `mejoras_planta` (CRUD directo, sin ligar a `personal`)
   completado/cancelado y la precarga con `fechaHoy()`. Sirve para registrar entregas de
   mobiliario/equipo a planta (ej. sillas nuevas a Producción) además de mejoras en curso.
 
-view-personal: grid unificado de TODA la tabla personal (área tapas + serig juntas,
-  sin duplicar el CRUD que ya existe en tapas.html/serigrafia.html — es la misma tabla,
-  los cambios se ven de inmediato en cualquier módulo). SIEMPRE tabla (buildPersonalTable),
-  agrupada por área — ya no hay vista de tarjetas (buildPersonalCard se eliminó).
-  Filtros: área (Todos/Tapas/Serigrafía/Producción/Molino/Bodega/Moldes) · buscador
-  nombre/código · toggle solo activos.
-  `area` acepta 'tapas'/'serig'/'produccion'/'molino'/'bodega'/'moldes'. Molino, Bodega y
-  Moldes TODAVÍA NO tienen módulo propio en la app — este registro de personal es la base
 BARRA DE INDICADORES (arriba de las pestañas, `renderKpis()`; oct/2026): Total activos ·
   Producción Turno Gabino · Producción Turno Alex · Serigrafía · Tapas · Otras áreas (= todo lo
   que no es Tapas/Serigrafía/Producción; el mouse encima muestra el desglose). Solo cuenta
@@ -403,6 +403,14 @@ BARRA DE INDICADORES (arriba de las pestañas, `renderKpis()`; oct/2026): Total 
   (ya no se consulta `rrhh_permisos` para la barra; las faltas pendientes siguen visibles en la
   tabla y en el perfil → Faltas).
 
+view-personal: grid unificado de TODA la tabla personal (área tapas + serig juntas,
+  sin duplicar el CRUD que ya existe en tapas.html/serigrafia.html — es la misma tabla,
+  los cambios se ven de inmediato en cualquier módulo). SIEMPRE tabla (buildPersonalTable),
+  agrupada por área — ya no hay vista de tarjetas (buildPersonalCard se eliminó).
+  Filtros: área (Todos/Tapas/Serigrafía/Producción/Molino/Bodega/Moldes) · buscador
+  nombre/código · toggle solo activos.
+  `area` acepta 'tapas'/'serig'/'produccion'/'molino'/'bodega'/'moldes'. Molino, Bodega y
+  Moldes TODAVÍA NO tienen módulo propio en la app — este registro de personal es la base
   para cuando se construyan, ninguna otra página los lee todavía (mismo caso que
   produccion.html con 'produccion': el módulo real llegó después que el registro de personal).
   ⚠️ `personal` tiene un CHECK constraint `personal_area_check` creado manual en el dashboard
@@ -605,10 +613,10 @@ Notas críticas:
   las usa desde sep/2026 (ver view-inicio arriba).
 - `rrhh_permisos` / `rrhh_incidentes`: historial por persona (FK `personal_id` uuid), master-only
   lectura+escritura (RLS). Gestionadas desde gestion.html
-- `mejoras_planta`: seguimiento de infraestructura — tabla lista, vista pendiente en gestion.html
+- `mejoras_planta`: seguimiento de infraestructura — vista en gestion.html → Planta (ver arriba)
 - `ventas`: fecha→DATE, RLS master-only escritura; importador reemplaza por rango de fechas (sin duplicar)
 - `bot_estado`: 1 fila por número (`whatsapp_from` UNIQUE)
-- `rechazos`: existe, RLS pendiente (sql/rechazos_rls_fix.sql)
+- `rechazos`: RLS activo con 4 políticas (verificado en la base 2026-10-09)
 - `movimientos_insumos`: destino de bodega.html/molino.html (`area`='bodega'|'molino'), separada de
   `movimientos_materiales` (esa es de tapas/PT) para no forzar campos que no aplican (ej. `solicitud_id`).
   Lectura abierta a cualquier autenticado (soporta visor), escritura master-only. Ver
@@ -620,13 +628,18 @@ Notas críticas:
   Tapas y Serigrafía leen/escriben la misma tabla sin distinción.
 
 ### RPCs atómicas
-- `descontar_inventario(p_sku, p_cantidad)` — usar en lugar de select+update manual
-- `aumentar_inventario(p_sku, p_cantidad)` — ídem
+- `descontar_inventario(p_sku, p_cantidad)` — usar en lugar de select+update manual.
+  ⚠️ Recorta en 0 (`GREATEST(0, existencia - cantidad)`): nunca deja negativo, así que un
+  descuadre (salida mayor a lo que el sistema tiene) queda oculto.
+- `aumentar_inventario(p_sku, p_cantidad)` — ídem. ⚠️ Si el SKU no existe lo CREA (upsert con
+  descripción "Producto terminado · pendiente descripción", facturable). Ninguna de las dos tiene
+  el SQL versionado en `sql/` — definición leída de la base en oct/2026. No hay RPC equivalente
+  para `insumos_b7`.
 
 ---
 
 ## SQL pendiente de correr en Supabase (dashboard → SQL Editor)
-1. `sql/rechazos_rls_fix.sql` — activa RLS en tabla rechazos
+1. ~~`sql/rechazos_rls_fix.sql`~~ — YA CORRIDO (verificado 2026-10-09: RLS activo, 4 políticas)
 2. `sql/operativo_tapas_v1.sql` — rol `operativo` + usuario tapas@tetrapp.app + políticas INSERT + trigger CMD-###
 3. `sql/registro_procesos_serig_v1.sql` — crea registro_flameado_serig + registro_empaque_serig con RLS
 4. `sql/ventas_financiero_v1.sql` — prepara tabla `ventas`: familia/codigo_cliente, fecha→DATE, RLS master
@@ -728,6 +741,8 @@ el área mientras no se haya escrito otro código a mano, y `guardarPersona()` a
 el código escrito (y si está de baja) en vez de mostrar el error crudo `personal_codigo_key`.
 Las áreas `mantenimiento`/`torno`/`oficina` (agregadas en la reconciliación) ya están también
 en el selector de Área, los filtros, la agrupación de la tabla y los colores por defecto.
+
+### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)
 - `sql/fix_rls_serig_v2.sql` — reparó registro_tiros_serig RLS + columna hora + CHECK velada
 - `sql/solicitudes_parcial_constraint.sql` (19-ago-2026) — CHECK de estado en `solicitudes`
@@ -744,8 +759,16 @@ en el selector de Área, los filtros, la agrupación de la tabla y los colores p
 ---
 
 ## Seguridad — estado
-Sólido: sin secretos hardcodeados; CSP + HSTS + X-Frame-Options en vercel.json; auth.js centralizado; anon sin privilegios; api/whatsapp.js valida firma Twilio (fail-closed).
-⚠️ Pendiente: `api/parse-doc.js` CORS `*` sin auth → tokens expuestos. `TWILIO_AUTH_TOKEN` debe existir en Vercel env vars.
+Sólido: sin secretos hardcodeados; CSP + HSTS + X-Frame-Options en vercel.json (CSP incluye
+`worker-src 'self' blob: cdnjs` para el worker de pdf.js); auth.js centralizado; anon sin privilegios;
+api/whatsapp.js valida firma Twilio (fail-closed); los 3 endpoints de IA (`parse-doc`, `parse-requi`,
+`parse-reporte-tapas`) exigen sesión vía `api/_auth.js` (oct/2026 — antes `parse-doc` estaba abierto).
+Auditoría oct/2026: se escapó con `escHtml()` la descripción de feriados (texto libre de `prompt()`)
+que iba sin escapar a `title="..."` en tapas.html y serigrafia.html.
+⚠️ Pendiente: confirmar que `TWILIO_AUTH_TOKEN` existe en Vercel env vars (sin ella el bot rechaza todo).
+⚠️ Conocido, bajo riesgo: los `onclick` arman `personal.codigo` solo escapando `'` (códigos los pone
+master); el filtro de escrituras de `operativo_prod` en auth.js compara la URL por prefijo — RLS es la
+barrera real.
 
 ## Roles de acceso (shared/auth.js)
 - `master` → todo · `visor` → solo lectura (banner Modo Visual)
