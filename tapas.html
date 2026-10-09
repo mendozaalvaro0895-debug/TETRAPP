@@ -321,7 +321,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .term-detalle{padding:8px 10px 14px;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px}
 .td-bloque{min-width:0}
 .td-titulo{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);margin-bottom:8px}
-.dg{display:flex;align-items:flex-end;gap:4px;height:210px;border-bottom:1px solid var(--bg2)}
+.dg{position:relative;display:flex;align-items:flex-end;gap:4px;height:210px;border-bottom:1px solid var(--bg2)}
+.dg-meta{position:absolute;left:0;right:0;border-top:2px dashed var(--red);pointer-events:none;z-index:2}
+.dg-meta span{position:absolute;right:0;bottom:2px;font-size:9px;font-weight:700;color:var(--red);background:rgba(255,255,255,.85);padding:0 4px;border-radius:3px;white-space:nowrap}
 .dg-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
 .dg-val{font-family:var(--mono);font-size:9px;color:var(--teal);line-height:1.2;margin-bottom:2px;white-space:nowrap}
 .dg-bar{width:100%;max-width:30px;border-radius:3px 3px 0 0;background:var(--teal)}
@@ -2065,6 +2067,10 @@ function compactoUnd(n) {
   return n >= 1000 ? (Math.round(n / 100) / 10).toString().replace(/\.0$/, '') + 'k' : String(n);
 }
 
+// Meta diaria por persona (línea punteada del gráfico de producción diaria)
+var META_DIA_GRAFICO = 15000;
+var ALTO_BARRAS_DIA = 180; // px de la barra más alta posible; el gráfico mide 210px
+
 function buildTermDiario(o) {
   var r = rangoMes();
   var ym = r.desde.slice(0, 7);
@@ -2084,11 +2090,15 @@ function buildTermDiario(o) {
     else if (st === 'pend') pendientes++;
   }
 
+  // La escala llega siempre hasta la meta, así la línea punteada queda en su sitio aunque nadie la alcance
+  var escalaDia = Math.max(maxDia, META_DIA_GRAFICO);
+  var lineaMeta = '<div class="dg-meta" style="bottom:' + Math.round(META_DIA_GRAFICO / escalaDia * ALTO_BARRAS_DIA) + 'px"><span>Meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>';
+
   var cols = estados.map(function(e) {
     var titulo = 'Día ' + e.d + ' · ';
     var barra = '', val = '';
     if (e.st === 'prod') {
-      var h = Math.max(5, Math.round((e.und / maxDia) * 180));
+      var h = Math.max(5, Math.round((e.und / escalaDia) * ALTO_BARRAS_DIA));
       barra = '<div class="dg-bar" style="height:' + h + 'px"></div>';
       val = '<div class="dg-val">' + compactoUnd(e.und) + '</div>';
       titulo += e.und.toLocaleString() + ' und';
@@ -2129,12 +2139,13 @@ function buildTermDiario(o) {
   }
 
   return '<div class="td-titulo">📅 Producción diaria</div>'
-    + '<div class="dg">' + cols + '</div><div class="dg-dias">' + etiquetas + '</div>'
+    + '<div class="dg">' + cols + lineaMeta + '</div><div class="dg-dias">' + etiquetas + '</div>'
     + '<div class="dg-resumen">' + resumen + '</div>'
     + '<div class="dg-leyenda"><span><i style="background:var(--teal)"></i>produjo</span>'
     + '<span><i style="background:var(--red-l);border:1px dashed var(--red)"></i>sin registro</span>'
     + '<span><i style="background:var(--bg2)"></i>ausente</span>'
-    + '<span><i style="background:var(--amber)"></i>por aprobar</span></div>';
+    + '<span><i style="background:var(--amber)"></i>por aprobar</span>'
+    + '<span><i style="background:none;border-top:2px dashed var(--red);height:0;width:14px;vertical-align:3px"></i>meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>';
 }
 
 // Ingresos (tareas terminadas y aprobadas) de UN proceso de UN operario, en orden cronológico.
