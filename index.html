@@ -109,6 +109,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ind-c.ok .ind-v{color:#4ADE80;text-shadow:0 0 12px rgba(74,222,128,.35)}
 .ind-c.mid .ind-v{color:#FBBF24;text-shadow:0 0 12px rgba(251,191,36,.3)}
 .ind-c.low .ind-v{color:#F87171;text-shadow:0 0 12px rgba(248,113,113,.3)}
+.ind-vac{color:#FBBF24;font-weight:600}
 .ind-foot{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--gray)}
 .ind-foot b{font-family:var(--mono);font-weight:500;color:var(--ink)}
 
@@ -749,7 +750,7 @@ function indPersonal(area, activosRows, asistRows, ayer) {
   if (rh) return { pres: rh.pres, total: rh.total, hayDia: rh.pres > 0 };   // hoja del Drive = fuente oficial
   if (activosRows === null || asistRows === null) return null;
   var activos = {};
-  activosRows.forEach(function (p) { if (p.area === area) activos[p.codigo] = true; });
+  activosRows.forEach(function (p) { if (p.area === area && p.activo) activos[p.codigo] = true; });
   var total = Object.keys(activos).length;
   var pres = {};
   asistRows.forEach(function (a) {
@@ -757,6 +758,24 @@ function indPersonal(area, activosRows, asistRows, ayer) {
   });
   var hayDia = asistRows.some(function (a) { return a.area === area && a.fecha === ayer; });
   return { pres: Object.keys(pres).length, total: total, hayDia: hayDia };
+}
+
+// ── Vacantes libres ──
+// Producción: cupo de 19 por turno (18 operadores + 1 supervisor) − activos del turno. ⚠️ ESPEJO de
+// PLANTILLA_PRODUCCION_TURNO de gestion.html (mismo número que ve Gestión → Personal).
+// Serigrafía/Tapas: bajas marcadas "dejar la plaza vacante" (personal.plaza_vacante).
+var IND_PLANTILLA_PRODUCCION_TURNO = 19;
+function indVacantes(area, personalRows) {
+  if (personalRows === null) return null;
+  if (area === 'produccion') {
+    var n = { gabino: 0, alex: 0 };
+    personalRows.forEach(function (p) {
+      if (p.area === 'produccion' && p.activo && n[p.turno_produccion] != null) n[p.turno_produccion]++;
+    });
+    return Math.max(0, IND_PLANTILLA_PRODUCCION_TURNO - n.gabino) + Math.max(0, IND_PLANTILLA_PRODUCCION_TURNO - n.alex);
+  }
+  if (!personalRows.length || personalRows[0].plaza_vacante === undefined) return null;   // el SQL de plazas vacantes aún no corrió
+  return personalRows.filter(function (p) { return p.area === area && !p.activo && p.plaza_vacante; }).length;
 }
 
 // ── Q facturado del mes por área (sin IVA) ──
@@ -797,11 +816,14 @@ function indCelda(label, valor, sub, clase) {
 // Umbrales propios: hasta 3% bien, hasta 6% atención, más de 6% alto
 function indClaseAus(p) { return p === null ? '' : (p <= 3 ? 'ok' : (p <= 6 ? 'mid' : 'low')); }
 
-function indPintarFicha(id, und, aus, pers, q, ctx, nombreUnd) {
+function indPintarFicha(id, und, aus, pers, q, ctx, nombreUnd, vacantes) {
   var cont = document.getElementById(id);
   if (!cont) return;
   var pv = pers && pers.hayDia ? pers.pres + '/' + pers.total : '—';
   var ps = pers ? (pers.hayDia ? 'asistencia ' + indFechaCorta(ctx.ayer) : 'sin asistencia ' + indFechaCorta(ctx.ayer)) : 'no disponible';
+  if (vacantes !== null && vacantes !== undefined) {
+    ps += vacantes > 0 ? ' · <span class="ind-vac">' + vacantes + (vacantes === 1 ? ' vacante' : ' vacantes') + '</span>' : ' · sin vacantes';
+  }
   var av = aus ? aus.pct.toFixed(1) + '%' : '—';
   var as = aus ? aus.faltas + (aus.faltas === 1 ? ' falta' : ' faltas') + ' · ' + indFmt(aus.total) + ' días-persona' : 'sin asistencia del mes';
   var uv = und !== null ? indFmt(und) : '—';
@@ -812,6 +834,13 @@ function indPintarFicha(id, und, aus, pers, q, ctx, nombreUnd) {
     indCelda('Ausentismo mes', av, as, indClaseAus(aus ? aus.pct : null)) +
     indCelda('Unidades mes', uv, nombreUnd, '') +
     indCelda('Q mes', qv, qs, '');
+}
+
+async function indCargarPersonal() {
+  var cols = 'codigo,area,activo,turno_produccion,plaza_vacante';
+  var r = await db.from('personal').select(cols).in('area', ['tapas', 'serig', 'produccion']);
+  if (r.error) r = await db.from('personal').select('codigo,area,activo,turno_produccion').in('area', ['tapas', 'serig', 'produccion']);
+  return r.error ? null : (r.data || []);
 }
 
 async function cargarIndicadores() {
@@ -828,7 +857,7 @@ async function cargarIndicadores() {
       diasMes: indDiasHabiles(mesIni, ayer, feriados)
     };
     var res = await Promise.all([
-      guiaSafe(db.from('personal').select('codigo,area').eq('activo', true).in('area', ['tapas', 'serig', 'produccion'])),
+      indCargarPersonal(),
       indPaginar(function () { return db.from('asistencia_diaria').select('fecha,operador_codigo,estado,area').in('area', ['tapas', 'serig', 'produccion']).gte('fecha', ctx.desdeDatos).lte('fecha', ayer); }),
       indVentasPorArea(ctx)
     ]);
@@ -838,11 +867,11 @@ async function cargarIndicadores() {
     var undTapas = await indTapasUnidades(ctx);
     var prod = await indProdUnidades(ctx);
     indPintarFicha('ind-serig', undSerig, indAusentismo('serig', asist, ctx), indPersonal('serig', activos, asist, ayer),
-      ventas ? { valor: ventas['Serigrafía'], ultima: ventas.ultima } : null, ctx, 'und entregadas (PT)');
+      ventas ? { valor: ventas['Serigrafía'], ultima: ventas.ultima } : null, ctx, 'und entregadas (PT)', indVacantes('serig', activos));
     indPintarFicha('ind-tapas', undTapas, indAusentismo('tapas', asist, ctx), indPersonal('tapas', activos, asist, ayer),
-      ventas ? { valor: ventas['Tapas'], ultima: ventas.ultima } : null, ctx, 'und ingreso PT');
+      ventas ? { valor: ventas['Tapas'], ultima: ventas.ultima } : null, ctx, 'und ingreso PT', indVacantes('tapas', activos));
     indPintarFicha('ind-prod', prod.und, indAusentismo('produccion', asist, ctx), indPersonal('produccion', activos, asist, ayer),
-      ventas ? { valor: ventas['Producción'], ultima: ventas.ultima } : null, ctx, prod.sub);
+      ventas ? { valor: ventas['Producción'], ultima: ventas.ultima } : null, ctx, prod.sub, indVacantes('produccion', activos));
   } catch (e) {
     console.error('Indicadores:', e);
   }
