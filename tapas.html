@@ -228,6 +228,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .lin-item-sku span{font-family:var(--font);font-weight:500;color:var(--gray);font-size:10px}
 .lin-item-desc{font-size:11px;color:var(--gray)}
 .lin-vacio{padding:10px 12px;font-size:11px;color:var(--gray);font-style:italic}
+/* ── Entregados (requis de ingreso PT) ── */
+.ent-busca{margin-left:auto;width:230px;max-width:40vw}
+.ent-scroll{overflow-x:auto}
+.ent-tabla td{vertical-align:top}
+.ent-ped{font-family:var(--mono);font-size:9px;font-weight:800;background:var(--teal-xl);color:var(--teal);border-radius:3px;padding:1px 5px}
+.ent-ped-x{background:#FEE2E2;color:#B91C1C;text-decoration:line-through}
+.ent-orig{font-size:9px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:2px 6px;font-weight:700}
+.ent-act button{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;color:var(--teal)}
+.ent-act button.ent-del{color:var(--gray-l);font-size:14px}
+.ent-mas{display:block;margin:10px auto 4px}
+.ing-lin{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.7fr) 84px 30px;gap:6px;margin-bottom:6px;align-items:start}
+.ing-x{background:none;border:1px solid var(--border);border-radius:6px;color:var(--gray-l);font-size:13px;cursor:pointer;padding:5px 0;line-height:1}
+@media(max-width:700px){.ing-lin{grid-template-columns:minmax(0,1fr) 84px 30px}.ing-lin>:first-child{grid-column:1/-1}}
 
 .sku-code{font-family:var(--mono);font-weight:700;color:var(--teal);font-size:11px;margin-bottom:2px}
 .sku-desc{color:var(--ink);font-size:11px}
@@ -536,6 +549,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </div>
           <div class="inicio-sec">
             <div id="fichasTapas"></div>
+          </div>
+          <div class="inicio-sec">
+            <div id="entregadosTapas"></div>
           </div>
         </div>
       </div>
@@ -948,6 +964,41 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="mf">
       <button class="btn btn-g" onclick="cerrarModalMov()">Cancelar</button>
       <button class="btn btn-t" id="movBtnOk" onclick="confirmarMov()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENTREGADO (requi de ingreso PT) -->
+<div class="overlay" id="overlayIngPT">
+  <div class="modal" style="max-width:780px">
+    <div class="mh">
+      <div class="mh-title" id="ingTitulo">📦 Registrar entregado</div>
+      <button class="m-close" onclick="cerrarIngPT()">✕</button>
+    </div>
+    <div class="mb">
+      <div class="fr">
+        <div class="fg">
+          <div class="fl">No. de requi de ingreso PT *</div>
+          <input class="fi" id="ingRequi" placeholder="Ej: PTI21056" autocomplete="off">
+        </div>
+        <div class="fg">
+          <div class="fl">Fecha del ingreso</div>
+          <input class="fi" id="ingFecha" type="date">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div class="fl">PRODUCTOS * <span style="font-weight:500;color:var(--gray-l)">(pedido opcional; suma al inventario de PT)</span></div>
+        <button class="btn btn-g btn-sm" onclick="ingAgregarLinea()">+ Agregar producto</button>
+      </div>
+      <div id="ingLineas"></div>
+      <div class="fg full" style="margin-top:10px">
+        <div class="fl">Nota / observaciones (opcional)</div>
+        <input class="fi" id="ingNota" placeholder="Ej: Barrilito dorado + SC naranja…" autocomplete="off">
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cerrarIngPT()">Cancelar</button>
+      <button class="btn btn-t" id="ingBtnOk" onclick="guardarIngPT()">Guardar</button>
     </div>
   </div>
 </div>
@@ -1716,7 +1767,9 @@ async function cargarInsumosB7() {
 // ── Buscador de SKU del formulario ────────────────────────────
 // Todas las coincidencias (cada palabra por separado, sin tildes), FACTURABLES PRIMERO.
 // facturable null cuenta como facturable, igual que el bot.
-function buildFormDropHtml(kind, query) {
+function buildFormDropHtml(kind, query, onSel) {
+  // onSel: prefijo de la función que recibe el SKU elegido (por defecto formSkuSelect del formulario de solicitud)
+  var fnSel = onSel || ('formSkuSelect(\'' + kind + '\',');
   var toks = normBusqueda(query).split(/[^a-z0-9]+/).filter(Boolean);
   if (!toks.length) return '';
   var b7 = esKindB7(kind);
@@ -1730,7 +1783,7 @@ function buildFormDropHtml(kind, query) {
   var fact = res.filter(function(i) { return i.facturable !== false; });
   var noFact = res.filter(function(i) { return i.facturable === false; });
   function item(i) {
-    return '<div class="lin-item" onmousedown="formSkuSelect(\'' + kind + '\',\'' + escHtml(String(i.sku).replace(/'/g, '')) + '\')">'
+    return '<div class="lin-item" onmousedown="' + fnSel + '\'' + escHtml(String(i.sku).replace(/'/g, '')) + '\')">'
       + '<div class="lin-item-sku">' + escHtml(i.sku) + '<span>Stock ' + (b7 ? 'B7 ' : '') + (i.existencia || 0).toLocaleString() + '</span></div>'
       + '<div class="lin-item-desc">' + escHtml(i.descripcion || '') + '</div></div>';
   }
@@ -2725,6 +2778,7 @@ function renderFichasTapas() {
 function renderInicioPedidosTapas() {
   renderFichasTapas();
   renderAlertasTapas();
+  renderEntregadosTapas();
 }
 
 // ══ IMPRIMIR — FICHAS DE TRABAJO ACTIVAS (PDF por cliente) ════
@@ -3831,6 +3885,7 @@ async function init() {
   await cargarPersonal();
   await cargarFeriados();
   await cargarSolicitudes();
+  await cargarMovimientos(); // alimenta el bloque "Entregados" del Inicio
   await cargarRechazos();
 
   // Poblar select de operadores en modal rechazo
@@ -3921,7 +3976,7 @@ function parseFechaDoc(obs) {
 
 function parseObs(obs) {
   if (!obs) return '';
-  return obs.replace(/^FECHA:\d{4}-\d{2}-\d{2} \| ?/, '');
+  return obs.replace(/^FECHA:\d{4}-\d{2}-\d{2}( \| ?)?/, '');
 }
 
 function formatFecha(isoStr) {
@@ -3954,6 +4009,7 @@ async function cargarMovimientos() {
     salidaMovs  = sal.data || [];
     ingresoMovs = ing.data || [];
     renderMov(movVistaActual);
+    renderEntregadosTapas();
   } catch(e) { console.error('cargarMovimientos:', e); }
 }
 
@@ -4135,6 +4191,406 @@ async function confirmarMov() {
   } finally {
     btnOk.disabled = false;
     btnOk.textContent = movTipoActual === 'salida_bodega' ? 'Registrar Salida' : 'Registrar Ingreso PT';
+  }
+}
+
+// ══ ENTREGADOS · HISTORIAL DE REQUIS DE INGRESO PT (Inicio) ══
+// Calcado del bloque "Entregados" de serigrafia.html. Serigrafía guarda sus requis en
+// entregas_serig; en Tapas el registro de ingreso PT ES movimientos_materiales (tipo
+// 'entrada_pt', UNA fila por producto): las filas que comparten num_documento son UNA requi.
+// Registrar suma la existencia del SKU (aumentar_inventario); editar/eliminar la revierte.
+var entVisibles = 40;
+var entBusca = '';
+var ingLineas = [];   // líneas del formulario: { sol, solTxt, sku, desc, skuTxt, cant }
+var ingEdit = null;   // { doc, rows } al editar una requi ya registrada
+
+function entFechaMov(m) { return parseFechaDoc(m.observaciones) || formatFecha(m.created_at); }
+
+function gruposEntregados() {
+  var map = {}, out = [];
+  ingresoMovs.forEach(function(m) {
+    if (m.area === 'serig') return;
+    var k = m.num_documento ? 'd:' + m.num_documento : 'i:' + m.id;
+    if (!map[k]) {
+      map[k] = { doc: m.num_documento || '', fecha: entFechaMov(m), nota: parseObs(m.observaciones), rows: [] };
+      out.push(map[k]);
+    }
+    map[k].rows.unshift(m); // ingresoMovs viene del más nuevo al más viejo: dentro de la requi, orden de captura
+  });
+  return out;
+}
+
+function grupoEntregadoDeFila(id) {
+  return gruposEntregados().find(function(g) {
+    return g.rows.some(function(r) { return String(r.id) === String(id); });
+  }) || null;
+}
+
+function mapasEntregados() {
+  var ent = {}, sal = {};
+  ingresoMovs.forEach(function(m) {
+    if (m.area === 'serig' || !m.solicitud_id) return;
+    ent[m.solicitud_id] = (ent[m.solicitud_id] || 0) + (m.cantidad || 0);
+  });
+  salidaMovs.forEach(function(m) {
+    if (m.area === 'serig' || !m.solicitud_id || !m.num_documento) return;
+    var a = sal[m.solicitud_id] || (sal[m.solicitud_id] = []);
+    if (a.indexOf(m.num_documento) < 0) a.push(m.num_documento);
+  });
+  return { ent: ent, sal: sal };
+}
+
+function renderEntregadosTapas() {
+  var wrap = document.getElementById('entregadosTapas');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="fich-wrap">'
+    + '<div class="fich-hdr"><span class="fich-title">📦 Entregados</span>'
+    +   '<span class="fich-count" id="entCuenta">—</span>'
+    +   '<input class="fi ent-busca" id="entBuscar" placeholder="🔍 Requi, SKU, cliente o pedido…" value="' + escHtml(entBusca) + '" oninput="entBuscarInput(this.value)" autocomplete="off">'
+    +   '<button class="btn btn-t btn-sm" onclick="abrirIngPT()">+ Registrar entregado</button></div>'
+    + '<div class="fich-body"><div id="entTabla"></div></div></div>';
+  renderEntTabla();
+}
+
+function entBuscarInput(v) {
+  entBusca = v;
+  entVisibles = 40;
+  renderEntTabla();
+}
+
+function entMasGrupos() {
+  entVisibles += 40;
+  renderEntTabla();
+}
+
+function renderEntTabla() {
+  var cont = document.getElementById('entTabla');
+  if (!cont) return;
+  var mp = mapasEntregados();
+  var grupos = gruposEntregados();
+  var toks = normBusqueda(entBusca).split(/[^a-z0-9]+/).filter(Boolean);
+  if (toks.length) {
+    grupos = grupos.filter(function(g) {
+      var txt = g.doc + ' ' + g.nota + ' ' + g.rows.map(function(m) {
+        var s = solicitudes.find(function(x) { return x.id === m.solicitud_id; });
+        return (m.sku_original || '') + ' ' + getSkuDesc(m.sku_original) + ' ' + (s ? (s.cliente || '') + ' ' + (s.id_display || '') : '');
+      }).join(' ');
+      var n = normBusqueda(txt);
+      return toks.every(function(t) { return n.indexOf(t) !== -1; });
+    });
+  }
+  var cu = document.getElementById('entCuenta');
+  if (cu) cu.textContent = grupos.length + ' requi' + (grupos.length !== 1 ? 's' : '') + (toks.length ? ' (filtradas)' : '') + ' · historial de ingresos a PT';
+  if (!grupos.length) {
+    cont.innerHTML = '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">'
+      + (toks.length ? '🔍 Ninguna requi coincide con la búsqueda' : '📭 No hay entregados registrados aún') + '</div>';
+    return;
+  }
+  var filas = grupos.slice(0, entVisibles).map(function(g, gi) { return buildEntGrupoHtml(g, gi, mp); }).join('');
+  cont.innerHTML = '<div class="ent-scroll"><table class="mov-table ent-tabla"><thead><tr>'
+    + '<th>No. Requi</th><th>Cliente</th><th>Pedido</th><th>Producto</th><th style="text-align:right">Unidades</th>'
+    + '<th>Fecha</th><th>Origen</th><th>Requi Salida Bodega</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+    + (grupos.length > entVisibles
+        ? '<button class="btn btn-g btn-sm ent-mas" onclick="entMasGrupos()">Mostrar más (' + (grupos.length - entVisibles) + ' requis restantes)</button>'
+        : '');
+}
+
+// Una requi = un grupo de filas: la fecha/origen/acciones salen en la primera, cada producto en su fila
+function buildEntGrupoHtml(g, gi, mp) {
+  var bg = gi % 2 === 0 ? '#ffffff' : 'var(--teal-xl)';
+  var sep = gi > 0 ? 'border-top:2px solid var(--border);' : '';
+  return g.rows.map(function(m, li) {
+    var primera = li === 0;
+    var s = m.solicitud_id ? solicitudes.find(function(x) { return x.id === m.solicitud_id; }) : null;
+    var ped = s ? '<span class="ent-ped">' + escHtml(s.id_display || String(s.id).slice(0, 8)) + '</span>'
+                : (m.solicitud_id ? '<span class="ent-ped ent-ped-x" title="Pedido eliminado">eliminado</span>' : '');
+    var sal = (m.solicitud_id && mp.sal[m.solicitud_id]) ? mp.sal[m.solicitud_id].join(', ') : '—';
+    var sty = 'background:' + bg + ';' + (primera ? sep : '');
+    var acc = primera
+      ? '<td class="ent-act" style="white-space:nowrap"><button title="Editar" onclick="abrirIngPT(\'' + escHtml(String(m.id)) + '\')">✏️</button>'
+        + '<button class="ent-del" title="Eliminar" onclick="eliminarIngPT(\'' + escHtml(String(m.id)) + '\')">✕</button></td>'
+      : '<td></td>';
+    return '<tr style="' + sty + '">'
+      + '<td>' + (primera ? '<span class="mov-doc">' + escHtml(g.doc || '—') + '</span>' : '<span style="color:var(--border);padding-left:8px">└</span>') + '</td>'
+      + '<td style="font-weight:600;font-size:11px">' + escHtml(s ? (s.cliente || '—') : '—') + '</td>'
+      + '<td>' + ped + '</td>'
+      + '<td style="font-size:11px;color:var(--gray)"><span style="font-family:var(--mono);font-size:10px;margin-right:4px">' + escHtml(m.sku_original || '') + '</span>' + escHtml(getSkuDesc(m.sku_original)) + '</td>'
+      + '<td class="mov-cant">' + (m.cantidad || 0).toLocaleString() + '</td>'
+      + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(g.fecha || '—') + '</td>'
+      + '<td><span class="ent-orig">MANUAL</span>' + (primera && g.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(g.nota) + '</span>' : '') + '</td>'
+      + '<td style="font-size:11px;font-family:var(--mono);color:var(--gray-l)">' + escHtml(sal) + '</td>'
+      + acc + '</tr>';
+  }).join('');
+}
+
+// ── Formulario ────────────────────────────────────────────────
+function ingNuevaLinea(d) {
+  d = d || {};
+  return { sol: d.sol || '', solTxt: '', sku: d.sku || '', desc: d.desc || '', skuTxt: '', cant: d.cant || '' };
+}
+
+function abrirIngPT(rowId) {
+  var g = rowId ? grupoEntregadoDeFila(rowId) : null;
+  ingEdit = g ? { doc: g.doc, rows: g.rows } : null;
+  document.getElementById('ingTitulo').textContent = g ? '✏️ Editar entregado' : '📦 Registrar entregado';
+  var rq = document.getElementById('ingRequi');
+  rq.value = g ? g.doc : '';
+  rq.style.borderColor = '';
+  document.getElementById('ingFecha').value = g ? g.fecha : fechaHoy();
+  document.getElementById('ingNota').value = g ? g.nota : '';
+  ingLineas = g ? g.rows.map(function(m) {
+    var solOk = m.solicitud_id && solicitudes.some(function(x) { return x.id === m.solicitud_id; }); // pedido borrado: se limpia el vínculo
+    var it = invB2DeTapas(m.sku_original);
+    return ingNuevaLinea({ sol: solOk ? m.solicitud_id : '', sku: m.sku_original || '', desc: it ? (it.descripcion || '') : '', cant: m.cantidad || '' });
+  }) : [ingNuevaLinea()];
+  document.getElementById('overlayIngPT').classList.add('open');
+  renderIngLineas();
+  rq.focus();
+}
+
+function cerrarIngPT() {
+  document.getElementById('overlayIngPT').classList.remove('open');
+  cerrarFormDrop();
+  ingEdit = null;
+}
+
+function ingAgregarLinea() {
+  ingSincronizarCant();
+  ingLineas.push(ingNuevaLinea());
+  renderIngLineas('ing-sol-' + (ingLineas.length - 1));
+}
+
+function ingQuitarLinea(i) {
+  ingSincronizarCant();
+  ingLineas.splice(i, 1);
+  if (!ingLineas.length) ingLineas.push(ingNuevaLinea());
+  renderIngLineas();
+}
+
+function ingSincronizarCant() {
+  ingLineas.forEach(function(l, i) {
+    var el = document.getElementById('ing-cant-' + i);
+    if (el) l.cant = el.value;
+  });
+}
+
+function ingTextoPedido(s) {
+  return (s.id_display || String(s.id).slice(0, 8)) + ' · ' + (s.cliente || '');
+}
+
+function renderIngLineas(focusId) {
+  var cont = document.getElementById('ingLineas');
+  if (!cont) return;
+  cont.innerHTML = ingLineas.map(function(l, i) {
+    var s = l.sol ? solicitudes.find(function(x) { return x.id === l.sol; }) : null;
+    var solVal = s ? ingTextoPedido(s) : l.solTxt;
+    var skuVal = l.sku ? textoCampoSku(l.sku, l.desc) : l.skuTxt;
+    return '<div class="ing-lin">'
+      + '<div class="lin-in-wrap"><textarea class="fi lin-ta" rows="1" id="ing-sol-' + i + '" placeholder="🔗 Pedido (opcional)" autocomplete="off"'
+      +   ' oninput="ingSolInput(' + i + ',this,true)" onfocus="ingSolInput(' + i + ',this,false)" onkeydown="if(event.key===\'Enter\')event.preventDefault()" onblur="setTimeout(cerrarFormDrop,200)">'
+      +   escHtml(solVal) + '</textarea></div>'
+      + '<div class="lin-in-wrap"><textarea class="fi lin-ta" rows="1" id="ing-sku-' + i + '" placeholder="🔍 SKU o descripción del producto…" autocomplete="off"'
+      +   ' oninput="ingSkuInput(' + i + ',this,true)" onfocus="ingSkuInput(' + i + ',this,false)" onkeydown="if(event.key===\'Enter\')event.preventDefault()" onblur="setTimeout(cerrarFormDrop,200)">'
+      +   escHtml(skuVal) + '</textarea></div>'
+      + '<input class="fi" type="number" min="1" id="ing-cant-' + i + '" placeholder="Cant." value="' + escHtml(String(l.cant || '')) + '" style="width:100%;box-sizing:border-box">'
+      + '<button class="ing-x" title="Quitar" onclick="ingQuitarLinea(' + i + ')">✕</button>'
+      + '</div>';
+  }).join('');
+  ingAjustarCampos();
+  if (focusId) {
+    var el = document.getElementById(focusId);
+    if (el) el.focus();
+  }
+}
+
+// Los cuadros crecen en alto para mostrar el texto completo sin cortarlo (el modal debe estar abierto)
+function ingAjustarCampos() {
+  document.querySelectorAll('#ingLineas .lin-ta').forEach(function(t) {
+    if (!t.offsetParent) return;
+    t.style.height = 'auto';
+    t.style.height = Math.max(t.scrollHeight + 2, 34) + 'px';
+  });
+}
+
+function ingMostrarDrop(el, html) {
+  var drop = document.getElementById('linDrop');
+  if (!drop) {
+    drop = document.createElement('div');
+    drop.id = 'linDrop';
+    drop.className = 'lin-drop';
+    document.body.appendChild(drop);
+  }
+  if (!html) { drop.classList.remove('open'); return; }
+  drop.innerHTML = html;
+  var r = el.getBoundingClientRect();
+  drop.style.left = r.left + 'px';
+  drop.style.width = Math.max(r.width, 300) + 'px';
+  var abajo = window.innerHeight - r.bottom;
+  if (abajo < 200 && r.top > abajo) { drop.style.top = 'auto'; drop.style.bottom = (window.innerHeight - r.top + 2) + 'px'; }
+  else { drop.style.bottom = 'auto'; drop.style.top = (r.bottom + 2) + 'px'; }
+  drop.classList.add('open');
+}
+
+// Pedido: fichas vivas (y las completadas si se escribe algo); filtra por código, cliente o producto
+function ingSolInput(i, el, escribiendo) {
+  var l = ingLineas[i];
+  if (!l) return;
+  if (!escribiendo && l.sol) return; // ya elegido: al enfocar no se reabre la lista
+  if (escribiendo) { l.sol = ''; l.solTxt = el.value; }
+  ingAjustarCampos();
+  var toks = normBusqueda(el.value).split(/[^a-z0-9]+/).filter(Boolean);
+  var ent = mapasEntregados().ent;
+  var cand = solicitudes.filter(function(s) {
+    if (!fichaViva(s) && !(s.estado === 'lista' && toks.length)) return false;
+    if (!toks.length) return true;
+    var t = normBusqueda((s.id_display || '') + ' ' + (s.cliente || '') + ' ' + s.lineas.map(function(x) { return (x.sku || '') + ' ' + (x.desc || ''); }).join(' '));
+    return toks.every(function(k) { return t.indexOf(k) !== -1; });
+  }).sort(function(a, b) { return (fichaViva(b) ? 1 : 0) - (fichaViva(a) ? 1 : 0); }).slice(0, 15);
+  if (!cand.length) { ingMostrarDrop(el, '<div class="lin-vacio">Sin pedidos que coincidan</div>'); return; }
+  var html = '<div class="lin-count">' + cand.length + ' pedido' + (cand.length === 1 ? '' : 's') + '</div>' + cand.map(function(s) {
+    var e = ent[s.id] || 0;
+    var chip = s.cant > 0 ? '<span>' + e.toLocaleString() + ' / ' + s.cant.toLocaleString() + ' und</span>' : '';
+    var sub = s.lineas.length ? s.lineas.map(function(x) { return (x.sku ? x.sku + ' — ' : '') + (x.desc || ''); }).join(' · ') : (s.desc || '');
+    return '<div class="lin-item" onmousedown="ingSolSelect(' + i + ',\'' + escHtml(String(s.id)) + '\')">'
+      + '<div class="lin-item-sku">' + (s.estado === 'lista' ? '✅ ' : '') + escHtml(s.id_display || String(s.id).slice(0, 8)) + ' · ' + escHtml(s.cliente || '') + chip + '</div>'
+      + '<div class="lin-item-desc">' + escHtml(sub.slice(0, 120)) + '</div></div>';
+  }).join('');
+  ingMostrarDrop(el, html);
+}
+
+function ingSolSelect(i, solId) {
+  ingSincronizarCant();
+  var l = ingLineas[i];
+  var s = solicitudes.find(function(x) { return x.id === solId; });
+  if (!l || !s) return;
+  l.sol = s.id; l.solTxt = '';
+  // Ficha de un solo producto: se completa el SKU solo (si hay varios, se elige a mano)
+  if (!l.sku && s.lineas.length === 1 && s.lineas[0].sku) {
+    var it = invB2DeTapas(s.lineas[0].sku);
+    if (it) { l.sku = it.sku; l.desc = it.descripcion || ''; l.skuTxt = ''; }
+  }
+  cerrarFormDrop();
+  renderIngLineas();
+}
+
+function ingSkuInput(i, el, escribiendo) {
+  var l = ingLineas[i];
+  if (!l) return;
+  if (!escribiendo && l.sku) return;
+  if (escribiendo) { l.sku = ''; l.desc = ''; l.skuTxt = el.value; }
+  ingAjustarCampos();
+  var html = el.value.trim().length >= 2 ? buildFormDropHtml('ing', el.value, 'ingSkuSelect(' + i + ',') : '';
+  ingMostrarDrop(el, html);
+}
+
+function ingSkuSelect(i, sku) {
+  ingSincronizarCant();
+  var l = ingLineas[i];
+  var it = invB2DeTapas(sku);
+  if (!l || !it) return;
+  l.sku = it.sku; l.desc = it.descripcion || ''; l.skuTxt = '';
+  cerrarFormDrop();
+  renderIngLineas();
+}
+
+// ── Guardar / editar / eliminar ───────────────────────────────
+function ingSumaPorSku(filas, campoSku) {
+  var out = {};
+  filas.forEach(function(f) { out[f[campoSku]] = (out[f[campoSku]] || 0) + (f.cantidad || 0); });
+  return out;
+}
+
+async function ingAplicarDeltas(antes, despues) {
+  var skus = Object.keys(antes).concat(Object.keys(despues));
+  var vistos = {};
+  for (var k = 0; k < skus.length; k++) {
+    var sku = skus[k];
+    if (vistos[sku]) continue;
+    vistos[sku] = true;
+    var d = (despues[sku] || 0) - (antes[sku] || 0);
+    if (d) await ajustarExistencia(sku, d);
+  }
+}
+
+async function guardarIngPT() {
+  ingSincronizarCant();
+  var rqEl = document.getElementById('ingRequi');
+  var requi = rqEl.value.trim();
+  var fecha = document.getElementById('ingFecha').value || fechaHoy();
+  var nota = document.getElementById('ingNota').value.trim();
+  if (!requi) { showToast('⚠️ El No. de requi es obligatorio', '#B83232'); rqEl.style.borderColor = '#B83232'; rqEl.focus(); return; }
+
+  var obsFinal = 'FECHA:' + fecha + (nota ? ' | ' + nota : '');
+  var filas = [];
+  for (var i = 0; i < ingLineas.length; i++) {
+    var l = ingLineas[i];
+    var sku = l.sku;
+    if (!sku && l.skuTxt) { // escribió el SKU exacto sin elegirlo de la lista
+      var it = invB2DeTapas(l.skuTxt.trim().split(/\s+—\s+/)[0].trim());
+      if (it) sku = it.sku;
+    }
+    var cant = parseInt(l.cant, 10) || 0;
+    if (!sku && !cant && !l.sol) continue; // línea en blanco
+    if (!sku)   { showToast('⚠️ Elige el producto de la lista en la línea ' + (i + 1), '#B83232'); return; }
+    if (cant < 1) { showToast('⚠️ Cantidad inválida en la línea ' + (i + 1), '#B83232'); return; }
+    filas.push({ solicitud_id: l.sol || null, sku_original: sku, cantidad: cant, tipo: 'entrada_pt',
+                 num_documento: requi, area: 'tapas', observaciones: obsFinal });
+  }
+  if (!filas.length) { showToast('⚠️ Agrega al menos un producto', '#B83232'); return; }
+
+  if (!ingEdit || ingEdit.doc !== requi) {
+    var dup = gruposEntregados().find(function(g) { return g.doc && g.doc.toLowerCase() === requi.toLowerCase(); });
+    if (dup && !confirm('⚠️ La requi "' + requi + '" ya está registrada (' + dup.fecha + ').\n¿Registrar de todas formas?')) return;
+  }
+
+  var btn = document.getElementById('ingBtnOk');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    // Primero se inserta lo nuevo; solo si salió bien se borra lo anterior (editar nunca deja la requi vacía)
+    var ins = await db.from('movimientos_materiales').insert(filas);
+    if (ins.error) throw ins.error;
+    var antes = {};
+    if (ingEdit) {
+      var ids = ingEdit.rows.map(function(m) { return m.id; });
+      var del = await db.from('movimientos_materiales').delete().in('id', ids).select('id');
+      if (del.error || (del.data || []).length < ids.length) {
+        showToast('⚠️ Se guardó la requi pero no se pudo borrar la versión anterior' + (del.error ? ': ' + del.error.message : ' (sin permiso)') + '. Revisa que no quede duplicada.', '#B83232');
+      } else {
+        antes = ingSumaPorSku(ingEdit.rows, 'sku_original');
+      }
+    }
+    await ingAplicarDeltas(antes, ingSumaPorSku(filas, 'sku_original'));
+    var editando = !!ingEdit;
+    cerrarIngPT();
+    await cargarMovimientos();
+    await cargarInventario();
+    renderInicioPedidosTapas();
+    showToast('✅ Entregado ' + (editando ? 'actualizado' : 'registrado') + ' · Requi ' + requi + ' (' + filas.length + ' producto' + (filas.length > 1 ? 's' : '') + ')');
+  } catch(e) {
+    showToast('❌ Error al guardar: ' + (e.message || e), '#B83232');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar';
+  }
+}
+
+async function eliminarIngPT(rowId) {
+  var g = grupoEntregadoDeFila(rowId);
+  if (!g) return;
+  var und = g.rows.reduce(function(s, m) { return s + (m.cantidad || 0); }, 0);
+  if (!confirm('¿Eliminar la requi ' + (g.doc || '(sin número)') + '?\n' + g.rows.length + ' producto(s) · ' + und.toLocaleString()
+      + ' und.\nSe restan esas unidades de la existencia de PT.')) return;
+  try {
+    var idsDel = g.rows.map(function(m) { return m.id; });
+    var del = await db.from('movimientos_materiales').delete().in('id', idsDel).select('id');
+    if (del.error) throw del.error;
+    if ((del.data || []).length < idsDel.length) throw new Error('sin permiso para eliminar (solo el usuario master puede)');
+    await ingAplicarDeltas(ingSumaPorSku(g.rows, 'sku_original'), {});
+    await cargarMovimientos();
+    await cargarInventario();
+    renderInicioPedidosTapas();
+    showToast('🗑 Requi eliminada');
+  } catch(e) {
+    showToast('❌ No se pudo eliminar: ' + (e.message || e), '#B83232');
   }
 }
 
