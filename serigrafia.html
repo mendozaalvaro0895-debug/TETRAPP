@@ -6067,11 +6067,17 @@ function entregadoSolInput(val, i) {
   if (!drop) return;
   eEntregadoSolIds[i] = null;
   var v = val.trim().toLowerCase();
-  // Solo fichas activas del mes vigente (período efectivo, igual que el board)
+  // Fichas activas del mes vigente (período efectivo, igual que el board) + las COMPLETADAS
+  // de este mes: sirven para cargar un sobrante/ajuste a una ficha que ya se entregó completa.
+  // Al escribir algo se buscan también completadas de meses anteriores (por código/cliente/desc).
   var perHoy = periodoActualKey();
+  var esActivaMes = function(s) { return ['nueva','proceso','parcial'].indexOf(s.estado) >= 0 && mesSol(s) === perHoy; };
   var candidatos = solicitudes.filter(function(s) {
-    return ['nueva','proceso','parcial'].indexOf(s.estado) >= 0 && mesSol(s) === perHoy;
+    if (esActivaMes(s)) return true;
+    return s.estado === 'lista' && (v.length > 0 || mesSol(s) === perHoy || fichaCompletadaEsteMes(s));
   });
+  // Activas primero, completadas después
+  candidatos.sort(function(a, b) { return (a.estado === 'lista' ? 1 : 0) - (b.estado === 'lista' ? 1 : 0); });
   var matches = v.length === 0 ? candidatos.slice(0, 12) : candidatos.filter(function(s) {
     return (s.id_display || '').toLowerCase().includes(v) || (s.cliente || '').toLowerCase().includes(v) || (s.desc || '').toLowerCase().includes(v);
   }).slice(0, 12);
