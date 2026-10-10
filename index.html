@@ -96,13 +96,22 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .area-status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .area-status.active::before{box-shadow:0 0 6px currentColor;animation:led 2.4s ease-in-out infinite}
 .area-status.soon{background:#1A1E1D;color:var(--gray)}
-.area-stats{display:flex;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--gray)}
-.area-stat{flex:1}
-.area-stat strong{display:block;font-family:var(--mono);font-size:18px;color:var(--ink);font-weight:500}
 .area-arrow{position:absolute;top:24px;right:26px;color:var(--gray-l);font-size:18px;font-family:var(--mono)}
 .area-card:hover .area-arrow{color:var(--acc);transform:translateX(4px);transition:all .2s}
 
 /* ── Guía de alimentación diaria ─────────────────────────────── */
+/* ── Indicadores por ficha ───────────────────────────────────── */
+.ind-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;margin-top:14px;background:var(--border);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.ind-c{background:var(--card);padding:10px 12px;min-width:0}
+.ind-l{font-family:var(--mono);font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--gray)}
+.ind-v{font-family:var(--mono);font-size:21px;font-weight:500;margin-top:3px;color:var(--ink);white-space:nowrap}
+.ind-s{font-size:10.5px;color:var(--gray);margin-top:2px;line-height:1.3}
+.ind-c.ok .ind-v{color:#4ADE80;text-shadow:0 0 12px rgba(74,222,128,.35)}
+.ind-c.mid .ind-v{color:#FBBF24;text-shadow:0 0 12px rgba(251,191,36,.3)}
+.ind-c.low .ind-v{color:#F87171;text-shadow:0 0 12px rgba(248,113,113,.3)}
+.ind-foot{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--gray)}
+.ind-foot b{font-family:var(--mono);font-weight:500;color:var(--ink)}
+
 .guia{max-width:1100px;margin:18px auto 0;padding:0 24px;position:relative}
 .guia-in{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:20px 24px;position:relative}
 .guia-in::before{content:"";position:absolute;top:7px;left:7px;width:14px;height:14px;border-top:1.5px solid #7ECEC0;border-left:1.5px solid #7ECEC0;opacity:.7}
@@ -260,11 +269,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="area-name">Serigrafía</div>
     <div class="area-desc">Flameado, impresión serigráfica, horno, secado y empaque. Control de personal activo por turno.</div>
     <div class="area-status active">Activo</div>
-    <div class="area-stats">
-      <div class="area-stat"><strong id="serig-activas">—</strong>En proceso</div>
-      <div class="area-stat"><strong id="serig-pendientes">—</strong>Pendientes</div>
-      <div class="area-stat"><strong>9</strong>Operadores</div>
-    </div>
+    <div class="ind-grid" id="ind-serig"><div class="ind-s">Calculando indicadores…</div></div>
+    <div class="ind-foot"><span><b id="serig-activas">—</b> en proceso</span><span><b id="serig-pendientes">—</b> pendientes</span></div>
   </a>
 
   <a href="tapas.html" class="area-card a-tapas">
@@ -273,11 +279,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="area-name">Tapas</div>
     <div class="area-desc">Solicitudes de producción, asignación de operadores y trazabilidad por proceso: armado, liner, impresión y encajado.</div>
     <div class="area-status active">Activo</div>
-    <div class="area-stats">
-      <div class="area-stat"><strong id="tapas-activas">—</strong>En proceso</div>
-      <div class="area-stat"><strong id="tapas-pendientes">—</strong>Pendientes</div>
-      <div class="area-stat"><strong>12</strong>Operadores</div>
-    </div>
+    <div class="ind-grid" id="ind-tapas"><div class="ind-s">Calculando indicadores…</div></div>
+    <div class="ind-foot"><span><b id="tapas-activas">—</b> en proceso</span><span><b id="tapas-pendientes">—</b> pendientes</span></div>
   </a>
 
   <a href="produccion.html" class="area-card a-prod">
@@ -606,6 +609,266 @@ async function guiaOmitirHoy() {
 
 cargarGuia();
 setInterval(cargarGuia, 60000);
+
+// ══ INDICADORES POR FICHA — Serigrafía y Tapas (oct/2026) ═══════════════
+// Efectividad (mes en curso hasta el último día hábil), Personal, Unidades del mes y Q facturado.
+// Metas: Serigrafía 30,000 und/día (meta global provisional, igual a PROD_META_DIA de serigrafia.html);
+// Tapas 10,000 und por persona presente y día (20,000 si ese día trabajó en método máquina).
+// Solo cuentan días hábiles (sin domingos ni feriados). Si una fuente falla se muestra "—", nunca 0%.
+var IND_META_SERIG_DIA = 30000;
+var IND_META_TAPAS = 10000;
+var IND_META_TAPAS_MAQ = 20000;
+var IND_PRESENTE = { presente: 1, tarde: 1, velada: 1 };
+
+// ⚠️ ESPEJO de AREA_FAM_MAP / clasificarArea de ventas.html — si cambia allá, replicar aquí.
+var IND_AREA_FAM = {
+  'ENVASE': 'Producción', 'BOLAS DE ROLL-ON': 'Producción', 'PEINES': 'Producción', 'PP': 'Producción',
+  'CONSUMIBLES': 'Producción', 'EMPAQUE Y EMBALAJE': 'Producción',
+  'TAPA': 'Tapas', 'BASE': 'Tapas', 'CONTRATAPA': 'Tapas', 'LINER': 'Tapas',
+  'SERVICIO': 'Serigrafía'
+};
+var IND_AREA_OVERRIDE_NOMBRE = { 'produccion': 'Producción', 'tapas': 'Tapas', 'serig': 'Serigrafía' };
+
+function indClasificarArea(sku, fam, overrides, serigSkus) {
+  if (sku && overrides[sku]) return overrides[sku];
+  // SICAF factura con un dígito extra al final del SKU de inventario
+  if (sku && sku.length > 1 && overrides[sku.slice(0, -1)]) return overrides[sku.slice(0, -1)];
+  if (sku && serigSkus.has(sku)) return 'Serigrafía';
+  return IND_AREA_FAM[fam] || null;
+}
+
+// Supabase corta en 1,000 filas: se pide por páginas. `armar` devuelve una consulta nueva cada vez.
+async function indPaginar(armar) {
+  try {
+    var todo = [];
+    for (var pag = 0; pag < 40; pag++) {
+      var r = await armar().range(pag * 1000, pag * 1000 + 999);
+      if (r.error) return null;
+      var d = r.data || [];
+      todo = todo.concat(d);
+      if (d.length < 1000) break;
+    }
+    return todo;
+  } catch (e) { return null; }
+}
+
+function indDiasHabiles(desde, hasta, feriados) {
+  var out = [], f = desde, n = 0;
+  while (f <= hasta && n < 40) {
+    if (guiaEsHabil(f, feriados)) out.push(f);
+    f = guiaSumarDias(f, 1); n++;
+  }
+  return out;
+}
+function indDeltaTiros(cnts) {
+  if (!cnts.length) return 0;
+  if (cnts.length === 1) return cnts[0] > 0 ? cnts[0] : 0;
+  return Math.max.apply(null, cnts) - Math.min.apply(null, cnts);
+}
+function indFmt(n) { return Math.round(n).toLocaleString('es-GT'); }
+function indFmtQ(n) { return 'Q ' + Math.round(n).toLocaleString('es-GT'); }
+function indFechaCorta(f) { return f ? f.slice(8) + '/' + f.slice(5, 7) : '—'; }
+
+// ── Serigrafía: producción del día = delta del contador de impresión por línea ──
+async function indSerigProduccion(desde, hasta) {
+  var rows = await indPaginar(function () {
+    return db.from('registro_tiros_serig').select('linea_id,contador,fecha').eq('area', 'serig').gte('fecha', desde).lte('fecha', hasta);
+  });
+  if (rows === null) return null;
+  var grupos = {};
+  rows.forEach(function (t) {
+    var k = t.fecha + '|' + t.linea_id;
+    if (!grupos[k]) grupos[k] = { fecha: t.fecha, cnts: [] };
+    grupos[k].cnts.push(t.contador || 0);
+  });
+  var porDia = {};
+  Object.keys(grupos).forEach(function (k) {
+    var g = grupos[k];
+    porDia[g.fecha] = (porDia[g.fecha] || 0) + indDeltaTiros(g.cnts);
+  });
+  return porDia;
+}
+
+async function indSerigCalcular(ctx) {
+  var porDia = await indSerigProduccion(ctx.desdeDatos, ctx.ayer);
+  var r = { efec: null, ayerReal: null, ayerMeta: IND_META_SERIG_DIA };
+  if (porDia !== null) {
+    r.ayerReal = porDia[ctx.ayer] || 0;
+    if (ctx.diasMes.length) {
+      var real = 0;
+      ctx.diasMes.forEach(function (f) { real += porDia[f] || 0; });
+      r.efec = real / (IND_META_SERIG_DIA * ctx.diasMes.length) * 100;
+    }
+  }
+  var ent = await indPaginar(function () {
+    return db.from('entregas_serig').select('fecha,cant').gte('fecha', ctx.mesIni).lte('fecha', ctx.hoy);
+  });
+  r.und = ent === null ? null : ent.reduce(function (s, e) { return s + (e.cant || 0); }, 0);
+  return r;
+}
+
+// ── Tapas: unidades terminadas y aprobadas por (persona, día) vs meta por persona presente ──
+async function indTapasCalcular(ctx, asistRows) {
+  var r = { efec: null, ayerReal: null, ayerMeta: null, und: null };
+  var cmd = await indPaginar(function () {
+    return db.from('comandas').select('*, comanda_tareas(cantidad, unidades_completadas, estado, metodo)')
+      .gte('fecha', ctx.desdeDatos).lte('fecha', ctx.ayer);
+  });
+  if (cmd !== null && asistRows !== null) {
+    // Misma regla que el resto del sistema: sin columna de aprobación = aprobada
+    var aprobadas = cmd.filter(function (c) { return !c.estado_aprobacion || c.estado_aprobacion === 'aprobada'; });
+    var prod = {}, maq = {};   // clave: fecha|codigo
+    aprobadas.forEach(function (c) {
+      var k = c.fecha + '|' + c.operario_id;
+      (c.comanda_tareas || []).forEach(function (t) {
+        if (t.estado !== 'Terminada') return;
+        prod[k] = (prod[k] || 0) + (t.unidades_completadas || t.cantidad || 0);
+        if (String(t.metodo || '').indexOf('maquina') === 0) maq[k] = true;
+      });
+    });
+    var presentes = {};   // fecha -> [codigos]
+    asistRows.forEach(function (a) {
+      if (!IND_PRESENTE[a.estado]) return;
+      if (!presentes[a.fecha]) presentes[a.fecha] = [];
+      if (presentes[a.fecha].indexOf(a.operador_codigo) === -1) presentes[a.fecha].push(a.operador_codigo);
+    });
+    var diasConAsist = {};
+    asistRows.forEach(function (a) { diasConAsist[a.fecha] = true; });
+    function dia(f) {
+      var real = 0, meta = 0;
+      (presentes[f] || []).forEach(function (cod) {
+        var k = f + '|' + cod;
+        real += prod[k] || 0;
+        meta += maq[k] ? IND_META_TAPAS_MAQ : IND_META_TAPAS;
+      });
+      return { real: real, meta: meta };
+    }
+    var d = dia(ctx.ayer);
+    if (diasConAsist[ctx.ayer]) { r.ayerReal = d.real; r.ayerMeta = d.meta; }
+    var tReal = 0, tMeta = 0;
+    ctx.diasMes.forEach(function (f) {
+      if (!diasConAsist[f]) return;   // día sin asistencia replicada: no entra ni a la producción ni a la meta
+      var x = dia(f); tReal += x.real; tMeta += x.meta;
+    });
+    if (tMeta > 0) r.efec = tReal / tMeta * 100;
+  }
+  var pt = await indPaginar(function () {
+    return db.from('movimientos_materiales').select('observaciones,created_at,cantidad')
+      .eq('tipo', 'entrada_pt').or('area.is.null,area.eq.tapas').gte('created_at', ctx.mesIni);
+  });
+  if (pt !== null) {
+    r.und = 0;
+    pt.forEach(function (m) {
+      var f = guiaFechaMov(m);
+      if (f >= ctx.mesIni && f <= ctx.hoy) r.und += (m.cantidad || 0);
+    });
+  }
+  return r;
+}
+
+// ── Personal: presentes del último día hábil ÷ activos del área ──
+function indPersonal(area, activosRows, asistRows, ayer) {
+  if (activosRows === null || asistRows === null) return null;
+  var activos = {};
+  activosRows.forEach(function (p) { if (p.area === area) activos[p.codigo] = true; });
+  var total = Object.keys(activos).length;
+  var pres = {};
+  asistRows.forEach(function (a) {
+    if (a.area === area && a.fecha === ayer && IND_PRESENTE[a.estado] && activos[a.operador_codigo]) pres[a.operador_codigo] = true;
+  });
+  var hayDia = asistRows.some(function (a) { return a.area === area && a.fecha === ayer; });
+  return { pres: Object.keys(pres).length, total: total, hayDia: hayDia };
+}
+
+// ── Q facturado del mes por área (sin IVA) ──
+async function indVentasPorArea(ctx) {
+  var ov = {};
+  try {
+    var rpc = await db.rpc('get_area_ventas_overrides');
+    if (rpc.error) return null;
+    (rpc.data || []).forEach(function (it) {
+      if (it.area_ventas && it.sku) ov[String(it.sku).trim()] = IND_AREA_OVERRIDE_NOMBRE[it.area_ventas] || null;
+    });
+  } catch (e) { return null; }
+  var sl = await indPaginar(function () {
+    return db.from('solicitud_lineas').select('sku,solicitudes!inner(area)').eq('solicitudes.area', 'serig').not('sku', 'is', null).not('sku', 'eq', '');
+  });
+  if (sl === null) return null;
+  var serigSkus = new Set();
+  sl.forEach(function (x) { var s = (x.sku || '').trim(); if (s) serigSkus.add(s); });
+  var ventas = await indPaginar(function () {
+    return db.from('ventas').select('sku,familia,descripcion_familia,total_quetzales,fecha').gte('fecha', ctx.mesIni).lte('fecha', ctx.hoy);
+  });
+  if (ventas === null) return null;
+  var out = { 'Serigrafía': 0, 'Tapas': 0, ultima: '' };
+  ventas.forEach(function (v) {
+    if (v.fecha > out.ultima) out.ultima = v.fecha;
+    var fam = (v.descripcion_familia || v.familia || '').trim().toUpperCase();
+    var area = indClasificarArea((v.sku || '').trim(), fam, ov, serigSkus);
+    if (area === 'Serigrafía' || area === 'Tapas') out[area] += (v.total_quetzales || 0);   // SIN IVA
+  });
+  return out;
+}
+
+// ── Pintar ──
+function indCelda(label, valor, sub, clase) {
+  return '<div class="ind-c ' + (clase || '') + '"><div class="ind-l">' + label + '</div>' +
+    '<div class="ind-v">' + valor + '</div><div class="ind-s">' + sub + '</div></div>';
+}
+function indClaseEfec(p) { return p === null ? '' : (p >= 100 ? 'ok' : (p >= 70 ? 'mid' : 'low')); }
+
+function indPintarFicha(id, d, pers, q, ctx, nombreUnd) {
+  var cont = document.getElementById(id);
+  if (!cont) return;
+  var efec = d && d.efec !== null ? Math.round(d.efec) + '%' : '—';
+  var subE = (d && d.ayerReal !== null && d.ayerMeta !== null)
+    ? indFechaCorta(ctx.ayer) + ': ' + indFmt(d.ayerReal) + ' / ' + indFmt(d.ayerMeta) : 'sin datos de ' + indFechaCorta(ctx.ayer);
+  var pv = pers && pers.hayDia ? pers.pres + '/' + pers.total : '—';
+  var ps = pers ? (pers.hayDia ? 'asistencia ' + indFechaCorta(ctx.ayer) : 'sin asistencia ' + indFechaCorta(ctx.ayer)) : 'no disponible';
+  var uv = d && d.und !== null ? indFmt(d.und) : '—';
+  var qv = q ? indFmtQ(q.valor) : '—';
+  var qs = q ? 'facturado al ' + indFechaCorta(q.ultima) + ' · sin IVA' : 'no disponible';
+  cont.innerHTML =
+    indCelda('Efectividad', efec, subE, indClaseEfec(d ? d.efec : null)) +
+    indCelda('Personal', pv, ps, '') +
+    indCelda('Unidades mes', uv, nombreUnd, '') +
+    indCelda('Q mes', qv, qs, '');
+}
+
+async function cargarIndicadores() {
+  try {
+    await guiaEsperarRol();
+    var hoy = fechaHoyLocal();
+    var mesIni = hoy.slice(0, 8) + '01';
+    var rf = await guiaSafe(db.from('dias_feriados').select('fecha').gte('fecha', guiaSumarDias(mesIni, -20)));
+    var feriados = {};
+    (rf || []).forEach(function (f) { feriados[f.fecha] = true; });
+    var ayer = guiaDiaHabilAnterior(hoy, feriados);
+    var ctx = {
+      hoy: hoy, mesIni: mesIni, ayer: ayer, desdeDatos: ayer < mesIni ? ayer : mesIni,
+      diasMes: indDiasHabiles(mesIni, ayer, feriados)
+    };
+    var res = await Promise.all([
+      guiaSafe(db.from('personal').select('codigo,area').eq('activo', true).in('area', ['tapas', 'serig'])),
+      indPaginar(function () { return db.from('asistencia_diaria').select('fecha,operador_codigo,estado,area').in('area', ['tapas', 'serig']).gte('fecha', ctx.desdeDatos).lte('fecha', ayer); }),
+      indVentasPorArea(ctx)
+    ]);
+    var activos = res[0], asist = res[1], ventas = res[2];
+    var asistTapas = asist === null ? null : asist.filter(function (a) { return a.area === 'tapas'; });
+
+    var rs = await indSerigCalcular(ctx);
+    var rt = await indTapasCalcular(ctx, asistTapas);
+    indPintarFicha('ind-serig', rs, indPersonal('serig', activos, asist, ayer),
+      ventas ? { valor: ventas['Serigrafía'], ultima: ventas.ultima } : null, ctx, 'und entregadas (PT)');
+    indPintarFicha('ind-tapas', rt, indPersonal('tapas', activos, asist, ayer),
+      ventas ? { valor: ventas['Tapas'], ultima: ventas.ultima } : null, ctx, 'und ingreso PT');
+  } catch (e) {
+    console.error('Indicadores:', e);
+  }
+}
+
+cargarIndicadores();
+setInterval(cargarIndicadores, 5 * 60 * 1000);
 
 function toggleLogoNav(e) {
   e.stopPropagation();
