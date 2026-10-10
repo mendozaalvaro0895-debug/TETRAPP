@@ -460,7 +460,7 @@ async function cargarKPIs() {
     console.error('Error cargando KPIs:', e);
   }
 
-  document.getElementById('last-update').textContent = new Date().toLocaleString('es-GT');
+  document.getElementById('last-update').textContent = indFechaCorta(fechaHoyLocal()) + ' · ' + new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
 }
 
 cargarKPIs();
@@ -559,8 +559,8 @@ async function guiaConstruir() {
 
   function porFecha(id, label, maxFecha, ir) {
     var done = maxFecha === null ? null : maxFecha >= ayer;
-    var det = maxFecha === null ? 'No se pudo verificar' : (maxFecha ? 'Último registro: ' + maxFecha : 'Sin registros recientes');
-    if (done === false) det += ' · se exige al menos ' + ayer;
+    var det = maxFecha === null ? 'No se pudo verificar' : (maxFecha ? 'Último registro: ' + indFechaCorta(maxFecha) : 'Sin registros recientes');
+    if (done === false) det += ' · se exige al menos ' + indFechaCorta(ayer);
     if (done === true) det = 'Al día · ' + det;
     t.push(guiaTarea(id, label, hoyHabil, done, det, ir));
   }
@@ -573,7 +573,7 @@ async function guiaConstruir() {
   function asistArea(id, label, area, ir) {
     var n = asist === null ? null : asist.filter(function (a) { return a.area === area; }).length;
     var done = n === null ? null : n > 0;
-    var det = n === null ? 'No se pudo verificar' : (n > 0 ? 'Al día · ' + ayer : 'Sin asistencia del ' + ayer);
+    var det = n === null ? 'No se pudo verificar' : (n > 0 ? 'Al día · ' + indFechaCorta(ayer) : 'Sin asistencia del ' + indFechaCorta(ayer));
     t.push(guiaTarea(id, label, hoyHabil, done, det, ir));
   }
   asistArea('asist_tapas', 'Asistencia Tapas', 'tapas', 'tapas.html');
@@ -690,7 +690,12 @@ function indDiasHabiles(desde, hasta, feriados) {
 }
 function indFmt(n) { return Math.round(n).toLocaleString('es-GT'); }
 function indFmtQ(n) { return 'Q ' + Math.round(n).toLocaleString('es-GT'); }
-function indFechaCorta(f) { return f ? f.slice(8) + '/' + f.slice(5, 7) : '—'; }
+// Formato de fecha para TODO texto visible del inicio: "09/Oct" (día/mes abreviado), nunca "09/10"
+var IND_MESES_ABR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+function indFechaCorta(f) {
+  var m = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3] + '/' + IND_MESES_ABR[parseInt(m[2], 10) - 1] : '—';
+}
 
 // ── Unidades del mes: Serigrafía = entregas a PT (requis vinculadas); Tapas = ingreso PT ──
 async function indSerigUnidades(ctx) {
@@ -1151,7 +1156,7 @@ function drvOpcionesPersonal(area) {
 function drvFilaBaja(b, i) {
   return '<tr><td><input type="checkbox" class="drv-baja" data-i="' + i + '" checked></td>' +
     '<td><b>' + escHtml(b.nombre) + '</b><div class="ci-doc-meta">' + escHtml(b.codigo) + ' · ' + escHtml(DRV_AREAS_NOMBRE[b.area] || b.area) + '</div></td>' +
-    '<td style="font-family:var(--mono)">' + escHtml(b.desde) + '</td></tr>';
+    '<td style="font-family:var(--mono)">' + escHtml(indFechaCorta(b.desde)) + '</td></tr>';
 }
 function drvFilaSinCruzar(s, i) {
   var nota = s.motivo === 'ambiguo' ? 'Varias coincidencias: ' + escHtml(s.candidatos.join(' / ')) : 'No hay nadie parecido en TETRAPP (¿persona nueva?)';
@@ -1634,7 +1639,7 @@ function ciRenderUnDoc(d, di) {
       '<span class="ci-pill ' + pillClass + '">' + pillTxt + '</span>' +
       '<div class="ci-doc-meta">Bodega ' + escHtml(d.bodega || '—') + ' · ' +
         '<input type="date" value="' + escHtml(d.fecha || '') + '" onchange="ciCambiarFecha(' + di + ',this.value)" style="border:1px solid var(--border);border-radius:5px;padding:2px 5px;font-family:var(--mono);font-size:11px;background:var(--card)">' +
-        (d.fechaOriginal ? ' <span style="color:#B45309;font-weight:600">⚠️ el documento decía ' + escHtml(d.fechaOriginal) + '</span>' : '') +
+        (d.fechaOriginal ? ' <span style="color:#B45309;font-weight:600">⚠️ el documento decía ' + escHtml(indFechaCorta(d.fechaOriginal)) + '</span>' : '') +
         (d.descripcion ? ' · ' + escHtml(d.descripcion) : '') +
         (d.referencia ? ' · ref: ' + escHtml(d.referencia) : '') + '</div>' +
     '</div></div>' +
