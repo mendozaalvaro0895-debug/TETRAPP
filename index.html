@@ -109,7 +109,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ind-c.ok .ind-v{color:#4ADE80;text-shadow:0 0 12px rgba(74,222,128,.35)}
 .ind-c.mid .ind-v{color:#FBBF24;text-shadow:0 0 12px rgba(251,191,36,.3)}
 .ind-c.low .ind-v{color:#F87171;text-shadow:0 0 12px rgba(248,113,113,.3)}
-.ind-vac{color:#FBBF24;font-weight:600}
+.ind-vac{display:block;white-space:nowrap;color:#FBBF24;font-weight:600}
+.ind-vac.ninguna{color:var(--gray);font-weight:400}
 .ind-foot{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--gray)}
 .ind-foot b{font-family:var(--mono);font-weight:500;color:var(--ink)}
 
@@ -822,7 +823,7 @@ function indPintarFicha(id, und, aus, pers, q, ctx, nombreUnd, vacantes) {
   var pv = pers && pers.hayDia ? pers.pres + '/' + pers.total : '—';
   var ps = pers ? (pers.hayDia ? 'asistencia ' + indFechaCorta(ctx.ayer) : 'sin asistencia ' + indFechaCorta(ctx.ayer)) : 'no disponible';
   if (vacantes !== null && vacantes !== undefined) {
-    ps += vacantes > 0 ? ' · <span class="ind-vac">' + vacantes + (vacantes === 1 ? ' vacante' : ' vacantes') + '</span>' : ' · sin vacantes';
+    ps += vacantes > 0 ? '<span class="ind-vac">' + vacantes + (vacantes === 1 ? ' vacante' : ' vacantes') + '</span>' : '<span class="ind-vac ninguna">sin vacantes</span>';
   }
   var av = aus ? aus.pct.toFixed(1) + '%' : '—';
   var as = aus ? aus.faltas + (aus.faltas === 1 ? ' falta' : ' faltas') + ' · ' + indFmt(aus.total) + ' días-persona' : 'sin asistencia del mes';
