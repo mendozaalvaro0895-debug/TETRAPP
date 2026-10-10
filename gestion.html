@@ -99,6 +99,42 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .kt-sub{padding:5px 2px 5px 22px;font-size:12px;color:var(--gray)}
 .kt-sub b{font-size:12px}
 .kt-total{border-bottom:none;border-top:2px solid var(--border);margin-top:2px;font-weight:800}
+/* ASISTENCIA — cuadro mensual (un solo contenedor con scroll: el encabezado y la columna de nombres quedan fijos) */
+.as-leyenda{display:flex;flex-wrap:wrap;gap:6px 16px;padding:6px 16px;font-size:10px;color:var(--gray);border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0}
+.as-leyenda b{display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:4px;margin-right:4px;font-size:10px;vertical-align:middle}
+.as-tabla{border-collapse:separate;border-spacing:0;font-size:11px;min-width:100%;background:var(--card)}
+.as-tabla th,.as-tabla td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:0;text-align:center;height:25px}
+.as-tabla thead th{position:sticky;top:0;z-index:6;background:var(--card);font-size:9.5px;font-weight:700;color:var(--gray);line-height:1.2;padding:3px 0;height:34px}
+.as-tabla .as-nom{position:sticky;left:0;z-index:4;background:var(--card);text-align:left;min-width:230px;max-width:230px;padding:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;cursor:default}
+.as-tabla thead .as-nom{z-index:8;text-transform:uppercase;letter-spacing:.6px;font-size:10px}
+.as-tabla td.as-nom[onclick]{cursor:pointer}
+.as-tabla td.as-nom[onclick]:hover{color:var(--gest-m);text-decoration:underline}
+.as-tabla .as-d{min-width:26px;width:26px}
+.as-tabla .as-tot{min-width:40px;width:40px;font-family:var(--mono);font-weight:700;font-size:11px;color:var(--gray-l)}
+.as-tabla .as-tot.as-malo{color:var(--red);background:var(--red-l)}
+.as-tabla .as-tot.as-medio{color:var(--amber);background:var(--amber-l)}
+.as-tabla thead th.as-hoy{color:var(--teal);box-shadow:inset 0 -2px 0 var(--teal);background:var(--teal-xl)}
+.as-cod{font-family:var(--mono);font-size:9.5px;color:var(--gray-l);margin-left:6px;font-weight:400}
+.as-baja{font-size:9px;font-weight:700;color:var(--gray);background:var(--bg2);border-radius:8px;padding:1px 6px;margin-left:6px}
+.as-row.as-sup .as-nom{font-weight:800}
+.as-row.as-inact .as-nom{color:var(--gray)}
+.as-grp td{background:var(--bg2);font-weight:800;font-size:11px;height:30px;color:var(--ink)}
+.as-grp td.as-nom{background:var(--bg2);font-size:12px}
+.as-gp{font-family:var(--mono);font-size:9.5px;font-weight:600;color:var(--gray);line-height:1.1}
+.as-ga{font-family:var(--mono);font-size:8.5px;font-weight:700;color:var(--red);line-height:1.1}
+.as-sin{font-size:10px;font-weight:700;color:var(--amber);margin-left:8px}
+.as-sub td{background:#F3F1EC;font-size:10px;font-weight:700;color:var(--gray);text-align:left;height:22px;letter-spacing:.4px;text-transform:uppercase}
+.as-sub td.as-nom{background:#F3F1EC;font-size:10px}
+.as-p{color:var(--green);background:#F0FDF4;font-weight:700}
+.as-a{color:var(--red);background:var(--red-l);font-weight:800}
+.as-t{color:var(--amber);background:var(--amber-l);font-weight:800}
+.as-v{color:var(--gest-m);background:var(--gest-l);font-weight:800}
+.as-pe{color:#0369A1;background:#E0F2FE;font-weight:800}
+.as-b{color:#fff;background:#8A8882;font-weight:800}
+.as-x{color:var(--gray);background:var(--bg2);font-weight:700}
+.as-nd{color:#C9C7C1}
+.as-nolab{background:var(--bg2)}
+.as-fuera{background:repeating-linear-gradient(45deg,#E4E2DC,#E4E2DC 3px,#F0EEE9 3px,#F0EEE9 6px)}
 
 /* PAGE HEADER (por vista) */
 .ph{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;gap:8px}
@@ -310,6 +346,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
   <div class="tabs" id="mainTabs">
     <div class="tab active" id="tab-personal" onclick="switchTab('personal')">🧑‍🤝‍🧑 Personal</div>
+    <div class="tab" id="tab-asistencia" onclick="switchTab('asistencia')">📅 Asistencia</div>
     <div class="tab" id="tab-lockers" onclick="switchTab('lockers')">🗄️ Lockers</div>
     <div class="tab" id="tab-planta" onclick="switchTab('planta')">🏗 Planta</div>
   </div>
@@ -351,6 +388,37 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         </div>
       </div>
       <div id="personalGrid" style="flex:1;overflow:auto"></div>
+    </div>
+
+    <!-- ══ ASISTENCIA ════════════════════════════════════════ -->
+    <div class="view" style="display:none;flex-direction:column;flex:1;overflow:hidden" id="view-asistencia">
+      <div class="ph">
+        <div>
+          <div class="ph-title">Asistencia diaria</div>
+          <div class="ph-sub">Todo el personal · solo lectura — llega desde la hoja ASISTENCIA DE PLANTA (Inicio → Sincronizar) y las grillas de Tapas y Serigrafía</div>
+        </div>
+        <div class="ph-r">
+          <button class="btn btn-g btn-sm" onclick="asMoverMes(-1)" title="Mes anterior">◀</button>
+          <span id="asMesLbl" style="font-weight:700;font-size:13px;min-width:120px;text-align:center">—</span>
+          <button class="btn btn-g btn-sm" onclick="asMoverMes(1)" title="Mes siguiente">▶</button>
+          <button class="btn btn-g btn-sm" onclick="asMesActual()">Hoy</button>
+          <select class="fs" id="asFiltroArea" style="width:150px" onchange="renderAsistencia()"></select>
+          <input class="fi" id="asBuscar" placeholder="🔍 Buscar nombre o código" oninput="renderAsistencia()" style="width:180px">
+        </div>
+      </div>
+      <div class="kpi-strip kpi-strip-h" id="asKpis" style="display:grid"></div>
+      <div class="as-leyenda">
+        <span><b class="as-p">✓</b> Presente</span>
+        <span><b class="as-a">✕</b> Ausente</span>
+        <span><b class="as-t">T</b> Tarde</span>
+        <span><b class="as-v">V</b> Velada</span>
+        <span><b class="as-pe">P</b> Permiso</span>
+        <span><b class="as-b">B</b> Baja</span>
+        <span><b class="as-nd">·</b> Sin dato</span>
+        <span><b class="as-nolab">&nbsp;&nbsp;</b> Domingo / feriado</span>
+        <span><b class="as-fuera">&nbsp;&nbsp;</b> Fuera de su período (antes del ingreso / tras la baja)</span>
+      </div>
+      <div id="asGrid" style="flex:1;overflow:auto"></div>
     </div>
 
     <!-- ══ LOCKERS ═══════════════════════════════════════════ -->
@@ -1037,11 +1105,13 @@ function showToast(msg, color) {
 // TABS PRINCIPALES
 // ════════════════════════════════════════════════════════════
 function switchTab(tab) {
-  ['personal', 'lockers', 'planta'].forEach(function(t) {
+  ['personal', 'asistencia', 'lockers', 'planta'].forEach(function(t) {
     document.getElementById('tab-' + t).classList.toggle('active', t === tab);
     document.getElementById('view-' + t).style.display = (t === tab) ? 'flex' : 'none';
   });
   document.getElementById('kpiStrip').style.display = (tab === 'personal') ? 'grid' : 'none';
+  // Se recarga al entrar: la hoja del Drive se sincroniza desde Inicio y puede haber datos nuevos
+  if (tab === 'asistencia') asCargarMes();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1060,6 +1130,324 @@ async function cargarPersonal() {
   renderKpis();
   renderPersonalGrid();
   renderLockers();
+  renderAsistencia(); // no hace nada si la pestaña Asistencia aún no cargó su mes
+}
+
+// ════════════════════════════════════════════════════════════
+// ASISTENCIA DIARIA — cuadro mensual de TODO el personal (solo lectura)
+// ════════════════════════════════════════════════════════════
+// Lee `asistencia_diaria` SIN filtrar por área y la cruza con `personal` por código. Esta pestaña
+// no es la fuente de los datos: llegan desde la hoja ASISTENCIA DE PLANTA (index.html → Sincronizar)
+// y desde las grillas de Tapas/Serigrafía. Un día sin registro es "sin dato" (·): nunca se asume
+// presente ni ausente (mismo criterio que la grilla de Tapas).
+var AS_ESTADOS = {
+  presente: { t: '✓', cls: 'as-p',  lbl: 'Presente' },
+  ausente:  { t: '✕', cls: 'as-a',  lbl: 'Ausente' },
+  tarde:    { t: 'T', cls: 'as-t',  lbl: 'Tarde' },
+  velada:   { t: 'V', cls: 'as-v',  lbl: 'Velada' },
+  permiso:  { t: 'P', cls: 'as-pe', lbl: 'Permiso' },
+  baja:     { t: 'B', cls: 'as-b',  lbl: 'Baja' }
+};
+var AS_DIA_SEM = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+var asMes = '';            // 'YYYY-MM' del mes visible
+var asDatos = {};          // { codigoEnMinuscula: { 'YYYY-MM-DD': [ { estado, area }, … ] } }
+var asFeriados = {};       // { 'YYYY-MM-DD': descripcion }
+var asCargado = false;     // hay datos del mes en memoria
+var asReq = 0;             // descarta respuestas viejas si se cambia de mes rápido
+
+function asUltimoDia(ym) { return new Date(parseInt(ym.slice(0, 4), 10), parseInt(ym.slice(5, 7), 10), 0).getDate(); }
+function asFecha(ym, d) { return ym + '-' + (d < 10 ? '0' : '') + d; }
+function asDow(fecha) { return new Date(fecha + 'T12:00:00').getDay(); }
+function asNombreMes(ym) {
+  var n = new Date(ym + '-15T12:00:00').toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+  return n.charAt(0).toUpperCase() + n.slice(1);
+}
+function asSumarMes(ym, delta) {
+  var d = new Date(parseInt(ym.slice(0, 4), 10), parseInt(ym.slice(5, 7), 10) - 1 + delta, 1);
+  var m = d.getMonth() + 1;
+  return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m;
+}
+function asMoverMes(delta) { asMes = asSumarMes(asMes, delta); asCargarMes(); }
+function asMesActual() { asMes = fechaHoy().slice(0, 7); asCargarMes(); }
+
+function asPrepararUI() {
+  var sel = document.getElementById('asFiltroArea');
+  if (sel.options.length) return;
+  sel.innerHTML = '<option value="todos">Todas las áreas</option>' +
+    AREA_GRUPOS.map(function(a) { return '<option value="' + a.key + '">' + a.label + '</option>'; }).join('');
+}
+
+async function asCargarMes() {
+  asPrepararUI();
+  if (!asMes) asMes = fechaHoy().slice(0, 7);
+  var miReq = ++asReq;
+  var ym = asMes;
+  var ini = ym + '-01';
+  var fin = asFecha(ym, asUltimoDia(ym));
+  document.getElementById('asMesLbl').textContent = asNombreMes(ym);
+  asCargado = false;
+  document.getElementById('asKpis').innerHTML = '';
+  document.getElementById('asGrid').innerHTML = '<div style="padding:40px;text-align:center;color:var(--gray-l)">Cargando asistencia…</div>';
+
+  var filas = [];
+  try {
+    // Paginado: PostgREST corta a 1000 filas por consulta y un mes de toda la planta pasa de 2,500
+    var desde = 0, BATCH = 1000;
+    while (true) {
+      var r = await db.from('asistencia_diaria').select('fecha,operador_codigo,area,turno,estado')
+        .gte('fecha', ini).lte('fecha', fin)
+        .order('fecha').order('operador_codigo').order('area').order('turno')
+        .range(desde, desde + BATCH - 1);
+      if (r.error) throw r.error;
+      filas = filas.concat(r.data || []);
+      if (!r.data || r.data.length < BATCH) break;
+      desde += BATCH;
+    }
+  } catch (e) {
+    if (miReq !== asReq) return;
+    document.getElementById('asGrid').innerHTML = '<div style="padding:40px;text-align:center;color:var(--red)">❌ No se pudo cargar la asistencia: ' +
+      escHtml((e && e.message) || e) + '</div>';
+    return;
+  }
+  var feriados = {};
+  try {
+    var rf = await db.from('dias_feriados').select('fecha,descripcion').gte('fecha', ini).lte('fecha', fin);
+    (rf.data || []).forEach(function(x) { feriados[x.fecha] = x.descripcion || 'Feriado'; });
+  } catch (e) { feriados = {}; }
+  if (miReq !== asReq) return;
+
+  var datos = {};
+  filas.forEach(function(row) {
+    var k = String(row.operador_codigo || '').toLowerCase();
+    if (!k) return;
+    if (!datos[k]) datos[k] = {};
+    if (!datos[k][row.fecha]) datos[k][row.fecha] = [];
+    datos[k][row.fecha].push({ estado: String(row.estado || '').toLowerCase(), area: row.area });
+  });
+  asDatos = datos;
+  asFeriados = feriados;
+  asCargado = true;
+  renderAsistencia();
+  if (ym === fechaHoy().slice(0, 7)) asScrollAHoy();
+}
+
+// Quiénes aparecen en el mes: activos, bajas dentro/después del mes, o cualquiera con registros ese mes;
+// nadie que haya ingresado después del mes.
+function asRoster(ym) {
+  var ini = ym + '-01';
+  var fin = asFecha(ym, asUltimoDia(ym));
+  return personalTodos.filter(function(p) {
+    if (p.fecha_inicio && p.fecha_inicio > fin) return false;
+    if (p.activo) return true;
+    if (p.fecha_baja && p.fecha_baja >= ini) return true;
+    return !!asDatos[String(p.codigo || '').toLowerCase()];
+  });
+}
+
+function asFiltrar(lista) {
+  var area = document.getElementById('asFiltroArea').value || 'todos';
+  var q = (document.getElementById('asBuscar').value || '').trim().toLowerCase();
+  return lista.filter(function(p) {
+    if (area !== 'todos' && p.area !== area) return false;
+    if (q && (p.nombre || '').toLowerCase().indexOf(q) === -1 && (p.codigo || '').toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  });
+}
+
+// Estado guardado de esa persona ese día (null = sin dato). Si hay filas en dos áreas (alguien que
+// cambió de área) manda la de su área actual.
+function asEstadoDe(p, fecha) {
+  var porFecha = asDatos[String(p.codigo || '').toLowerCase()];
+  var lst = porFecha ? porFecha[fecha] : null;
+  if (!lst || !lst.length) return null;
+  for (var i = 0; i < lst.length; i++) { if (lst[i].area === p.area) return lst[i].estado; }
+  return lst[0].estado;
+}
+
+// Una celda del cuadro: { est, cls, txt, tip }
+function asCelda(p, fecha) {
+  var dia = parseInt(fecha.slice(8, 10), 10);
+  var nolab = asDow(fecha) === 0 || !!asFeriados[fecha];
+  var base = nolab ? ' as-nolab' : '';
+  if ((p.fecha_inicio && fecha < p.fecha_inicio) || (p.fecha_baja && fecha > p.fecha_baja)) {
+    return { est: null, fuera: true, cls: 'as-fuera', txt: '', tip: 'Día ' + dia + ' · fuera de su período (ingreso/baja)' };
+  }
+  var est = asEstadoDe(p, fecha);
+  if (est) {
+    var def = AS_ESTADOS[est] || { t: est.charAt(0).toUpperCase(), cls: 'as-x', lbl: est };
+    return { est: est, cls: def.cls, txt: def.t, tip: 'Día ' + dia + ' · ' + def.lbl };
+  }
+  var tip = 'Día ' + dia + ' · ' + (asFeriados[fecha] ? ('feriado: ' + asFeriados[fecha]) : (asDow(fecha) === 0 ? 'domingo' : 'sin dato'));
+  return { est: null, cls: 'as-nd' + base, txt: nolab ? '' : '·', tip: tip };
+}
+
+function asEsPresente(est) { return est === 'presente' || est === 'tarde' || est === 'velada' || est === 'permiso'; }
+
+function asFilaPersona(p, ym, ultimo) {
+  var celdas = [], aus = 0, tar = 0;
+  for (var d = 1; d <= ultimo; d++) {
+    var c = asCelda(p, asFecha(ym, d));
+    celdas.push(c);
+    if (c.est === 'ausente') aus++;
+    else if (c.est === 'tarde') tar++;
+  }
+  return { p: p, celdas: celdas, aus: aus, tar: tar };
+}
+
+function asBuildHead(ym, ultimo, hoy) {
+  var h = '<tr><th class="as-nom">Persona</th>';
+  for (var d = 1; d <= ultimo; d++) {
+    var f = asFecha(ym, d);
+    var dow = asDow(f);
+    var nolab = dow === 0 || !!asFeriados[f];
+    var tit = asFeriados[f] ? ('Feriado: ' + asFeriados[f]) : f;
+    h += '<th class="as-d' + (nolab ? ' as-nolab' : '') + (f === hoy ? ' as-hoy' : '') + '" title="' + escHtml(tit) + '">' +
+      d + '<br>' + AS_DIA_SEM[dow] + '</th>';
+  }
+  return h + '<th class="as-tot" title="Ausencias del mes">Aus.</th><th class="as-tot" title="Tardanzas del mes">Tar.</th></tr>';
+}
+
+function asBuildFila(fila) {
+  var p = fila.p;
+  var sup = p.rol === 'supervisor';
+  var nombre = (sup ? '★ ' : '') + escHtml(p.nombre || p.codigo || '—');
+  var etiquetas = '<span class="as-cod">' + escHtml(p.codigo || '') + '</span>' +
+    (p.activo ? '' : '<span class="as-baja">baja</span>');
+  var h = '<tr class="as-row' + (sup ? ' as-sup' : '') + (p.activo ? '' : ' as-inact') + '">' +
+    '<td class="as-nom" onclick="abrirPerfil(\'' + escHtml(String(p.id)) + '\')" title="Abrir perfil de ' + escHtml(p.nombre || '') + '">' + nombre + etiquetas + '</td>';
+  fila.celdas.forEach(function(c) {
+    h += '<td class="as-d ' + c.cls + '" title="' + escHtml(c.tip) + '">' + c.txt + '</td>';
+  });
+  h += '<td class="as-tot' + (fila.aus ? ' as-malo' : '') + '">' + (fila.aus || '') + '</td>' +
+    '<td class="as-tot' + (fila.tar ? ' as-medio' : '') + '">' + (fila.tar || '') + '</td></tr>';
+  return h;
+}
+
+// Fila-título de un área: nombre + cuántos son, y por cada día cuántos presentes (y ausentes en rojo).
+function asBuildGrupoHead(label, filas, ym, ultimo) {
+  var conDato = 0, ausTot = 0, tarTot = 0;
+  var pres = [], ause = [];
+  for (var d = 0; d < ultimo; d++) { pres.push(0); ause.push(0); }
+  filas.forEach(function(f) {
+    ausTot += f.aus;
+    tarTot += f.tar;
+    f.celdas.forEach(function(c, i) {
+      if (!c.est) return;
+      conDato++;
+      if (asEsPresente(c.est)) pres[i]++;
+      else if (c.est === 'ausente') ause[i]++;
+    });
+  });
+  var h = '<tr class="as-grp"><td class="as-nom">' + label + ' · ' + filas.length +
+    (conDato ? '' : '<span class="as-sin">sin datos del mes</span>') + '</td>';
+  for (var i = 0; i < ultimo; i++) {
+    h += '<td class="as-d">' + (pres[i] ? '<div class="as-gp">' + pres[i] + '</div>' : '') +
+      (ause[i] ? '<div class="as-ga">−' + ause[i] + '</div>' : '') + '</td>';
+  }
+  return h + '<td class="as-tot' + (ausTot ? ' as-malo' : '') + '">' + (ausTot || '') + '</td>' +
+    '<td class="as-tot' + (tarTot ? ' as-medio' : '') + '">' + (tarTot || '') + '</td></tr>';
+}
+
+function asBuildGrupo(key, label, grupo, ym, ultimo) {
+  var filas = grupo.map(function(p) { return asFilaPersona(p, ym, ultimo); });
+  var h = asBuildGrupoHead(label, filas, ym, ultimo);
+  var turnoPrev = null;
+  filas.forEach(function(f) {
+    // Producción se separa por turno, igual que en la hoja de asistencia de planta
+    if (key === 'produccion') {
+      var t = f.p.turno_produccion || '';
+      if (t !== turnoPrev) {
+        h += '<tr class="as-sub"><td class="as-nom">' + escHtml(TURNO_PRODUCCION_LBL[t] || 'Sin turno asignado') + '</td>' +
+          '<td colspan="' + (ultimo + 2) + '"></td></tr>';
+        turnoPrev = t;
+      }
+    }
+    h += asBuildFila(f);
+  });
+  return h;
+}
+
+// Resumen del día de referencia (hoy, o el último día con datos) y ausentismo del mes
+function asBuildKpis(lista, ym, hoy) {
+  var ultimo = asUltimoDia(ym);
+  var ref = null;
+  for (var d = ultimo; d >= 1 && !ref; d--) {
+    var f = asFecha(ym, d);
+    if (f > hoy) continue;
+    for (var i = 0; i < lista.length; i++) {
+      if (asEstadoDe(lista[i], f)) { ref = f; break; }
+    }
+  }
+  var kpi = function(l, v, extra) {
+    return '<div class="kpi"><div class="kpi-l">' + l + '</div><div class="kpi-v"' + (extra || '') + '>' + v + '</div></div>';
+  };
+  // Ausentismo del mes: ausencias ÷ registros (sin contar bajas), hasta hoy
+  var aus = 0, reg = 0;
+  lista.forEach(function(p) {
+    for (var d2 = 1; d2 <= ultimo; d2++) {
+      var f2 = asFecha(ym, d2);
+      if (f2 > hoy) break;
+      var c = asCelda(p, f2);
+      if (!c.est || c.est === 'baja') continue;
+      reg++;
+      if (c.est === 'ausente') aus++;
+    }
+  });
+  var ausentismo = kpi('Ausentismo del mes', reg ? ((Math.round(aus / reg * 1000) / 10) + '%') : '—');
+  if (!ref) {
+    return kpi('Día de referencia', '—') + kpi('Presentes', '—') + kpi('Ausentes', '—') + kpi('Tarde', '—') +
+      kpi('Sin dato', '—') + ausentismo;
+  }
+  var pres = 0, ause = 0, tarde = 0, sinDato = 0, enPeriodo = 0;
+  lista.forEach(function(p) {
+    var c = asCelda(p, ref);
+    if (c.fuera) return;
+    enPeriodo++;
+    if (!c.est) { sinDato++; return; }
+    if (asEsPresente(c.est)) pres++;
+    if (c.est === 'ausente') ause++;
+    if (c.est === 'tarde') tarde++;
+  });
+  var etiqueta = new Date(ref + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: '2-digit', month: 'short' });
+  return kpi('Día de referencia', escHtml(etiqueta)) +
+    kpi('Presentes', pres + ' <span style="font-size:10px;color:var(--gray-l)">de ' + enPeriodo + '</span>') +
+    kpi('Ausentes', ause, ause ? ' style="color:var(--red)"' : '') +
+    kpi('Tarde', tarde, tarde ? ' style="color:var(--amber)"' : '') +
+    kpi('Sin dato', sinDato, sinDato ? ' style="color:var(--gray)"' : '') +
+    ausentismo;
+}
+
+function renderAsistencia() {
+  var cont = document.getElementById('asGrid');
+  if (!cont || !asCargado) return;
+  var ym = asMes;
+  var ultimo = asUltimoDia(ym);
+  var hoy = fechaHoy();
+  var lista = asFiltrar(asRoster(ym));
+  document.getElementById('asKpis').innerHTML = asBuildKpis(lista, ym, hoy);
+  if (!lista.length) {
+    cont.innerHTML = '<div style="padding:40px;text-align:center;color:var(--gray-l)">' +
+      '<div style="font-size:32px;margin-bottom:8px">📅</div>No hay personas que coincidan con el filtro.</div>';
+    return;
+  }
+  var html = '<table class="as-tabla"><thead>' + asBuildHead(ym, ultimo, hoy) + '</thead>';
+  var vistos = {};
+  AREA_GRUPOS.forEach(function(a) {
+    vistos[a.key] = true;
+    var comparador = a.key === 'produccion' ? ordenProduccionPorTurno : ordenSupervisorPrimero;
+    var grupo = lista.filter(function(p) { return p.area === a.key; }).sort(comparador);
+    if (grupo.length) html += '<tbody>' + asBuildGrupo(a.key, a.label, grupo, ym, ultimo) + '</tbody>';
+  });
+  var otros = lista.filter(function(p) { return !vistos[p.area]; }).sort(ordenSupervisorPrimero);
+  if (otros.length) html += '<tbody>' + asBuildGrupo('otras', 'Otras áreas', otros, ym, ultimo) + '</tbody>';
+  cont.innerHTML = html + '</table>';
+}
+
+// En el mes en curso, deja a la vista la columna de hoy sin tener que desplazarse
+function asScrollAHoy() {
+  var cont = document.getElementById('asGrid');
+  var th = cont ? cont.querySelector('th.as-hoy') : null;
+  if (th) cont.scrollLeft = Math.max(0, th.offsetLeft - 380);
 }
 
 // ════════════════════════════════════════════════════════════

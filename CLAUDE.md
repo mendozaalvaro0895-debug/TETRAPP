@@ -335,7 +335,30 @@ Orden dentro de cada desplegable: rojo → amarillo → verde.
 ## gestion.html — Arquitectura de vistas
 
 ```
-Tabs: Personal (activo) · Lockers (activo) · Planta (activo)
+Tabs: Personal (activo) · Asistencia (activo) · Lockers (activo) · Planta (activo)
+
+view-asistencia (oct/2026): cuadro MENSUAL de asistencia de TODO el personal, SOLO LECTURA (no es una
+  fuente de datos nueva: lee `asistencia_diaria` — la llena la sincronización con la hoja "ASISTENCIA DE
+  PLANTA" desde index.html y las grillas de Tapas/Serigrafía — y la cruza con `personal` por
+  `operador_codigo` = `personal.codigo`, sin distinguir mayúsculas). `asCargarMes()` se dispara cada vez
+  que se entra a la pestaña y al cambiar de mes (◀ ▶ / "Hoy"); trae el mes completo SIN filtrar por área y
+  PAGINADO de a 1000 (un mes de toda la planta pasa de 2,500 filas — PostgREST corta en 1000) + los
+  `dias_feriados` del mes. Filas = personal agrupado como en la pestaña Personal (AREA_GRUPOS, supervisor
+  ★ primero con `ordenSupervisorPrimero`; Producción con `ordenProduccionPorTurno` y sub-fila "Turno
+  Gabino/Alex"); columnas = días 1…fin de mes + totales Aus./Tar. Quién aparece (`asRoster`): activos,
+  bajas con `fecha_baja` dentro/después del mes o con registros ese mes; nunca quien ingresó después del
+  mes. Celdas (`asCelda`): ✓ presente · ✕ ausente · T tarde · V velada · P permiso · B baja · "·" SIN DATO
+  (nunca se asume presente ni ausente, igual que la grilla de Tapas) · gris = domingo/feriado · rayado = fuera
+  de su período (antes de `fecha_inicio` / después de `fecha_baja`). El sábado cuenta como día laborable.
+  Si dos filas del mismo día vienen de áreas distintas (alguien que cambió de área) manda la de su área
+  actual. La fila-título de cada área muestra por día cuántos presentes (y ausentes en rojo) y avisa "sin
+  datos del mes" si esa área no tiene ningún registro (ej. áreas que la hoja aún no sincronizó, o
+  `sql/asistencia_drive_v1.sql` sin correr). La tira de indicadores (clase `kpi-strip-h` para esquivar la
+  regla de 2 columnas de shared/styles.css en pantallas ≤1024px) resume el último día con datos (presentes
+  de N, ausentes, tarde, sin dato) y el ausentismo del mes (ausencias ÷ registros sin bajas, hasta hoy), y
+  se recalcula sobre lo FILTRADO (selector de área + buscador nombre/código). Clic en un nombre = perfil
+  (`abrirPerfil`). ⚠️ `renderAsistencia()` se llama también desde `cargarPersonal()` y no hace nada si la
+  pestaña aún no cargó su mes.
 
 view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la disponibilidad se
   calcula en vivo desde `personal.locker` (personas activas) vía `renderLockers()`, ya
