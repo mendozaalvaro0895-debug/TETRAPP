@@ -466,6 +466,7 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   El buscador encuentra vacantes por "vacante", por su proceso o por el nombre de quien se
   fue (el código no se muestra ni se busca). `plaza_vacante` solo viaja en el payload cuando se marca/desmarca, así guardar a
   cualquier otra persona no se rompe si el SQL aún no corrió.
+  CUPO DE PRODUCCIÓN (oct/2026, `PLANTILLA_PRODUCCION_TURNO`=19 = 18 operadores + 1 supervisor por turno): en la vista "Solo activos" sin buscador, las vacantes de Producción salen del cupo (19 − activos del turno, contados sobre `personalTodos`) y NO de marcar la casilla — las bajas marcadas conservan su "Antes: …" (`buildFilasProduccionConCupo`), el resto son filas "VACANTE · plaza libre del cupo" (`buildFilaVacanteCupo`, clic = alta con Producción+turno). El encabezado del grupo muestra una pastilla por turno (`pillCupoTurno`): verde completo, ámbar "N vacantes", ROJA "⚠ sobra N" (solo señala, no bloquea ni cambia datos). Los demás grupos siguen con la casilla manual `plaza_vacante`. Si cambia la plantilla, tocar solo esa constante.
   ⚠️ Producción usa un comparador aparte (`ordenProduccionPorTurno()`, elegido en
   `buildPersonalTable()` solo para `a.key==='produccion'`): agrupa primero por
   `turno_produccion` (Gabino, luego Alex — mismo orden que la hoja de asistencia de planta;

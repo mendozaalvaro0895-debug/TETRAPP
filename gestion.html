@@ -120,6 +120,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .pill-aprobado{background:var(--green-l);color:var(--green)}
 .pill-rechazado{background:var(--red-l);color:var(--red)}
 .pill-vacante{background:var(--amber-l);color:var(--amber)}
+.pill-sobra{background:#FEE2E2;color:#B83232}
 
 /* LOCKERS */
 .lockers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px;padding:16px}
@@ -1520,6 +1521,7 @@ function renderPersonalGrid() {
   var q = (document.getElementById('pBuscar').value || '').trim().toLowerCase();
   var soloActivos = document.getElementById('pSoloActivos').checked;
 
+  PERS_VER_CUPOS = soloActivos && !q && (filtroArea === 'todos' || filtroArea === 'produccion');
   var lista = personalTodos.filter(function(p) {
     if (filtroArea !== 'todos' && p.area !== filtroArea) return false;
     var esVacante = esPlazaVacante(p, soloActivos);
@@ -1641,6 +1643,66 @@ function ordenProduccionPorTurno(a, b) {
   return (a.rol === 'supervisor' ? 0 : 1) - (b.rol === 'supervisor' ? 0 : 1);
 }
 
+// Producción trabaja con plantilla fija por turno: 18 operadores + 1 supervisor = 19. Las vacantes de
+// Producción salen del cupo (19 − activos del turno), ya no de marcar la casilla a mano; las bajas que sí
+// se marcaron conservan su línea "Antes: …". Si un turno pasa de 19 solo se señala (pastilla roja).
+// Se cuenta sobre personalTodos (la tabla `personal`, la misma que leen todos los módulos).
+var PLANTILLA_PRODUCCION_TURNO = 19;
+var PERS_VER_CUPOS = true;
+
+function activosProduccionPorTurno() {
+  var r = { gabino: 0, alex: 0 };
+  personalTodos.forEach(function(p) {
+    if (p.area === 'produccion' && p.activo && r[p.turno_produccion] != null) r[p.turno_produccion]++;
+  });
+  return r;
+}
+
+function pillCupoTurno(turno, activos) {
+  var nombre = turno === 'gabino' ? 'Gabino' : 'Alex';
+  var dif = activos - PLANTILLA_PRODUCCION_TURNO;
+  var base = nombre + ' ' + activos + '/' + PLANTILLA_PRODUCCION_TURNO;
+  if (dif > 0) return '<span class="pill pill-sobra" style="margin-left:6px" title="El turno supera la plantilla de ' + PLANTILLA_PRODUCCION_TURNO + ': revisa quién no corresponde">⚠ ' + base + ' · sobra ' + dif + '</span>';
+  if (dif < 0) return '<span class="pill pill-vacante" style="margin-left:6px">' + base + ' · ' + (-dif) + (dif === -1 ? ' vacante' : ' vacantes') + '</span>';
+  return '<span class="pill pill-activo" style="margin-left:6px">' + base + '</span>';
+}
+
+// Fila de vacante generada por el cupo (no hay ficha de baja detrás): clic = alta con Producción y turno puestos
+function buildFilaVacanteCupo(turno) {
+  var guion = '<span class="falta-none">—</span>';
+  return '<tr class="p-row vacante" onclick="cubrirVacanteCupo(\'produccion\',\'' + turno + '\')" title="Clic para cubrir esta plaza con una persona nueva">' +
+    '<td><span class="p-row-avatar">＋</span>VACANTE<span class="vac-antes">Plaza libre del cupo de ' + PLANTILLA_PRODUCCION_TURNO + '</span></td>' +
+    '<td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td>' +
+    '<td>Operador</td><td>' + escHtml(TURNO_PRODUCCION_LBL[turno] || '—') + '</td>' +
+    '<td><span class="pill pill-vacante">Vacante</span></td>' +
+    '<td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td></tr>';
+}
+
+function cubrirVacanteCupo(area, turno) {
+  abrirNuevaPersona();
+  document.getElementById('mpArea').value = area;
+  cambiarAreaPersona();
+  document.getElementById('mpRolBase').value = 'operador';
+  if (area === 'produccion') document.getElementById('mpTurno').value = turno || '';
+}
+
+// Filas de Producción turno por turno: activos + vacantes hasta completar el cupo
+function buildFilasProduccionConCupo(grupo) {
+  var activos = activosProduccionPorTurno(), html = '';
+  ['gabino', 'alex'].forEach(function(t) {
+    var delTurno = grupo.filter(function(p) { return p.turno_produccion === t; });
+    var vivos = delTurno.filter(function(p) { return !esPlazaVacante(p, true); });
+    var marcadas = delTurno.filter(function(p) { return esPlazaVacante(p, true); });
+    var faltan = Math.max(0, PLANTILLA_PRODUCCION_TURNO - activos[t]);
+    var usadas = marcadas.slice(0, faltan);
+    html += vivos.map(function(p) { return buildPersonalRow(p, true); }).join('');
+    html += usadas.map(function(p) { return buildPersonalRow(p, true); }).join('');
+    for (var i = usadas.length; i < faltan; i++) html += buildFilaVacanteCupo(t);
+  });
+  var sinTurno = grupo.filter(function(p) { return p.turno_produccion !== 'gabino' && p.turno_produccion !== 'alex'; });
+  return html + sinTurno.map(function(p) { return buildPersonalRow(p, true); }).join('');
+}
+
 function buildGrupoBloque(key, label, grupo, anonVac) {
   var colapsado = !!gruposColapsados[key];
   var chevron = colapsado ? '▸' : '▾';
@@ -1648,9 +1710,18 @@ function buildGrupoBloque(key, label, grupo, anonVac) {
   var contador = (grupo.length - vacantes) + (vacantes
     ? ' <span class="pill pill-vacante" style="margin-left:6px">' + vacantes + (vacantes === 1 ? ' vacante' : ' vacantes') + '</span>'
     : '');
+  var conCupo = key === 'produccion' && anonVac;
+  if (conCupo) {
+    var act = activosProduccionPorTurno();
+    contador = grupo.filter(function(p) { return !esPlazaVacante(p, true); }).length +
+      pillCupoTurno('gabino', act.gabino) + pillCupoTurno('alex', act.alex);
+  }
   var html = '<tbody><tr class="p-group" onclick="toggleGrupoArea(\'' + key + '\')">' +
     '<td colspan="' + P_TABLE_COLS + '">' + chevron + ' ' + label + ' · ' + contador + '</td></tr></tbody>';
-  if (!colapsado) html += '<tbody>' + grupo.map(function(p) { return buildPersonalRow(p, anonVac); }).join('') + '</tbody>';
+  if (!colapsado) {
+    var filas = (conCupo && PERS_VER_CUPOS) ? buildFilasProduccionConCupo(grupo) : grupo.map(function(p) { return buildPersonalRow(p, anonVac); }).join('');
+    html += '<tbody>' + filas + '</tbody>';
+  }
   return html;
 }
 
