@@ -639,13 +639,10 @@ async function guiaOmitirHoy() {
 setInterval(cargarGuia, 60000);
 
 // ══ INDICADORES POR FICHA — Serigrafía y Tapas (oct/2026) ═══════════════
-// Efectividad (mes en curso hasta el último día hábil), Personal, Unidades del mes y Q facturado.
-// Metas: Serigrafía 30,000 und/día (meta global provisional, igual a PROD_META_DIA de serigrafia.html);
-// Tapas 10,000 und por persona presente y día (20,000 si ese día trabajó en método máquina).
+// Personal, Ausentismo del mes, Unidades del mes y Q facturado. Ninguno depende de captura diaria manual:
+// la asistencia llega sola desde la hoja del Drive (asistencia_diaria) y las unidades/ventas de las requis.
+// (Se retiró "Efectividad": con datos de producción atrasados mostraba 0% aunque la planta trabajara.)
 // Solo cuentan días hábiles (sin domingos ni feriados). Si una fuente falla se muestra "—", nunca 0%.
-var IND_META_SERIG_DIA = 30000;
-var IND_META_TAPAS = 10000;
-var IND_META_TAPAS_MAQ = 20000;
 var IND_PRESENTE = { presente: 1, tarde: 1, velada: 1 };
 
 // ⚠️ ESPEJO de AREA_FAM_MAP / clasificarArea de ventas.html — si cambia allá, replicar aquí.
@@ -688,110 +685,47 @@ function indDiasHabiles(desde, hasta, feriados) {
   }
   return out;
 }
-function indDeltaTiros(cnts) {
-  if (!cnts.length) return 0;
-  if (cnts.length === 1) return cnts[0] > 0 ? cnts[0] : 0;
-  return Math.max.apply(null, cnts) - Math.min.apply(null, cnts);
-}
 function indFmt(n) { return Math.round(n).toLocaleString('es-GT'); }
 function indFmtQ(n) { return 'Q ' + Math.round(n).toLocaleString('es-GT'); }
 function indFechaCorta(f) { return f ? f.slice(8) + '/' + f.slice(5, 7) : '—'; }
 
-// ── Serigrafía: producción del día = delta del contador de impresión por línea ──
-async function indSerigProduccion(desde, hasta) {
-  var rows = await indPaginar(function () {
-    return db.from('registro_tiros_serig').select('linea_id,contador,fecha').eq('area', 'serig').gte('fecha', desde).lte('fecha', hasta);
-  });
-  if (rows === null) return null;
-  var grupos = {};
-  rows.forEach(function (t) {
-    var k = t.fecha + '|' + t.linea_id;
-    if (!grupos[k]) grupos[k] = { fecha: t.fecha, cnts: [] };
-    grupos[k].cnts.push(t.contador || 0);
-  });
-  var porDia = {};
-  Object.keys(grupos).forEach(function (k) {
-    var g = grupos[k];
-    porDia[g.fecha] = (porDia[g.fecha] || 0) + indDeltaTiros(g.cnts);
-  });
-  return porDia;
-}
-
-async function indSerigCalcular(ctx) {
-  var porDia = await indSerigProduccion(ctx.desdeDatos, ctx.ayer);
-  var r = { efec: null, ayerReal: null, ayerMeta: IND_META_SERIG_DIA };
-  if (porDia !== null) {
-    r.ayerReal = porDia[ctx.ayer] || 0;
-    if (ctx.diasMes.length) {
-      var real = 0;
-      ctx.diasMes.forEach(function (f) { real += porDia[f] || 0; });
-      r.efec = real / (IND_META_SERIG_DIA * ctx.diasMes.length) * 100;
-    }
-  }
+// ── Unidades del mes: Serigrafía = entregas a PT (requis vinculadas); Tapas = ingreso PT ──
+async function indSerigUnidades(ctx) {
   var ent = await indPaginar(function () {
     return db.from('entregas_serig').select('fecha,cant').gte('fecha', ctx.mesIni).lte('fecha', ctx.hoy);
   });
-  r.und = ent === null ? null : ent.reduce(function (s, e) { return s + (e.cant || 0); }, 0);
-  return r;
+  return ent === null ? null : ent.reduce(function (s, e) { return s + (e.cant || 0); }, 0);
 }
 
-// ── Tapas: unidades terminadas y aprobadas por (persona, día) vs meta por persona presente ──
-async function indTapasCalcular(ctx, asistRows) {
-  var r = { efec: null, ayerReal: null, ayerMeta: null, und: null };
-  var cmd = await indPaginar(function () {
-    return db.from('comandas').select('*, comanda_tareas(cantidad, unidades_completadas, estado, metodo)')
-      .gte('fecha', ctx.desdeDatos).lte('fecha', ctx.ayer);
-  });
-  if (cmd !== null && asistRows !== null) {
-    // Misma regla que el resto del sistema: sin columna de aprobación = aprobada
-    var aprobadas = cmd.filter(function (c) { return !c.estado_aprobacion || c.estado_aprobacion === 'aprobada'; });
-    var prod = {}, maq = {};   // clave: fecha|codigo
-    aprobadas.forEach(function (c) {
-      var k = c.fecha + '|' + c.operario_id;
-      (c.comanda_tareas || []).forEach(function (t) {
-        if (t.estado !== 'Terminada') return;
-        prod[k] = (prod[k] || 0) + (t.unidades_completadas || t.cantidad || 0);
-        if (String(t.metodo || '').indexOf('maquina') === 0) maq[k] = true;
-      });
-    });
-    var presentes = {};   // fecha -> [codigos]
-    asistRows.forEach(function (a) {
-      if (!IND_PRESENTE[a.estado]) return;
-      if (!presentes[a.fecha]) presentes[a.fecha] = [];
-      if (presentes[a.fecha].indexOf(a.operador_codigo) === -1) presentes[a.fecha].push(a.operador_codigo);
-    });
-    var diasConAsist = {};
-    asistRows.forEach(function (a) { diasConAsist[a.fecha] = true; });
-    function dia(f) {
-      var real = 0, meta = 0;
-      (presentes[f] || []).forEach(function (cod) {
-        var k = f + '|' + cod;
-        real += prod[k] || 0;
-        meta += maq[k] ? IND_META_TAPAS_MAQ : IND_META_TAPAS;
-      });
-      return { real: real, meta: meta };
-    }
-    var d = dia(ctx.ayer);
-    if (diasConAsist[ctx.ayer]) { r.ayerReal = d.real; r.ayerMeta = d.meta; }
-    var tReal = 0, tMeta = 0;
-    ctx.diasMes.forEach(function (f) {
-      if (!diasConAsist[f]) return;   // día sin asistencia replicada: no entra ni a la producción ni a la meta
-      var x = dia(f); tReal += x.real; tMeta += x.meta;
-    });
-    if (tMeta > 0) r.efec = tReal / tMeta * 100;
-  }
+async function indTapasUnidades(ctx) {
   var pt = await indPaginar(function () {
     return db.from('movimientos_materiales').select('observaciones,created_at,cantidad')
       .eq('tipo', 'entrada_pt').or('area.is.null,area.eq.tapas').gte('created_at', ctx.mesIni);
   });
-  if (pt !== null) {
-    r.und = 0;
-    pt.forEach(function (m) {
-      var f = guiaFechaMov(m);
-      if (f >= ctx.mesIni && f <= ctx.hoy) r.und += (m.cantidad || 0);
-    });
-  }
-  return r;
+  if (pt === null) return null;
+  var und = 0;
+  pt.forEach(function (m) {
+    var f = guiaFechaMov(m);
+    if (f >= ctx.mesIni && f <= ctx.hoy) und += (m.cantidad || 0);
+  });
+  return und;
+}
+
+// ── Ausentismo del mes = ausencias ÷ días-persona registrados (días hábiles hasta el último día hábil) ──
+// Sale de asistencia_diaria, que se alimenta sola desde la hoja del Drive. PERMISO ya se guarda como
+// presente (no cuenta como falta) y "tarde"/"velada" tampoco son ausencia.
+function indAusentismo(area, asistRows, ctx) {
+  if (asistRows === null) return null;
+  var habil = {};
+  ctx.diasMes.forEach(function (f) { habil[f] = true; });
+  var faltas = 0, total = 0;
+  asistRows.forEach(function (a) {
+    if (a.area !== area || !habil[a.fecha]) return;
+    total++;
+    if (a.estado === 'ausente') faltas++;
+  });
+  if (!total) return null;
+  return { pct: faltas / total * 100, faltas: faltas, total: total };
 }
 
 // ── Personal: presentes del último día hábil ÷ activos del área ──
@@ -845,22 +779,22 @@ function indCelda(label, valor, sub, clase) {
   return '<div class="ind-c ' + (clase || '') + '"><div class="ind-l">' + label + '</div>' +
     '<div class="ind-v">' + valor + '</div><div class="ind-s">' + sub + '</div></div>';
 }
-function indClaseEfec(p) { return p === null ? '' : (p >= 100 ? 'ok' : (p >= 70 ? 'mid' : 'low')); }
+// Umbrales propios: hasta 3% bien, hasta 6% atención, más de 6% alto
+function indClaseAus(p) { return p === null ? '' : (p <= 3 ? 'ok' : (p <= 6 ? 'mid' : 'low')); }
 
-function indPintarFicha(id, d, pers, q, ctx, nombreUnd) {
+function indPintarFicha(id, und, aus, pers, q, ctx, nombreUnd) {
   var cont = document.getElementById(id);
   if (!cont) return;
-  var efec = d && d.efec !== null ? Math.round(d.efec) + '%' : '—';
-  var subE = (d && d.ayerReal !== null && d.ayerMeta !== null)
-    ? indFechaCorta(ctx.ayer) + ': ' + indFmt(d.ayerReal) + ' / ' + indFmt(d.ayerMeta) : 'sin datos de ' + indFechaCorta(ctx.ayer);
   var pv = pers && pers.hayDia ? pers.pres + '/' + pers.total : '—';
   var ps = pers ? (pers.hayDia ? 'asistencia ' + indFechaCorta(ctx.ayer) : 'sin asistencia ' + indFechaCorta(ctx.ayer)) : 'no disponible';
-  var uv = d && d.und !== null ? indFmt(d.und) : '—';
+  var av = aus ? aus.pct.toFixed(1) + '%' : '—';
+  var as = aus ? aus.faltas + (aus.faltas === 1 ? ' falta' : ' faltas') + ' · ' + indFmt(aus.total) + ' días-persona' : 'sin asistencia del mes';
+  var uv = und !== null ? indFmt(und) : '—';
   var qv = q ? indFmtQ(q.valor) : '—';
   var qs = q ? 'facturado al ' + indFechaCorta(q.ultima) + ' · sin IVA' : 'no disponible';
   cont.innerHTML =
-    indCelda('Efectividad', efec, subE, indClaseEfec(d ? d.efec : null)) +
     indCelda('Personal', pv, ps, '') +
+    indCelda('Ausentismo mes', av, as, indClaseAus(aus ? aus.pct : null)) +
     indCelda('Unidades mes', uv, nombreUnd, '') +
     indCelda('Q mes', qv, qs, '');
 }
@@ -884,13 +818,12 @@ async function cargarIndicadores() {
       indVentasPorArea(ctx)
     ]);
     var activos = res[0], asist = res[1], ventas = res[2];
-    var asistTapas = asist === null ? null : asist.filter(function (a) { return a.area === 'tapas'; });
 
-    var rs = await indSerigCalcular(ctx);
-    var rt = await indTapasCalcular(ctx, asistTapas);
-    indPintarFicha('ind-serig', rs, indPersonal('serig', activos, asist, ayer),
+    var undSerig = await indSerigUnidades(ctx);
+    var undTapas = await indTapasUnidades(ctx);
+    indPintarFicha('ind-serig', undSerig, indAusentismo('serig', asist, ctx), indPersonal('serig', activos, asist, ayer),
       ventas ? { valor: ventas['Serigrafía'], ultima: ventas.ultima } : null, ctx, 'und entregadas (PT)');
-    indPintarFicha('ind-tapas', rt, indPersonal('tapas', activos, asist, ayer),
+    indPintarFicha('ind-tapas', undTapas, indAusentismo('tapas', asist, ctx), indPersonal('tapas', activos, asist, ayer),
       ventas ? { valor: ventas['Tapas'], ultima: ventas.ultima } : null, ctx, 'und ingreso PT');
   } catch (e) {
     console.error('Indicadores:', e);
