@@ -300,6 +300,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="area-name">Producción</div>
     <div class="area-desc">Órdenes de fabricación, control de máquinas, eficiencia de línea y planificación de turnos.</div>
     <div class="area-status active">Activo</div>
+    <div class="ind-grid" id="ind-prod"><div class="ind-s">Calculando indicadores…</div></div>
   </a>
 
   <a href="ventas.html" class="area-card a-ventas">
@@ -711,6 +712,20 @@ async function indTapasUnidades(ctx) {
   return und;
 }
 
+// ── Producción: unidades del mes de produccion_diaria (la llena la Central de Ingreso / produccion.html).
+// Si el mes no tiene ninguna fila NO se muestra 0: se avisa desde cuándo no hay carga.
+async function indProdUnidades(ctx) {
+  var rows = await indPaginar(function () {
+    return db.from('produccion_diaria').select('fecha,cantidad').gte('fecha', ctx.mesIni).lte('fecha', ctx.hoy);
+  });
+  if (rows === null) return { und: null, sub: 'no disponible' };
+  if (rows.length) {
+    return { und: rows.reduce(function (s, r) { return s + (Number(r.cantidad) || 0); }, 0), sub: 'und producidas (sopladoras)' };
+  }
+  var ult = await guiaSafe(db.from('produccion_diaria').select('fecha').order('fecha', { ascending: false }).limit(1));
+  return { und: null, sub: ult && ult.length ? 'sin carga desde ' + indFechaCorta(ult[0].fecha) : 'sin registros de producción' };
+}
+
 // ── Ausentismo del mes = ausencias ÷ días-persona registrados (días hábiles hasta el último día hábil) ──
 // Sale de asistencia_diaria, que se alimenta sola desde la hoja del Drive. PERMISO ya se guarda como
 // presente (no cuenta como falta) y "tarde"/"velada" tampoco son ausencia.
@@ -764,12 +779,12 @@ async function indVentasPorArea(ctx) {
     return db.from('ventas').select('sku,familia,descripcion_familia,total_quetzales,fecha').gte('fecha', ctx.mesIni).lte('fecha', ctx.hoy);
   });
   if (ventas === null) return null;
-  var out = { 'Serigrafía': 0, 'Tapas': 0, ultima: '' };
+  var out = { 'Serigrafía': 0, 'Tapas': 0, 'Producción': 0, ultima: '' };
   ventas.forEach(function (v) {
     if (v.fecha > out.ultima) out.ultima = v.fecha;
     var fam = (v.descripcion_familia || v.familia || '').trim().toUpperCase();
     var area = indClasificarArea((v.sku || '').trim(), fam, ov, serigSkus);
-    if (area === 'Serigrafía' || area === 'Tapas') out[area] += (v.total_quetzales || 0);   // SIN IVA
+    if (area === 'Serigrafía' || area === 'Tapas' || area === 'Producción') out[area] += (v.total_quetzales || 0);   // SIN IVA
   });
   return out;
 }
@@ -813,18 +828,21 @@ async function cargarIndicadores() {
       diasMes: indDiasHabiles(mesIni, ayer, feriados)
     };
     var res = await Promise.all([
-      guiaSafe(db.from('personal').select('codigo,area').eq('activo', true).in('area', ['tapas', 'serig'])),
-      indPaginar(function () { return db.from('asistencia_diaria').select('fecha,operador_codigo,estado,area').in('area', ['tapas', 'serig']).gte('fecha', ctx.desdeDatos).lte('fecha', ayer); }),
+      guiaSafe(db.from('personal').select('codigo,area').eq('activo', true).in('area', ['tapas', 'serig', 'produccion'])),
+      indPaginar(function () { return db.from('asistencia_diaria').select('fecha,operador_codigo,estado,area').in('area', ['tapas', 'serig', 'produccion']).gte('fecha', ctx.desdeDatos).lte('fecha', ayer); }),
       indVentasPorArea(ctx)
     ]);
     var activos = res[0], asist = res[1], ventas = res[2];
 
     var undSerig = await indSerigUnidades(ctx);
     var undTapas = await indTapasUnidades(ctx);
+    var prod = await indProdUnidades(ctx);
     indPintarFicha('ind-serig', undSerig, indAusentismo('serig', asist, ctx), indPersonal('serig', activos, asist, ayer),
       ventas ? { valor: ventas['Serigrafía'], ultima: ventas.ultima } : null, ctx, 'und entregadas (PT)');
     indPintarFicha('ind-tapas', undTapas, indAusentismo('tapas', asist, ctx), indPersonal('tapas', activos, asist, ayer),
       ventas ? { valor: ventas['Tapas'], ultima: ventas.ultima } : null, ctx, 'und ingreso PT');
+    indPintarFicha('ind-prod', prod.und, indAusentismo('produccion', asist, ctx), indPersonal('produccion', activos, asist, ayer),
+      ventas ? { valor: ventas['Producción'], ultima: ventas.ultima } : null, ctx, prod.sub);
   } catch (e) {
     console.error('Indicadores:', e);
   }
