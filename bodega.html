@@ -1042,6 +1042,21 @@ function registrarImportDiario() {
     d.last  = new Date().toISOString();
     localStorage.setItem(invKey(), JSON.stringify(d));
   } catch(e) {}
+  registrarTareaInventarioDB();
+}
+
+/* Guía de alimentación (index.html): deja constancia en Supabase, visible desde cualquier
+   equipo. AM = antes de las 3:33 pm (hora Guatemala), PM = desde esa hora.
+   Best-effort: si sql/tareas_diarias_v1.sql no ha corrido, el localStorage de arriba sigue sirviendo. */
+function registrarTareaInventarioDB() {
+  try {
+    var gt = new Date(Date.now() - 6 * 60 * 60 * 1000);
+    var minutos = gt.getUTCHours() * 60 + gt.getUTCMinutes();
+    var tarea = minutos >= 15 * 60 + 33 ? 'inventario_pm' : 'inventario_am';
+    db.from('tareas_diarias')
+      .insert({ fecha: fechaHoy(), tarea: tarea, estado: 'hecha', usuario: TETRA.nombre || TETRA.email || null })
+      .then(function (r) { if (r && r.error) console.warn('tareas_diarias:', r.error.message); });
+  } catch(e) {}
 }
 
 /* ── Importar Excel ──────────────────────────────────────────── */

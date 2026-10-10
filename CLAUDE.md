@@ -79,7 +79,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 ### Módulos activos
 | Archivo | Descripción |
 |---|---|
-| `index.html` | Fachada principal — 8 cards de módulo + **Central de Ingreso** (sube PDF/imagen de reportes SICAF; pdf.js lee por página, 4 en paralelo, conserva lo ya leído si una página falla → `api/parse-requi.js`; clasifica cada documento por prefijo según `.claude/docs/contexto-bot-requis.md` y graba en `entregas_serig`/`movimientos_materiales`/`movimientos_insumos`/`produccion_diaria`, o ajusta existencia en `insumos_b7`/`inventario`). Solo funciona para master (el endpoint rechaza a otros roles). ⚠️ El ajuste de existencia es select+update NO atómico y permite quedar en negativo — no se pasó a `descontar_inventario` porque esa RPC recorta en 0 y ocultaría descuadres contra SICAF |
+| `index.html` | Fachada principal (modo OSCURO, branding futurista/elegante/industrial desde oct/2026) — fichas en orden Serigrafía·Tapas·Producción·Ventas·Bodega·Moldes*·Molino·Torno*·Mantenimiento*·Gestión·Dashboard (*sin módulo = `.area-card.disabled` "Próximamente") + **Guía de alimentación diaria** (`cargarGuia`, oct/2026: inventario AM desde el 1er ingreso / PM desde 3:33 pm GT, requis de Tapas y Serigrafía, ventas y asistencia Tapas/Serig del día HÁBIL ANTERIOR — salta domingos y `dias_feriados`; sin dato verificable NO bloquea; a master le bloquea las fichas hasta cumplir, con "Omitir hoy" + motivo en `tareas_diarias`; el bloqueo es solo en el inicio, los módulos siguen accesibles por enlace/menú; pendiente: indicadores por ficha y lectura automática de la hoja de asistencia del Drive) + **Central de Ingreso** (sube PDF/imagen de reportes SICAF; pdf.js lee por página, 4 en paralelo, conserva lo ya leído si una página falla → `api/parse-requi.js`; clasifica cada documento por prefijo según `.claude/docs/contexto-bot-requis.md` y graba en `entregas_serig`/`movimientos_materiales`/`movimientos_insumos`/`produccion_diaria`, o ajusta existencia en `insumos_b7`/`inventario`). Solo funciona para master (el endpoint rechaza a otros roles). ⚠️ El ajuste de existencia es select+update NO atómico y permite quedar en negativo — no se pasó a `descontar_inventario` porque esa RPC recorta en 0 y ocultaría descuadres contra SICAF |
 | `tapas.html` | Módulo completo Tapas: hub (Personal y Roles + Asistencia Mensual) + movimientos (salidas/ingresos/rechazos) + productividad + trazabilidad + personal + pedidos |
 | `serigrafia.html` | Módulo admin Serigrafía: Inicio (board) + Movimientos + Productividad + Personal |
 | `registro-serigrafia.html` | Formulario móvil rol `operativo_serig`: Flameado / Impresión / Empaque |
@@ -720,6 +720,8 @@ Notas críticas:
     `sql/personal_plaza_vacante_v1.sql` (oct/2026) — columna `plaza_vacante` en `personal` +
     deja marcada como vacante la plaza de Lesly Rojas (Serigrafía, `t-18`, dada de baja). Sin
     correrlo, la casilla "Dejar la plaza vacante" avisa que falta el SQL y no guarda.
+
+32. `sql/tareas_diarias_v1.sql` (oct/2026) — tabla `tareas_diarias` (inventario AM/PM que escribe bodega.html al importar + omisiones de la guía). Sin correrlo la guía cae al `localStorage` del equipo para el inventario y "Omitir hoy" avisa que falta el SQL.
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
