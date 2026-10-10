@@ -352,13 +352,20 @@ view-asistencia (oct/2026): cuadro MENSUAL de asistencia de TODO el personal, SO
   de su período (antes de `fecha_inicio` / después de `fecha_baja`). El sábado cuenta como día laborable.
   Si dos filas del mismo día vienen de áreas distintas (alguien que cambió de área) manda la de su área
   actual. La fila-título de cada área muestra por día cuántos presentes (y ausentes en rojo) y avisa "sin
-  datos del mes" si esa área no tiene ningún registro (ej. áreas que la hoja aún no sincronizó, o
-  `sql/asistencia_drive_v1.sql` sin correr). La tira de indicadores (clase `kpi-strip-h` para esquivar la
+  datos del mes" si esa área no tiene ningún registro (ej. áreas que la hoja aún no sincronizó). La tira de indicadores (clase `kpi-strip-h` para esquivar la
   regla de 2 columnas de shared/styles.css en pantallas ≤1024px) resume el último día con datos (presentes
   de N, ausentes, tarde, sin dato) y el ausentismo del mes (ausencias ÷ registros sin bajas, hasta hoy), y
   se recalcula sobre lo FILTRADO (selector de área + buscador nombre/código). Clic en un nombre = perfil
   (`abrirPerfil`). ⚠️ `renderAsistencia()` se llama también desde `cargarPersonal()` y no hace nada si la
   pestaña aún no cargó su mes.
+  EXPORTAR PDF (botón "📄 Exportar PDF", `asExportarPDF()`): abre una ventana nueva (mismo patrón que el
+  listado de lockers: `window.open` + `document.write`, avisa si el navegador bloquea pop-ups) con el MISMO
+  cuadro del mes y del filtro actuales (`asBuildTabla`, compartida con la pantalla) puesto para carta
+  HORIZONTAL (`@page`, encabezado repetido en cada hoja, colores forzados con `print-color-adjust`), con
+  título, filtro aplicado, resumen del día y leyenda, y lanza el diálogo de impresión → "Guardar como PDF"
+  (el `<title>` "Asistencia diaria YYYY-MM — TETRAPLASTIC" sale como nombre sugerido del archivo). Es el mes
+  calendario completo: NO está partido por quincenas como los PDF de Asistencia de Tapas/Serigrafía (esos
+  usan el corte de nómina con 2 días del mes anterior); si se necesita, habría que traer también el mes previo.
 
 view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la disponibilidad se
   calcula en vivo desde `personal.locker` (personas activas) vía `renderLockers()`, ya
@@ -749,7 +756,7 @@ Notas críticas:
 
 32. `sql/tareas_diarias_v1.sql` (oct/2026) — tabla `tareas_diarias` (inventario AM/PM que escribe bodega.html al importar + omisiones de la guía). Sin correrlo la guía cae al `localStorage` del equipo para el inventario y "Omitir hoy" avisa que falta el SQL.
 
-33. `sql/asistencia_drive_v1.sql` (oct/2026) — amplía el CHECK de `asistencia_diaria.area` a todas las áreas + columna `personal.nombre_hoja`. Además requiere la variable de Vercel `ASISTENCIA_SHEET_ID` (id de la hoja; la hoja debe estar compartida como LECTOR por enlace). Sin el SQL, Tapas/Serig sincronizan y las demás áreas avisan del error.
+33. ✅ CHECK YA CORRIDO (verificado 10-oct-2026: `asistencia_diaria_area_check` admite las 9 áreas; la columna `personal.nombre_hoja` NO se verificó) — `sql/asistencia_drive_v1.sql` (oct/2026) — amplía el CHECK de `asistencia_diaria.area` a todas las áreas + columna `personal.nombre_hoja`. Además requiere la variable de Vercel `ASISTENCIA_SHEET_ID` (id de la hoja; la hoja debe estar compartida como LECTOR por enlace). Sin el SQL, Tapas/Serig sincronizan y las demás áreas avisan del error.
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos

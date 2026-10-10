@@ -404,6 +404,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <button class="btn btn-g btn-sm" onclick="asMesActual()">Hoy</button>
           <select class="fs" id="asFiltroArea" style="width:150px" onchange="renderAsistencia()"></select>
           <input class="fi" id="asBuscar" placeholder="🔍 Buscar nombre o código" oninput="renderAsistencia()" style="width:180px">
+          <button class="btn btn-s btn-sm" onclick="asExportarPDF()" title="Exporta el mes y el filtro actuales">📄 Exportar PDF</button>
         </div>
       </div>
       <div class="kpi-strip kpi-strip-h" id="asKpis" style="display:grid"></div>
@@ -1430,6 +1431,11 @@ function renderAsistencia() {
       '<div style="font-size:32px;margin-bottom:8px">📅</div>No hay personas que coincidan con el filtro.</div>';
     return;
   }
+  cont.innerHTML = asBuildTabla(lista, ym, ultimo, hoy);
+}
+
+// La tabla completa (encabezado + un bloque por área). La usan la pantalla y el PDF.
+function asBuildTabla(lista, ym, ultimo, hoy) {
   var html = '<table class="as-tabla"><thead>' + asBuildHead(ym, ultimo, hoy) + '</thead>';
   var vistos = {};
   AREA_GRUPOS.forEach(function(a) {
@@ -1440,7 +1446,96 @@ function renderAsistencia() {
   });
   var otros = lista.filter(function(p) { return !vistos[p.area]; }).sort(ordenSupervisorPrimero);
   if (otros.length) html += '<tbody>' + asBuildGrupo('otras', 'Otras áreas', otros, ym, ultimo) + '</tbody>';
-  cont.innerHTML = html + '</table>';
+  return html + '</table>';
+}
+
+// PDF: ventana nueva con el MISMO cuadro del mes (y del filtro) puesto para imprimir en horizontal;
+// abre el diálogo de impresión → "Guardar como PDF". Mismo patrón que el listado de lockers.
+function asExportarPDF() {
+  if (!asCargado) { showToast('⏳ Espera a que cargue la asistencia', '#B83232'); return; }
+  var ym = asMes;
+  var ultimo = asUltimoDia(ym);
+  var hoy = fechaHoy();
+  var lista = asFiltrar(asRoster(ym));
+  if (!lista.length) { showToast('No hay personas para exportar con este filtro', '#B83232'); return; }
+
+  var areaSel = document.getElementById('asFiltroArea').value || 'todos';
+  var q = (document.getElementById('asBuscar').value || '').trim();
+  var filtro = (areaSel === 'todos' ? 'Todas las áreas' : (AREA_LBL_MAP[areaSel] || areaSel).replace(/^\S+\s/, '')) +
+    (q ? ' · búsqueda: "' + q + '"' : '');
+  // En el papel no hay perfil que abrir
+  var tabla = asBuildTabla(lista, ym, ultimo, hoy).replace(/ onclick="abrirPerfil\('[^']*'\)"/g, '');
+  var generado = new Date().toLocaleString('es-GT');
+
+  // asBuildKpis colorea con var(--red)/var(--gray…): en la ventana nueva hay que definirlas
+  var css = ':root{--red:#B83232;--amber:#B87200;--gray:#6B6B6A;--gray-l:#A8A6A0}'
+    + '@page{size:letter landscape;margin:8mm}'
+    + '*{box-sizing:border-box;margin:0;padding:0}'
+    + 'body{font-family:Arial,Helvetica,sans-serif;color:#0C0C0B;background:#fff;padding:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + 'h1{font-size:15px;margin-bottom:2px}'
+    + '.sub{font-size:10px;color:#6B6B6A;margin-bottom:8px}'
+    + '.acciones{margin-bottom:10px}'
+    + '.acciones button{padding:7px 14px;font-size:12px;font-weight:700;border-radius:7px;border:none;background:#4338CA;color:#fff;cursor:pointer}'
+    + '.kpis{display:flex;gap:8px;margin-bottom:8px}'
+    + '.kpi{border:1px solid #E0DED8;border-radius:5px;padding:4px 10px;min-width:96px}'
+    + '.kpi-l{font-size:7px;font-weight:700;text-transform:uppercase;color:#6B6B6A;letter-spacing:.5px}'
+    + '.kpi-v{font-size:13px;font-weight:700}'
+    + '.leyenda{display:flex;flex-wrap:wrap;gap:3px 12px;font-size:8px;color:#6B6B6A;margin-bottom:6px}'
+    + '.leyenda b{display:inline-block;min-width:12px;height:12px;line-height:12px;text-align:center;border-radius:3px;margin-right:3px;font-size:8px}'
+    + '.as-tabla{border-collapse:collapse;width:100%;table-layout:fixed}'
+    + '.as-tabla th,.as-tabla td{border:.4px solid #CFCDC7;padding:0;text-align:center;height:4.7mm;font-size:7.5px;overflow:hidden}'
+    + '.as-tabla thead{display:table-header-group}'
+    + '.as-tabla tr{page-break-inside:avoid}'
+    + '.as-tabla thead th{background:#F1EFEA;font-size:7px;line-height:1.15;padding:1px 0;color:#444}'
+    + '.as-tabla thead th.as-hoy{box-shadow:inset 0 -2px 0 #1A6B5B}'
+    + '.as-tabla .as-nom{width:46mm;text-align:left;padding:0 3px;white-space:nowrap;text-overflow:ellipsis;font-size:8px}'
+    + '.as-tabla .as-tot{width:7mm;font-weight:700}'
+    + '.as-cod{font-size:6.5px;color:#A8A6A0;margin-left:3px}'
+    + '.as-baja{font-size:6px;font-weight:700;background:#E4E2DC;border-radius:5px;padding:0 3px;margin-left:3px}'
+    + '.as-row.as-sup .as-nom{font-weight:700}'
+    + '.as-row.as-inact .as-nom{color:#6B6B6A}'
+    + '.as-grp td{background:#E7E5E0;font-weight:700;height:5.4mm}'
+    + '.as-grp .as-nom{font-size:8.5px}'
+    + '.as-gp{font-size:6.5px;color:#6B6B6A;line-height:1.05}'
+    + '.as-ga{font-size:6px;color:#B83232;font-weight:700;line-height:1.05}'
+    + '.as-sin{font-size:7px;color:#B87200;margin-left:6px}'
+    + '.as-sub td{background:#F3F1EC;font-size:7px;font-weight:700;text-align:left;color:#6B6B6A;height:4mm;text-transform:uppercase}'
+    + '.as-p{color:#166534;background:#F0FDF4;font-weight:700}'
+    + '.as-a{color:#B83232;background:#FEE2E2;font-weight:800}'
+    + '.as-t{color:#B87200;background:#FFF3D6;font-weight:800}'
+    + '.as-v{color:#4338CA;background:#E0E7FF;font-weight:800}'
+    + '.as-pe{color:#0369A1;background:#E0F2FE;font-weight:800}'
+    + '.as-b{color:#fff;background:#8A8882;font-weight:800}'
+    + '.as-x{color:#6B6B6A;background:#EBE9E4;font-weight:700}'
+    + '.as-nd{color:#C9C7C1}'
+    + '.as-nolab{background:#EBE9E4}'
+    + '.as-fuera{background:repeating-linear-gradient(45deg,#E4E2DC,#E4E2DC 2px,#F0EEE9 2px,#F0EEE9 4px)}'
+    + '.as-tot.as-malo{color:#B83232;background:#FEE2E2}'
+    + '.as-tot.as-medio{color:#B87200;background:#FFF3D6}'
+    + '@media print{.acciones{display:none}body{padding:0}}';
+
+  var leyenda = '<div class="leyenda">'
+    + '<span><b class="as-p">✓</b>Presente</span><span><b class="as-a">✕</b>Ausente</span><span><b class="as-t">T</b>Tarde</span>'
+    + '<span><b class="as-v">V</b>Velada</span><span><b class="as-pe">P</b>Permiso</span><span><b class="as-b">B</b>Baja</span>'
+    + '<span><b class="as-nd">·</b>Sin dato</span><span><b class="as-nolab">&nbsp;</b>Domingo / feriado</span>'
+    + '<span><b class="as-fuera">&nbsp;</b>Fuera de su período (ingreso / baja)</span></div>';
+
+  var doc = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Asistencia diaria ' + ym + ' — TETRAPLASTIC</title><style>' + css + '</style></head><body>'
+    + '<div class="acciones"><button onclick="window.print()">🖨 Imprimir / Guardar como PDF</button></div>'
+    + '<h1>TETRAPLASTIC · Asistencia diaria — ' + escHtml(asNombreMes(ym)) + '</h1>'
+    + '<div class="sub">' + escHtml(filtro) + ' · ' + lista.length + ' personas · generado ' + escHtml(generado) + ' · fuente: TETRAPP (asistencia_diaria)</div>'
+    + '<div class="kpis">' + asBuildKpis(lista, ym, hoy) + '</div>'
+    + leyenda
+    + tabla
+    + '<script>window.onload=function(){setTimeout(function(){window.print();},500);};' + '<' + '/script>'
+    + '</body></html>';
+
+  var w = window.open('', '_blank');
+  if (!w) { showToast('⚠️ El navegador bloqueó la ventana emergente — habilita pop-ups para este sitio', '#B83232'); return; }
+  w.document.open();
+  w.document.write(doc);
+  w.document.close();
+  w.focus();
 }
 
 // En el mes en curso, deja a la vista la columna de hoy sin tener que desplazarse
