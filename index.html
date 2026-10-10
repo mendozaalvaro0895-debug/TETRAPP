@@ -138,6 +138,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .guia-lock{margin-top:14px;padding:12px 14px;border:1px solid rgba(245,158,11,.5);background:rgba(245,158,11,.08);border-radius:4px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12.5px;color:#FBBF24}
 .guia-skip{font-family:var(--mono);font-size:11px;color:var(--gray);background:transparent;border:1px solid var(--border);border-radius:3px;padding:5px 12px;cursor:pointer}
 .guia-skip:hover{color:var(--ink);border-color:var(--gray)}
+.guia-drive{display:none;align-items:center;gap:12px;padding:12px 0 2px;margin-top:4px}
+.guia-led.good{background:#4ADE80;box-shadow:0 0 8px #4ADE80}
+.guia-led.warn{background:#F59E0B;box-shadow:0 0 8px #F59E0B}
+.guia-led.bad{background:#F87171;box-shadow:0 0 8px #F87171}
+.guia-det.pend-txt{color:#FBBF24}
 .areas-grid.locked .area-card{pointer-events:none;filter:grayscale(1) brightness(.55)}
 
 .footer-info{padding:32px 24px 48px;max-width:1100px;margin:0 auto;text-align:center;color:var(--gray);font-size:12px}
@@ -257,6 +262,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     </div>
     <div class="guia-bar"><i id="guiaBarFill"></i></div>
     <div class="guia-list" id="guiaList"><div class="guia-det">Verificando…</div></div>
+    <div class="guia-drive" id="guiaDrive">
+      <span class="guia-led" id="driveLed"></span>
+      <div class="guia-txt"><div class="guia-lbl">Asistencia · Drive</div><div class="guia-det" id="driveDet">—</div></div>
+      <button class="guia-go" id="driveRev" style="display:none" onclick="drvAbrirRevision()">Revisar</button>
+      <button class="guia-go" onclick="drvSincronizar(true)">Sincronizar ahora</button>
+    </div>
     <div class="guia-lock" id="guiaLock" style="display:none"></div>
   </div>
 </section>
@@ -388,6 +399,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <button class="btn-ghost" style="padding:9px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-weight:600;font-size:13px;cursor:pointer" onclick="ciCerrar()">Cerrar</button>
         <button class="ci-btn" id="ciBtnProcesar" onclick="ciProcesar()">Leer con IA</button>
         <button class="ci-btn" id="ciBtnGuardar" onclick="ciGuardarTodo()" style="display:none">💾 Guardar todo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ REVISIÓN DE LA SINCRONIZACIÓN CON EL DRIVE ═══ -->
+<div class="ci-overlay" id="driveOverlay">
+  <div class="ci-modal">
+    <div class="ci-mh">
+      <div class="ci-mh-title">Asistencia · Drive</div>
+      <span class="ci-mh-x" onclick="drvCerrarRevision()">×</span>
+    </div>
+    <div class="ci-mb" id="driveBody"></div>
+    <div class="ci-mf">
+      <div class="ci-status" style="margin-top:0"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-ghost" style="padding:9px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-weight:600;font-size:13px;cursor:pointer" onclick="drvCerrarRevision()">Ahora no</button>
+        <button class="ci-btn" id="driveBtnBajas" style="display:none" onclick="drvConfirmarBajas()">Dar de baja a las marcadas</button>
       </div>
     </div>
   </div>
@@ -607,7 +636,6 @@ async function guiaOmitirHoy() {
   cargarGuia();
 }
 
-cargarGuia();
 setInterval(cargarGuia, 60000);
 
 // ══ INDICADORES POR FICHA — Serigrafía y Tapas (oct/2026) ═══════════════
@@ -768,6 +796,8 @@ async function indTapasCalcular(ctx, asistRows) {
 
 // ── Personal: presentes del último día hábil ÷ activos del área ──
 function indPersonal(area, activosRows, asistRows, ayer) {
+  var rh = DRIVE.roster && DRIVE.roster[area];
+  if (rh) return { pres: rh.pres, total: rh.total, hayDia: rh.pres > 0 };   // hoja del Drive = fuente oficial
   if (activosRows === null || asistRows === null) return null;
   var activos = {};
   activosRows.forEach(function (p) { if (p.area === area) activos[p.codigo] = true; });
@@ -867,8 +897,356 @@ async function cargarIndicadores() {
   }
 }
 
-cargarIndicadores();
 setInterval(cargarIndicadores, 5 * 60 * 1000);
+
+// ══ ASISTENCIA ← DRIVE (oct/2026) ═══════════════════════════════════════
+// La hoja "ASISTENCIA DE PLANTA" es la fuente OFICIAL. api/asistencia-drive.js la lee (solo master) y aquí:
+//  · se cruza cada nombre de la hoja con `personal` (tolera nombres cortos, typos y apellidos de más);
+//  · se escribe asistencia_diaria (todas las áreas, turno 'dia'): la hoja manda, salvo que ella no puede
+//    expresar "tarde" — un 'tarde' marcado en TETRAPP NO se pisa con un PRESENTE de la hoja;
+//  · PERMISO y "Viaje laboral" se guardan como PRESENTE (no deben afectar el pago);
+//  · en Tapas/Serigrafía se mantiene rrhh_faltas igual que las grillas (origen asistencia_tapas/asistencia_serig);
+//  · BAJA/RENUNCIA NUNCA da de baja sola: propone y pide confirmación (fecha_baja = primer día reportado);
+//  · el roster activo del indicador "Personal" sale de la hoja del mes en curso, no de la tabla personal.
+var DRIVE = { ejecutando: false, resultado: null, roster: null, promesa: null };
+var DRV_STOP = { DE: 1, DEL: 1, LA: 1, LAS: 1, LOS: 1, Y: 1 };
+var DRV_ESTADO_APP = { presente: 'presente', permiso: 'presente', ausente: 'ausente', velada: 'velada', tarde: 'tarde' };
+var DRV_ORIGEN_FALTA = { tapas: 'asistencia_tapas', serig: 'asistencia_serig' };
+var DRV_AREAS_NOMBRE = { produccion: 'Producción', serig: 'Serigrafía', tapas: 'Tapas', bodega: 'Bodega', mantenimiento: 'Mantenimiento',
+  torno: 'Torno', moldes: 'Moldes', molino: 'Molino', oficina: 'Oficina' };
+
+function drvNorm(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+    .replace(/\([^)]*\)/g, ' ').replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function drvTokens(s) {
+  return drvNorm(s).split(' ').filter(function (t) { return t.length > 1 && !DRV_STOP[t]; });
+}
+function drvLev(a, b) {
+  var prev = [], i, j;
+  for (j = 0; j <= b.length; j++) prev[j] = j;
+  for (i = 1; i <= a.length; i++) {
+    var cur = [i];
+    for (j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+function drvTokIgual(a, b) {
+  if (a === b) return true;
+  var m = Math.min(a.length, b.length);
+  if (m < 4) return false;
+  return drvLev(a, b) <= (m >= 7 ? 2 : 1);
+}
+// Cuántos tokens de A tienen pareja en B (cada token de B se usa una sola vez)
+function drvCoincidencias(tA, tB) {
+  var usado = [], n = 0;
+  tA.forEach(function (a) {
+    for (var j = 0; j < tB.length; j++) {
+      if (!usado[j] && drvTokIgual(a, tB[j])) { usado[j] = true; n++; break; }
+    }
+  });
+  return n;
+}
+
+// Devuelve { persona } o { sin: 'sin_candidatos'|'ambiguo', candidatos }
+function drvCruzar(p, personal) {
+  var nH = drvNorm(p.nombre), tH = drvTokens(p.nombre);
+  var alias = personal.filter(function (x) { return x.nombre_hoja && drvNorm(x.nombre_hoja) === nH; });
+  if (alias.length === 1) return { persona: alias[0] };
+  var cands = [];
+  personal.forEach(function (x) {
+    var tP = drvTokens(x.nombre);
+    if (!tP.length) return;
+    var misma = x.area === p.area;
+    var n = drvCoincidencias(tP, tH);
+    // completo (todos los tokens de un lado), o con UN token distinto si ya coinciden 3 (typos tipo DEIMY/DELMI)
+    var ok = ((n === tP.length || n === tH.length) && (n >= 2 || (tP.length === 1 && n === 1 && misma))) ||
+             (n >= 3 && n >= Math.min(tP.length, tH.length) - 1);
+    if (ok) cands.push({ x: x, n: n, misma: misma });
+  });
+  if (!cands.length) return { sin: 'sin_candidatos', candidatos: [] };
+  var misma = cands.filter(function (c) { return c.misma; });
+  if (misma.length) cands = misma;
+  var act = cands.filter(function (c) { return c.x.activo; });
+  if (act.length) cands = act;
+  var mx = Math.max.apply(null, cands.map(function (c) { return c.n; }));
+  cands = cands.filter(function (c) { return c.n === mx; });
+  if (cands.length === 1) return { persona: cands[0].x };
+  return { sin: 'ambiguo', candidatos: cands.map(function (c) { return c.x.codigo + ' · ' + c.x.nombre; }) };
+}
+
+async function drvCargarPersonal() {
+  var r = await db.from('personal').select('id,codigo,nombre,area,activo,nombre_hoja');
+  if (r.error) r = await db.from('personal').select('id,codigo,nombre,area,activo');   // nombre_hoja aún no existe
+  if (r.error) throw r.error;
+  return r.data || [];
+}
+
+async function drvLeerHoja(mes) {
+  var r = await fetch('/api/asistencia-drive?mes=' + mes, { headers: { Authorization: HEADERS['Authorization'] } });
+  var j = await r.json().catch(function () { return {}; });
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+function drvDet(msg, clase) {
+  var el = document.getElementById('driveDet');
+  if (el) { el.textContent = msg; el.className = 'guia-det' + (clase ? ' ' + clase : ''); }
+}
+
+async function drvSincronizar(manual) {
+  if (DRIVE.ejecutando) return DRIVE.promesa;
+  DRIVE.ejecutando = true;
+  DRIVE.promesa = drvEjecutar(manual).finally(function () { DRIVE.ejecutando = false; });
+  return DRIVE.promesa;
+}
+
+async function drvEjecutar(manual) {
+  var fila = document.getElementById('guiaDrive');
+  if (fila) fila.style.display = 'flex';
+  drvDet('Sincronizando con el Drive…');
+  try {
+    var hoy = fechaHoyLocal();
+    var mesActual = hoy.slice(0, 7);
+    var mesPrevio = guiaSumarDias(hoy, -7).slice(0, 7);
+    var hojas = [await drvLeerHoja(mesActual)];
+    if (mesPrevio !== mesActual) { try { hojas.unshift(await drvLeerHoja(mesPrevio)); } catch (e) { /* sin pestaña del mes previo: no pasa nada */ } }
+    var hojaActual = hojas[hojas.length - 1];
+
+    var res = await Promise.all([
+      drvCargarPersonal(),
+      guiaSafe(db.from('dias_feriados').select('fecha').gte('fecha', guiaSumarDias(hoy, -40))),
+      indPaginar(function () {
+        return db.from('asistencia_diaria').select('fecha,operador_codigo,area,turno,estado').eq('turno', 'dia')
+          .gte('fecha', hojas[0].mes + '-01').lte('fecha', hoy);
+      })
+    ]);
+    var personal = res[0], feriados = {}, existentes = {};
+    (res[1] || []).forEach(function (f) { feriados[f.fecha] = true; });
+    (res[2] || []).forEach(function (a) { existentes[a.fecha + '|' + a.operador_codigo + '|' + a.area] = a.estado; });
+    var ayer = guiaDiaHabilAnterior(hoy, feriados);
+
+    var upserts = [], cambios = [], sinCruzar = [], bajas = [], reactivar = [], vistos = {}, cruzados = {};
+    var areasHoja = {};
+    hojas.forEach(function (h) {
+      var esActual = h.mes === mesActual;
+      h.personas.forEach(function (p) {
+        areasHoja[p.area] = true;
+        var m = drvCruzar(p, personal);
+        if (!m.persona) {
+          if (esActual) sinCruzar.push({ nombre: p.nombre, area: p.area, motivo: m.sin, candidatos: m.candidatos });
+          return;
+        }
+        var x = m.persona;
+        if (esActual) cruzados[x.codigo] = true;
+        if (!x.activo) {
+          var fechasP = Object.keys(p.estados).sort();
+          var ultima = fechasP.length ? fechasP[fechasP.length - 1] : null;
+          // solo si el ÚLTIMO estado de la hoja no es baja (si no, es alguien ya dado de baja en ambos lados)
+          var reciente = ultima && ultima >= guiaSumarDias(hoy, -7) && p.estados[ultima] !== 'baja';
+          if (esActual && reciente) reactivar.push({ codigo: x.codigo, nombre: x.nombre, area: p.area });
+          return;
+        }
+        if (esActual && p.baja_desde && p.baja_desde <= hoy) {
+          bajas.push({ codigo: x.codigo, nombre: x.nombre, area: p.area, desde: p.baja_desde });
+        }
+        Object.keys(p.estados).forEach(function (f) {
+          if (f > hoy) return;
+          var nuevo = DRV_ESTADO_APP[p.estados[f]];
+          if (!nuevo) return;                                  // baja: no se escribe asistencia
+          var k = f + '|' + x.codigo + '|' + p.area;
+          var antes = existentes[k];
+          if (antes === nuevo) return;
+          if (antes === 'tarde' && nuevo === 'presente') return; // la hoja no distingue "tarde"
+          upserts.push({ fecha: f, operador_codigo: x.codigo, operador_nombre: x.nombre, area: p.area, turno: 'dia', estado: nuevo });
+          cambios.push({ id: x.id, area: p.area, fecha: f, nuevo: nuevo, antes: antes || null });
+        });
+      });
+    });
+
+    // Roster del indicador "Personal": SOLO la hoja del mes en curso, último día hábil
+    var roster = {};
+    hojaActual.personas.forEach(function (p) {
+      var e = p.estados[ayer];
+      if (e === 'baja') return;
+      if (p.ingreso && p.ingreso > ayer) return;
+      if (!roster[p.area]) roster[p.area] = { pres: 0, total: 0, fecha: ayer };
+      roster[p.area].total++;
+      if (e && e !== 'ausente') roster[p.area].pres++;
+    });
+    DRIVE.roster = roster;
+
+    // Activos en TETRAPP (de áreas que SÍ vienen en la hoja) que no aparecen en ella: solo informativo
+    var faltanEnHoja = personal.filter(function (x) { return x.activo && areasHoja[x.area] && !cruzados[x.codigo]; });
+
+    // Escritura (en bloques); si falla la tabla/constraint se informa y no se rompe nada
+    // Tapas/Serigrafía primero y aparte: el CHECK de `area` solo admite las demás áreas tras correr el SQL
+    var escritas = 0, errEscritura = null;
+    var grupos = [
+      upserts.filter(function (u) { return u.area === 'tapas' || u.area === 'serig'; }),
+      upserts.filter(function (u) { return u.area !== 'tapas' && u.area !== 'serig'; })
+    ];
+    for (var g = 0; g < grupos.length; g++) {
+      for (var i = 0; i < grupos[g].length; i += 300) {
+        var chunk = grupos[g].slice(i, i + 300);
+        var w = await db.from('asistencia_diaria').upsert(chunk, { onConflict: 'fecha,operador_codigo,area,turno' });
+        if (w.error) { errEscritura = w.error.message; break; }
+        escritas += chunk.length;
+      }
+    }
+    await drvSincronizarFaltas(cambios, feriados);
+
+    DRIVE.resultado = {
+      hora: new Date(), escritas: escritas, errEscritura: errEscritura, bajas: bajas, sinCruzar: sinCruzar,
+      reactivar: reactivar, faltanEnHoja: faltanEnHoja, desconocidos: hojaActual.estados_desconocidos || []
+    };
+    drvResumen();
+    var snooze = parseInt(localStorage.getItem('tetra_drive_snooze') || '0', 10);
+    if (bajas.length && !manual && Date.now() - snooze > 12 * 3600 * 1000) drvAbrirRevision();
+    else if (manual) drvAbrirRevision();
+  } catch (e) {
+    console.error('Drive:', e);
+    drvDet('No se pudo sincronizar: ' + (e && e.message ? e.message : e), 'pend-txt');
+  }
+}
+
+// Mismo criterio que las grillas de Tapas/Serigrafía, pero en bloque
+async function drvSincronizarFaltas(cambios, feriados) {
+  try {
+    var rel = cambios.filter(function (c) { return DRV_ORIGEN_FALTA[c.area] && c.id && !feriados[c.fecha]; });
+    if (!rel.length) return;
+    var ids = {}, fmin = '9999', fmax = '0000';
+    rel.forEach(function (c) { ids[c.id] = true; if (c.fecha < fmin) fmin = c.fecha; if (c.fecha > fmax) fmax = c.fecha; });
+    var ex = await indPaginar(function () {
+      return db.from('rrhh_faltas').select('id,personal_id,fecha,origen,tipo,justificacion_texto,justificacion_foto_url')
+        .in('personal_id', Object.keys(ids)).gte('fecha', fmin).lte('fecha', fmax).in('origen', ['asistencia_tapas', 'asistencia_serig']);
+    });
+    if (ex === null) return;
+    var mapa = {};
+    ex.forEach(function (f) { mapa[f.personal_id + '|' + f.fecha + '|' + f.origen] = f; });
+    var nuevos = [], borrar = [];
+    rel.forEach(function (c) {
+      var origen = DRV_ORIGEN_FALTA[c.area], k = c.id + '|' + c.fecha + '|' + origen, f = mapa[k];
+      if (c.nuevo === 'ausente' || c.nuevo === 'tarde') {
+        var tipo = c.nuevo === 'ausente' ? 'ausencia' : 'tardanza';
+        if (!f) nuevos.push({ personal_id: c.id, fecha: c.fecha, origen: origen, tipo: tipo,
+          notas: 'Falta detectada automáticamente desde la hoja de asistencia (Drive)' });
+      } else if (f && !f.justificacion_texto && !f.justificacion_foto_url) {
+        borrar.push(f.id);   // ya no está ausente/tarde y nadie la justificó
+      }
+    });
+    if (nuevos.length) await db.from('rrhh_faltas').insert(nuevos);
+    if (borrar.length) await db.from('rrhh_faltas').delete().in('id', borrar);
+  } catch (e) { console.warn('Faltas desde Drive:', e); }
+}
+
+function drvResumen() {
+  var r = DRIVE.resultado;
+  if (!r) return;
+  var hora = r.hora.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+  var pend = r.bajas.length + r.sinCruzar.length;
+  var txt = r.errEscritura
+    ? 'Error al guardar: ' + r.errEscritura + ' — ¿corriste sql/asistencia_drive_v1.sql?'
+    : 'Sincronizado ' + hora + ' · ' + r.escritas + ' cambio(s)' + (pend ? ' · ' + pend + ' por revisar' : '');
+  drvDet(txt, r.errEscritura ? 'pend-txt' : '');
+  var led = document.getElementById('driveLed');
+  if (led) led.className = 'guia-led ' + (r.errEscritura ? 'bad' : (pend ? 'warn' : 'good'));
+  var btn = document.getElementById('driveRev');
+  if (btn) { btn.style.display = pend || r.reactivar.length || r.faltanEnHoja.length ? 'inline-block' : 'none'; btn.textContent = pend ? 'Revisar (' + pend + ')' : 'Ver detalle'; }
+}
+
+// ── Revisión (bajas por confirmar, nombres sin cruzar, informativos) ──
+function drvOpcionesPersonal(area) {
+  var lista = (DRIVE.personalCache || []).filter(function (x) { return x.activo; });
+  lista.sort(function (a, b) { return (b.area === area) - (a.area === area) || a.nombre.localeCompare(b.nombre); });
+  return '<option value="">— elegir persona de TETRAPP —</option>' + lista.map(function (x) {
+    return '<option value="' + escHtml(x.codigo) + '">' + escHtml(x.nombre) + ' (' + escHtml(x.codigo) + ' · ' + escHtml(DRV_AREAS_NOMBRE[x.area] || x.area) + ')</option>';
+  }).join('');
+}
+
+function drvFilaBaja(b, i) {
+  return '<tr><td><input type="checkbox" class="drv-baja" data-i="' + i + '" checked></td>' +
+    '<td><b>' + escHtml(b.nombre) + '</b><div class="ci-doc-meta">' + escHtml(b.codigo) + ' · ' + escHtml(DRV_AREAS_NOMBRE[b.area] || b.area) + '</div></td>' +
+    '<td style="font-family:var(--mono)">' + escHtml(b.desde) + '</td></tr>';
+}
+function drvFilaSinCruzar(s, i) {
+  var nota = s.motivo === 'ambiguo' ? 'Varias coincidencias: ' + escHtml(s.candidatos.join(' / ')) : 'No hay nadie parecido en TETRAPP (¿persona nueva?)';
+  return '<tr><td><b>' + escHtml(s.nombre) + '</b><div class="ci-doc-meta">' + escHtml(DRV_AREAS_NOMBRE[s.area] || s.area) + ' · ' + nota + '</div></td>' +
+    '<td><select id="drvSel' + i + '" style="max-width:260px">' + drvOpcionesPersonal(s.area) + '</select> ' +
+    '<button class="guia-go" onclick="drvVincular(' + i + ')">Vincular</button></td></tr>';
+}
+function drvLista(titulo, items, fmt) {
+  if (!items.length) return '';
+  return '<div class="ci-doc" style="margin-bottom:14px"><div class="ci-doc-h"><div class="ci-doc-title">' + titulo + ' (' + items.length + ')</div></div>' +
+    '<div style="padding:10px 14px;font-size:12px;color:var(--gray);line-height:1.7">' + items.map(fmt).join('<br>') + '</div></div>';
+}
+
+async function drvAbrirRevision() {
+  var r = DRIVE.resultado;
+  if (!r) return;
+  try { DRIVE.personalCache = await drvCargarPersonal(); } catch (e) { DRIVE.personalCache = []; }
+  var h = '';
+  if (r.bajas.length) {
+    h += '<div class="ci-doc" style="margin-bottom:14px"><div class="ci-doc-h"><div><div class="ci-doc-title">Bajas reportadas en la hoja — confirma antes de aplicar</div>' +
+      '<div class="ci-doc-meta">La baja queda con fecha del primer día en que la hoja marca BAJA/RENUNCIA.</div></div></div>' +
+      '<table class="ci-tbl"><thead><tr><th></th><th>Persona</th><th>Baja desde</th></tr></thead><tbody>' + r.bajas.map(drvFilaBaja).join('') + '</tbody></table></div>';
+  }
+  if (r.sinCruzar.length) {
+    h += '<div class="ci-doc" style="margin-bottom:14px"><div class="ci-doc-h"><div><div class="ci-doc-title">Nombres de la hoja sin cruzar con TETRAPP</div>' +
+      '<div class="ci-doc-meta">Su asistencia no se sincroniza hasta vincularlos. Si es persona nueva, dala de alta en Gestión.</div></div></div>' +
+      '<table class="ci-tbl"><tbody>' + r.sinCruzar.map(drvFilaSinCruzar).join('') + '</tbody></table></div>';
+  }
+  h += drvLista('Activos en la hoja pero dados de baja en TETRAPP', r.reactivar, function (x) { return escHtml(x.nombre) + ' · ' + escHtml(x.codigo); });
+  h += drvLista('Activos en TETRAPP que no aparecen en la hoja del mes', r.faltanEnHoja, function (x) { return escHtml(x.nombre) + ' · ' + escHtml(x.codigo) + ' · ' + escHtml(DRV_AREAS_NOMBRE[x.area] || x.area); });
+  h += drvLista('Estados de la hoja que no reconozco (se ignoran)', r.desconocidos, function (x) { return escHtml(x); });
+  if (!h) h = '<div class="ci-status">Todo al día — nada por revisar.</div>';
+  document.getElementById('driveBody').innerHTML = h;
+  document.getElementById('driveBtnBajas').style.display = r.bajas.length ? 'inline-block' : 'none';
+  document.getElementById('driveOverlay').classList.add('open');
+}
+function drvCerrarRevision() {
+  document.getElementById('driveOverlay').classList.remove('open');
+  try { localStorage.setItem('tetra_drive_snooze', String(Date.now())); } catch (e) {}
+}
+
+async function drvConfirmarBajas() {
+  var r = DRIVE.resultado, marcadas = [];
+  document.querySelectorAll('.drv-baja').forEach(function (c) { if (c.checked) marcadas.push(r.bajas[parseInt(c.getAttribute('data-i'), 10)]); });
+  if (!marcadas.length) return;
+  if (!confirm('¿Dar de baja a ' + marcadas.length + ' persona(s)?')) return;
+  var fallos = [];
+  for (var i = 0; i < marcadas.length; i++) {
+    var u = await db.from('personal').update({ activo: false, fecha_baja: marcadas[i].desde }).eq('codigo', marcadas[i].codigo);
+    if (u.error) fallos.push(marcadas[i].nombre + ': ' + u.error.message);
+  }
+  if (fallos.length) alert('No se pudieron aplicar:\n' + fallos.join('\n'));
+  document.getElementById('driveOverlay').classList.remove('open');
+  await drvSincronizar(false);
+  cargarGuia(); cargarIndicadores();
+}
+
+async function drvVincular(i) {
+  var s = DRIVE.resultado.sinCruzar[i];
+  var cod = document.getElementById('drvSel' + i).value;
+  if (!cod) { alert('Elige primero a la persona de TETRAPP.'); return; }
+  var u = await db.from('personal').update({ nombre_hoja: s.nombre }).eq('codigo', cod);
+  if (u.error) { alert('No se pudo vincular: ' + u.error.message + '\n¿Corriste sql/asistencia_drive_v1.sql?'); return; }
+  document.getElementById('driveOverlay').classList.remove('open');
+  await drvSincronizar(true);
+}
+
+// Arranque ordenado: primero la hoja (alimenta asistencia y roster), luego guía e indicadores
+async function iniciarPanel() {
+  await guiaEsperarRol();
+  if (TETRA.rol === 'master') await drvSincronizar(false);
+  cargarGuia();
+  cargarIndicadores();
+}
+
+iniciarPanel();
 
 function toggleLogoNav(e) {
   e.stopPropagation();
