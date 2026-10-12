@@ -3227,9 +3227,10 @@ function boardBuildSinBlock(items) {
             boardBuildCardSinRow(item, solEsc, cliEsc) +
           '</div>';
         }).join('');
-        // Colapsado: lo guardado manda; por defecto solo el período en curso abierto
+        // Colapsado: solo si el usuario lo colapsó a mano (lo guardado manda). Por defecto TODOS los
+        // períodos van desplegados: así ninguna ficha completada queda escondida en un mes anterior.
         var gkEsc     = gk.replace(/'/g, "\\'");
-        var colapsado = colState[gk] === undefined ? (per.key !== perHoy) : colState[gk] === 1;
+        var colapsado = colState[gk] === 1;
         var perClase  = 'sin-grupo-per' + (per.key === perHoy ? ' per-actual' : '');
         return '<div class="sin-grupo' + (colapsado ? ' collapsed' : '') + '" data-gk="' + escHtml(gk) + '"' +
           ' ondragover="sinGrupoDragOver(event,\'' + cliEsc + '\')"' +
@@ -3376,24 +3377,26 @@ function auditarFichasOcultas() {
     var sel = '[onclick*="' + s.id + '"]';
     var nodos = document.querySelectorAll('#boardSin ' + sel + ', #boardLines ' + sel);
     var cod = s.id_display || s.id.slice(0, 8);
-    if (!nodos.length) { ocultas.push({ id: s.id, cod: cod, cli: s.cliente, motivo: 'no se dibuja (estado «' + (s.estado || '?') + '»)' }); return; }
+    if (!nodos.length) { ocultas.push({ id: s.id, cod: cod, cli: s.cliente, fecha: s.created_at || '', motivo: 'no se dibuja (estado «' + (s.estado || '?') + '»)' }); return; }
     var visibles = Array.prototype.filter.call(nodos, function(n) { return !n.closest('.sin-grupo.collapsed'); });
     if (!visibles.length) {
       var g = nodos[0].closest('.sin-grupo');
-      ocultas.push({ id: s.id, cod: cod, cli: s.cliente, motivo: 'dentro de un grupo colapsado', gk: g ? g.getAttribute('data-gk') : '' });
+      ocultas.push({ id: s.id, cod: cod, cli: s.cliente, fecha: s.created_at || '', motivo: 'dentro de un grupo colapsado', gk: g ? g.getAttribute('data-gk') : '' });
       return;
     }
     var cont = visibles[0].closest('.board-sin-cards');
     if (cont) {
       var rc = cont.getBoundingClientRect(), rn = visibles[0].getBoundingClientRect();
-      if (rc.width > 0 && rn.left >= rc.right - 4) ocultas.push({ id: s.id, cod: cod, cli: s.cliente, motivo: 'fuera de pantalla (desliza a la derecha)' });
+      if (rc.width > 0 && rn.left >= rc.right - 4) ocultas.push({ id: s.id, cod: cod, cli: s.cliente, fecha: s.created_at || '', motivo: 'fuera de pantalla (desliza a la derecha)' });
     }
   });
+  // Más recientes primero (por fecha de ingreso de la ficha)
+  ocultas.sort(function(a, b) { return (a.fecha < b.fecha) ? 1 : (a.fecha > b.fecha ? -1 : 0); });
   window._fichasOcultas = ocultas;
   if (!ocultas.length) { bar.innerHTML = ''; return; }
   var chips = ocultas.map(function(o) {
     return '<span onclick="mostrarFichaOculta(\'' + o.id + '\')" title="' + escHtml(o.motivo) + '" style="cursor:pointer;display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border-radius:10px;background:#fff;border:1px solid #fcd34d;font-size:11px;font-weight:700;color:#92400e">' +
-      escHtml(o.cod) + ' · ' + escHtml(o.cli || '—') + ' <span style="font-weight:500;color:#b45309">— ' + escHtml(o.motivo) + '</span></span>';
+      escHtml(o.cod) + ' · ' + escHtml(o.cli || '—') + (o.fecha ? ' · ' + fmtFechaCorta(o.fecha) : '') + ' <span style="font-weight:500;color:#b45309">— ' + escHtml(o.motivo) + '</span></span>';
   }).join('');
   bar.innerHTML = '<div style="margin:0 0 12px;padding:8px 12px;border:1.5px solid #fcd34d;background:#fffbeb;border-radius:10px;font-size:12px;color:#92400e">' +
     '<b>⚠️ ' + ocultas.length + ' ficha' + (ocultas.length > 1 ? 's' : '') + ' no ' + (ocultas.length > 1 ? 'están' : 'está') + ' a la vista</b> · clic en una para mostrarla ' +
