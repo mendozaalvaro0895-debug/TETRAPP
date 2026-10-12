@@ -987,7 +987,7 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
       <div class="fr">
         <div class="fg">
           <div class="fl">Cliente</div>
-          <select class="fs" id="fCli">
+          <select class="fs" id="fCli" onchange="actualizarCampoOC()">
             <option value="">— Selecciona cliente —</option>
           </select>
         </div>
@@ -1012,6 +1012,12 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
             <option value="programada">🟡 Programada</option>
             <option value="vela">🌙 Vela</option>
           </select>
+        </div>
+      </div>
+      <div class="fr" id="fOcRow" style="display:none">
+        <div class="fg">
+          <div class="fl">Número de OC *</div>
+          <input class="fi" id="fNumeroOC" type="text" placeholder="Ej.: OC-12345" autocomplete="off" oninput="this.style.borderColor=''">
         </div>
       </div>
       <div class="fg full">
@@ -1958,7 +1964,7 @@ async function cargarSolicitudes() {
       var descExtra   = ld.length > 1 ? ' (+' + (ld.length - 1) + ')' : '';
       return {
         id: s.id, dbId: s.id,
-        id_display: s.codigo, area: s.area,
+        id_display: s.codigo, numero_oc: s.numero_oc || '', area: s.area,
         cliente: s.cliente_nombre, area_sol: s.area_solicitante,
         sku: ld[0] ? (ld[0].sku || '—') : '—',
         desc: (ld.length === 1 ? descPrimera : descPrimera + descExtra),
@@ -2615,6 +2621,7 @@ function boardBuildCard(item) {
     ' onclick="mostrarDetalle(\'' + item.solId + '\')">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;margin-bottom:3px">' +
       '<span style="font-size:10px;font-weight:700;color:var(--serig-m);font-family:var(--mono)">' + item.solCodigo + '</span>' +
+      (item.numeroOC ? '<span title="Número de OC" style="font-size:9px;font-weight:800;color:#0f766e;background:#ccfbf1;border-radius:4px;padding:1px 5px">OC ' + escHtml(item.numeroOC) + '</span>' : '') +
       '<span style="display:flex;gap:4px;align-items:center">' + badgeAgo + badge + '</span>' +
     '</div>' +
     '<div style="font-size:12px;font-weight:700;color:var(--ink);line-height:1.2;margin-bottom:2px">' + item.cliente + '</div>' +
@@ -2710,6 +2717,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
       '<span style="font-family:var(--mono);font-size:10px;font-weight:800;color:' + (isComplete ? '#15803d' : 'var(--serig-m)') + ';flex-shrink:0">' + escHtml(item.solCodigo) + '</span>' +
       badgeAgo3 +
       badgeTraslado3 +
+      (item.numeroOC ? '<span title="Número de OC" style="font-size:9px;font-weight:800;color:#0f766e;background:#ccfbf1;border-radius:4px;padding:1px 5px;flex-shrink:0">OC ' + escHtml(item.numeroOC) + '</span>' : '') +
       (item.restaurada && item.linea_id ? '<span title="Línea donde se trabajó" style="background:#fff;color:#15803d;border:1px solid #86efac;border-radius:4px;padding:1px 5px;font-size:9px;font-weight:800;flex-shrink:0">L' + escHtml(String(item.linea_id)) + '</span>' : '') +
       '<span onclick="event.stopPropagation();abrirEstadoSin(event,\'' + item.solId + '\',\'' + (item.lineaDbId || '') + '\')" title="Cambiar estado" style="background:' + badgeBg + ';color:' + badgeClr + ';border:1.5px solid ' + badgeBdr + ';border-radius:5px;padding:3px 8px;font-size:9px;font-weight:800;flex-shrink:0;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.10);letter-spacing:.3px;display:inline-flex;align-items:center;gap:4px">' + badgeTxt + ' <span style="font-size:8px;opacity:.7">▾</span></span>' +
       '<span style="flex:1"></span>' +
@@ -3371,7 +3379,7 @@ function renderBoard() {
       var perRest = s.periodo_efectivo || periodoCompletadaKey(s);
       s.lineas.forEach(function(l) {
         sinExtra.push({
-          lineaDbId: l.id, solId: s.id, solCodigo: s.id_display || s.id.slice(0,8),
+          lineaDbId: l.id, solId: s.id, solCodigo: s.id_display || s.id.slice(0,8), numeroOC: s.numero_oc || '',
           cliente: s.cliente, sku: l.sku || '', desc: l.desc || '', skuBase: (l.sku_base || '').trim(),
           cant: l.cant || 0, linea_id: l.linea_id || 0, prog: s.prog || 0, estado: 'lista',
           procEstado: procEstadoEfectivo(s), tiros: 1, tiro_actual: 1, notas: s.notas || '',
@@ -3386,7 +3394,7 @@ function renderBoard() {
       items.push({
         lineaDbId: null,
         solId:     s.id,
-        solCodigo: s.id_display || s.id.slice(0,8),
+        solCodigo: s.id_display || s.id.slice(0,8), numeroOC: s.numero_oc || '',
         cliente:   s.cliente,
         sku:       '',
         desc:      '(sin líneas registradas)',
@@ -3406,7 +3414,7 @@ function renderBoard() {
         items.push({
           lineaDbId: l.id,
           solId:     s.id,
-          solCodigo: s.id_display || s.id.slice(0,8),
+          solCodigo: s.id_display || s.id.slice(0,8), numeroOC: s.numero_oc || '',
           cliente:   s.cliente,
           sku:       l.sku  || '',
           desc:      l.desc || '',
@@ -6997,7 +7005,7 @@ async function mostrarDetalle(id) {
     '<div class="ph" style="flex-shrink:0">' +
       '<div>' +
         '<div class="ph-title">' + (s.id_display||s.id.slice(0,8)) + ' — ' + s.cliente + '</div>' +
-        '<div class="ph-sub">' + s.sku + ' · ' + s.cant.toLocaleString() + ' unidades</div>' +
+        '<div class="ph-sub">' + s.sku + ' · ' + s.cant.toLocaleString() + ' unidades' + (s.numero_oc ? ' · <b>OC ' + escHtml(s.numero_oc) + '</b>' : '') + '</div>' +
       '</div>' +
       '<div class="ph-r">' +
         btnEstado +
@@ -7389,12 +7397,24 @@ async function restaurarSolicitud(id) {
 
 var editandoSolicitudId = null;
 
+// Número de OC: obligatorio en pedidos NUEVOS de DAROSA (columna solicitudes.numero_oc)
+function esClienteConOC(cli) { return /darosa/i.test(cli || ''); }
+function actualizarCampoOC() {
+  var cli = (document.getElementById('fCli') || {}).value || '';
+  var row = document.getElementById('fOcRow');
+  if (row) row.style.display = esClienteConOC(cli) ? '' : 'none';
+}
+function valorOC() { return ((document.getElementById('fNumeroOC') || {}).value || '').trim(); }
+
 function abrirForm() {
   editandoSolicitudId = null;
   lineas = [];
   addLinea();
   document.getElementById('fCli').value = '';
   document.getElementById('fNotas').value = '';
+  document.getElementById('fNumeroOC').value = '';
+  document.getElementById('fNumeroOC').style.borderColor = '';
+  actualizarCampoOC();
   document.getElementById('mTitle').textContent = 'Nueva solicitud · Serigrafía';
   document.getElementById('btnSave').textContent = 'Guardar';
   var d = new Date(); d.setDate(d.getDate() + 3);
@@ -7418,6 +7438,9 @@ function abrirFormEditar(solId) {
   }
   editandoSolicitudId = solId;
   document.getElementById('fCli').value = s.cliente || '';
+  document.getElementById('fNumeroOC').value = s.numero_oc || '';
+  document.getElementById('fNumeroOC').style.borderColor = '';
+  actualizarCampoOC();
   document.getElementById('fArea').value = s.area_sol || 'Ventas';
   document.getElementById('fFecha').value = s.fecha_lim || '';
   document.getElementById('fPrioSelect').value = s.prio || 'normal';
@@ -8169,6 +8192,15 @@ function calcular() {
 async function guardar() {
   var cliente = document.getElementById('fCli').value;
   if (!cliente) { showToast('⚠️ Selecciona un cliente', '#B83232'); return; }
+  // OC obligatoria en pedidos NUEVOS de DAROSA; al editar una ficha, solo si ya traía OC
+  var solEd = editandoSolicitudId ? solicitudes.find(function(x) { return x.id === editandoSolicitudId; }) : null;
+  var ocObligatoria = esClienteConOC(cliente) && (!solEd || !!solEd.numero_oc);
+  if (ocObligatoria && !valorOC()) {
+    showToast('⚠️ El Número de OC es obligatorio para pedidos de DAROSA', '#B83232');
+    var ocEl = document.getElementById('fNumeroOC');
+    if (ocEl) { ocEl.style.borderColor = '#dc2626'; ocEl.focus(); }
+    return;
+  }
   var lineasValidas = lineas.filter(function(l) { return l.cant > 0; });
   if (lineasValidas.length === 0) { showToast('⚠️ Agrega al menos una línea con cantidad', '#B83232'); return; }
   if (editandoSolicitudId) {
@@ -8189,6 +8221,14 @@ function sincronizarTirosHora(lineasValidas) {
       .then(function() { item.tiros_hora = l.cap_impresion; })
       .catch(function(e) { console.warn('sincronizarTirosHora:', e); });
   });
+}
+
+// Si falta la columna numero_oc, avisar qué SQL correr en vez del error crudo
+function errorOC(err) {
+  if (/numero_oc/i.test((err.message || '') + (err.details || ''))) {
+    return new Error('Falta correr sql/solicitudes_numero_oc_v1.sql en Supabase (columna numero_oc)');
+  }
+  return err;
 }
 
 function buildLineasPayload(lineasValidas, solicitudId) {
@@ -8231,15 +8271,17 @@ async function guardarNuevo(lineasValidas, cliente) {
   var notasFinal = encodeMeta(0, 0, 0, document.getElementById('fNotas').value);
   var nuevaId = null;
   try {
-    var r = await db.from('solicitudes').insert({
+    var datosNuevo = {
       codigo: codigo, area: 'serig',
       cliente_nombre: cliente,
       area_solicitante: document.getElementById('fArea').value,
       fecha_limite: document.getElementById('fFecha').value,
       prioridad: document.getElementById('fPrioSelect').value,
       estado: 'nueva', progreso_pct: 0, notas: notasFinal
-    }).select().single();
-    if (r.error) throw r.error;
+    };
+    if (esClienteConOC(cliente) && valorOC()) datosNuevo.numero_oc = valorOC();
+    var r = await db.from('solicitudes').insert(datosNuevo).select().single();
+    if (r.error) throw errorOC(r.error);
     nuevaId = r.data.id;
     var payload = buildLineasPayload(lineasValidas, nuevaId);
     await insertarLineas(payload.base, payload.full);
@@ -8260,14 +8302,16 @@ async function guardarEdicion(lineasValidas, cliente) {
   if (!s) return;
   var notasFinal = encodeMeta(0, 0, 0, document.getElementById('fNotas').value, s.proc_estado || '', s.tiro_actual || 1);
   try {
-    var r = await db.from('solicitudes').update({
+    var datosEdit = {
       cliente_nombre: cliente,
       area_solicitante: document.getElementById('fArea').value,
       fecha_limite: document.getElementById('fFecha').value,
       prioridad: document.getElementById('fPrioSelect').value,
       notas: notasFinal
-    }).eq('id', s.dbId);
-    if (r.error) throw r.error;
+    };
+    if (esClienteConOC(cliente)) datosEdit.numero_oc = valorOC() || null;
+    var r = await db.from('solicitudes').update(datosEdit).eq('id', s.dbId);
+    if (r.error) throw errorOC(r.error);
     var rd = await db.from('solicitud_lineas').delete().eq('solicitud_id', s.dbId);
     if (rd.error) throw rd.error;
     var payload = buildLineasPayload(lineasValidas, s.dbId);
