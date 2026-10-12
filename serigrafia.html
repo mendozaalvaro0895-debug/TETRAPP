@@ -743,6 +743,9 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
           <div id="prodMensual"></div>
         </div>
 
+        <!-- Aviso de fichas no visibles (auditarFichasOcultas) -->
+        <div id="fichasOcultasBar"></div>
+
         <!-- Board: carriles línea 1-4 (con pipeline de procesos integrado) -->
         <div class="sec-hdr">
           <div class="sec-title">Líneas de Producción</div>
@@ -3228,7 +3231,7 @@ function boardBuildSinBlock(items) {
         var gkEsc     = gk.replace(/'/g, "\\'");
         var colapsado = colState[gk] === undefined ? (per.key !== perHoy) : colState[gk] === 1;
         var perClase  = 'sin-grupo-per' + (per.key === perHoy ? ' per-actual' : '');
-        return '<div class="sin-grupo' + (colapsado ? ' collapsed' : '') + '"' +
+        return '<div class="sin-grupo' + (colapsado ? ' collapsed' : '') + '" data-gk="' + escHtml(gk) + '"' +
           ' ondragover="sinGrupoDragOver(event,\'' + cliEsc + '\')"' +
           ' ondragleave="this.classList.remove(\'drag-grupo-over\')"' +
           ' ondrop="sinGrupoDrop(event,\'' + cliEsc + '\')">' +
@@ -3362,6 +3365,72 @@ function fichaCompletadaEsteMes(s) {
   return periodoCompletadaKey(s) === periodoActualKey();
 }
 
+// ── Auditoría: fichas que existen pero NO están a la vista ────────────────
+// Compara las solicitudes cargadas contra lo realmente dibujado en el tablero y avisa de:
+//  · no dibujada · dentro de un grupo colapsado de Sin asignar · fuera de pantalla (a la derecha).
+function auditarFichasOcultas() {
+  var bar = document.getElementById('fichasOcultasBar');
+  if (!bar) return;
+  var ocultas = [];
+  (solicitudes || []).forEach(function(s) {
+    var sel = '[onclick*="' + s.id + '"]';
+    var nodos = document.querySelectorAll('#boardSin ' + sel + ', #boardLines ' + sel);
+    var cod = s.id_display || s.id.slice(0, 8);
+    if (!nodos.length) { ocultas.push({ id: s.id, cod: cod, cli: s.cliente, motivo: 'no se dibuja (estado «' + (s.estado || '?') + '»)' }); return; }
+    var visibles = Array.prototype.filter.call(nodos, function(n) { return !n.closest('.sin-grupo.collapsed'); });
+    if (!visibles.length) {
+      var g = nodos[0].closest('.sin-grupo');
+      ocultas.push({ id: s.id, cod: cod, cli: s.cliente, motivo: 'dentro de un grupo colapsado', gk: g ? g.getAttribute('data-gk') : '' });
+      return;
+    }
+    var cont = visibles[0].closest('.board-sin-cards');
+    if (cont) {
+      var rc = cont.getBoundingClientRect(), rn = visibles[0].getBoundingClientRect();
+      if (rc.width > 0 && rn.left >= rc.right - 4) ocultas.push({ id: s.id, cod: cod, cli: s.cliente, motivo: 'fuera de pantalla (desliza a la derecha)' });
+    }
+  });
+  window._fichasOcultas = ocultas;
+  if (!ocultas.length) { bar.innerHTML = ''; return; }
+  var chips = ocultas.map(function(o) {
+    return '<span onclick="mostrarFichaOculta(\'' + o.id + '\')" title="' + escHtml(o.motivo) + '" style="cursor:pointer;display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border-radius:10px;background:#fff;border:1px solid #fcd34d;font-size:11px;font-weight:700;color:#92400e">' +
+      escHtml(o.cod) + ' · ' + escHtml(o.cli || '—') + ' <span style="font-weight:500;color:#b45309">— ' + escHtml(o.motivo) + '</span></span>';
+  }).join('');
+  bar.innerHTML = '<div style="margin:0 0 12px;padding:8px 12px;border:1.5px solid #fcd34d;background:#fffbeb;border-radius:10px;font-size:12px;color:#92400e">' +
+    '<b>⚠️ ' + ocultas.length + ' ficha' + (ocultas.length > 1 ? 's' : '') + ' no ' + (ocultas.length > 1 ? 'están' : 'está') + ' a la vista</b> · clic en una para mostrarla ' +
+    '<button class="btn btn-g btn-xs" style="margin-left:6px" onclick="mostrarTodasOcultas()">Mostrar todas</button><div style="margin-top:4px">' + chips + '</div></div>';
+}
+
+// Despliega el grupo (si estaba colapsado), lleva la ficha a la vista y la resalta; si no se dibuja, abre su detalle
+function mostrarFichaOculta(solId) {
+  var o = (window._fichasOcultas || []).find(function(x) { return x.id === solId; });
+  if (o && o.gk) {
+    var st = getSinGrupoCol(); st[o.gk] = 0;
+    localStorage.setItem('sin_grupo_col', JSON.stringify(st));
+    document.querySelectorAll('.sin-grupo').forEach(function(g) { if (g.getAttribute('data-gk') === o.gk) g.classList.remove('collapsed'); });
+  }
+  var nodo = document.querySelector('#boardSin [onclick*="' + solId + '"], #boardLines [onclick*="' + solId + '"]');
+  if (nodo) {
+    nodo.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    nodo.style.transition = 'box-shadow .3s';
+    nodo.style.boxShadow = '0 0 0 3px #f59e0b';
+    setTimeout(function() { nodo.style.boxShadow = ''; }, 2500);
+    setTimeout(auditarFichasOcultas, 400);
+  } else {
+    mostrarDetalle(solId);
+  }
+}
+
+function mostrarTodasOcultas() {
+  var ocultas = window._fichasOcultas || [];
+  var st = getSinGrupoCol();
+  ocultas.forEach(function(o) { if (o.gk) st[o.gk] = 0; });
+  localStorage.setItem('sin_grupo_col', JSON.stringify(st));
+  document.querySelectorAll('.sin-grupo.collapsed').forEach(function(g) {
+    if (ocultas.some(function(o) { return o.gk && o.gk === g.getAttribute('data-gk'); })) g.classList.remove('collapsed');
+  });
+  setTimeout(auditarFichasOcultas, 100);
+}
+
 function renderBoard() {
   var contSin   = document.getElementById('boardSin');
   var contLines = document.getElementById('boardLines');
@@ -3384,6 +3453,19 @@ function renderBoard() {
           cant: l.cant || 0, linea_id: l.linea_id || 0, prog: s.prog || 0, estado: 'lista',
           procEstado: procEstadoEfectivo(s), tiros: 1, tiro_actual: 1, notas: s.notas || '',
           createdAt: s.created_at || '', periodoEfectivo: perRest, restaurada: true
+        });
+      });
+      return;
+    }
+    if (['nueva','proceso','parcial','lista'].indexOf(s.estado) < 0) {
+      // Estado fuera de los 4 oficiales (dato viejo/raro): se muestra igual, en Sin asignar, como nueva
+      (s.lineas.length ? s.lineas : [{}]).forEach(function(l) {
+        sinExtra.push({
+          lineaDbId: l.id || null, solId: s.id, solCodigo: s.id_display || s.id.slice(0,8), numeroOC: s.numero_oc || '',
+          cliente: s.cliente, sku: l.sku || '', desc: l.desc || '(sin líneas registradas)', skuBase: (l.sku_base || '').trim(),
+          cant: l.cant || s.cant || 0, linea_id: 0, prog: s.prog || 0, estado: 'nueva',
+          procEstado: procEstadoEfectivo(s), tiros: 1, tiro_actual: 1, notas: s.notas || '',
+          createdAt: s.created_at || '', periodoEfectivo: s.periodo_efectivo || null
         });
       });
       return;
@@ -3459,6 +3541,7 @@ function renderBoard() {
   });
   contLines.innerHTML = html;
   verificarCierresPeriodo(lanes[0]); // fire-and-forget: cierra períodos vencidos si aplica
+  auditarFichasOcultas();
 }
 
 // ── Auto-scroll al arrastrar fichas cerca del borde de pantalla ──
