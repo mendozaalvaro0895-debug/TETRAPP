@@ -191,6 +191,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ci-tbl td{padding:7px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
 .ci-tbl select,.ci-tbl input{background:var(--bg2);color:var(--ink);padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:var(--font);font-size:11.5px}
 .ci-tbl select:focus,.ci-tbl input:focus{outline:none;border-color:var(--teal)}
+.drv-form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.drv-fg.full{grid-column:1 / -1}
+.drv-fg label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray);margin-bottom:4px}
+.drv-fg input,.drv-fg select,.drv-ro{width:100%;background:var(--bg2);color:var(--ink);padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:var(--font);font-size:13px}
+.drv-fg input:focus,.drv-fg select:focus{outline:none;border-color:var(--teal)}
+.drv-ro{color:var(--gray);background:transparent}
+.drv-aviso{color:#FBBF24}
+@media(max-width:560px){.drv-form{grid-template-columns:1fr}}
 .ci-recon-ok{color:#4ADE80;font-weight:700;font-size:11.5px}
 .ci-recon-warn{color:#FBBF24;font-weight:700;font-size:11.5px}
 .ci-row-saved td{opacity:.45}
@@ -420,6 +428,38 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div style="display:flex;gap:10px">
         <button class="btn-ghost" style="padding:9px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-weight:600;font-size:13px;cursor:pointer" onclick="drvCerrarRevision()">Ahora no</button>
         <button class="ci-btn" id="driveBtnBajas" style="display:none" onclick="drvConfirmarBajas()">Dar de baja a las marcadas</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ALTA DE UNA PERSONA NUEVA DE LA HOJA (desde "sin cruzar") ═══ -->
+<div class="ci-overlay" id="driveAltaOverlay">
+  <div class="ci-modal" style="max-width:560px">
+    <div class="ci-mh">
+      <div class="ci-mh-title">Dar de alta en TETRAPP</div>
+      <span class="ci-mh-x" onclick="drvAltaCerrar()">×</span>
+    </div>
+    <div class="ci-mb">
+      <div class="ci-doc-meta" id="altaAviso" style="margin-bottom:14px;line-height:1.6"></div>
+      <div class="drv-form">
+        <div class="drv-fg full"><label for="altaNombre">Nombre (igual que en la hoja)</label><input id="altaNombre" type="text" oninput="drvAltaNombreCambio()"></div>
+        <div class="drv-fg"><label for="altaCodigo">Código</label><input id="altaCodigo" type="text"></div>
+        <div class="drv-fg"><label for="altaIniciales">Iniciales</label><input id="altaIniciales" type="text" maxlength="3" style="text-transform:uppercase" oninput="this.setAttribute('data-manual','1')"></div>
+        <div class="drv-fg"><label>Área</label><div class="drv-ro" id="altaArea"></div></div>
+        <div class="drv-fg"><label for="altaInicio">Fecha de inicio (INGRESO de la hoja)</label><input id="altaInicio" type="date"></div>
+        <div class="drv-fg"><label for="altaRol">Rol</label>
+          <select id="altaRol"><option value="operador">Operador</option><option value="supervisor">Supervisor</option></select></div>
+        <div class="drv-fg"><label for="altaProceso">Proceso / puesto</label><input id="altaProceso" type="text" placeholder="Ej: Flameador"></div>
+        <div class="drv-fg full"><label for="altaVacante">¿Cubre una vacante?</label>
+          <select id="altaVacante" onchange="drvAltaVacanteCambio()"></select></div>
+      </div>
+    </div>
+    <div class="ci-mf">
+      <div class="ci-status" style="margin-top:0">Después se sincroniza solo: su asistencia del mes empieza a guardarse.</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn-ghost" style="padding:9px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-weight:600;font-size:13px;cursor:pointer" onclick="drvAltaCerrar()">Cancelar</button>
+        <button class="ci-btn" id="altaBtnCrear" onclick="drvAltaGuardar()">Crear persona</button>
       </div>
     </div>
   </div>
@@ -1023,7 +1063,8 @@ async function drvEjecutar(manual) {
         areasHoja[p.area] = true;
         var m = drvCruzar(p, personal);
         if (!m.persona) {
-          if (esActual) sinCruzar.push({ nombre: p.nombre, area: p.area, motivo: m.sin, candidatos: m.candidatos });
+          if (esActual) sinCruzar.push({ nombre: p.nombre, area: p.area, motivo: m.sin, candidatos: m.candidatos,
+            ingreso: p.ingreso || null, rolHoja: p.rol || '', turnoProd: p.turno_prod || null });
           return;
         }
         var x = m.persona;
@@ -1162,7 +1203,8 @@ function drvFilaSinCruzar(s, i) {
   var nota = s.motivo === 'ambiguo' ? 'Varias coincidencias: ' + escHtml(s.candidatos.join(' / ')) : 'No hay nadie parecido en TETRAPP (¿persona nueva?)';
   return '<tr><td><b>' + escHtml(s.nombre) + '</b><div class="ci-doc-meta">' + escHtml(DRV_AREAS_NOMBRE[s.area] || s.area) + ' · ' + nota + '</div></td>' +
     '<td><select id="drvSel' + i + '" style="max-width:260px">' + drvOpcionesPersonal(s.area) + '</select> ' +
-    '<button class="guia-go" onclick="drvVincular(' + i + ')">Vincular</button></td></tr>';
+    '<button class="guia-go" onclick="drvVincular(' + i + ')">Vincular</button> ' +
+    '<button class="guia-go" onclick="drvAltaAbrir(' + i + ')" title="Crear la ficha en TETRAPP con los datos de la hoja">➕ Dar de alta</button></td></tr>';
 }
 function drvLista(titulo, items, fmt) {
   if (!items.length) return '';
@@ -1222,6 +1264,154 @@ async function drvVincular(i) {
   if (u.error) { alert('No se pudo vincular: ' + u.error.message + '\n¿Corriste sql/asistencia_drive_v1.sql?'); return; }
   document.getElementById('driveOverlay').classList.remove('open');
   await drvSincronizar(true);
+}
+
+// ── Alta de una persona nueva de la hoja ─────────────────────────────────────
+// Misma ficha que "+ Nueva persona" de gestion.html (mismas columnas, color por defecto y regla de
+// código). ESPEJO: si cambian el prefijo/color por área o la regla del código allá, replicarlo acá.
+var DRV_PREFIJO = { tapas: 'T', serig: 'S', produccion: 'P', molino: 'M', bodega: 'B', moldes: 'M',
+  mantenimiento: 'MT', torno: 'TO', oficina: 'OF', limpieza: 'LI' };
+var DRV_COLOR_AREA = { tapas: '#1A6B5B', serig: '#5A2D9E', produccion: '#B07D2A', molino: '#92400E', bodega: '#0E7490',
+  moldes: '#475569', mantenimiento: '#B45309', torno: '#334155', oficina: '#1D4ED8', limpieza: '#0F766E' };
+var DRV_ALTA = { i: null, vacantes: [], procAuto: '' };
+
+// Próximo código libre del área: máximo usado con ese prefijo + 1 sobre TODAS las filas (activos E
+// inactivos — una baja sigue ocupando su código), sin distinguir mayúsculas.
+function drvCodigoLibre(area, personal) {
+  var prefijo = DRV_PREFIJO[area] || 'X';
+  var re = new RegExp('^' + prefijo + '-?(\\d+)$', 'i');
+  var max = 0, usados = {};
+  personal.forEach(function (p) {
+    var c = String(p.codigo || '').trim();
+    usados[c.toLowerCase()] = true;
+    var m = c.match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  });
+  var dos = ['B', 'M', 'MT', 'TO', 'OF', 'LI'].indexOf(prefijo) !== -1;   // B-03, M-04, MT-01… con 2 dígitos; P-55, T-5, S-16 no
+  function formato(n) { return prefijo + '-' + (dos && n < 10 ? '0' + n : n); }
+  var n = max + 1;
+  while (usados[formato(n).toLowerCase()]) n++;
+  return formato(n);
+}
+
+function drvIniciales(nombre) {
+  var t = String(nombre || '').trim().split(/\s+/).filter(Boolean);
+  if (!t.length) return '';
+  return (t[0].charAt(0) + (t.length > 1 ? t[t.length - 1].charAt(0) : '')).toUpperCase();
+}
+
+async function drvAltaAbrir(i) {
+  var s = DRIVE.resultado && DRIVE.resultado.sinCruzar[i];
+  if (!s) return;
+  var personal = DRIVE.personalCache || [];
+  // Vacantes del área = bajas marcadas "dejar la plaza vacante" (si esa columna aún no existe, no hay lista)
+  var vacantes = [];
+  try {
+    var rv = await db.from('personal').select('id,codigo,nombre,rol,proceso_hab,turno_produccion,fecha_baja')
+      .eq('area', s.area).eq('activo', false).eq('plaza_vacante', true).order('fecha_baja', { ascending: false });
+    if (!rv.error) vacantes = rv.data || [];
+  } catch (e) { vacantes = []; }
+  DRV_ALTA = { i: i, vacantes: vacantes, procAuto: '' };
+
+  var nombre = String(s.nombre || '').trim().replace(/\s+/g, ' ');
+  document.getElementById('altaNombre').value = nombre;
+  document.getElementById('altaCodigo').value = drvCodigoLibre(s.area, personal);
+  document.getElementById('altaIniciales').removeAttribute('data-manual');
+  document.getElementById('altaIniciales').value = drvIniciales(nombre);
+  document.getElementById('altaArea').textContent = (DRV_AREAS_NOMBRE[s.area] || s.area) +
+    (s.area === 'produccion' && s.turnoProd ? ' · Turno ' + s.turnoProd.charAt(0).toUpperCase() + s.turnoProd.slice(1) : '');
+  document.getElementById('altaInicio').value = s.ingreso || '';
+  document.getElementById('altaRol').value = 'operador';
+  document.getElementById('altaProceso').value = '';
+
+  var sel = document.getElementById('altaVacante');
+  sel.innerHTML = vacantes.length
+    ? vacantes.map(function (v) {
+        return '<option value="' + escHtml(String(v.id)) + '">Cubre la plaza de ' + escHtml(v.nombre || v.codigo) +
+          (v.proceso_hab ? ' · ' + escHtml(v.proceso_hab) : '') + (v.fecha_baja ? ' (baja ' + escHtml(indFechaCorta(v.fecha_baja)) + ')' : '') + '</option>';
+      }).join('') + '<option value="">No cubre ninguna vacante</option>'
+    : '<option value="">No hay vacantes marcadas en ' + escHtml(DRV_AREAS_NOMBRE[s.area] || s.area) + '</option>';
+  drvAltaVacanteCambio();
+
+  var aviso = '<b>' + escHtml(nombre) + '</b> está en la hoja del mes' + (s.rolHoja ? ' (rol en la hoja: ' + escHtml(s.rolHoja) + ')' : '') + ' y no existe en TETRAPP.';
+  if (s.motivo === 'ambiguo') {
+    aviso += '<br><span class="drv-aviso">⚠️ Ojo: hay personas parecidas (' + escHtml((s.candidatos || []).join(' / ')) +
+      '). Si es la misma persona, cierra esto y usa <b>Vincular</b> — dar de alta crearía un duplicado.</span>';
+  }
+  document.getElementById('altaAviso').innerHTML = aviso;
+  document.getElementById('altaBtnCrear').disabled = false;
+  document.getElementById('driveAltaOverlay').classList.add('open');
+}
+
+function drvAltaCerrar() { document.getElementById('driveAltaOverlay').classList.remove('open'); }
+
+// Si no se tocó a mano, las iniciales siguen al nombre
+function drvAltaNombreCambio() {
+  var ini = document.getElementById('altaIniciales');
+  if (!ini.getAttribute('data-manual')) ini.value = drvIniciales(document.getElementById('altaNombre').value);
+}
+
+// Al elegir qué vacante cubre, la ficha hereda su rol y su puesto (mientras no se hayan editado a mano)
+function drvAltaVacanteCambio() {
+  var id = document.getElementById('altaVacante').value;
+  var v = DRV_ALTA.vacantes.filter(function (x) { return String(x.id) === String(id); })[0];
+  var proc = document.getElementById('altaProceso');
+  if (proc.value === '' || proc.value === DRV_ALTA.procAuto) {
+    DRV_ALTA.procAuto = v ? (v.proceso_hab || '') : '';
+    proc.value = DRV_ALTA.procAuto;
+  }
+  if (v) document.getElementById('altaRol').value = v.rol === 'supervisor' ? 'supervisor' : 'operador';
+}
+
+async function drvAltaGuardar() {
+  var s = DRIVE.resultado && DRIVE.resultado.sinCruzar[DRV_ALTA.i];
+  if (!s) return;
+  var nombre = String(document.getElementById('altaNombre').value || '').trim().replace(/\s+/g, ' ');
+  var codigo = String(document.getElementById('altaCodigo').value || '').trim();
+  var iniciales = String(document.getElementById('altaIniciales').value || '').trim().toUpperCase();
+  if (!nombre) { alert('Falta el nombre.'); return; }
+  if (!codigo) { alert('Falta el código.'); return; }
+  if (!iniciales) { alert('Faltan las iniciales.'); return; }
+  var personal = DRIVE.personalCache || [];
+  var dup = personal.filter(function (p) { return String(p.codigo || '').trim().toLowerCase() === codigo.toLowerCase(); })[0];
+  if (dup) {
+    alert('El código ' + codigo + ' ya lo tiene ' + dup.nombre + (dup.activo ? '' : ' (de baja)') + '. Prueba con ' + drvCodigoLibre(s.area, personal) + '.');
+    return;
+  }
+  var vacId = document.getElementById('altaVacante').value || null;
+  var payload = {
+    nombre: nombre, iniciales: iniciales, codigo: codigo, area: s.area,
+    rol: document.getElementById('altaRol').value || 'operador',
+    proceso_hab: String(document.getElementById('altaProceso').value || '').trim(),
+    activo: true,
+    turno_produccion: s.area === 'produccion' ? (s.turnoProd || null) : null,
+    fecha_inicio: document.getElementById('altaInicio').value || null,
+    fecha_baja: null,
+    epp_asignado: false,
+    color_hex: DRV_COLOR_AREA[s.area] || '#1A6B5B'
+  };
+  var btn = document.getElementById('altaBtnCrear');
+  btn.disabled = true;
+  var r = await db.from('personal').insert(payload);
+  if (r.error) {
+    btn.disabled = false;
+    if (r.error.code === '23505' || /personal_codigo_key/.test(r.error.message || '')) alert('Ese código ya está en uso. Prueba con ' + drvCodigoLibre(s.area, personal) + '.');
+    else alert('No se pudo crear la persona: ' + r.error.message + (/personal_area_check/.test(r.error.message || '') ? '\n¿Corriste el SQL de esa área?' : ''));
+    return;
+  }
+  // Si cubre una vacante, esa plaza deja de estar vacante (igual que "Cubrir vacante" en Gestión)
+  var avisoVac = '';
+  if (vacId) {
+    var rc = await db.from('personal').update({ plaza_vacante: false }).eq('id', vacId);
+    if (rc.error) avisoVac = '\n(La persona se creó, pero no se pudo cerrar la vacante: ' + rc.error.message + ' — ciérrala en Gestión.)';
+  }
+  drvAltaCerrar();
+  document.getElementById('driveOverlay').classList.remove('open');
+  if (avisoVac) alert(nombre + ' creada como ' + codigo + '.' + avisoVac);
+  // Se vuelve a sincronizar: ya existe, se cruza por nombre y su asistencia del mes se guarda; reabre
+  // la revisión con lo que siga pendiente (p. ej. la otra persona nueva)
+  await drvSincronizar(true);
+  cargarGuia(); cargarIndicadores();
 }
 
 // Arranque ordenado: primero la hoja (alimenta asistencia y roster), luego guía e indicadores
