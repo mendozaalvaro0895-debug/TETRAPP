@@ -198,6 +198,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .drv-fg input:focus,.drv-fg select:focus{outline:none;border-color:var(--teal)}
 .drv-ro{color:var(--gray);background:transparent}
 .drv-aviso{color:#FBBF24}
+.drv-nueva{color:#7ECEC0;font-weight:700}
 @media(max-width:560px){.drv-form{grid-template-columns:1fr}}
 .ci-recon-ok{color:#4ADE80;font-weight:700;font-size:11.5px}
 .ci-recon-warn{color:#FBBF24;font-weight:700;font-size:11.5px}
@@ -454,9 +455,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="drv-fg full"><label for="altaVacante">¿Cubre una vacante?</label>
           <select id="altaVacante" onchange="drvAltaVacanteCambio()"></select></div>
       </div>
+      <div class="ci-doc-meta" style="margin-top:14px">Después se sincroniza solo: su asistencia del mes empieza a guardarse.</div>
     </div>
-    <div class="ci-mf">
-      <div class="ci-status" style="margin-top:0">Después se sincroniza solo: su asistencia del mes empieza a guardarse.</div>
+    <div class="ci-mf" style="justify-content:flex-end">
       <div style="display:flex;gap:10px">
         <button class="btn-ghost" style="padding:9px 18px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);font-weight:600;font-size:13px;cursor:pointer" onclick="drvAltaCerrar()">Cancelar</button>
         <button class="ci-btn" id="altaBtnCrear" onclick="drvAltaGuardar()">Crear persona</button>
@@ -1131,8 +1132,10 @@ async function drvEjecutar(manual) {
       reactivar: reactivar, faltanEnHoja: faltanEnHoja, desconocidos: hojaActual.estados_desconocidos || []
     };
     drvResumen();
+    // Se abre sola cuando hay algo que decidir (bajas por confirmar o personas nuevas por dar de alta),
+    // como mucho cada 12 h si se cierra con "Ahora no"
     var snooze = parseInt(localStorage.getItem('tetra_drive_snooze') || '0', 10);
-    if (bajas.length && !manual && Date.now() - snooze > 12 * 3600 * 1000) drvAbrirRevision();
+    if ((bajas.length || sinCruzar.length) && !manual && Date.now() - snooze > 12 * 3600 * 1000) drvAbrirRevision();
     else if (manual) drvAbrirRevision();
   } catch (e) {
     console.error('Drive:', e);
@@ -1175,9 +1178,11 @@ function drvResumen() {
   if (!r) return;
   var hora = r.hora.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
   var pend = r.bajas.length + r.sinCruzar.length;
+  var nuevas = r.sinCruzar.filter(drvEsNueva).length;
   var txt = r.errEscritura
     ? 'Error al guardar: ' + r.errEscritura + ' — ¿corriste sql/asistencia_drive_v1.sql?'
-    : 'Sincronizado ' + hora + ' · ' + r.escritas + ' cambio(s)' + (pend ? ' · ' + pend + ' por revisar' : '');
+    : 'Sincronizado ' + hora + ' · ' + r.escritas + ' cambio(s)' + (pend ? ' · ' + pend + ' por revisar' : '') +
+      (nuevas ? ' · 🆕 ' + nuevas + (nuevas === 1 ? ' persona nueva en la hoja: dar de alta' : ' personas nuevas en la hoja: dar de alta') : '');
   drvDet(txt, r.errEscritura ? 'pend-txt' : '');
   var led = document.getElementById('driveLed');
   if (led) led.className = 'guia-led ' + (r.errEscritura ? 'bad' : (pend ? 'warn' : 'good'));
@@ -1199,12 +1204,21 @@ function drvFilaBaja(b, i) {
     '<td><b>' + escHtml(b.nombre) + '</b><div class="ci-doc-meta">' + escHtml(b.codigo) + ' · ' + escHtml(DRV_AREAS_NOMBRE[b.area] || b.area) + '</div></td>' +
     '<td style="font-family:var(--mono)">' + escHtml(indFechaCorta(b.desde)) + '</td></tr>';
 }
+// Persona NUEVA = nadie parecido en TETRAPP → se recomienda el alta (botón destacado).
+// Con parecidos (ambiguo) lo más probable es que ya exista → se recomienda Vincular.
+function drvEsNueva(s) { return s.motivo !== 'ambiguo'; }
 function drvFilaSinCruzar(s, i) {
-  var nota = s.motivo === 'ambiguo' ? 'Varias coincidencias: ' + escHtml(s.candidatos.join(' / ')) : 'No hay nadie parecido en TETRAPP (¿persona nueva?)';
+  var nueva = drvEsNueva(s);
+  var nota = nueva
+    ? '<span class="drv-nueva">🆕 Persona nueva en la hoja — se recomienda darla de alta</span>'
+    : '<span class="drv-aviso">⚠️ Parecida a: ' + escHtml(s.candidatos.join(' / ')) + ' — si es la misma persona, usa Vincular</span>';
+  var alta = nueva
+    ? '<button class="ci-btn" style="padding:6px 14px;font-size:12px" onclick="drvAltaAbrir(' + i + ')" title="Crear la ficha en TETRAPP con los datos de la hoja">➕ Dar de alta</button> '
+    : '<button class="guia-go" onclick="drvAltaAbrir(' + i + ')" title="Solo si de verdad es otra persona">➕ Dar de alta</button>';
+  var vinc = '<select id="drvSel' + i + '" style="max-width:240px">' + drvOpcionesPersonal(s.area) + '</select> ' +
+    '<button class="guia-go" onclick="drvVincular(' + i + ')">Vincular</button>';
   return '<tr><td><b>' + escHtml(s.nombre) + '</b><div class="ci-doc-meta">' + escHtml(DRV_AREAS_NOMBRE[s.area] || s.area) + ' · ' + nota + '</div></td>' +
-    '<td><select id="drvSel' + i + '" style="max-width:260px">' + drvOpcionesPersonal(s.area) + '</select> ' +
-    '<button class="guia-go" onclick="drvVincular(' + i + ')">Vincular</button> ' +
-    '<button class="guia-go" onclick="drvAltaAbrir(' + i + ')" title="Crear la ficha en TETRAPP con los datos de la hoja">➕ Dar de alta</button></td></tr>';
+    '<td>' + (nueva ? alta + vinc : vinc + ' ' + alta) + '</td></tr>';
 }
 function drvLista(titulo, items, fmt) {
   if (!items.length) return '';
@@ -1223,8 +1237,8 @@ async function drvAbrirRevision() {
       '<table class="ci-tbl"><thead><tr><th></th><th>Persona</th><th>Baja desde</th></tr></thead><tbody>' + r.bajas.map(drvFilaBaja).join('') + '</tbody></table></div>';
   }
   if (r.sinCruzar.length) {
-    h += '<div class="ci-doc" style="margin-bottom:14px"><div class="ci-doc-h"><div><div class="ci-doc-title">Nombres de la hoja sin cruzar con TETRAPP</div>' +
-      '<div class="ci-doc-meta">Su asistencia no se sincroniza hasta vincularlos. Si es persona nueva, dala de alta en Gestión.</div></div></div>' +
+    h += '<div class="ci-doc" style="margin-bottom:14px"><div class="ci-doc-h"><div><div class="ci-doc-title">Personas de la hoja sin cruzar con TETRAPP</div>' +
+      '<div class="ci-doc-meta">Su asistencia no se sincroniza hasta que existan en TETRAPP. Las marcadas 🆕 parecen personas nuevas: <b>dalas de alta</b> aquí mismo. Si ya existen con otro nombre, usa <b>Vincular</b>.</div></div></div>' +
       '<table class="ci-tbl"><tbody>' + r.sinCruzar.map(drvFilaSinCruzar).join('') + '</tbody></table></div>';
   }
   h += drvLista('Activos en la hoja pero dados de baja en TETRAPP', r.reactivar, function (x) { return escHtml(x.nombre) + ' · ' + escHtml(x.codigo); });
@@ -1294,6 +1308,16 @@ function drvCodigoLibre(area, personal) {
   return formato(n);
 }
 
+// La hoja anota notas dentro del nombre ("JENNIFER KARINA TOJ REYES (INGRESO 12/10)"): la ficha lleva solo el nombre
+function drvNombreLimpio(n) { return String(n || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim(); }
+// Fecha de ingreso escrita en esa nota (DD/MM[/AA]), por si la columna INGRESO de la hoja va vacía
+function drvIngresoDeNombre(n) {
+  var m = String(n || '').match(/INGRESO\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?/i);
+  if (!m) return null;
+  var y = m[3] ? (m[3].length === 2 ? '20' + m[3] : m[3]) : fechaHoyLocal().slice(0, 4);
+  return y + '-' + (m[2].length < 2 ? '0' : '') + m[2] + '-' + (m[1].length < 2 ? '0' : '') + m[1];
+}
+
 function drvIniciales(nombre) {
   var t = String(nombre || '').trim().split(/\s+/).filter(Boolean);
   if (!t.length) return '';
@@ -1313,14 +1337,14 @@ async function drvAltaAbrir(i) {
   } catch (e) { vacantes = []; }
   DRV_ALTA = { i: i, vacantes: vacantes, procAuto: '' };
 
-  var nombre = String(s.nombre || '').trim().replace(/\s+/g, ' ');
+  var nombre = drvNombreLimpio(s.nombre);
   document.getElementById('altaNombre').value = nombre;
   document.getElementById('altaCodigo').value = drvCodigoLibre(s.area, personal);
   document.getElementById('altaIniciales').removeAttribute('data-manual');
   document.getElementById('altaIniciales').value = drvIniciales(nombre);
   document.getElementById('altaArea').textContent = (DRV_AREAS_NOMBRE[s.area] || s.area) +
     (s.area === 'produccion' && s.turnoProd ? ' · Turno ' + s.turnoProd.charAt(0).toUpperCase() + s.turnoProd.slice(1) : '');
-  document.getElementById('altaInicio').value = s.ingreso || '';
+  document.getElementById('altaInicio').value = s.ingreso || drvIngresoDeNombre(s.nombre) || '';
   document.getElementById('altaRol').value = 'operador';
   document.getElementById('altaProceso').value = '';
 
@@ -1331,7 +1355,16 @@ async function drvAltaAbrir(i) {
           (v.proceso_hab ? ' · ' + escHtml(v.proceso_hab) : '') + (v.fecha_baja ? ' (baja ' + escHtml(indFechaCorta(v.fecha_baja)) + ')' : '') + '</option>';
       }).join('') + '<option value="">No cubre ninguna vacante</option>'
     : '<option value="">No hay vacantes marcadas en ' + escHtml(DRV_AREAS_NOMBRE[s.area] || s.area) + '</option>';
+  // Vacante sugerida: la que coincide con el puesto que trae la hoja (ej. "L2 - FLAMEO" ↔ Flameador); si no, la primera
+  var rolHoja = drvNorm(s.rolHoja), coincide = false;
+  for (var k = 0; k < vacantes.length; k++) {
+    var pv = drvNorm(vacantes[k].proceso_hab);
+    if (pv.length >= 4 && rolHoja.indexOf(pv.slice(0, 5)) !== -1) { sel.value = String(vacantes[k].id); coincide = true; break; }
+  }
   drvAltaVacanteCambio();
+  // Si la hoja trae un puesto y NINGUNA vacante coincide (ej. "EMPAQUE" vs plaza de Impresión), no se hereda
+  // el puesto de la vacante: se deja en blanco para escribirlo (la vacante cubierta se puede cambiar igual)
+  if (vacantes.length && rolHoja && !coincide) { document.getElementById('altaProceso').value = ''; DRV_ALTA.procAuto = ''; }
 
   var aviso = '<b>' + escHtml(nombre) + '</b> está en la hoja del mes' + (s.rolHoja ? ' (rol en la hoja: ' + escHtml(s.rolHoja) + ')' : '') + ' y no existe en TETRAPP.';
   if (s.motivo === 'ambiguo') {
@@ -1366,7 +1399,7 @@ function drvAltaVacanteCambio() {
 async function drvAltaGuardar() {
   var s = DRIVE.resultado && DRIVE.resultado.sinCruzar[DRV_ALTA.i];
   if (!s) return;
-  var nombre = String(document.getElementById('altaNombre').value || '').trim().replace(/\s+/g, ' ');
+  var nombre = drvNombreLimpio(document.getElementById('altaNombre').value);
   var codigo = String(document.getElementById('altaCodigo').value || '').trim();
   var iniciales = String(document.getElementById('altaIniciales').value || '').trim().toUpperCase();
   if (!nombre) { alert('Falta el nombre.'); return; }
