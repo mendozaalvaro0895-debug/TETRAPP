@@ -27,7 +27,8 @@ const SECCIONES = {
   'TORNO': { area: 'torno', turno: null },
   'MOLDES': { area: 'moldes', turno: null },
   'MOLINO': { area: 'molino', turno: null },
-  'OFICINA': { area: 'oficina', turno: null }
+  'OFICINA': { area: 'oficina', turno: null },
+  'LIMPIEZA': { area: 'limpieza', turno: null }
 };
 
 function normalizar(s) {

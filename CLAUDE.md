@@ -56,7 +56,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
   `perfiles` consultando COMO el propio usuario (`perfiles` no tiene grants para service_role).
   `mimeImagen(m)` limita `mime_type` a png/jpeg/webp/gif. Lo usan los 3 endpoints de parseo.
   El front manda el token con `HEADERS.Authorization` (auth.js lo renueva en cada refresh).
-- `api/asistencia-drive.js` (oct/2026) — GET `?mes=YYYY-MM`: lee la pestaña del mes (ENE…DIC) de la hoja "ASISTENCIA DE PLANTA" por CSV público (gviz) y devuelve personas por área con estados normalizados (presente/ausente/velada/tarde/permiso/baja). Solo `master`. Env: `ASISTENCIA_SHEET_ID` (NO se guarda en el repo). Lo consume index.html.
+- `api/asistencia-drive.js` (oct/2026) — GET `?mes=YYYY-MM`: lee la pestaña del mes (ENE…DIC) de la hoja "ASISTENCIA DE PLANTA" por CSV público (gviz) y devuelve personas por área con estados normalizados (presente/ausente/velada/tarde/permiso/baja). Solo `master`. Env: `ASISTENCIA_SHEET_ID` (NO se guarda en el repo). Lo consume index.html. Los encabezados de sección que reconoce (col A, con B y C vacías) están en `SECCIONES`: GRUPO GABINO/ALEX, SERIGRAFIA, TAPAS, BODEGA, MANTENIMIENTO, TORNO, MOLDES, MOLINO, OFICINA y LIMPIEZA (oct/2026). ⚠️ Un encabezado NUEVO en la hoja que no esté ahí se lee como una PERSONA más de la sección anterior (así salió "LIMPIEZA" en "Nombres de la hoja sin cruzar"): al aparecer un área nueva, agregarla a `SECCIONES`, a los CHECK de `personal.area` y `asistencia_diaria.area`, y a `AREA_GRUPOS`/selectores de gestion.html.
 - `api/parse-doc.js` — parsea foto de requi con Claude Vision → JSON {requi, fecha, productos[]}.
   Gateado (oct/2026): rol `master` u `operativo_prod` (401 sin sesión, 403 otro rol). Lo llaman
   produccion.html (screenshot de Ingreso) y serigrafia.html (lector de requis), sin CORS abierto.
@@ -758,6 +758,8 @@ Notas críticas:
 
 33. ✅ CHECK YA CORRIDO (verificado 10-oct-2026: `asistencia_diaria_area_check` admite las 9 áreas; la columna `personal.nombre_hoja` NO se verificó) — `sql/asistencia_drive_v1.sql` (oct/2026) — amplía el CHECK de `asistencia_diaria.area` a todas las áreas + columna `personal.nombre_hoja`. Además requiere la variable de Vercel `ASISTENCIA_SHEET_ID` (id de la hoja; la hoja debe estar compartida como LECTOR por enlace). Sin el SQL, Tapas/Serig sincronizan y las demás áreas avisan del error.
 
+34. `sql/personal_area_limpieza_v1.sql` (oct/2026) — agrega 'limpieza' a los DOS CHECK (`personal_area_check` y `asistencia_diaria_area_check`). Sin esto no se puede dar de alta a Irma Azucena Ulicia Arias (única colaboradora de Limpieza) en Gestión y la sincronización con el Drive falla al guardar la asistencia de esa área. Orden: correr el SQL → Gestión → "+ Nueva persona" (Área Limpieza, código sugerido LI-01, nombre igual al de la hoja) → Inicio → "Sincronizar ahora".
+
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
 para la misma persona (no un simple typo de UI) — confirmado con Karen Hernández y Blandina
@@ -776,8 +778,8 @@ usado + 1 sobre TODAS las filas, sin distinguir mayúsculas — evita p-57 vs P-
 B/M/MT/TO/OF como B-03, sin ceros en P/T/S), `cambiarAreaPersona()` la actualiza al cambiar
 el área mientras no se haya escrito otro código a mano, y `guardarPersona()` avisa QUIÉN tiene
 el código escrito (y si está de baja) en vez de mostrar el error crudo `personal_codigo_key`.
-Las áreas `mantenimiento`/`torno`/`oficina` (agregadas en la reconciliación) ya están también
-en el selector de Área, los filtros, la agrupación de la tabla y los colores por defecto.
+Las áreas `mantenimiento`/`torno`/`oficina` (agregadas en la reconciliación) y `limpieza` (oct/2026, prefijo `LI-`, 2 dígitos, sin módulo propio)
+ya están también en el selector de Área, los filtros, la agrupación de la tabla y los colores por defecto.
 
 ### SQL ya corridos (solo si necesitas re-correr)
 - `sql/seguridad_v1.sql` ⚠️ Su sección C borra TODAS las políticas y recrea solo las genéricas — después hay que re-correr los fix específicos (insert_operativo_serig etc.)

@@ -380,6 +380,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <button class="seg-btn"            id="seg-area-mantenimiento" onclick="setFiltroArea('mantenimiento')">🛠 Mantenimiento</button>
           <button class="seg-btn"            id="seg-area-torno" onclick="setFiltroArea('torno')">🔩 Torno</button>
           <button class="seg-btn"            id="seg-area-oficina" onclick="setFiltroArea('oficina')">🏢 Oficina</button>
+          <button class="seg-btn"            id="seg-area-limpieza" onclick="setFiltroArea('limpieza')">🧹 Limpieza</button>
           <input class="fi" id="pBuscar" placeholder="🔍 Buscar nombre o código" oninput="renderPersonalGrid()" style="width:180px">
           <label class="fchk" style="font-size:11px;font-weight:600">
             <input type="checkbox" id="pSoloActivos" checked onchange="renderPersonalGrid()"> Solo activos
@@ -531,6 +532,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
               <option value="mantenimiento">🛠 Mantenimiento</option>
               <option value="torno">🔩 Torno</option>
               <option value="oficina">🏢 Oficina</option>
+              <option value="limpieza">🧹 Limpieza</option>
             </select>
           </div>
         </div>
@@ -1992,7 +1994,7 @@ function cerrarSiOverlayKpiTotal(ev) {
 
 function setFiltroArea(area) {
   filtroArea = area;
-  ['todos', 'tapas', 'serig', 'produccion', 'molino', 'bodega', 'moldes', 'mantenimiento', 'torno', 'oficina'].forEach(function(a) {
+  ['todos', 'tapas', 'serig', 'produccion', 'molino', 'bodega', 'moldes', 'mantenimiento', 'torno', 'oficina', 'limpieza'].forEach(function(a) {
     document.getElementById('seg-area-' + a).classList.toggle('seg-active', a === area);
   });
   renderPersonalGrid();
@@ -2045,21 +2047,22 @@ var AREA_GRUPOS = [
   { key: 'moldes', label: '🔧 Moldes' },
   { key: 'mantenimiento', label: '🛠 Mantenimiento' },
   { key: 'torno', label: '🔩 Torno' },
-  { key: 'oficina', label: '🏢 Oficina' }
+  { key: 'oficina', label: '🏢 Oficina' },
+  { key: 'limpieza', label: '🧹 Limpieza' }
 ];
 
 // Color del avatar al CREAR una persona nueva (no se toca en ediciones — ver nota RRHH)
 var AREA_COLOR_DEFAULT = {
   tapas: '#1A6B5B', serig: '#5A2D9E', produccion: '#B07D2A',
   molino: '#92400E', bodega: '#0E7490', moldes: '#475569',
-  mantenimiento: '#B45309', torno: '#334155', oficina: '#1D4ED8'
+  mantenimiento: '#B45309', torno: '#334155', oficina: '#1D4ED8', limpieza: '#0F766E'
 };
 
 // Prefijo de código por área — convención ya en uso en `personal` (P-55, T-5, S-16, M-04, B-03,
 // MT-01, TO-01, OF-01). Moldes y Molino comparten la serie M-.
 var AREA_PREFIJO_CODIGO = {
   tapas: 'T', serig: 'S', produccion: 'P', molino: 'M', bodega: 'B',
-  moldes: 'M', mantenimiento: 'MT', torno: 'TO', oficina: 'OF'
+  moldes: 'M', mantenimiento: 'MT', torno: 'TO', oficina: 'OF', limpieza: 'LI'
 };
 
 // Próximo código libre del área: máximo número usado con ese prefijo (en cualquier formato,
@@ -2075,8 +2078,8 @@ function siguienteCodigoLibre(area) {
     var m = c.match(re);
     if (m) max = Math.max(max, parseInt(m[1], 10));
   });
-  // B-03 / M-04 / MT-01 / TO-01 / OF-05 van con 2 dígitos; P-55, T-5, S-16 no
-  var dosDigitos = ['B', 'M', 'MT', 'TO', 'OF'].indexOf(prefijo) !== -1;
+  // B-03 / M-04 / MT-01 / TO-01 / OF-05 / LI-01 van con 2 dígitos; P-55, T-5, S-16 no
+  var dosDigitos = ['B', 'M', 'MT', 'TO', 'OF', 'LI'].indexOf(prefijo) !== -1;
   function formato(n) { return prefijo + '-' + (dosDigitos && n < 10 ? '0' + n : n); }
   var n = max + 1;
   while (usados[formato(n).toLowerCase()]) n++;
