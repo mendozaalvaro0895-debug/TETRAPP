@@ -758,7 +758,7 @@ Notas críticas:
 
 33. ✅ CHECK YA CORRIDO (verificado 10-oct-2026: `asistencia_diaria_area_check` admite las 9 áreas; la columna `personal.nombre_hoja` NO se verificó) — `sql/asistencia_drive_v1.sql` (oct/2026) — amplía el CHECK de `asistencia_diaria.area` a todas las áreas + columna `personal.nombre_hoja`. Además requiere la variable de Vercel `ASISTENCIA_SHEET_ID` (id de la hoja; la hoja debe estar compartida como LECTOR por enlace). Sin el SQL, Tapas/Serig sincronizan y las demás áreas avisan del error.
 
-34. `sql/personal_area_limpieza_v1.sql` (oct/2026) — agrega 'limpieza' a los DOS CHECK (`personal_area_check` y `asistencia_diaria_area_check`). Sin esto no se puede dar de alta a Irma Azucena Ulicia Arias (única colaboradora de Limpieza) en Gestión y la sincronización con el Drive falla al guardar la asistencia de esa área. Orden: correr el SQL → Gestión → "+ Nueva persona" (Área Limpieza, código sugerido LI-01, nombre igual al de la hoja) → Inicio → "Sincronizar ahora".
+34. ✅ YA CORRIDO (verificado 13-oct-2026: ambos CHECK admiten 'limpieza') — `sql/personal_area_limpieza_v1.sql` (oct/2026) — agrega 'limpieza' a los DOS CHECK (`personal_area_check` y `asistencia_diaria_area_check`). Sin esto no se puede dar de alta a Irma Azucena Ulicia Arias (única colaboradora de Limpieza) en Gestión y la sincronización con el Drive falla al guardar la asistencia de esa área. Orden: correr el SQL → Gestión → "+ Nueva persona" (Área Limpieza, código sugerido LI-01, nombre igual al de la hoja) → Inicio → "Sincronizar ahora".
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
