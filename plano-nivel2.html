@@ -1,0 +1,2616 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TETRAPLASTIC — Plano de Planta · Nivel 2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="shared/auth.js"></script>
+<script>TETRA_PAGINAS_MASTER.push('plano-nivel2');</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<style>
+:root{
+  --ink:#0C0C0B; --panel:#141413; --line:#2A2A28; --txt:#E8E6E1; --mut:#8F8D86;
+  --acc:#14B8A6; --acc-d:#0F766E; --red:#EF4444;
+  --font:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ink);color:var(--txt);font-family:var(--font);font-size:13px}
+#app{display:flex;height:100vh;height:100dvh}
+#panel{width:310px;flex:none;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:14px 16px 24px}
+#wrap{flex:1;position:relative;min-width:0;min-height:0}
+#wrap canvas{display:block;width:100%;height:100%}
+h1{font-size:15px;margin:0 0 2px;letter-spacing:.04em}
+.sub{color:var(--mut);font-size:11px;margin-bottom:12px}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--acc);margin:18px 0 8px;border-top:1px solid var(--line);padding-top:12px}
+label{display:block;color:var(--mut);font-size:11px;margin:6px 0 2px}
+input[type=number],input[type=text],select{width:100%;background:#0C0C0B;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit}
+input[type=color]{width:30px;height:28px;padding:0;border:1px solid var(--line);background:none;border-radius:6px;flex:none}
+button{background:#1d1d1b;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px 10px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.on{background:var(--acc-d);border-color:var(--acc);color:#fff}
+button.pri{background:var(--acc-d);border-color:var(--acc)}
+.row{display:flex;gap:6px;align-items:center}
+.row>*{flex:1}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.zrow{display:flex;gap:5px;margin-bottom:5px;align-items:center}
+.zrow input[type=text]{flex:1;min-width:0}
+.zrow input[type=number]{width:62px;flex:none}
+.zrow button{padding:5px 8px;flex:none}
+.chk{display:flex;align-items:center;gap:6px;color:var(--txt);font-size:12px;margin:4px 0}
+.chk input{margin:0}
+.hint{color:var(--mut);font-size:11px;line-height:1.45;margin-top:8px;min-height:30px}
+.warn{color:#F59E0B;font-size:11px;margin-top:4px}
+#coord{position:absolute;left:12px;bottom:10px;background:rgba(12,12,11,.8);border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-family:ui-monospace,Consolas,monospace;font-size:12px;pointer-events:none}
+#tabla{width:100%;border-collapse:collapse;font-size:11px}
+#tabla td{padding:3px 0;border-bottom:1px solid var(--line)}
+#tabla td:last-child{text-align:right;font-family:ui-monospace,Consolas,monospace}
+.opt{display:none}
+@media (max-width:760px){
+  #app{flex-direction:column-reverse}
+  #panel{width:100%;height:46vh;border-right:0;border-top:1px solid var(--line)}
+  #wrap{flex:1}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="panel">
+    <h1>PLANO DE PLANTA · NIVEL 2</h1>
+    <div class="sub">Tetraplastic · 35 m frente × 45 m fondo · unidades en metros</div>
+
+    <h2 style="margin-top:6px;border-top:0;padding-top:0">Vista</h2>
+    <div class="grid2">
+      <button id="v3d" class="on">3D</button>
+      <button id="vtop">Cenital 2D</button>
+      <button id="btnEnfoque" style="grid-column:1/3">Enfocar "Por definir"</button>
+    </div>
+    <div style="margin-top:8px">
+      <div class="grid2">
+        <label class="chk"><input type="checkbox" data-capa="muros" checked> Muros</label>
+        <label class="chk"><input type="checkbox" data-capa="zonas" checked> Zonas</label>
+        <label class="chk"><input type="checkbox" data-capa="rotulos" checked> Rótulos</label>
+        <label class="chk"><input type="checkbox" data-capa="rejilla" checked> Rejilla 1 m</label>
+        <label class="chk"><input type="checkbox" data-capa="lineas" checked> Líneas</label>
+        <label class="chk"><input type="checkbox" data-capa="tarimas" checked> Tarimas</label>
+        <label class="chk"><input type="checkbox" data-capa="techo"> Techo del cajón</label>
+        <label class="chk"><input type="checkbox" data-capa="refs" checked> Referencias</label>
+        <label class="chk"><input type="checkbox" data-capa="nivel1" checked> Nivel 1 (planta)</label>
+        <label class="chk"><input type="checkbox" data-capa="n1mod" checked> Nivel 1 (modelo SketchUp)</label>
+      </div>
+    </div>
+
+    <h2>Dibujar</h2>
+    <div class="grid3">
+      <button data-tool="none" class="on">Mover</button>
+      <button data-tool="tarima">Tarima</button>
+      <button data-tool="linea">Línea</button>
+      <button data-tool="area">Zona</button>
+      <button data-tool="bloque">Bloque</button>
+      <button data-tool="borrar">Borrar</button>
+      <button data-tool="puerta">Puerta</button>
+      <button data-tool="pared">Pared</button>
+      <button id="btnUndo">Deshacer</button>
+    </div>
+    <div class="grid2" style="margin:6px 0">
+      <button data-tool="pasillo">Pasillo peatonal</button>
+      <button data-tool="carga">Pasillo de carga</button>
+      <button data-tool="gradas">Gradas</button>
+      <button data-tool="elevador">Elevador</button>
+      <button data-tool="uso" style="grid-column:1/3">Asignar uso a una tarima</button>
+      <button data-tool="tonel" style="grid-column:1/3">Tonel de 55 galones</button>
+      <button data-tool="rack" style="grid-column:1/3">Rack (2 niveles de tarimas)</button>
+    </div>
+    <label>Ajuste al dibujar / mover</label>
+    <select id="snapStep">
+      <option value="0.1">0.1 m (libre)</option>
+      <option value="0.5">0.5 m</option>
+      <option value="1.5">1.5 m (cuadrícula de tarimas)</option>
+    </select>
+    <div id="optTarima" class="opt">
+      <div class="grid2">
+        <div><label>Ancho del espacio (m)</label><input type="number" id="tw" value="1.5" step="0.05" min="0.2"></div>
+        <div><label>Largo del espacio (m)</label><input type="number" id="tl" value="1.5" step="0.05" min="0.2"></div>
+      </div>
+      <label class="chk"><input type="checkbox" id="tc"> Con producto encima</label>
+      <label>Nivel de la tarima</label>
+      <select id="tNivel">
+        <option value="piso">Piso</option>
+        <option value="rack">Sobre rack (2.º nivel)</option>
+      </select>
+    </div>
+    <div id="optLinea" class="opt">
+      <label>Tipo de línea</label>
+      <select id="ltipo">
+        <option value="peatonal">Pasillo peatonal (bordes de 10 cm)</option>
+        <option value="montacargas">Ruta de montacargas (bordes amarillos)</option>
+        <option value="limite">Límite / seguridad (rojo)</option>
+        <option value="porton">Portón / acceso (verde, abre el muro)</option>
+        <option value="gradas">Gradas (bajan a planta, 1.5 m)</option>
+      </select>
+      <label>Ancho de la franja (m)</label>
+      <input type="number" id="lw" value="1.5" step="0.05" min="0.05">
+      <div class="row" style="margin-top:6px"><button id="btnFin">Terminar línea</button></div>
+    </div>
+    <div id="optRack" class="opt">
+      <label>Tamaño del rack</label>
+      <select id="rackTam">
+        <option value="2">2 tarimas por nivel (2 abajo + 2 arriba)</option>
+        <option value="1">1 tarima por nivel (1 abajo + 1 arriba)</option>
+      </select>
+      <label>Orientación</label>
+      <select id="rackOri">
+        <option value="x">Horizontal (a lo ancho)</option>
+        <option value="d">Vertical (a lo largo de la planta)</option>
+      </select>
+      <button id="btnRackGirar" style="margin-top:6px;width:100%">Girar 90° (tecla R)</button>
+      <label>Racks seguidos (en fila)</label>
+      <input type="number" id="rackN" value="1" step="1" min="1" max="20">
+      <div class="hint">Un clic pone un rack completo en 2 niveles: <b>2 tarimas abajo y 2 arriba</b>, o <b>1 y 1</b> con el tamaño de 1 tarima, con postes en cada módulo y la primera viga a la altura configurada (1.70 m). Elige Horizontal o Vertical (o pulsa R). Con un rack ya puesto y seleccionado (clic con Mover), R lo gira junto con sus tarimas. Con "Racks seguidos" mayor que 1 se ponen varios pegados. Con Mover se arrastra con sus tarimas; Borrar quita el rack y sus tarimas.</div>
+    </div>
+    <div id="optTonel" class="opt">
+      <label class="chk"><input type="checkbox" id="tonel4" checked> Clic sobre una tarima: poner 4 toneles (2 × 2)</label>
+      <div class="hint">Tonel estándar de 55 galones (208 L): 0.58 m de diámetro y 0.88 m de alto. Sobre una tarima queda apoyado encima.</div>
+    </div>
+    <div id="optPared" class="opt">
+      <label>Tipo de pared</label>
+      <select id="ptipo">
+        <option value="estructural">Estructural (altura de la nave)</option>
+        <option value="media">Media altura (1.2 m)</option>
+        <option value="otra">Otra altura</option>
+      </select>
+      <label>Altura (m)</label>
+      <input type="number" id="pAlto" value="5" step="0.1" min="0.3">
+    </div>
+    <div id="optArea" class="opt">
+      <label>Qué es</label>
+      <select id="atipo">
+        <option value="espacio">Zona (relleno de color)</option>
+        <option value="producto">Producto (zona de almacenaje)</option>
+        <option value="doble">Zona doble (dividida en 2, línea móvil)</option>
+        <option value="techo">Techo de lámina (a una altura)</option>
+        <option value="ref">Referencia (marca para decirme qué dibujar)</option>
+      </select>
+      <div class="hint" style="margin-top:6px">Color automático: cada nombre distinto tiene su propio color y el mismo nombre repite el color.</div>
+      <input type="color" id="acolor" value="#A855F7" style="display:none">
+      <label>Alto del techo (m, solo para techo)</label>
+      <input type="number" id="aAlto" value="2.5" step="0.1" min="0.5">
+    </div>
+    <div class="hint" id="hint"></div>
+
+    <h2>Medidas del nivel</h2>
+    <div class="grid2">
+      <div><label>Ancho Bodega (m)</label><input type="number" id="cBodega" step="0.1" min="1"></div>
+      <div><label>Ancho "cajón" (m)</label><input type="number" id="cCajon" step="0.1" min="1"></div>
+      <div><label>Alto del cajón (m)</label><input type="number" id="cAlto" step="0.1" min="1"></div>
+      <div><label>Alto de la nave (m)</label><input type="number" id="cAltoN" step="0.5" min="1"></div>
+      <div><label>Alto de puertas (m)</label><input type="number" id="cAltoP" step="0.1" min="0.5"></div>
+      <div><label>Entre niveles (m)</label><input type="number" id="cAltoNiv" step="0.5" min="1"></div>
+      <div><label>Alto muros nivel 1 (m)</label><input type="number" id="cAltoM1" step="0.5" min="1"></div>
+      <div style="grid-column:1/3"><label>Color de pasillos peatonales</label>
+        <select id="cNorma">
+          <option value="iso">Verde · ISO 3864-1 (vía segura)</option>
+          <option value="ansi">Amarillo · ANSI Z535 / OSHA / NOM-001-STPS</option>
+        </select></div>
+      <div><label>Rack: 1.ª viga (m)</label><input type="number" id="cAltoRk1" step="0.05" min="0.5"></div>
+      <div><label>Rack: alto total (m)</label><input type="number" id="cAltoRk" step="0.1" min="1"></div>
+      <div><label>Pared elevador (m)</label><input type="number" id="cAltoEl" step="0.05" min="0.3"></div>
+      <div><label>Reja elevador n1 (m)</label><input type="number" id="cAltoRj" step="0.05" min="0.3"></div>
+      <div><label>Cajón en la mitad…</label>
+        <select id="cLado"><option value="der">derecha (junto al muro)</option><option value="izq">izquierda (junto a Bodega)</option></select></div>
+      <div><label>Zonas empiezan desde…</label>
+        <select id="cInicio"><option value="frente">el frente</option><option value="fondo">el fondo</option></select></div>
+    </div>
+    <label style="margin-top:10px">Áreas del cajón (nombre · largo m) · ＋↓ agrega una zona debajo</label>
+    <div id="zonasBox"></div>
+    <div class="row"><button id="btnAddZona">+ Zona</button><button id="btnAplicar" class="pri">Aplicar</button></div>
+    <div class="warn" id="aviso"></div>
+
+    <h2>Áreas</h2>
+    <table id="tabla"></table>
+
+    <h2>Espacios funcionales</h2>
+    <div class="hint" style="margin:0 0 6px"><span style="color:#22C55E">■</span> Serigrafía (Flameo, Flameado, Merma) · <span style="color:#FACC15">■</span> Tapas · <span style="color:#38BDF8">■</span> General (materiales) · <span style="color:#C9A66B">■</span> Bodega (tarimas sin asignar)</div>
+    <div id="usoList" class="hint" style="user-select:text;white-space:pre-line;min-height:0">Sin asignar.</div>
+
+    <h2>Referencias</h2>
+    <div id="refList" class="hint" style="user-select:text;white-space:pre-line;min-height:0">Aún no hay referencias.</div>
+
+    <h2>Señalización (ISO 3864-1 / ANSI Z535)</h2>
+    <div class="hint" style="line-height:1.75">
+      <span style="color:#237F52">■</span> Verde: pasillo peatonal y accesos (condición segura)<br>
+      <span style="color:#F9A800">■</span> Amarillo: precaución — ruta de montacargas, parapeto del elevador y borde de escalones (también el pasillo peatonal si eliges ANSI/OSHA)<br>
+      <span style="color:#C1121F">■</span> Rojo: límite de seguridad / prohibido<br>
+      Bordes de 10 cm (mínimo OSHA y NOM-001-STPS: 5 cm). Los códigos de color son aproximados: confirmar el tono exacto con el proveedor de pintura.
+    </div>
+
+    <h2>Nivel 1 · modelo importado (SketchUp)</h2>
+    <div class="row"><button id="n1Cargar" class="pri">Cargar GLB…</button><button id="n1Quitar">Quitar</button></div>
+    <input type="file" id="n1File" accept=".glb,.gltf,model/gltf-binary" style="display:none">
+    <label>Escala (metros por unidad del archivo; mm = 0.001)</label>
+    <input type="number" id="n1Esc" value="0.001" step="0.0001" min="0.00001">
+    <div class="row"><div><label>Mover X (m)</label><input type="number" id="n1X" value="0" step="0.1"></div><div><label>Mover fondo (m)</label><input type="number" id="n1D" value="0" step="0.1"></div><div><label>Altura (m)</label><input type="number" id="n1Y" value="0" step="0.1"></div></div>
+    <div class="row"><button id="n1Rot">Girar 90°</button><button id="n1Fit">Ajustar al fondo (45 m)</button></div>
+    <div class="hint" id="n1Info">Sin modelo. Es solo una referencia: no se exporta en el GLB del Nivel 2 y se guarda en este navegador.</div>
+
+    <h2>Guardar en la base de datos</h2>
+    <label>Nota de esta versión (opcional)</label>
+    <input type="text" id="dbNota" placeholder="Ej.: racks de Bodega acomodados">
+    <div class="row"><button id="dbGuardar" class="pri">Guardar versión</button><button id="dbLista">Ver versiones</button></div>
+    <select id="dbVersiones" style="display:none;margin-top:6px"></select>
+    <button id="dbCargar" style="display:none;margin-top:6px;width:100%">Cargar la versión elegida</button>
+    <div class="hint" id="dbEstado">Cada guardado crea una versión nueva; no pisa las anteriores. Incluye el modelo del Nivel 1 si está cargado. Solo el usuario master puede guardar.</div>
+
+    <h2>Exportar / guardar</h2>
+    <div class="grid2">
+      <button id="eGLB" class="pri">3D · GLB</button>
+      <button id="ePNG">Plano · PNG</button>
+      <button id="eJSON">Datos · JSON</button>
+      <button id="eGEO">GeoJSON · 2D</button>
+      <button id="eSVG">Plano · SVG</button>
+      <button id="eImp">Importar JSON</button>
+    </div>
+    <input type="file" id="fileImp" accept=".json,application/json" style="display:none">
+    <div class="hint">GLB = 3D universal (Blender, SketchUp, Unity, Three.js). GeoJSON = 2D con datos (QGIS, web, bases de datos). SVG = plano vectorial (CAD, Illustrator, navegador). JSON = el diseño completo, versionado. El GLB solo exporta las capas visibles. El PNG sale a 50 px por metro. Todo se guarda solo en este equipo; usa JSON para respaldar o pasarlo a otro.</div>
+    <button id="btnLimpiar" style="margin-top:6px;width:100%">Borrar todo lo dibujado</button>
+    <div class="hint" id="conteo"></div>
+  </div>
+  <div id="wrap"><div id="coord">—</div>
+    <div id="dlgU" style="display:none;position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:5">
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(380px,92%)">
+        <div style="margin-bottom:4px;font-weight:600">Uso de la tarima</div>
+        <div id="uInfo" style="color:var(--mut);font-size:11px;margin-bottom:10px"></div>
+        <select id="uTipo">
+          <option value="libre">Libre (sin asignar)</option>
+          <option value="f1">FLAMEO · rotación alta · Línea 1</option>
+          <option value="f2">FLAMEO · rotación alta · Línea 2</option>
+          <option value="f3">FLAMEO · rotación alta · Línea 3</option>
+          <option value="f4">FLAMEO · rotación alta · Línea 4</option>
+          <option value="e1">FLAMEADO · entrega Flameo, recoge Impresión · Línea 1</option>
+          <option value="e2">FLAMEADO · entrega Flameo, recoge Impresión · Línea 2</option>
+          <option value="e3">FLAMEADO · entrega Flameo, recoge Impresión · Línea 3</option>
+          <option value="e4">FLAMEADO · entrega Flameo, recoge Impresión · Línea 4</option>
+          <option value="m1">MERMA POR LÍNEA · rechazo de Empaque · Línea 1</option>
+          <option value="m2">MERMA POR LÍNEA · rechazo de Empaque · Línea 2</option>
+          <option value="m3">MERMA POR LÍNEA · rechazo de Empaque · Línea 3</option>
+          <option value="m4">MERMA POR LÍNEA · rechazo de Empaque · Línea 4</option>
+          <option value="pt">ENTREGAS PT · producto terminado</option>
+          <option value="pe">PENDIENTE DE EMPAQUE</option>
+          <option value="eb">ENTREGAS DE BODEGA PARA TRABAJAR</option>
+          <option value="ri">RECHAZOS INTERNOS</option>
+          <option value="mp">MATERIA PRIMA MOLIDA</option>
+          <option value="br">BOLSAS PARA RECICLAJE</option>
+          <option value="cm">CORRUGADO MALO</option>
+          <option value="cb">CORRUGADO BUENO</option>
+          <option value="tapas">TAPAS · para flameo antes de impresión</option>
+        </select>
+        <label>Área (define el color)</label>
+        <select id="uArea">
+          <option value="serig">Serigrafía · verde</option>
+          <option value="tapas">Tapas · amarillo</option>
+          <option value="general">General (materiales) · azul</option>
+        </select>
+        <div id="uNota" style="color:var(--mut);font-size:11px;line-height:1.45;margin-top:8px"></div>
+        <label class="chk" style="margin-top:10px"><input type="checkbox" id="uOcup"> Ocupada (con producto)</label>
+        <div class="row" style="margin-top:12px"><button id="uNo">Cancelar</button><button id="uOk" class="pri">Aceptar</button></div>
+      </div>
+    </div>
+    <div id="dlgR" style="display:none;position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:5">
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(380px,92%)">
+        <div style="margin-bottom:4px;font-weight:600">Zonas del cajón</div>
+        <div style="color:var(--mut);font-size:11px;margin-bottom:10px">Color · nombre · alto en metros</div>
+        <div class="zrow"><input type="color" id="rc0"><input type="text" id="rn0" maxlength="30"><input type="number" id="rh0" step="0.1" min="0.5"></div>
+        <div class="zrow"><input type="color" id="rc1"><input type="text" id="rn1" maxlength="30"><input type="number" id="rh1" step="0.1" min="0.5"></div>
+        <div class="row" style="margin-top:12px"><button id="rNo">Cancelar</button><button id="rOk" class="pri">Aceptar</button></div>
+      </div>
+    </div>
+    <div id="dlg" style="display:none;position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:5">
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(340px,90%)">
+        <div id="dlgMsg" style="margin-bottom:10px;line-height:1.4"></div>
+        <input type="text" id="dlgIn" maxlength="40">
+        <div class="row" style="margin-top:12px"><button id="dlgNo">Cancelar</button><button id="dlgOk" class="pri">Aceptar</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+var KEY = 'tetrapp_plano_n2_v1';
+var W = 35, F = 45;
+var SLAB_OSC = 0x3A3A38, SLAB_CLARO = 0xE9E7E1;
+var SEG_VERDE = 0x237F52, SEG_AMARILLO = 0xF9A800, SEG_ROJO = 0xC1121F;
+var TIPOS = {
+  peatonal:    { c: SEG_VERDE, w: 1.5,  n: 'Pasillo peatonal' },
+  montacargas: { c: SEG_AMARILLO, w: 2.5,  n: 'Ruta de montacargas' },
+  limite:      { c: SEG_ROJO, w: 0.10, n: 'Limite / seguridad' },
+  porton:      { c: SEG_VERDE, w: 0.3,  n: 'Porton / acceso' },
+  gradas:      { c: 0xA8A29E, w: 1.5,  n: 'Gradas' }
+};
+var DEF = {
+  bodega: 17.5, cajon: 9, alto: 2.5, altoNave: 5, altoPuerta: 2, altoNivel: 8, altoMurosN1: 8, altoElev: 1.25, altoReja: 1.5, altoRack1: 1.7, altoRack: 3.4, normaPasillo: 'iso', lado: 'der', inicio: 'frente',
+  zonas: [
+    { n: 'FLAMEO', l: 11.25, c: '#EF4444' },
+    { n: 'IMPRESIÓN Y SECADO', l: 11.25, c: '#3B82F6' },
+    { n: 'EMPAQUE', l: 11.25, c: '#22C55E' },
+    { n: 'TAPAS', l: 11.25, c: '#F59E0B' }
+  ]
+};
+var CFG = JSON.parse(JSON.stringify(DEF));
+var items = [];
+var nextId = 1;
+var tool = 'none', rot = 0, draft = null, cursor = null;
+
+function $(id){ return document.getElementById(id); }
+function num(id, def){ var v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : def; }
+var hist = [];
+function snapshot(){ return JSON.stringify({ c: CFG, i: items }); }
+function pushHist(){ hist.push(snapshot()); if (hist.length > 60) hist.shift(); }
+function histFin(){ if (hist.length && hist[hist.length - 1] === snapshot()) hist.pop(); }
+var STEP = 0.1;
+function snap(v){ return Math.round(Math.round(v / STEP) * STEP * 1000) / 1000; }
+function fmt(v){ return (Math.round(v * 100) / 100).toString(); }
+
+/* ---------- persistencia ---------- */
+function guardar(){
+  try { localStorage.setItem(KEY, JSON.stringify({ cfg: CFG, items: items })); } catch (e) {}
+}
+function cargar(){
+  try {
+    var s = localStorage.getItem(KEY);
+    if (!s) return;
+    var o = JSON.parse(s);
+    aplicarDatos(o);
+  } catch (e) {}
+}
+function aplicarDatos(o){
+  if (!o || !o.cfg || !Array.isArray(o.cfg.zonas) || !Array.isArray(o.items)) throw new Error('formato');
+  CFG = o.cfg;
+  items = o.items;
+  nextId = 1;
+  items.forEach(function(it){ if (it.id >= nextId) nextId = it.id + 1; });
+}
+
+/* ---------- escena ---------- */
+var wrap = $('wrap');
+var renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+wrap.insertBefore(renderer.domElement, wrap.firstChild);
+var cv = renderer.domElement;
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0C0C0B);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 0.95));
+var dl = new THREE.DirectionalLight(0xffffff, 0.55);
+dl.position.set(20, 50, 20);
+scene.add(dl);
+
+var CX = W / 2, CZ = -F / 2;
+var camP = new THREE.PerspectiveCamera(45, 1, 0.5, 600);
+camP.position.set(48, 44, 24);
+var camO = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 300);
+camO.up.set(0, 0, -1);
+camO.position.set(CX, 100, CZ);
+camO.lookAt(CX, 0, CZ);
+var ctlP = new THREE.OrbitControls(camP, cv);
+ctlP.target.set(CX, 0, CZ);
+ctlP.maxPolarAngle = Math.PI / 2.05;
+ctlP.update();
+var ctlO = new THREE.OrbitControls(camO, cv);
+ctlO.target.set(CX, 0, CZ);
+ctlO.enableRotate = false;
+ctlO.mouseButtons.LEFT = THREE.MOUSE.PAN;
+ctlO.touches.ONE = THREE.TOUCH.PAN;
+ctlO.update();
+ctlO.enabled = false;
+var cam = camP, ctl = ctlP;
+
+function resize(){
+  var w = wrap.clientWidth, h = wrap.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h);
+  camP.aspect = w / h; camP.updateProjectionMatrix();
+  var a = w / h, hh = 27;
+  camO.left = -hh * a; camO.right = hh * a; camO.top = hh; camO.bottom = -hh;
+  camO.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+var root = new THREE.Group(); root.name = 'nivel2';
+var gLosa = new THREE.Group(), gMuros = new THREE.Group(), gMurosC = new THREE.Group(), gMurosR = new THREE.Group(), gTechoC = new THREE.Group(), gTechoR = new THREE.Group(), gZonas = new THREE.Group(),
+    gRot = new THREE.Group(), gAreas = new THREE.Group(), gLineas = new THREE.Group(),
+    gTarimas = new THREE.Group(), gTecho = new THREE.Group(), gPlanta = new THREE.Group(), gHandles = new THREE.Group(), gRefs = new THREE.Group(), gHandlesR = new THREE.Group(), gRej = new THREE.Group(), gGhost = new THREE.Group();
+gLosa.name = 'losa'; gMuros.name = 'muros'; gZonas.name = 'zonas'; gRot.name = 'rotulos';
+var gN1 = new THREE.Group(); gN1.name = 'nivel1_modelo_skp'; scene.add(gN1);
+gAreas.name = 'productos'; gLineas.name = 'lineas'; gTarimas.name = 'tarimas'; gTecho.name = 'techo'; gPlanta.name = 'nivel1_planta'; gTecho.visible = false;
+[gLosa, gMuros, gZonas, gRot, gAreas, gLineas, gTarimas, gTecho, gPlanta].forEach(function(g){ root.add(g); });
+gMuros.add(gMurosC); gMuros.add(gMurosR); gTecho.add(gTechoC); gTecho.add(gTechoR);
+scene.add(root); scene.add(gRefs); scene.add(gHandles); scene.add(gHandlesR); scene.add(gRej); scene.add(gGhost);
+var CAPAS = { muros: gMuros, zonas: [gZonas, gAreas], rotulos: gRot, rejilla: gRej, lineas: gLineas, tarimas: gTarimas, techo: gTecho, refs: gRefs, nivel1: gPlanta, n1mod: gN1 };
+
+function disposeObj(o){
+  o.traverse(function(n){
+    if (n.geometry) n.geometry.dispose();
+    if (n.material){
+      if (n.material.map) n.material.map.dispose();
+      n.material.dispose();
+    }
+  });
+}
+function clearG(g){
+  while (g.children.length){ var c = g.children.pop(); disposeObj(c); }
+}
+function mat(color, op){
+  var o = (op === undefined) ? 1 : op;
+  return new THREE.MeshStandardMaterial({ color: color, roughness: 0.9, metalness: 0, transparent: o < 1, opacity: o });
+}
+function V(x, d, y){ return new THREE.Vector3(x, y || 0, -d); }
+
+function mkWall(x1, d1, x2, d2, h, op, name, y0, th){
+  var len = Math.hypot(x2 - x1, d2 - d1);
+  var m = new THREE.Mesh(new THREE.BoxGeometry(len, h, th || 0.2), mat(0xB8B5AD, op));
+  m.position.set((x1 + x2) / 2, (y0 || 0) + h / 2, -(d1 + d2) / 2);
+  m.rotation.y = Math.atan2(d2 - d1, x2 - x1);
+  m.name = name;
+  return m;
+}
+function wall(x1, d1, x2, d2, h, op, name, y0){ gMurosC.add(mkWall(x1, d1, x2, d2, h, op, name, y0)); }
+function rectFloor(x0, x1, d0, d1, color, y, op, name){
+  var g = new THREE.PlaneGeometry(Math.abs(x1 - x0), Math.abs(d1 - d0));
+  g.rotateX(-Math.PI / 2);
+  var m = new THREE.Mesh(g, mat(color, op));
+  m.position.set((x0 + x1) / 2, y, -(d0 + d1) / 2);
+  m.name = name;
+  return m;
+}
+function makeLabel(t1, t2, w){
+  var c = document.createElement('canvas');
+  c.width = 512; c.height = 160;
+  var x = c.getContext('2d');
+  x.textAlign = 'center'; x.lineJoin = 'round';
+  var fs = 64;
+  x.font = '700 ' + fs + 'px sans-serif';
+  while (x.measureText(t1).width > 480 && fs > 20){ fs -= 4; x.font = '700 ' + fs + 'px sans-serif'; }
+  x.lineWidth = 8; x.strokeStyle = 'rgba(0,0,0,.85)'; x.fillStyle = '#fff';
+  x.strokeText(t1, 256, 72); x.fillText(t1, 256, 72);
+  if (t2){
+    x.font = '500 36px sans-serif'; x.lineWidth = 6;
+    x.strokeText(t2, 256, 128); x.fillText(t2, 256, 128);
+  }
+  var tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  var g = new THREE.PlaneGeometry(w, w * 160 / 512);
+  g.rotateX(-Math.PI / 2);
+  var m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  m.name = 'rotulo_' + t1;
+  return m;
+}
+function rotuloEn(x0, x1, d0, d1, t1, t2){
+  var w = Math.min(Math.abs(x1 - x0) * 0.9, 8);
+  var m = makeLabel(t1, t2, w);
+  m.position.set((x0 + x1) / 2, 0.08, -(d0 + d1) / 2);
+  gRot.add(m);
+}
+
+var slabMat = null, stripCx = 13, lastPortonSig = '', wallXs = [];
+function portones(){ return items.filter(function(it){ return it.k === 'linea' && it.tipo === 'porton'; }); }
+function portonSig(){ return JSON.stringify(portones().map(function(it){ return it.pts; })) + (CFG.altoPuerta || 2) + JSON.stringify(rangosFrente()) + JSON.stringify(gradasRects()) + (CFG.altoNivel || 8); }
+function rangosFrente(){
+  var r = [];
+  items.forEach(function(it){
+    if (it.k === 'pared' && Math.abs(it.pts[0][1]) < 0.05 && Math.abs(it.pts[1][1]) < 0.05)
+      r.push([Math.min(it.pts[0][0], it.pts[1][0]), Math.max(it.pts[0][0], it.pts[1][0])]);
+  });
+  r.sort(function(a, b){ return a[0] - b[0]; });
+  return r;
+}
+function muroFrente(h){
+  var x = 0, k = 0;
+  rangosFrente().forEach(function(r){
+    if (r[0] > x + 0.01) wall(x, 0, r[0], 0, h, 0.15, 'muro_frente_' + (k++));
+    x = Math.max(x, r[1]);
+  });
+  if (x < W - 0.01) wall(x, 0, W, 0, h, 0.15, 'muro_frente_' + k);
+}
+function huecosEn(x){
+  var hs = [];
+  portones().forEach(function(it){
+    var ok = it.pts.every(function(q){ return Math.abs(q[0] - x) <= 0.5; });
+    if (!ok) return;
+    var ds = it.pts.map(function(q){ return q[1]; });
+    hs.push([Math.max(0, Math.min.apply(null, ds)), Math.min(F, Math.max.apply(null, ds))]);
+  });
+  hs.sort(function(a, b){ return a[0] - b[0]; });
+  return hs;
+}
+function muroVertical(x, h, op, name){
+  var d = 0, k = 0;
+  huecosEn(x).forEach(function(r){
+    if (r[0] > d + 0.01){ wall(x, d, x, r[0], h, op, name + '_' + (k++)); }
+    var hp = CFG.altoPuerta || 2;
+    if (h > hp + 0.01) wall(x, r[0], x, r[1], h - hp, op, name + '_dintel_' + (k++), hp);
+    d = Math.max(d, r[1]);
+  });
+  if (d < F - 0.01) wall(x, d, x, F, h, op, name + '_' + k);
+}
+var medidas = [];   // [{nombre, ancho, largo}]
+
+function esElevador(it){ return it.k === 'area' && it.tipo === 'espacio' && /^ELEVADOR/.test(normNombre(it.nombre)); }
+function gradasRects(){
+  var out = [];
+  items.forEach(function(it){ if (esElevador(it)) out.push([it.x0, it.x1, it.d0, it.d1]); });
+  items.forEach(function(it){
+    if (it.k !== 'linea' || it.tipo !== 'gradas') return;
+    var hw = it.w / 2, n = it.pts.length - 1, i;
+    for (i = 0; i < n; i++){
+      var a = it.pts[i], b = it.pts[i + 1], hor = Math.abs(b[1] - a[1]) < 0.001;
+      if (hor){
+        var x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]);
+        if (i > 0) { if (b[0] > a[0]) x0 -= hw; else x1 += hw; }
+        if (i < n - 1) { if (b[0] > a[0]) x1 += hw; else x0 -= hw; }
+        out.push([x0, x1, a[1] - hw, a[1] + hw]);
+      } else {
+        var d0 = Math.min(a[1], b[1]), d1 = Math.max(a[1], b[1]);
+        if (i > 0) { if (b[1] > a[1]) d0 -= hw; else d1 += hw; }
+        if (i < n - 1) { if (b[1] > a[1]) d1 += hw; else d0 -= hw; }
+        out.push([a[0] - hw, a[0] + hw, d0, d1]);
+      }
+    }
+  });
+  return out.map(function(r){ return [Math.max(0, r[0]), Math.min(W, r[1]), Math.max(0, r[2]), Math.min(F, r[3])]; });
+}
+function buildLosa(){
+  var holes = gradasRects(), xs = [0, W], ds = [0, F];
+  holes.forEach(function(r){ xs.push(r[0], r[1]); ds.push(r[2], r[3]); });
+  var uniq = function(a){ return a.sort(function(p, q){ return p - q; }).filter(function(v, i, arr){ return i === 0 || v - arr[i - 1] > 0.0005; }); };
+  xs = uniq(xs); ds = uniq(ds);
+  slabMat = mat(SLAB_OSC, 1);
+  var i, j;
+  for (i = 0; i < xs.length - 1; i++){
+    for (j = 0; j < ds.length - 1; j++){
+      var cx = (xs[i] + xs[i + 1]) / 2, cd = (ds[j] + ds[j + 1]) / 2;
+      var inside = holes.some(function(r){ return cx > r[0] && cx < r[1] && cd > r[2] && cd < r[3]; });
+      if (inside) continue;
+      var c = new THREE.Mesh(new THREE.BoxGeometry(xs[i + 1] - xs[i], 0.3, ds[j + 1] - ds[j]), slabMat);
+      c.position.set(cx, -0.15, -cd);
+      c.name = 'losa_nivel2_' + i + '_' + j;
+      gLosa.add(c);
+    }
+  }
+}
+function buildPlanta(){
+  var rise = CFG.altoNivel || 8;
+  var sl = new THREE.Mesh(new THREE.BoxGeometry(W, 0.3, F), mat(0x2B2B29, 1));
+  sl.position.set(W / 2, -rise - 0.15, -F / 2);
+  sl.name = 'losa_nivel1';
+  gPlanta.add(sl);
+  var hm = CFG.altoMurosN1 || 8;
+  var dv = mkWall(CFG.bodega, 0, CFG.bodega, F, hm, 0.45, 'muro_divisor_nivel1', -rise, 0.3);
+  dv.material.color.setHex(0x7C7A74);
+  gPlanta.add(dv);
+  [['frente', 0, 0, W, 0], ['fondo', 0, F, W, F], ['izquierdo', 0, 0, 0, F], ['derecho', W, 0, W, F]].forEach(function(e){
+    gPlanta.add(mkWall(e[1], e[2], e[3], e[4], hm, 0.2, 'muro_' + e[0] + '_nivel1', -rise, 0.3));
+  });
+  var lb = makeLabel('NIVEL 1 · PLANTA', 'a ' + fmt(rise) + ' m bajo el nivel 2', 9);
+  lb.position.set(W / 2, -rise + 0.05, -F / 2);
+  gPlanta.add(lb);
+}
+function construir(){
+  clearG(gLosa); clearG(gPlanta); clearG(gMurosC); clearG(gZonas); clearG(gRot); clearG(gRej); clearG(gTechoC); clearG(gHandles);
+  medidas = [];
+  lastPortonSig = portonSig();
+  var H = CFG.alto || 2.5, HN = CFG.altoNave || 5;
+  buildLosa();
+  buildPlanta();
+
+  wallXs = [CFG.bodega, CFG.lado === 'der' ? W - CFG.cajon : CFG.bodega + CFG.cajon];
+  muroFrente(HN);
+  wall(0, F, W, F, HN, 0.15, 'muro_fondo');
+  wall(0, 0, 0, F, HN, 0.15, 'muro_izquierdo');
+  wall(W, 0, W, F, HN, 0.15, 'muro_derecho');
+
+  var xb = CFG.bodega, cx0, cx1, sx0, sx1, esDer = (CFG.lado === 'der');
+  if (esDer){ cx1 = W; cx0 = W - CFG.cajon; sx0 = xb; sx1 = cx0; }
+  else { cx0 = xb; cx1 = xb + CFG.cajon; sx0 = cx1; sx1 = W; }
+  muroVertical(xb, HN, 0.2, 'muro_bodega');
+  muroVertical(esDer ? cx0 : cx1, H, 0.3, 'muro_cajon');
+  var tc = new THREE.Mesh(new THREE.BoxGeometry(cx1 - cx0, 0.1, F), mat(0xB8B5AD, 0.35));
+  tc.position.set((cx0 + cx1) / 2, H + 0.05, -F / 2); tc.name = 'techo_cajon';
+  gTechoC.add(tc);
+
+  // Bodega
+  gZonas.add(rectFloor(0, xb, 0, F, 0x8B7355, 0.02, 0.35, 'zona_BODEGA'));
+  rotuloEn(0, xb, 0, F, 'BODEGA', fmt(xb) + ' × ' + fmt(F) + ' m');
+  medidas.push({ n: 'Bodega', a: xb, l: F });
+
+  // franja sin definir
+  stripCx = (sx0 + sx1) / 2;
+  if (sx1 - sx0 > 0.05){
+    gZonas.add(rectFloor(sx0, sx1, 0, F, 0x77756F, 0.02, 0.25, 'zona_POR_DEFINIR'));
+    rotuloEn(sx0, sx1, 0, F, 'POR DEFINIR', fmt(sx1 - sx0) + ' × ' + fmt(F) + ' m');
+    medidas.push({ n: 'Franja por definir', a: sx1 - sx0, l: F });
+  }
+
+  // zonas del cajón
+  var d = (CFG.inicio === 'fondo') ? F : 0, suma = 0;
+  CFG.zonas.forEach(function(z, zi){
+    var d0, d1;
+    if (CFG.inicio === 'fondo'){ d0 = d - z.l; d1 = d; d -= z.l; }
+    else { d0 = d; d1 = d + z.l; d += z.l; }
+    suma += z.l;
+    gZonas.add(rectFloor(cx0, cx1, d0, d1, new THREE.Color(z.c), 0.02, 0.5, 'zona_' + z.n));
+    rotuloEn(cx0, cx1, d0, d1, z.n, fmt(cx1 - cx0) + ' × ' + fmt(z.l) + ' m');
+    var db = (CFG.inicio === 'fondo') ? d0 : d1;
+    if (db > 0.05 && db < F - 0.05) wall(cx0, db, cx1, db, H, 0.3, 'division_' + z.n);
+    if (zi < CFG.zonas.length - 1){
+      var hm = new THREE.Mesh(new THREE.BoxGeometry(cx1 - cx0, 0.25, 0.4), new THREE.MeshBasicMaterial({ color: 0x14B8A6 }));
+      hm.position.set((cx0 + cx1) / 2, 0.2, -db);
+      hm.userData.k = zi; hm.name = 'asa_' + zi;
+      gHandles.add(hm);
+    }
+    medidas.push({ n: z.n, a: cx1 - cx0, l: z.l });
+  });
+  var av = $('aviso');
+  if (Math.abs(suma - F) > 0.05) av.textContent = 'Las zonas suman ' + fmt(suma) + ' m y el fondo es ' + F + ' m.';
+  else av.textContent = '';
+  if (xb + CFG.cajon > W + 0.001) av.textContent = 'Bodega + cajón pasan de ' + W + ' m de frente.';
+
+  // rejilla
+  var pm = [], pM = [], i;
+  for (i = 0; i <= W; i++){ var arr = (i % 5 === 0) ? pM : pm; arr.push(i, 0.03, 0, i, 0.03, -F); }
+  for (i = 0; i <= F; i++){ var arr2 = (i % 5 === 0) ? pM : pm; arr2.push(0, 0.03, -i, W, 0.03, -i); }
+  gRej.add(lineasGeo(pm, 0x777777, 0.3));
+  gRej.add(lineasGeo(pM, 0xAAAAAA, 0.6));
+  gHandles.visible = (tool === 'none');
+  pintarTabla();
+}
+function lineasGeo(arr, color, op){
+  var g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+  return new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: op }));
+}
+function pintarTabla(){
+  var t = $('tabla'), html = '';
+  medidas.forEach(function(m){
+    var tr = document.createElement('tr');
+    var a = document.createElement('td'); a.textContent = m.n;
+    var b = document.createElement('td'); b.textContent = fmt(m.a) + ' × ' + fmt(m.l) + ' = ' + fmt(m.a * m.l) + ' m²';
+    tr.appendChild(a); tr.appendChild(b);
+    if (!html){ t.innerHTML = ''; html = '1'; }
+    t.appendChild(tr);
+  });
+}
+
+/* ---------- elementos dibujados ---------- */
+var NOTAS_USO = {
+  flameo: 'Envase que Bodega entrega a Flameo para atender la requi de salida de Serigrafía. Rotación alta, 1 tarima por línea.',
+  flameado: 'Flameo entrega aquí el envase flameado e Impresión lo recoge. 1 tarima por línea.',
+  merma: 'Empaque deja aquí el envase rechazado por mala impresión. Cada línea lo limpia y lo deja listo para reprocesar; si no lo limpia, se lleva a Molino y se cobra a la línea operativa por gramo.',
+  entregaspt: 'Zona de entregas de producto terminado (PT).',
+  pendempaque: 'Producto pendiente de empaque, en espera de ser empacado.',
+  entbodega: 'Entregas de Bodega para trabajar: material que Bodega entrega al área para su proceso.',
+  rechazoint: 'Tarimas para rechazos internos del área.',
+  mpmolida: 'Materia prima molida.',
+  bolsasrec: 'Bolsas para reciclaje.',
+  corrmalo: 'Corrugado malo (en mal estado).',
+  corrbueno: 'Corrugado bueno (en buen estado).',
+  tapas: 'Tapas que necesitan proceso de flameo antes de la impresión.'
+};
+function notaUso(it){ return it.uso ? (NOTAS_USO[it.uso.tipo] || '') : ''; }
+var COLOR_TARIMA_SERIG = 0x22C55E, COLOR_TARIMA_TAPAS = 0xFACC15, COLOR_TARIMA_GENERAL = 0x38BDF8;
+var USOS_GENERALES = ['mpmolida', 'bolsasrec', 'corrmalo', 'corrbueno'];
+function areaUso(it){
+  if (!it.uso) return 'serig';
+  return it.uso.area || (it.uso.tipo === 'tapas' ? 'tapas' : (USOS_GENERALES.indexOf(it.uso.tipo) >= 0 ? 'general' : 'serig'));
+}
+function usoCodigo(it){
+  if (!it.uso) return '';
+  if (it.uso.tipo === 'tapas') return 'TAPAS_para_flameo';
+  if (it.uso.tipo === 'flameado') return 'FLAMEADO_L' + it.uso.linea;
+  if (it.uso.tipo === 'merma') return 'MERMA_L' + it.uso.linea;
+  var suf = (areaUso(it) === 'tapas') ? '_TAPAS' : '';
+  if (it.uso.tipo === 'entregaspt') return 'ENTREGAS_PT' + suf;
+  if (it.uso.tipo === 'pendempaque') return 'PENDIENTE_EMPAQUE' + suf;
+  if (it.uso.tipo === 'entbodega') return 'ENTREGA_BODEGA_TRABAJAR' + suf;
+  if (it.uso.tipo === 'rechazoint') return 'RECHAZO_INTERNO' + suf;
+  if (it.uso.tipo === 'mpmolida') return 'MATERIA_PRIMA_MOLIDA';
+  if (it.uso.tipo === 'bolsasrec') return 'BOLSAS_RECICLAJE';
+  if (it.uso.tipo === 'corrmalo') return 'CORRUGADO_MALO';
+  if (it.uso.tipo === 'corrbueno') return 'CORRUGADO_BUENO';
+  return 'FLAMEO_L' + it.uso.linea;
+}
+function usoTexto(it){
+  if (it.uso.tipo === 'tapas') return ['TAPAS', 'p/ flameo'];
+  if (it.uso.tipo === 'flameado') return ['FLAMEADO L' + it.uso.linea, 'p/ impresión'];
+  if (it.uso.tipo === 'merma') return ['MERMA L' + it.uso.linea, 'rechazo empaque'];
+  var sa = (areaUso(it) === 'tapas') ? ' · tapas' : '';
+  if (it.uso.tipo === 'entregaspt') return ['ENTREGAS PT', 'prod. terminado' + sa];
+  if (it.uso.tipo === 'pendempaque') return ['PEND. EMPAQUE', 'por empacar' + sa];
+  if (it.uso.tipo === 'entbodega') return ['ENTREGA BODEGA', 'p/ trabajar' + sa];
+  if (it.uso.tipo === 'rechazoint') return ['RECHAZO INTERNO', (sa ? 'tapas' : 'serigrafía')];
+  if (it.uso.tipo === 'mpmolida') return ['MP MOLIDA', 'materia prima'];
+  if (it.uso.tipo === 'bolsasrec') return ['BOLSAS', 'para reciclaje'];
+  if (it.uso.tipo === 'corrmalo') return ['CORRUGADO MALO', ''];
+  if (it.uso.tipo === 'corrbueno') return ['CORRUGADO BUENO', ''];
+  return ['FLAMEO L' + it.uso.linea, 'rot. alta'];
+}
+function cargaColorTarima(it){
+  if (!it.uso) return 0xE5E2DA;
+  return colorUsoTarima(it);
+}
+function colorUsoTarima(it){
+  if (!it.uso) return 0xC9A66B;
+  var ar = areaUso(it);
+  return (ar === 'tapas') ? COLOR_TARIMA_TAPAS : (ar === 'general' ? COLOR_TARIMA_GENERAL : COLOR_TARIMA_SERIG);
+}
+function pintarUsos(){
+  var lin = [];
+  items.forEach(function(it){
+    if (it.k !== 'tarima' || !it.uso) return;
+    lin.push(usoTexto(it).join(' · ') + (it.carga ? ' (ocupada)' : ' (libre)') + ' — x ' + fmt(it.x) + ', fondo ' + fmt(it.d));
+  });
+  lin.sort();
+  var nb = 0;
+  items.forEach(function(it){ if (it.k === 'tarima' && !it.uso) nb++; });
+  lin.push('Bodega (sin asignar): ' + nb + ' tarimas');
+  $('usoList').textContent = lin.join('\n');
+}
+var TONEL_D = 0.58, TONEL_H = 0.88, COLOR_TONEL = 0x2563EB;
+function girarOrientacionRack(){
+  $('rackOri').value = ($('rackOri').value === 'x') ? 'd' : 'x';
+  actualizarGhost();
+}
+function rotarRack(rk){
+  var pw = rk.prof || 1.5, bahia = rk.bahia || 2 * pw, z2 = (CFG.altoRack1 || 1.7) + 0.12;
+  var x0 = Math.min(rk.x0, rk.x1), x1 = Math.max(rk.x0, rk.x1), d0 = Math.min(rk.d0, rk.d1), d1 = Math.max(rk.d0, rk.d1);
+  var cx = (x0 + x1) / 2, cd = (d0 + d1) / 2, nor = (rk.orient === 'x') ? 'd' : 'x';
+  var nx0 = (nor === 'x') ? cx - bahia / 2 : cx - pw / 2, nx1 = (nor === 'x') ? cx + bahia / 2 : cx + pw / 2;
+  var nd0 = (nor === 'x') ? cd - pw / 2 : cd - bahia / 2, nd1 = (nor === 'x') ? cd + pw / 2 : cd + bahia / 2;
+  if (nx0 < -0.001 || nx1 > W + 0.001 || nd0 < -0.001 || nd1 > F + 0.001) return false;
+  pushHist();
+  var pals = items.filter(function(t){ return t.k === 'tarima' && t.rack === rk.id; });
+  pals.forEach(function(t){
+    var idx = (rk.orient === 'x') ? Math.round((t.x - x0 - pw / 2) / pw) : Math.round((t.d - d0 - pw / 2) / pw);
+    idx = Math.max(0, Math.min(Math.max(1, Math.round(bahia / pw)) - 1, idx));
+    t.x = r3((nor === 'x') ? nx0 + (idx + 0.5) * pw : cx);
+    t.d = r3((nor === 'x') ? cd : nd0 + (idx + 0.5) * pw);
+  });
+  rk.x0 = r3(nx0); rk.x1 = r3(nx1); rk.d0 = r3(nd0); rk.d1 = r3(nd1); rk.orient = nor;
+  refreshItems();
+  return true;
+}
+function crearTarimasRack(rk){
+  var out = [], pw = rk.prof || 1.5, z2 = (CFG.altoRack1 || 1.7) + 0.12, i, cnt = Math.max(1, Math.round((rk.bahia || 2 * pw) / pw));
+  var x0 = Math.min(rk.x0, rk.x1), x1 = Math.max(rk.x0, rk.x1), d0 = Math.min(rk.d0, rk.d1), d1 = Math.max(rk.d0, rk.d1);
+  for (i = 0; i < cnt; i++){
+    var cx = (rk.orient === 'x') ? x0 + (i + 0.5) * pw : (x0 + x1) / 2;
+    var cd = (rk.orient === 'x') ? (d0 + d1) / 2 : d0 + (i + 0.5) * pw;
+    [0, z2].forEach(function(zz){
+      out.push({ id: nextId++, k: 'tarima', x: r3(cx), d: r3(cd), rot: 0, w: pw, l: pw, carga: false, z: zz, rack: rk.id });
+    });
+  }
+  return out;
+}
+function tarimaEn(x, d){
+  var best = null;
+  for (var i = 0; i < items.length; i++){
+    var t = items[i];
+    if (t.k === 'tarima' && Math.abs(x - t.x) <= t.w / 2 && Math.abs(d - t.d) <= t.l / 2 && (!best || (t.z || 0) > (best.z || 0))) best = t;
+  }
+  return best;
+}
+function elevNivel(){ return ($('tNivel').value === 'rack') ? (CFG.altoRack1 || 1.7) + 0.12 : 0; }
+function buildRack(it){
+  var g = new THREE.Group();
+  g.userData.itemId = it.id; g.name = 'rack_' + it.id;
+  g.userData.codigo = 'N2-K' + it.id; g.userData.tipo = 'rack'; g.userData.modulos = it.n;
+  var h1 = CFG.altoRack1 || 1.7, H = Math.max(CFG.altoRack || 3.4, h1 + 0.3), along = it.orient;
+  var x0 = Math.min(it.x0, it.x1), x1 = Math.max(it.x0, it.x1), d0 = Math.min(it.d0, it.d1), d1 = Math.max(it.d0, it.d1);
+  var len = (along === 'x') ? x1 - x0 : d1 - d0, colP = 0x1E40AF, colV = 0xF97316, i;
+  for (i = 0; i <= it.n; i++){
+    var tt = i * len / it.n;
+    [0, 1].forEach(function(sd){
+      var cx = (along === 'x') ? x0 + tt : (sd ? x1 : x0), cd = (along === 'x') ? (sd ? d1 : d0) : d0 + tt;
+      var po = new THREE.Mesh(new THREE.BoxGeometry(0.1, H, 0.1), mat(colP, 1));
+      po.position.set(cx, H / 2, -cd); po.userData.c0 = colP; po.name = 'poste_rack';
+      g.add(po);
+    });
+  }
+  [h1, H].forEach(function(hy){
+    [0, 1].forEach(function(sd){
+      var bx = (along === 'x') ? (x0 + x1) / 2 : (sd ? x1 : x0), bd = (along === 'x') ? (sd ? d1 : d0) : (d0 + d1) / 2;
+      var vg = new THREE.Mesh(new THREE.BoxGeometry(along === 'x' ? len : 0.08, 0.12, along === 'x' ? 0.08 : len), mat(colV, 1));
+      vg.position.set(bx, hy - 0.06, -bd); vg.userData.c0 = colV; vg.name = 'viga_rack';
+      g.add(vg);
+    });
+  });
+  g.add(rectFloor(x0, x1, d0, d1, colV, 0.045, 0.18, 'huella_rack'));
+  var lb = makeLabel('RACK', Math.round((it.bahia || 3) / (it.prof || 1.5)) + (Math.round((it.bahia || 3) / (it.prof || 1.5)) === 1 ? ' tarima por nivel' : ' tarimas por nivel'), Math.max(1.2, Math.min(len * 0.5, 3)));
+  lb.position.set((x0 + x1) / 2, 0.07, -(d0 + d1) / 2);
+  g.add(lb);
+  return g;
+}
+function buildTonel(it){
+  var g = new THREE.Group();
+  g.userData.itemId = it.id; g.name = 'tonel_' + it.id;
+  g.userData.codigo = 'N2-O' + it.id; g.userData.tipo = 'tonel_55gal'; g.userData.sobreTarima = !!tarimaEn(it.x, it.d);
+  var tb = tarimaEn(it.x, it.d), elev = tb ? (tb.z || 0) + 0.14 : 0;
+  var cy = new THREE.Mesh(new THREE.CylinderGeometry(TONEL_D / 2, TONEL_D / 2, TONEL_H, 28), mat(COLOR_TONEL, 1));
+  cy.position.y = elev + TONEL_H / 2; cy.userData.c0 = COLOR_TONEL; g.add(cy);
+  var tap = new THREE.Mesh(new THREE.CylinderGeometry(TONEL_D / 2 - 0.03, TONEL_D / 2 - 0.03, 0.02, 28), mat(0x1E40AF, 1));
+  tap.position.y = elev + TONEL_H + 0.01; g.add(tap);
+  g.position.copy(V(it.x, it.d));
+  return g;
+}
+function buildTarima(it){
+  var g = new THREE.Group();
+  g.userData.itemId = it.id; g.name = 'tarima_' + it.id + '_' + (it.uso ? usoCodigo(it) : 'BODEGA');
+  g.userData.area = it.uso ? areaUso(it) : 'bodega';
+  g.userData.codigo = 'N2-T' + it.id;
+  g.userData.ocupada = !!it.carga;
+  var base = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.1, it.w - 0.08), 0.14, Math.max(0.1, it.l - 0.08)), mat(colorUsoTarima(it), 1));
+  base.position.y = 0.07; base.userData.c0 = colorUsoTarima(it); g.add(base);
+  if (it.carga){
+    var c = new THREE.Mesh(new THREE.BoxGeometry(it.w * 0.94, 1.0, it.l * 0.94), mat(cargaColorTarima(it), 1));
+    c.position.y = 0.64; c.userData.c0 = cargaColorTarima(it); g.add(c);
+  }
+  if (it.uso){
+    g.userData.uso = it.uso.tipo + (it.uso.linea ? ' L' + it.uso.linea : '');
+    g.userData.nota = notaUso(it);
+    var ut = usoTexto(it);
+    var ulb = makeLabel(ut[0], ut[1] + (it.carga ? ' · ocup.' : ''), Math.max(0.6, Math.min(it.w * 0.92, 1.8)));
+    ulb.position.y = (it.carga ? 1.18 : 0.17);
+    g.add(ulb);
+  }
+  var hw = it.w / 2, hl = it.l / 2;
+  var bg = new THREE.BufferGeometry();
+  bg.setAttribute('position', new THREE.Float32BufferAttribute([-hw, 0.16, -hl, hw, 0.16, -hl, hw, 0.16, hl, -hw, 0.16, hl], 3));
+  var borde = new THREE.LineLoop(bg, new THREE.LineBasicMaterial({ color: 0x111111 }));
+  borde.name = 'borde_tarima_' + it.id;
+  g.add(borde);
+  g.position.copy(V(it.x, it.d));
+  g.position.y = it.z || 0;
+  g.rotation.y = it.rot || 0;
+  return g;
+}
+function colorPasillo(){ return (CFG.normaPasillo === 'ansi') ? SEG_AMARILLO : SEG_VERDE; }
+function buildCarril(it, g, op){
+  var col = op.col, borde = 0.10, i;
+  for (i = 0; i < it.pts.length - 1; i++){
+    var a = it.pts[i], b = it.pts[i + 1], dx = b[0] - a[0], dd = b[1] - a[1], len = Math.hypot(dx, dd);
+    if (len < 0.01) continue;
+    var ux = dx / len, ud = dd / len, nx = -ud, nd = ux, ang = Math.atan2(dd, dx), mx = (a[0] + b[0]) / 2, md = (a[1] + b[1]) / 2;
+    var fg = new THREE.PlaneGeometry(len, it.w);
+    fg.rotateX(-Math.PI / 2);
+    var fm = new THREE.Mesh(fg, mat(col, 0.22));
+    fm.position.set(mx, 0.045, -md); fm.rotation.y = ang; fm.name = 'pasillo_relleno';
+    g.add(fm);
+    [-1, 1].forEach(function(sg){
+      var off = sg * (it.w / 2 - borde / 2);
+      var eg = new THREE.PlaneGeometry(len, borde);
+      eg.rotateX(-Math.PI / 2);
+      var em = new THREE.Mesh(eg, mat(col, 1));
+      em.position.set(mx + nx * off, 0.05, -(md + nd * off)); em.rotation.y = ang; em.name = 'pasillo_borde';
+      em.userData.c0 = col;
+      g.add(em);
+    });
+    var hg = new THREE.PlaneGeometry(len, Math.max(it.w, 1.0));
+    hg.rotateX(-Math.PI / 2);
+    var hit = new THREE.Mesh(hg, new THREE.MeshBasicMaterial());
+    hit.position.set(mx, 0.06, -md); hit.rotation.y = ang; hit.visible = false;
+    g.add(hit);
+    if (op.dash){
+      var nd2 = Math.floor(len / 1.2), q;
+      for (q = 0; q < nd2; q++){
+        var tt = (q + 0.5) * 1.2;
+        var dg = new THREE.PlaneGeometry(0.6, 0.12);
+        dg.rotateX(-Math.PI / 2);
+        var dm = new THREE.Mesh(dg, new THREE.MeshBasicMaterial({ color: 0xFFFFFF }));
+        dm.position.set(a[0] + ux * tt, 0.052, -(a[1] + ud * tt)); dm.rotation.y = ang; dm.name = 'eje_discontinuo';
+        g.add(dm);
+      }
+    }
+    var nl = Math.floor(len / 12), k;
+    for (k = 0; k < nl; k++){
+      var tpos = (k + 0.5) * len / nl, lx = a[0] + ux * tpos, ld = a[1] + ud * tpos;
+      var lb = makeLabel(op.label, '', Math.min(op.lw || 2.4, it.w * 1.5));
+      lb.position.set(lx, 0.07, -ld);
+      lb.rotation.y = (dx < -0.001 || (Math.abs(dx) <= 0.001 && dd < 0)) ? ang + Math.PI : ang;
+      g.add(lb);
+    }
+  }
+  return g;
+}
+function buildGradasGrupo(it, g){
+  var hw = it.w / 2, n = it.pts.length - 1, rise = CFG.altoNivel || 8, i, j;
+  var runs = [];
+  for (i = 0; i < n; i++){
+    var a = it.pts[i], b = it.pts[i + 1], dx = b[0] - a[0], dd = b[1] - a[1], len = Math.hypot(dx, dd);
+    if (len < 0.01) continue;
+    var s0 = (i > 0) ? hw : 0, s1 = len - ((i < n - 1) ? hw : 0);
+    if (s1 < s0 + 0.1) s1 = s0 + 0.1;
+    runs.push({ a: a, ux: dx / len, ud: dd / len, s0: s0, s1: s1, len: s1 - s0, corner: (i < n - 1) });
+    // zona de agarre para seleccionar
+    var hg = new THREE.PlaneGeometry(len, Math.max(it.w, 1.0));
+    hg.rotateX(-Math.PI / 2);
+    var hit = new THREE.Mesh(hg, new THREE.MeshBasicMaterial());
+    hit.position.set((a[0] + b[0]) / 2, 0.06, -(a[1] + b[1]) / 2);
+    hit.rotation.y = Math.atan2(dd, dx); hit.visible = false;
+    g.add(hit);
+  }
+  if (!runs.length) return g;
+  var corners = 0, totalRun = 0;
+  runs.forEach(function(r){ if (r.corner) corners++; totalRun += r.len; });
+  var target = Math.max(4, Math.round(rise / 0.2)), tdep = totalRun / Math.max(1, target - 2 * corners);
+  runs.forEach(function(r){ r.cnt = Math.max(1, Math.round(r.len / tdep)); });
+  var total = corners * 2;
+  runs.forEach(function(r){ total += r.cnt; });
+  var riser = rise / total, k = 0;
+  var addStep = function(r, sc, depth){
+    var th = 0.15, top = -(k + 1) * riser;
+    var col = new THREE.Color().setHSL(0, 0, 0.72 - 0.42 * (k / total));
+    var m = new THREE.Mesh(new THREE.BoxGeometry(depth * 0.98, th, it.w), mat(col, 1));
+    m.position.set(r.a[0] + r.ux * sc, top - th / 2, -(r.a[1] + r.ud * sc));
+    m.rotation.y = Math.atan2(r.ud, r.ux);
+    m.name = 'grada_' + (k + 1);
+    g.add(m);
+    var ng = new THREE.PlaneGeometry(0.06, it.w * 0.98);
+    ng.rotateX(-Math.PI / 2);
+    var nm = new THREE.Mesh(ng, new THREE.MeshBasicMaterial({ color: SEG_AMARILLO }));
+    nm.position.set(r.a[0] + r.ux * (sc + depth / 2 - 0.04), top + 0.003, -(r.a[1] + r.ud * (sc + depth / 2 - 0.04)));
+    nm.rotation.y = Math.atan2(r.ud, r.ux); nm.name = 'nariz_grada_' + (k + 1);
+    g.add(nm);
+    k++;
+  };
+  runs.forEach(function(r){
+    var td = r.len / r.cnt;
+    for (j = 0; j < r.cnt; j++) addStep(r, r.s0 + (j + 0.5) * td, td);
+    if (r.corner){
+      addStep(r, r.s1 + hw / 2, hw);
+      addStep(r, r.s1 + hw * 1.5, hw);
+    }
+  });
+  g.userData.pasos = total;
+  return g;
+}
+function buildLinea(it){
+  var g = new THREE.Group();
+  g.userData.itemId = it.id; g.name = 'linea_' + it.tipo + '_' + it.id;
+  var tp = TIPOS[it.tipo] || TIPOS.peatonal;
+  var m = mat(tp.c, 1), i;
+  if (it.tipo === 'gradas') return buildGradasGrupo(it, g);
+  if (it.tipo === 'peatonal') return buildCarril(it, g, { col: colorPasillo(), label: 'PASO PEATONAL', lw: 2.4 });
+  if (it.tipo === 'montacargas') return buildCarril(it, g, { col: SEG_AMARILLO, label: 'RUTA MONTACARGAS', lw: 3.4, dash: true });
+  for (i = 0; i < it.pts.length - 1; i++){
+    var a = it.pts[i], b = it.pts[i + 1];
+    var dx = b[0] - a[0], dd = b[1] - a[1], len = Math.hypot(dx, dd);
+    if (len < 0.01) continue;
+    var geo = new THREE.PlaneGeometry(len, it.w);
+    geo.rotateX(-Math.PI / 2);
+    var s = new THREE.Mesh(geo, m);
+    s.position.set((a[0] + b[0]) / 2, 0.05, -(a[1] + b[1]) / 2);
+    s.rotation.y = Math.atan2(dd, dx);
+    s.userData.c0 = tp.c;
+    g.add(s);
+    var hg = new THREE.PlaneGeometry(len, Math.max(it.w, 1.0));
+    hg.rotateX(-Math.PI / 2);
+    var hit = new THREE.Mesh(hg, new THREE.MeshBasicMaterial());
+    hit.position.copy(s.position); hit.position.y = 0.06;
+    hit.rotation.y = s.rotation.y; hit.visible = false;
+    g.add(hit);
+  }
+  for (i = 0; i < it.pts.length; i++){
+    var cg = new THREE.CircleGeometry(it.w / 2, 16);
+    cg.rotateX(-Math.PI / 2);
+    var j = new THREE.Mesh(cg, m);
+    j.position.set(it.pts[i][0], 0.051, -it.pts[i][1]);
+    j.userData.c0 = tp.c;
+    g.add(j);
+  }
+  return g;
+}
+function buildArea(it){
+  var g = new THREE.Group();
+  g.userData.itemId = it.id; g.name = ((it.tipo === 'producto') ? 'producto_' : 'zona_') + it.nombre;
+  var col = new THREE.Color((it.tipo === 'producto') ? '#FACC15' : (it.color || '#A855F7'));
+  g.add(rectFloor(it.x0, it.x1, it.d0, it.d1, col, 0.04, esElevador(it) ? 0.25 : ((it.tipo === 'producto') ? 0.45 : 0.55), 'area_' + it.id));
+  var w = Math.abs(it.x1 - it.x0), l = Math.abs(it.d1 - it.d0);
+  var lb = makeLabel(it.nombre, fmt(w) + ' × ' + fmt(l) + ' m', Math.max(1.5, Math.min(w * 0.9, 6)));
+  lb.position.set((it.x0 + it.x1) / 2, 0.09, -(it.d0 + it.d1) / 2);
+  g.add(lb);
+  return g;
+}
+var PALETA = ['#f43f5e', '#0ea5e9', '#84cc16', '#eab308', '#14b8a6', '#8b5cf6', '#ec4899', '#22d3ee', '#a3e635', '#fb7185', '#38bdf8', '#facc15', '#34d399', '#c084fc', '#f472b6', '#fb923c'];
+function normNombre(n){ return String(n || '').trim().toUpperCase(); }
+function coloresPorNombre(excluir){
+  var m = {};
+  CFG.zonas.forEach(function(z){ m[normNombre(z.n)] = String(z.c).toLowerCase(); });
+  items.forEach(function(it){
+    if (it.k === 'recinto') it.zonas.forEach(function(z){ m[normNombre(z.n)] = String(z.c).toLowerCase(); });
+    else if (it.k === 'area' && it.tipo === 'espacio' && it !== excluir && it.color) m[normNombre(it.nombre)] = String(it.color).toLowerCase();
+  });
+  return m;
+}
+function colorLibre(usados){
+  var i;
+  for (i = 0; i < PALETA.length; i++){ if (!usados[PALETA[i]]) return PALETA[i]; }
+  var h = (Object.keys(usados).length * 137.5) % 360;
+  return '#' + new THREE.Color().setHSL(h / 360, 0.65, 0.55).getHexString();
+}
+function colorParaNombre(nombre, excluir){
+  var m = coloresPorNombre(excluir), key = normNombre(nombre);
+  if (m[key]) return m[key];
+  var usados = {};
+  Object.keys(m).forEach(function(k){ usados[m[k]] = 1; });
+  return colorLibre(usados);
+}
+function normalizarRacks(){
+  var z2 = (CFG.altoRack1 || 1.7) + 0.12, nuevos = [], quitar = {}, cambios = false;
+  var casi = function(a, b){ return Math.abs(a - b) < 0.06; };
+  var asegurar = function(rk){
+    crearTarimasRack(rk).forEach(function(q){
+      var hallada = null;
+      items.concat(nuevos).forEach(function(t){
+        if (!hallada && t.k === 'tarima' && casi(t.x, q.x) && casi(t.d, q.d) && casi(t.z || 0, q.z)) hallada = t;
+      });
+      if (hallada){ if (hallada.rack !== rk.id){ hallada.rack = rk.id; cambios = true; } }
+      else { nuevos.push(q); cambios = true; }
+    });
+  };
+  items.slice().forEach(function(rk){
+    if (rk.k !== 'rack') return;
+    var n = rk.n || 1, bahia = rk.bahia || 3;
+    if (n > 1){
+      quitar[rk.id] = 1; cambios = true;
+      var x0 = Math.min(rk.x0, rk.x1), d0 = Math.min(rk.d0, rk.d1), x1 = Math.max(rk.x0, rk.x1), d1 = Math.max(rk.d0, rk.d1), i;
+      for (i = 0; i < n; i++){
+        var m = { id: nextId++, k: 'rack', orient: rk.orient, n: 1, bahia: bahia, prof: rk.prof || 1.5 };
+        if (rk.orient === 'x'){ m.x0 = r3(x0 + i * bahia); m.x1 = r3(x0 + (i + 1) * bahia); m.d0 = d0; m.d1 = d1; }
+        else { m.d0 = r3(d0 + i * bahia); m.d1 = r3(d0 + (i + 1) * bahia); m.x0 = x0; m.x1 = x1; }
+        nuevos.push(m);
+        asegurar(m);
+      }
+    } else {
+      rk.n = 1;
+      asegurar(rk);
+    }
+  });
+  if (cambios){
+    items = items.filter(function(t){ return !quitar[t.id]; }).concat(nuevos);
+    guardar();
+  }
+}
+function lineaDePasillo(it){
+  var w = it.x1 - it.x0, l = it.d1 - it.d0, r3 = function(v){ return Math.round(v * 1000) / 1000; };
+  var ancho = r3(Math.min(w, l));
+  var pts = (w >= l)
+    ? [[r3(it.x0), r3((it.d0 + it.d1) / 2)], [r3(it.x1), r3((it.d0 + it.d1) / 2)]]
+    : [[r3((it.x0 + it.x1) / 2), r3(it.d0)], [r3((it.x0 + it.x1) / 2), r3(it.d1)]];
+  return { id: nextId++, k: 'linea', tipo: 'peatonal', w: ancho, pts: pts };
+}
+function esPasillo(it){ return it.k === 'area' && it.tipo === 'espacio' && /^PASILLO/.test(normNombre(it.nombre)); }
+function convertirPasillos(){
+  var nuevos = [];
+  items = items.filter(function(it){
+    if (esPasillo(it)){ nuevos.push(lineaDePasillo(it)); return false; }
+    return true;
+  });
+  nuevos.forEach(function(l){ items.push(l); });
+  if (nuevos.length) guardar();
+}
+function recolorConflictos(){
+  var vistos = {}, cambios = false;
+  CFG.zonas.forEach(function(z){ vistos[normNombre(z.n)] = String(z.c).toLowerCase(); });
+  items.forEach(function(it){ if (it.k === 'recinto') it.zonas.forEach(function(z){ vistos[normNombre(z.n)] = String(z.c).toLowerCase(); }); });
+  items.forEach(function(it){
+    if (it.k !== 'area' || it.tipo !== 'espacio') return;
+    var nm = normNombre(it.nombre), c = String(it.color || '').toLowerCase();
+    if (vistos[nm]){
+      if (c !== vistos[nm]){ it.color = vistos[nm]; cambios = true; }
+      return;
+    }
+    var usados = {};
+    Object.keys(vistos).forEach(function(k){ usados[vistos[k]] = 1; });
+    if (!c || usados[c]){ c = colorLibre(usados); it.color = c; cambios = true; }
+    vistos[nm] = c;
+  });
+  if (cambios) guardar();
+}
+function zonaRect(x0, x1, d0, d1, z){
+  var g = new THREE.Group();
+  g.add(rectFloor(x0, x1, d0, d1, new THREE.Color(z.c), 0.04, 0.5, 'zona_' + z.n));
+  var w = Math.abs(x1 - x0), l = Math.abs(d1 - d0);
+  var lb = makeLabel(z.n, fmt(w) + ' × ' + fmt(l) + ' m', Math.max(1.5, Math.min(w * 0.9, 5)));
+  lb.position.set((x0 + x1) / 2, 0.09, -(d0 + d1) / 2);
+  g.add(lb);
+  return g;
+}
+function zExt(it, zi){
+  var z = it.zonas[zi], h = (it.orient === 'h');
+  return [z.a !== undefined ? z.a : (h ? it.x0 : it.d0), z.b !== undefined ? z.b : (h ? it.x1 : it.d1)];
+}
+function rectsRecinto(it){
+  var e0 = zExt(it, 0), e1 = zExt(it, 1);
+  if (it.orient === 'h') return [[e0[0], e0[1], it.d0, it.pos], [e1[0], e1[1], it.pos, it.d1]];
+  return [[it.x0, it.pos, e0[0], e0[1]], [it.pos, it.x1, e1[0], e1[1]]];
+}
+function cajonRecinto(it){
+  rectsRecinto(it).forEach(function(r, zi){
+    var nm = it.zonas[zi].n, H = it.zonas[zi].h || CFG.alto || 2.5;
+    gMurosR.add(mkWall(r[0], r[2], r[1], r[2], H, 0.3, 'muro_' + nm + '_frente'));
+    gMurosR.add(mkWall(r[0], r[3], r[1], r[3], H, 0.3, 'muro_' + nm + '_fondo'));
+    gMurosR.add(mkWall(r[0], r[2], r[0], r[3], H, 0.3, 'muro_' + nm + '_izq'));
+    gMurosR.add(mkWall(r[1], r[2], r[1], r[3], H, 0.3, 'muro_' + nm + '_der'));
+    var t = new THREE.Mesh(new THREE.BoxGeometry(r[1] - r[0], 0.1, r[3] - r[2]), mat(0xB8B5AD, 0.35));
+    t.position.set((r[0] + r[1]) / 2, H + 0.05, -(r[2] + r[3]) / 2);
+    t.name = 'techo_' + nm;
+    gTechoR.add(t);
+  });
+}
+function buildRecinto(it){
+  var g = new THREE.Group();
+  g.userData.itemId = it.id; g.name = 'recinto_' + it.id;
+  var e0 = zExt(it, 0), e1 = zExt(it, 1), lo = Math.min(e0[0], e1[0]), hi = Math.max(e0[1], e1[1]);
+  if (it.orient === 'h'){
+    g.add(zonaRect(e0[0], e0[1], it.d0, it.pos, it.zonas[0]));
+    g.add(zonaRect(e1[0], e1[1], it.pos, it.d1, it.zonas[1]));
+    g.add(rectFloor(lo, hi, it.pos - 0.05, it.pos + 0.05, 0x111111, 0.055, 1, 'division_recinto_' + it.id));
+  } else {
+    g.add(zonaRect(it.x0, it.pos, e0[0], e0[1], it.zonas[0]));
+    g.add(zonaRect(it.pos, it.x1, e1[0], e1[1], it.zonas[1]));
+    g.add(rectFloor(it.pos - 0.05, it.pos + 0.05, lo, hi, 0x111111, 0.055, 1, 'division_recinto_' + it.id));
+  }
+  return g;
+}
+function asaMesh(w, l, x, d, color, y, ud){
+  var m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.25, l), new THREE.MeshBasicMaterial({ color: color }));
+  m.position.set(x, y, -d);
+  m.userData = ud;
+  return m;
+}
+function buildAsasRecinto(it){
+  var out = [], h = (it.orient === 'h'), e0 = zExt(it, 0), e1 = zExt(it, 1), ex = [e0, e1], zi;
+  var lo = Math.min(e0[0], e1[0]), hi = Math.max(e0[1], e1[1]);
+  if (h) out.push(asaMesh(hi - lo, 0.4, (lo + hi) / 2, it.pos, 0x14B8A6, 0.25, { id: it.id, kind: 'div' }));
+  else out.push(asaMesh(0.4, hi - lo, it.pos, (lo + hi) / 2, 0x14B8A6, 0.25, { id: it.id, kind: 'div' }));
+  for (zi = 0; zi < 2; zi++){
+    var r0 = h ? (zi === 0 ? it.d0 : it.pos) : (zi === 0 ? it.x0 : it.pos);
+    var r1 = h ? (zi === 0 ? it.pos : it.d1) : (zi === 0 ? it.pos : it.x1);
+    var len = Math.max(0.2, r1 - r0), mid = (r0 + r1) / 2;
+    var oc = h ? (zi === 0 ? it.d0 : it.d1) : (zi === 0 ? it.x0 : it.x1);
+    var oext = ex[zi], span = Math.max(0.2, oext[1] - oext[0]), omid = (oext[0] + oext[1]) / 2;
+    if (h) out.push(asaMesh(span, 0.3, omid, oc, 0x99F6E4, 0.3, { id: it.id, kind: 'oedge', z: zi }));
+    else out.push(asaMesh(0.3, span, oc, omid, 0x99F6E4, 0.3, { id: it.id, kind: 'oedge', z: zi }));
+    ['a', 'b'].forEach(function(side, si){
+      var c = ex[zi][si];
+      var ud = { id: it.id, kind: 'edge', z: zi, side: side };
+      if (h) out.push(asaMesh(0.3, len, c, mid, 0x99F6E4, 0.3, ud));
+      else out.push(asaMesh(len, 0.3, mid, c, 0x99F6E4, 0.3, ud));
+    });
+  }
+  return out;
+}
+function buildRef(it){
+  var g = new THREE.Group();
+  g.userData.itemId = it.id; g.name = 'ref_R' + it.n;
+  g.add(rectFloor(it.x0, it.x1, it.d0, it.d1, 0xEC4899, 0.1, 0.28, 'ref_fill_' + it.n));
+  var bg = new THREE.BufferGeometry();
+  bg.setAttribute('position', new THREE.Float32BufferAttribute([it.x0, 0.12, -it.d0, it.x1, 0.12, -it.d0, it.x1, 0.12, -it.d1, it.x0, 0.12, -it.d1], 3));
+  g.add(new THREE.LineLoop(bg, new THREE.LineBasicMaterial({ color: 0xEC4899 })));
+  var w = Math.abs(it.x1 - it.x0), l = Math.abs(it.d1 - it.d0);
+  var t1 = 'R' + it.n + (it.nota ? ' · ' + it.nota : '');
+  var t2 = fmt(w) + ' × ' + fmt(l) + ' m · x ' + fmt(it.x0) + '–' + fmt(it.x1) + ' · f ' + fmt(it.d0) + '–' + fmt(it.d1);
+  var lb = makeLabel(t1, t2, Math.max(2, Math.min(w * 0.95, 6)));
+  lb.position.set((it.x0 + it.x1) / 2, 0.14, -(it.d0 + it.d1) / 2);
+  g.add(lb);
+  return g;
+}
+function pintarRefList(){
+  var lin = [];
+  items.forEach(function(it){
+    if (it.k !== 'ref') return;
+    lin.push('R' + it.n + ': ' + fmt(Math.abs(it.x1 - it.x0)) + ' × ' + fmt(Math.abs(it.d1 - it.d0)) + ' m, x ' + fmt(it.x0) + '–' + fmt(it.x1) + ', fondo ' + fmt(it.d0) + '–' + fmt(it.d1) + (it.nota ? ' — ' + it.nota : ''));
+  });
+  $('refList').textContent = lin.length ? lin.join('\n') : 'Aún no hay referencias.';
+}
+function franjasPeligro(len){
+  var c = document.createElement('canvas');
+  c.width = 128; c.height = 64;
+  var x = c.getContext('2d');
+  x.fillStyle = '#F9A800'; x.fillRect(0, 0, 128, 64);
+  x.fillStyle = '#111111';
+  var i;
+  for (i = -64; i < 192; i += 32){
+    x.beginPath(); x.moveTo(i, 64); x.lineTo(i + 16, 64); x.lineTo(i + 80, 0); x.lineTo(i + 64, 0); x.closePath(); x.fill();
+  }
+  var t = new THREE.CanvasTexture(c);
+  t.wrapS = THREE.RepeatWrapping;
+  t.repeat.set(Math.max(1, len / 0.64), 1);
+  return t;
+}
+function ladoEnMuro(eje, v){
+  var arr = (eje === 'x') ? wallXs.concat([0, W]) : [0, F];
+  return arr.some(function(a){ return Math.abs(a - v) < 0.06; });
+}
+function cajonElevador(it){
+  var rise = CFG.altoNivel || 8, hg = CFG.altoElev || 1.25;
+  var x0 = it.x0, x1 = it.x1, d0 = it.d0, d1 = it.d1;
+  var lados = [['izq', x0, d0, x0, d1], ['der', x1, d0, x1, d1], ['frente', x0, d0, x1, d0], ['fondo', x0, d1, x1, d1]];
+  var abre = (ladoEnMuro('x', x1) && !ladoEnMuro('x', x0)) ? 'izq' : 'der';
+  lados.forEach(function(l){
+    if (l[0] === abre) return;
+    var m = mkWall(l[1], l[2], l[3], l[4], rise, 0.18, 'foso_elevador_' + l[0] + '_' + it.id, -rise, 0.1);
+    m.material.color.setHex(0x38BDF8);
+    gMurosR.add(m);
+  });
+  var xr = (abre === 'izq') ? x0 : x1;
+  var rj = mkWall(xr, d0, xr, d1, CFG.altoReja || 1.5, 0.6, 'reja_elevador_nivel1_' + it.id, -rise, 0.06);
+  rj.material.color.setHex(SEG_AMARILLO);
+  gMurosR.add(rj);
+  var pw = Math.max(0.2, x1 - x0 - 0.1), pl = Math.max(0.2, d1 - d0 - 0.1);
+  var pf = new THREE.Mesh(new THREE.BoxGeometry(pw, 0.2, pl), mat(0x9CA3AF, 1));
+  pf.position.set((x0 + x1) / 2, -rise / 2 - 0.1, -(d0 + d1) / 2);
+  pf.name = 'plataforma_elevador_' + it.id;
+  gMurosR.add(pf);
+  lados.forEach(function(l){
+    var enMuro = (l[0] === 'izq' && ladoEnMuro('x', x0)) || (l[0] === 'der' && ladoEnMuro('x', x1)) || (l[0] === 'frente' && ladoEnMuro('d', d0)) || (l[0] === 'fondo' && ladoEnMuro('d', d1));
+    if (enMuro) return;
+    var m = mkWall(l[1], l[2], l[3], l[4], hg, 0.75, 'pared_elevador_' + l[0] + '_' + it.id, 0, 0.15);
+    m.material.color.setHex(0xFFFFFF);
+    m.material.map = franjasPeligro(Math.hypot(l[3] - l[1], l[4] - l[2]));
+    m.material.needsUpdate = true;
+    gMurosR.add(m);
+  });
+}
+function buildPared(it){
+  var a = it.pts[0], b = it.pts[1], est = (it.tipo === 'estructural');
+  var m = mkWall(a[0], a[1], b[0], b[1], it.h, est ? 0.6 : 0.45, 'pared_' + it.tipo + '_' + it.id, 0, est ? 0.3 : 0.2);
+  m.material.color.setHex(est ? 0x7C7A74 : 0xB8B5AD);
+  m.userData.itemId = it.id;
+  return m;
+}
+function buildTechoLamina(it){
+  var w = Math.abs(it.x1 - it.x0), l = Math.abs(it.d1 - it.d0);
+  var m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, l), mat(0x9AA5B1, 0.6));
+  m.position.set((it.x0 + it.x1) / 2, (it.h || 2.5) + 0.04, -(it.d0 + it.d1) / 2);
+  m.name = 'techo_lamina_' + it.nombre; m.userData.itemId = it.id;
+  return m;
+}
+function refreshItems(){
+  clearG(gTarimas); clearG(gLineas); clearG(gAreas);
+  items.forEach(function(it){
+    if (it.k === 'tarima') gTarimas.add(buildTarima(it));
+    else if (it.k === 'tonel') gTarimas.add(buildTonel(it));
+    else if (it.k === 'rack') gTarimas.add(buildRack(it));
+    else if (it.k === 'linea') gLineas.add(buildLinea(it));
+    else if (it.k === 'area' && it.tipo !== 'techo') gAreas.add(buildArea(it));
+    else if (it.k === 'recinto') gAreas.add(buildRecinto(it));
+  });
+  clearG(gRefs);
+  items.forEach(function(it){ if (it.k === 'ref') gRefs.add(buildRef(it)); });
+  pintarRefList();
+  pintarUsos();
+  clearG(gMurosR); clearG(gTechoR);
+  items.forEach(function(it){
+    if (it.k === 'pared') gMurosR.add(buildPared(it));
+    else if (esElevador(it)) cajonElevador(it);
+    else if (it.k === 'area' && it.tipo === 'techo') gTechoR.add(buildTechoLamina(it));
+  });
+  items.forEach(function(it){ if (it.k === 'recinto') cajonRecinto(it); });
+  clearG(gHandlesR);
+  items.forEach(function(it){ if (it.k === 'recinto') buildAsasRecinto(it).forEach(function(m){ gHandlesR.add(m); }); });
+  items.forEach(function(it){
+    if (it.k !== 'area' && it.k !== 'ref') return;
+    var zl = Math.max(0.2, it.d1 - it.d0), zw = Math.max(0.2, it.x1 - it.x0), zmx = (it.x0 + it.x1) / 2, zmd = (it.d0 + it.d1) / 2, zc = 0x99F6E4;
+    gHandlesR.add(asaMesh(0.6, zl, it.x0, zmd, zc, 0.3, { id: it.id, kind: 'zedge', side: 'x0' }));
+    gHandlesR.add(asaMesh(0.6, zl, it.x1, zmd, zc, 0.3, { id: it.id, kind: 'zedge', side: 'x1' }));
+    gHandlesR.add(asaMesh(zw, 0.6, zmx, it.d0, zc, 0.3, { id: it.id, kind: 'zedge', side: 'd0' }));
+    gHandlesR.add(asaMesh(zw, 0.6, zmx, it.d1, zc, 0.3, { id: it.id, kind: 'zedge', side: 'd1' }));
+  });
+  items.forEach(function(it){
+    if (it.k !== 'linea' || it.tipo !== 'gradas') return;
+    it.pts.forEach(function(q, qi){ gHandlesR.add(asaMesh(0.6, 0.6, q[0], q[1], 0x5EEAD4, 0.3, { id: it.id, kind: 'lvert', pi: qi })); });
+  });
+  items.forEach(function(it){
+    if (it.k !== 'linea' || (it.tipo !== 'peatonal' && it.tipo !== 'montacargas') || it.pts.length < 2) return;
+    var li = 0, lm = 0, qi;
+    for (qi = 0; qi < it.pts.length - 1; qi++){
+      var ql = Math.hypot(it.pts[qi + 1][0] - it.pts[qi][0], it.pts[qi + 1][1] - it.pts[qi][1]);
+      if (ql > lm){ lm = ql; li = qi; }
+    }
+    if (lm < 0.3) return;
+    var qa = it.pts[li], qb = it.pts[li + 1], qnx = -(qb[1] - qa[1]) / lm, qnd = (qb[0] - qa[0]) / lm, qmx = (qa[0] + qb[0]) / 2, qmd = (qa[1] + qb[1]) / 2;
+    if (it.pts.length === 2){
+      [0, 1].forEach(function(ei){ gHandlesR.add(asaMesh(0.6, 0.6, it.pts[ei][0], it.pts[ei][1], 0x5EEAD4, 0.3, { id: it.id, kind: 'lend', pi: ei })); });
+    } else {
+      it.pts.forEach(function(q, ei){ gHandlesR.add(asaMesh(0.6, 0.6, q[0], q[1], 0x5EEAD4, 0.3, { id: it.id, kind: 'lvert', pi: ei })); });
+    }
+    [-1, 1].forEach(function(sg){
+      gHandlesR.add(asaMesh(0.5, 0.5, qmx + qnx * sg * it.w / 2, qmd + qnd * sg * it.w / 2, 0x99F6E4, 0.3, { id: it.id, kind: 'lwid' }));
+    });
+  });
+  items.forEach(function(it){
+    if (it.k !== 'pared') return;
+    gHandlesR.add(asaMesh(0.6, 0.6, it.pts[0][0], it.pts[0][1], 0x5EEAD4, 0.3, { id: it.id, kind: 'pwend', pi: 0 }));
+    gHandlesR.add(asaMesh(0.6, 0.6, it.pts[1][0], it.pts[1][1], 0x5EEAD4, 0.3, { id: it.id, kind: 'pwend', pi: 1 }));
+    gHandlesR.add(asaMesh(0.6, 0.6, (it.pts[0][0] + it.pts[1][0]) / 2, (it.pts[0][1] + it.pts[1][1]) / 2, 0x14B8A6, 0.3, { id: it.id, kind: 'pwmid' }));
+  });
+  portones().forEach(function(it){
+    if (it.pts.length < 2) return;
+    [0, it.pts.length - 1].forEach(function(pi){
+      gHandlesR.add(asaMesh(0.6, 0.6, it.pts[pi][0], it.pts[pi][1], 0x5EEAD4, 0.3, { id: it.id, kind: 'pend', pi: pi }));
+    });
+  });
+  gHandlesR.visible = (tool === 'none');
+  if (portonSig() !== lastPortonSig) construir();
+  guardar();
+  marcarSel();
+  var nt = 0, nl = 0, na = 0;
+  var nto = 0, nrk = 0;
+  items.forEach(function(it){ if (it.k === 'tarima') nt++; else if (it.k === 'tonel') nto++; else if (it.k === 'rack') nrk++; else if (it.k === 'linea') nl++; else na++; });
+  $('conteo').textContent = nt + ' tarimas · ' + nl + ' líneas · ' + na + ' zonas · ' + nto + ' toneles · ' + nrk + ' racks';
+}
+
+/* ---------- vista previa (ghost) ---------- */
+var marker = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.05, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+var tGhost = new THREE.Mesh(new THREE.BoxGeometry(1, 0.14, 1), new THREE.MeshBasicMaterial({ color: 0x14B8A6, transparent: true, opacity: 0.6 }));
+var lGeo = new THREE.BufferGeometry();
+lGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(600), 3));
+var lGhost = new THREE.Line(lGeo, new THREE.LineBasicMaterial({ color: 0x14B8A6 }));
+lGhost.frustumCulled = false;
+var oGhost = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.88, 20), new THREE.MeshBasicMaterial({ color: 0x2563EB, transparent: true, opacity: 0.5 }));
+var aGeo = new THREE.PlaneGeometry(1, 1); aGeo.rotateX(-Math.PI / 2);
+var aGhost = new THREE.Mesh(aGeo, new THREE.MeshBasicMaterial({ color: 0x14B8A6, transparent: true, opacity: 0.4 }));
+[marker, tGhost, lGhost, aGhost, oGhost].forEach(function(o){ o.visible = false; gGhost.add(o); });
+
+function actualizarGhost(){
+  marker.visible = tGhost.visible = lGhost.visible = aGhost.visible = oGhost.visible = false;
+  if (!cursor || tool === 'none' || tool === 'borrar' || tool === 'uso') return;
+  marker.visible = true;
+  marker.position.set(cursor.x, 0.07, -cursor.d);
+  if (tool === 'rack'){
+    var gpw = num('tw', 1.5), gb = (parseInt($('rackTam').value, 10) || 2) * gpw, ghor = ($('rackOri').value === 'x'), gN = Math.max(1, Math.min(20, parseInt($('rackN').value, 10) || 1));
+    aGhost.visible = true;
+    aGhost.scale.set(ghor ? gb * gN : gpw, 1, ghor ? gpw : gb * gN);
+    aGhost.position.set(cursor.x + (ghor ? (gN - 1) * gb / 2 : 0), 0.07, -(cursor.d + (ghor ? 0 : (gN - 1) * gb / 2)));
+    return;
+  }
+  if (tool === 'tonel'){
+    oGhost.visible = true;
+    var tg0 = tarimaEn(cursor.x, cursor.d);
+    oGhost.position.set(cursor.x, (tg0 ? (tg0.z || 0) + 0.14 : 0) + 0.44, -cursor.d);
+    return;
+  }
+  if (tool === 'tarima'){
+    tGhost.visible = true;
+    tGhost.scale.set(num('tw', 1.5), 1, num('tl', 1.5));
+    tGhost.position.set(cursor.x, 0.07 + elevNivel(), -cursor.d);
+    tGhost.rotation.y = rot;
+  } else if ((tool === 'linea' || tool === 'puerta' || tool === 'pared') && draft && draft.pts && draft.pts.length){
+    var pts = draft.pts.concat([[cursor.x, cursor.d]]), arr = lGeo.attributes.position.array, i;
+    for (i = 0; i < pts.length && i < 200; i++){ arr[i * 3] = pts[i][0]; arr[i * 3 + 1] = 0.08; arr[i * 3 + 2] = -pts[i][1]; }
+    lGeo.setDrawRange(0, Math.min(pts.length, 200));
+    lGeo.attributes.position.needsUpdate = true;
+    lGhost.visible = true;
+  } else if ((tool === 'area' || tool === 'bloque' || tool === 'elevador') && draft && draft.p){
+    aGhost.visible = true;
+    aGhost.scale.set(Math.max(0.01, Math.abs(cursor.x - draft.p[0])), 1, Math.max(0.01, Math.abs(cursor.d - draft.p[1])));
+    aGhost.position.set((cursor.x + draft.p[0]) / 2, 0.07, -(cursor.d + draft.p[1]) / 2);
+  }
+}
+
+/* ---------- interacción ---------- */
+var ray = new THREE.Raycaster(); ray.params.Line.threshold = 0.05;
+var mouse = new THREE.Vector2(), plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+function setMouse(e){
+  var r = cv.getBoundingClientRect();
+  mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  ray.setFromCamera(mouse, cam);
+}
+function pick(e, raw){
+  setMouse(e);
+  var p = new THREE.Vector3();
+  if (!ray.ray.intersectPlane(plane, p)) return null;
+  if (raw) return { x: p.x, d: -p.z };
+  var x = snap(p.x), d = snap(-p.z);
+  x = Math.max(0, Math.min(W, x)); d = Math.max(0, Math.min(F, d));
+  return { x: x, d: d };
+}
+function terminarLinea(){
+  if (draft && draft.pts && draft.pts.length >= 2){
+    pushHist();
+    items.push({ id: nextId++, k: 'linea', tipo: $('ltipo').value, w: num('lw', 1), pts: draft.pts });
+    refreshItems();
+  }
+  draft = null; actualizarGhost();
+}
+function cadenaVisible(o){
+  for (var n = o; n; n = n.parent){ if (!n.visible) return false; }
+  return true;
+}
+var uEdit = null;
+function usoValor(it){
+  var t = it.uso.tipo;
+  if (t === 'tapas') return 'tapas';
+  if (t === 'entregaspt') return 'pt';
+  if (t === 'pendempaque') return 'pe';
+  if (t === 'entbodega') return 'eb';
+  if (t === 'rechazoint') return 'ri';
+  if (t === 'mpmolida') return 'mp';
+  if (t === 'bolsasrec') return 'br';
+  if (t === 'corrmalo') return 'cm';
+  if (t === 'corrbueno') return 'cb';
+  return (t === 'flameado' ? 'e' : (t === 'merma' ? 'm' : 'f')) + it.uso.linea;
+}
+function usoClaveDeValor(v){
+  if (v === 'libre') return '';
+  if (v === 'tapas') return 'tapas';
+  if (v === 'pt') return 'entregaspt';
+  if (v === 'pe') return 'pendempaque';
+  if (v === 'eb') return 'entbodega';
+  if (v === 'ri') return 'rechazoint';
+  if (v === 'mp') return 'mpmolida';
+  if (v === 'br') return 'bolsasrec';
+  if (v === 'cm') return 'corrmalo';
+  if (v === 'cb') return 'corrbueno';
+  var c = v.charAt(0);
+  return (c === 'e') ? 'flameado' : (c === 'm' ? 'merma' : 'flameo');
+}
+function actualizarNotaUso(){
+  var k = usoClaveDeValor($('uTipo').value);
+  $('uNota').textContent = k ? NOTAS_USO[k] : '';
+}
+$('uTipo').addEventListener('change', function(){
+  var v = $('uTipo').value;
+  if (v === 'tapas') $('uArea').value = 'tapas';
+  else if (['mp', 'br', 'cm', 'cb'].indexOf(v) >= 0) $('uArea').value = 'general';
+  else if (v !== 'pt' && v !== 'eb' && v !== 'ri' && v !== 'libre') $('uArea').value = 'serig';
+  actualizarNotaUso();
+});
+function abrirUsoTarima(it){
+  uEdit = it;
+  var v = 'libre';
+  if (it.uso) v = usoValor(it);
+  $('uTipo').value = v;
+  $('uArea').value = areaUso(it);
+  $('uOcup').checked = !!it.carga;
+  $('uInfo').textContent = 'Tarima en x ' + fmt(it.x) + ' m, fondo ' + fmt(it.d) + ' m';
+  actualizarNotaUso();
+  $('dlgU').style.display = 'flex';
+}
+function cerrarUsoTarima(ok){
+  var it = uEdit;
+  $('dlgU').style.display = 'none';
+  uEdit = null;
+  if (!ok || !it) return;
+  pushHist();
+  var v = $('uTipo').value;
+  if (v === 'libre') delete it.uso;
+  else if (v === 'tapas') it.uso = { tipo: 'tapas' };
+  else if (v === 'pt') it.uso = { tipo: 'entregaspt' };
+  else if (v === 'pe') it.uso = { tipo: 'pendempaque' };
+  else if (v === 'eb') it.uso = { tipo: 'entbodega' };
+  else if (v === 'ri') it.uso = { tipo: 'rechazoint' };
+  else if (v === 'mp') it.uso = { tipo: 'mpmolida' };
+  else if (v === 'br') it.uso = { tipo: 'bolsasrec' };
+  else if (v === 'cm') it.uso = { tipo: 'corrmalo' };
+  else if (v === 'cb') it.uso = { tipo: 'corrbueno' };
+  else it.uso = { tipo: (v.charAt(0) === 'e') ? 'flameado' : (v.charAt(0) === 'm' ? 'merma' : 'flameo'), linea: parseInt(v.slice(1), 10) };
+  if (it.uso) it.uso.area = $('uArea').value;
+  it.carga = $('uOcup').checked;
+  refreshItems();
+}
+$('uOk').addEventListener('click', function(){ cerrarUsoTarima(true); });
+$('uNo').addEventListener('click', function(){ cerrarUsoTarima(false); });
+function borrarEn(e){
+  setMouse(e);
+  var hits = ray.intersectObjects([gTarimas, gLineas, gAreas, gMurosR, gTechoR, gRefs], true);
+  for (var i = 0; i < hits.length; i++){
+    var o = hits[i].object;
+    if (!cadenaVisible(o)) continue;
+    while (o && o.userData.itemId === undefined) o = o.parent;
+    if (o){
+      var id = o.userData.itemId, it0 = itemPorId(id);
+      if (it0 && it0.k === 'tarima' && it0.rack){ var rk0 = itemPorId(it0.rack); if (rk0){ id = rk0.id; it0 = rk0; } }
+      var quitar = function(){
+        pushHist();
+        items = items.filter(function(it){ return it.id !== id && it.rack !== id; });
+        refreshItems();
+      };
+      if (it0 && it0.k === 'recinto')
+        dialogo('¿Borrar el cajón "' + it0.zonas[0].n + ' / ' + it0.zonas[1].n + '"? Deshacer lo recupera.', 'confirm', quitar);
+      else if (it0 && it0.k === 'area')
+        dialogo('¿Borrar "' + it0.nombre + '"? Deshacer lo recupera.', 'confirm', quitar);
+      else if (it0 && it0.k === 'pared')
+        dialogo('¿Borrar esta pared (' + it0.h + ' m de alto)? Deshacer la recupera.', 'confirm', quitar);
+      else if (it0 && it0.k === 'rack'){
+        var rpal = items.filter(function(t){ return t.rack === id; }), rcon = rpal.filter(function(t){ return t.uso; }).length;
+        dialogo('¿Borrar el rack y sus ' + rpal.length + ' tarimas?' + (rcon ? ' ' + rcon + ' tienen uso asignado.' : '') + ' Deshacer lo recupera.', 'confirm', quitar);
+      }
+      else quitar();
+      return;
+    }
+  }
+}
+var dlgCb = null;
+function dialogo(msg, modo, cb, valor){
+  $('dlgMsg').textContent = msg;
+  $('dlgIn').style.display = (modo === 'input') ? 'block' : 'none';
+  $('dlgIn').value = valor || '';
+  $('dlgNo').style.display = (modo === 'info') ? 'none' : 'inline-block';
+  $('dlg').style.display = 'flex';
+  dlgCb = cb || null;
+  setTimeout(function(){ if (modo === 'input') $('dlgIn').focus(); else $('dlgOk').focus(); }, 30);
+}
+function cerrarDlg(ok){
+  var v = null;
+  if (ok) v = ($('dlgIn').style.display === 'none') ? true : $('dlgIn').value;
+  $('dlg').style.display = 'none';
+  var cb = dlgCb; dlgCb = null;
+  if (cb && v !== null) cb(v);
+}
+$('dlgOk').addEventListener('click', function(){ cerrarDlg(true); });
+$('dlgNo').addEventListener('click', function(){ cerrarDlg(false); });
+$('dlg').addEventListener('keydown', function(e){
+  if (e.key === 'Enter'){ e.preventDefault(); cerrarDlg(true); }
+  else if (e.key === 'Escape'){ e.preventDefault(); cerrarDlg(false); }
+});
+function crearBloque(bx0, bd0, nx, nd, pw, pl){
+  pushHist();
+  var ci, cj, carga = $('tc').checked;
+  for (ci = 0; ci < nx; ci++){
+    for (cj = 0; cj < nd; cj++){
+      items.push({ id: nextId++, k: 'tarima', x: Math.round((bx0 + pw / 2 + ci * pw) * 1000) / 1000, d: Math.round((bd0 + pl / 2 + cj * pl) * 1000) / 1000, rot: 0, w: pw, l: pl, carga: carga, z: elevNivel() });
+    }
+  }
+  refreshItems();
+}
+function muroCercano(x){
+  var best = null, bd = 1.5;
+  wallXs.forEach(function(wx){ if (Math.abs(wx - x) <= bd){ bd = Math.abs(wx - x); best = wx; } });
+  return best;
+}
+function clic(e){
+  if (tool === 'none') return;
+  if (tool === 'borrar'){ borrarEn(e); return; }
+  if (tool === 'uso'){
+    setMouse(e);
+    var hu = ray.intersectObject(gTarimas, true), ou = hu.length ? hu[0].object : null;
+    while (ou && ou.userData.itemId === undefined) ou = ou.parent;
+    var iu = ou ? itemPorId(ou.userData.itemId) : null;
+    if (iu && iu.k === 'tarima') abrirUsoTarima(iu);
+    return;
+  }
+  var p = pick(e);
+  if (!p) return;
+  if (tool === 'tarima'){
+    pushHist();
+    items.push({ id: nextId++, k: 'tarima', x: p.x, d: p.d, rot: rot, w: num('tw', 1.5), l: num('tl', 1.5), carga: $('tc').checked, z: elevNivel() });
+    refreshItems();
+  } else if (tool === 'linea'){
+    if (!draft) draft = { pts: [] };
+    var last = draft.pts[draft.pts.length - 1];
+    if (last && last[0] === p.x && last[1] === p.d) return;
+    draft.pts.push([p.x, p.d]);
+    if (draft.pts.length >= 199) terminarLinea();
+  } else if (tool === 'rack'){
+    var rpw = num('tw', 1.5), rbahia = (parseInt($('rackTam').value, 10) || 2) * rpw, rhor = ($('rackOri').value === 'x'), rN = Math.max(1, Math.min(20, parseInt($('rackN').value, 10) || 1));
+    var rcreados = [], rii;
+    for (rii = 0; rii < rN; rii++){
+      var rcx = p.x + (rhor ? rii * rbahia : 0), rcd = p.d + (rhor ? 0 : rii * rbahia);
+      var rx0 = rhor ? rcx - rbahia / 2 : rcx - rpw / 2, rx1 = rhor ? rcx + rbahia / 2 : rcx + rpw / 2;
+      var rd0 = rhor ? rcd - rpw / 2 : rcd - rbahia / 2, rd1 = rhor ? rcd + rpw / 2 : rcd + rbahia / 2;
+      if (rx0 < -0.001 || rx1 > W + 0.001 || rd0 < -0.001 || rd1 > F + 0.001) break;
+      rcreados.push({ id: 0, k: 'rack', x0: r3(rx0), x1: r3(rx1), d0: r3(rd0), d1: r3(rd1), orient: rhor ? 'x' : 'd', n: 1, bahia: rbahia, prof: rpw });
+    }
+    if (rcreados.length){
+      pushHist();
+      rcreados.forEach(function(rk){ rk.id = nextId++; items.push(rk); crearTarimasRack(rk).forEach(function(t){ items.push(t); }); });
+      refreshItems();
+    }
+  } else if (tool === 'tonel'){
+    pushHist();  } else if (tool === 'tonel'){
+    pushHist();
+    var sobre = tarimaEn(p.x, p.d);
+    if (sobre && $('tonel4').checked){
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function(q){
+        items.push({ id: nextId++, k: 'tonel', x: Math.round((sobre.x + q[0] * 0.3) * 1000) / 1000, d: Math.round((sobre.d + q[1] * 0.3) * 1000) / 1000 });
+      });
+    } else {
+      items.push({ id: nextId++, k: 'tonel', x: p.x, d: p.d });
+    }
+    refreshItems();
+  } else if (tool === 'elevador'){
+    if (!draft || !draft.p){ draft = { p: [p.x, p.d] }; actualizarGhost(); return; }
+    var ex0 = Math.min(draft.p[0], p.x), ex1 = Math.max(draft.p[0], p.x), ed0 = Math.min(draft.p[1], p.d), ed1 = Math.max(draft.p[1], p.d);
+    draft = null;
+    if (ex1 - ex0 < 0.5 || ed1 - ed0 < 0.5){ actualizarGhost(); return; }
+    pushHist();
+    items.push({ id: nextId++, k: 'area', tipo: 'espacio', x0: ex0, x1: ex1, d0: ed0, d1: ed1, nombre: 'ELEVADOR', color: colorParaNombre('ELEVADOR') });
+    refreshItems();
+  } else if (tool === 'pared'){
+    if (!draft || !draft.pts){ draft = { pts: [[p.x, p.d]] }; actualizarGhost(); return; }
+    var q0 = draft.pts[0], pdx = Math.abs(p.x - q0[0]), pdd = Math.abs(p.d - q0[1]);
+    draft = null;
+    var q1 = (pdx >= pdd) ? [p.x, q0[1]] : [q0[0], p.d];
+    if (Math.abs(q1[0] - q0[0]) + Math.abs(q1[1] - q0[1]) < 0.3){ actualizarGhost(); return; }
+    pushHist();
+    items.push({ id: nextId++, k: 'pared', pts: [q0, q1], h: num('pAlto', 5), tipo: $('ptipo').value });
+    refreshItems();
+  } else if (tool === 'puerta'){
+    var wx = muroCercano(p.x), px = (wx === null) ? p.x : wx;
+    if (!draft || !draft.pts){ draft = { pts: [[px, p.d]] }; actualizarGhost(); return; }
+    var a0 = draft.pts[0], dd1 = Math.min(a0[1], p.d), dd2 = Math.max(a0[1], p.d);
+    draft = null;
+    if (dd2 - dd1 < 0.3){ actualizarGhost(); return; }
+    pushHist();
+    items.push({ id: nextId++, k: 'linea', tipo: 'porton', w: 0.3, pts: [[a0[0], dd1], [a0[0], dd2]] });
+    refreshItems();
+  } else if (tool === 'bloque'){
+    if (!draft || !draft.p){ draft = { p: [p.x, p.d] }; return; }
+    var bx0 = Math.min(draft.p[0], p.x), bx1 = Math.max(draft.p[0], p.x);
+    var bd0 = Math.min(draft.p[1], p.d), bd1 = Math.max(draft.p[1], p.d);
+    draft = null;
+    var pw = num('tw', 1.5), pl = num('tl', 1.5);
+    var nx = Math.floor((bx1 - bx0) / pw + 1e-6), nd = Math.floor((bd1 - bd0) / pl + 1e-6);
+    if (nx < 1 || nd < 1){ actualizarGhost(); return; }
+    if (nx * nd > 400){
+      dialogo('Esto crea ' + (nx * nd) + ' tarimas. ¿Continuar?', 'confirm', function(){ crearBloque(bx0, bd0, nx, nd, pw, pl); });
+      actualizarGhost(); return;
+    }
+    crearBloque(bx0, bd0, nx, nd, pw, pl);
+  } else if (tool === 'area'){
+    if (!draft || !draft.p){ draft = { p: [p.x, p.d] }; return; }
+    var x0 = Math.min(draft.p[0], p.x), x1 = Math.max(draft.p[0], p.x);
+    var d0 = Math.min(draft.p[1], p.d), d1 = Math.max(draft.p[1], p.d);
+    draft = null;
+    if (x1 - x0 < 0.1 || d1 - d0 < 0.1){ actualizarGhost(); return; }
+    var tipoA = $('atipo').value, colorA = $('acolor').value;
+    if (tipoA === 'ref'){
+      var nref = 0;
+      items.forEach(function(it){ if (it.k === 'ref' && it.n > nref) nref = it.n; });
+      pushHist();
+      items.push({ id: nextId++, k: 'ref', n: nref + 1, x0: x0, x1: x1, d0: d0, d1: d1 });
+      refreshItems(); actualizarGhost(); return;
+    }
+    if (tipoA === 'techo'){
+      var hT = num('aAlto', 2.5);
+      dialogo('Nombre del techo:', 'input', function(nm){
+        pushHist();
+        items.push({ id: nextId++, k: 'area', tipo: 'techo', x0: x0, x1: x1, d0: d0, d1: d1, h: hT, nombre: (nm && nm.trim()) ? nm.trim().slice(0, 40) : 'LÁMINA' });
+        document.querySelector('[data-capa=techo]').checked = true; gTecho.visible = true;
+        refreshItems();
+      }, 'TECHO LÁMINA');
+      actualizarGhost(); return;
+    }
+    if (tipoA === 'doble'){
+      var hor = (x1 - x0) < (d1 - d0);
+      pushHist();
+      items.push({ id: nextId++, k: 'recinto', x0: x0, x1: x1, d0: d0, d1: d1, orient: hor ? 'h' : 'v', pos: Math.round((hor ? (d0 + d1) / 2 : (x0 + x1) / 2) * 20) / 20,
+        zonas: [{ n: 'ZONA 1', c: '#06B6D4' }, { n: 'ZONA 2', c: '#F97316' }] });
+      refreshItems(); actualizarGhost(); return;
+    }
+    dialogo('Nombre de la zona:', 'input', function(nombre){
+      if (nombre && nombre.trim() && tipoA === 'espacio' && /^PASILLO/.test(normNombre(nombre))){
+        pushHist();
+        items.push(lineaDePasillo({ x0: x0, x1: x1, d0: d0, d1: d1 }));
+        refreshItems();
+        return;
+      }
+      if (nombre && nombre.trim()){
+        pushHist();
+        items.push({ id: nextId++, k: 'area', x0: x0, x1: x1, d0: d0, d1: d1, nombre: nombre.trim().slice(0, 40), tipo: tipoA, color: (tipoA === 'espacio') ? colorParaNombre(nombre.trim().slice(0, 40)) : colorA });
+        refreshItems();
+      }
+    });
+  }
+  actualizarGhost();
+}
+var selId = null, drag = null, dragZ = null, dragR = null;
+function moverLadoZona(dr, p){
+  var it = itemPorId(dr.id);
+  if (!it) return;
+  var sd = dr.side, v = Math.round((sd.charAt(0) === 'x' ? p.x : p.d) * 20) / 20, mn = 0.3;
+  if (sd === 'x0') v = Math.max(0, Math.min(it.x1 - mn, v));
+  else if (sd === 'x1') v = Math.max(it.x0 + mn, Math.min(W, v));
+  else if (sd === 'd0') v = Math.max(0, Math.min(it.d1 - mn, v));
+  else v = Math.max(it.d0 + mn, Math.min(F, v));
+  if (v === it[sd]) return;
+  it[sd] = v;
+  refreshItems();
+  $('coord').textContent = (it.nombre || (it.k === 'ref' ? 'R' + it.n : 'Zona')) + ' ' + fmt(it.x1 - it.x0) + ' × ' + fmt(it.d1 - it.d0) + ' m';
+}
+function extremoSobreLinea(it, pi, t){
+  var o = it.pts[1 - pi], q = it.pts[pi], dx = q[0] - o[0], dd = q[1] - o[1], len = Math.hypot(dx, dd);
+  if (len < 0.01) return false;
+  var ux = dx / len, ud = dd / len, tmax = 1e9;
+  if (ux > 1e-6) tmax = Math.min(tmax, (W - o[0]) / ux); else if (ux < -1e-6) tmax = Math.min(tmax, (0 - o[0]) / ux);
+  if (ud > 1e-6) tmax = Math.min(tmax, (F - o[1]) / ud); else if (ud < -1e-6) tmax = Math.min(tmax, (0 - o[1]) / ud);
+  t = Math.max(0.3, Math.min(tmax, Math.round(t * 20) / 20));
+  var nx = Math.round((o[0] + ux * t) * 1000) / 1000, nd = Math.round((o[1] + ud * t) * 1000) / 1000;
+  if (nx === q[0] && nd === q[1]) return false;
+  it.pts[pi] = [nx, nd];
+  return t;
+}
+function moverExtremoLinea(dr, p){
+  var it = itemPorId(dr.id);
+  if (!it || it.pts.length !== 2) return;
+  var o = it.pts[1 - dr.pi], q = it.pts[dr.pi], len = Math.hypot(q[0] - o[0], q[1] - o[1]);
+  if (len < 0.01) return;
+  var t = ((p.x - o[0]) * (q[0] - o[0]) + (p.d - o[1]) * (q[1] - o[1])) / len;
+  var r = extremoSobreLinea(it, dr.pi, t);
+  if (r === false) return;
+  refreshItems();
+  $('coord').textContent = (it.tipo === 'montacargas' ? 'Pasillo de carga' : 'Pasillo peatonal') + ' largo ' + fmt(r) + ' m';
+}
+function editarLargoLinea(it, pi){
+  var o = it.pts[1 - pi], q = it.pts[pi], len = Math.hypot(q[0] - o[0], q[1] - o[1]);
+  dialogo('Largo del pasillo (m):', 'input', function(v){
+    var L = parseFloat(v);
+    if (L >= 0.3 && L <= 200){ pushHist(); extremoSobreLinea(it, pi, L); refreshItems(); }
+  }, String(Math.round(len * 100) / 100));
+}
+function moverAnchoLinea(dr, p){
+  var it = itemPorId(dr.id);
+  if (!it) return;
+  var li = 0, lm = 0, qi;
+  for (qi = 0; qi < it.pts.length - 1; qi++){
+    var ql = Math.hypot(it.pts[qi + 1][0] - it.pts[qi][0], it.pts[qi + 1][1] - it.pts[qi][1]);
+    if (ql > lm){ lm = ql; li = qi; }
+  }
+  if (lm < 0.3) return;
+  var a = it.pts[li], b = it.pts[li + 1], nx = -(b[1] - a[1]) / lm, nd = (b[0] - a[0]) / lm;
+  var dist = Math.abs((p.x - a[0]) * nx + (p.d - a[1]) * nd);
+  var w = Math.max(0.3, Math.min(12, Math.round(dist * 2 * 20) / 20));
+  if (w === it.w) return;
+  it.w = w;
+  refreshItems();
+  $('coord').textContent = (it.tipo === 'montacargas' ? 'Pasillo de carga' : 'Pasillo peatonal') + ' ancho ' + fmt(w) + ' m';
+}
+function moverVertice(dr, p){
+  var it = itemPorId(dr.id);
+  if (!it) return;
+  var x = Math.max(0, Math.min(W, Math.round(p.x * 20) / 20)), d = Math.max(0, Math.min(F, Math.round(p.d * 20) / 20));
+  var q = it.pts[dr.pi];
+  if (q[0] === x && q[1] === d) return;
+  it.pts[dr.pi] = [x, d];
+  refreshItems();
+  var tot = 0, i;
+  for (i = 0; i < it.pts.length - 1; i++) tot += Math.abs(it.pts[i + 1][0] - it.pts[i][0]) + Math.abs(it.pts[i + 1][1] - it.pts[i][1]);
+  $('coord').textContent = 'Gradas recorrido ' + fmt(tot) + ' m (aprox.)';
+}
+function moverParedExtremo(dr, p){
+  var it = itemPorId(dr.id);
+  if (!it) return;
+  var hor = (it.pts[0][1] === it.pts[1][1]), i = dr.pi, o = it.pts[1 - i];
+  var v = Math.round((hor ? p.x : p.d) * 20) / 20;
+  v = Math.max(0, Math.min(hor ? W : F, v));
+  if (Math.abs(v - (hor ? o[0] : o[1])) < 0.3) return;
+  var np = hor ? [v, it.pts[i][1]] : [it.pts[i][0], v];
+  if (np[0] === it.pts[i][0] && np[1] === it.pts[i][1]) return;
+  it.pts[i] = np;
+  refreshItems();
+  $('coord').textContent = 'Pared largo ' + fmt(Math.abs(it.pts[1][0] - it.pts[0][0]) + Math.abs(it.pts[1][1] - it.pts[0][1])) + ' m';
+}
+function moverParedMedio(dr, p){
+  var it = itemPorId(dr.id);
+  if (!it) return;
+  var hor = (it.pts[0][1] === it.pts[1][1]);
+  var v = Math.round((hor ? p.d : p.x) * 20) / 20;
+  v = Math.max(0, Math.min(hor ? F : W, v));
+  if (v === (hor ? it.pts[0][1] : it.pts[0][0])) return;
+  it.pts.forEach(function(q){ if (hor) q[1] = v; else q[0] = v; });
+  refreshItems();
+  $('coord').textContent = 'Pared a ' + fmt(v) + ' m ' + (hor ? 'de fondo' : 'del muro izquierdo');
+}
+function editarAlturaPared(it){
+  dialogo('Altura de la pared (m):', 'input', function(v){
+    var h = parseFloat(v);
+    if (h >= 0.3 && h <= 30){ pushHist(); it.h = Math.round(h * 100) / 100; refreshItems(); }
+  }, String(it.h));
+}
+function moverExtremo(dr, p){
+  var it = itemPorId(dr.id);
+  if (!it) return;
+  var last = it.pts.length - 1, otro = it.pts[dr.pi === 0 ? last : 0];
+  var d = Math.max(0, Math.min(F, Math.round(p.d * 20) / 20));
+  if (Math.abs(d - otro[1]) < 0.3 || d === it.pts[dr.pi][1]) return;
+  it.pts[dr.pi] = [it.pts[dr.pi][0], d];
+  refreshItems();
+  $('coord').textContent = 'Puerta largo ' + fmt(Math.abs(it.pts[last][1] - it.pts[0][1])) + ' m';
+}
+function moverBordeExterior(dr, p){
+  var it = itemPorId(dr.id);
+  if (!it) return;
+  var h = (it.orient === 'h'), lim = h ? F : W, v = Math.round((h ? p.d : p.x) * 20) / 20, key;
+  if (dr.z === 0){ key = h ? 'd0' : 'x0'; v = Math.max(0, Math.min(it.pos - 0.5, v)); }
+  else { key = h ? 'd1' : 'x1'; v = Math.max(it.pos + 0.5, Math.min(lim, v)); }
+  if (v === it[key]) return;
+  it[key] = v;
+  refreshItems();
+  var largo = (dr.z === 0) ? it.pos - (h ? it.d0 : it.x0) : (h ? it.d1 : it.x1) - it.pos;
+  $('coord').textContent = it.zonas[dr.z].n + ' largo ' + fmt(largo) + ' m';
+}
+function moverBorde(dr, p){
+  var it = itemPorId(dr.id);
+  if (!it) return;
+  var h = (it.orient === 'h'), lim = h ? W : F, zz = it.zonas[dr.z], ext = zExt(it, dr.z);
+  var v = Math.round((h ? p.x : p.d) * 20) / 20;
+  if (dr.side === 'a') v = Math.max(0, Math.min(ext[1] - 0.5, v));
+  else v = Math.max(ext[0] + 0.5, Math.min(lim, v));
+  if (v === (dr.side === 'a' ? ext[0] : ext[1])) return;
+  zz.a = (dr.side === 'a') ? v : ext[0];
+  zz.b = (dr.side === 'b') ? v : ext[1];
+  refreshItems();
+  $('coord').textContent = zz.n + ' ancho ' + fmt(zz.b - zz.a) + ' m';
+}
+function moverDivisor(id, p){
+  var it = itemPorId(id);
+  if (!it) return;
+  var pos;
+  if (it.orient === 'h') pos = Math.max(it.d0 + 0.5, Math.min(it.d1 - 0.5, Math.round(p.d * 20) / 20));
+  else pos = Math.max(it.x0 + 0.5, Math.min(it.x1 - 0.5, Math.round(p.x * 20) / 20));
+  if (pos === it.pos) return;
+  it.pos = pos;
+  refreshItems();
+  var a = (it.orient === 'h') ? pos - it.d0 : pos - it.x0, b = (it.orient === 'h') ? it.d1 - pos : it.x1 - pos;
+  $('coord').textContent = it.zonas[0].n + ' ' + fmt(a) + ' m  |  ' + it.zonas[1].n + ' ' + fmt(b) + ' m';
+}
+function moverLimite(k, d){
+  var s = (CFG.inicio === 'fondo') ? F - d : d, i, cumPrev = 0;
+  for (i = 0; i < k; i++) cumPrev += CFG.zonas[i].l;
+  var cumNext = cumPrev + CFG.zonas[k].l + CFG.zonas[k + 1].l;
+  s = Math.round(s * 20) / 20;
+  s = Math.max(cumPrev + 0.5, Math.min(cumNext - 0.5, s));
+  var a = Math.round((s - cumPrev) * 100) / 100, b = Math.round((cumNext - s) * 100) / 100;
+  if (a === CFG.zonas[k].l) return;
+  CFG.zonas[k].l = a; CFG.zonas[k + 1].l = b;
+  construir();
+  $('coord').textContent = CFG.zonas[k].n + ' ' + fmt(a) + ' m  |  ' + CFG.zonas[k + 1].n + ' ' + fmt(b) + ' m';
+}
+function itemPorId(id){ for (var i = 0; i < items.length; i++){ if (items[i].id === id) return items[i]; } return null; }
+function marcarSel(){
+  [gTarimas, gLineas].forEach(function(grp){
+    grp.children.forEach(function(g){
+      var on = (g.userData.itemId === selId);
+      g.traverse(function(n){ if (n.isMesh && n.userData.c0 !== undefined) n.material.color.setHex(on ? 0xFFFFFF : n.userData.c0); });
+    });
+  });
+}
+wrap.addEventListener('pointerdown', function(e){
+  if (e.button !== 0 || tool !== 'none') return;
+  setMouse(e);
+  var hr = gHandlesR.visible ? ray.intersectObject(gHandlesR, true) : [];
+  if (hr.length){
+    var udr = hr[0].object.userData;
+    pushHist();
+    dragR = { id: udr.id, kind: udr.kind, z: udr.z, side: udr.side, pi: udr.pi };
+    ctl.enabled = false;
+    e.stopPropagation(); e.preventDefault();
+    return;
+  }
+  var hh = gHandles.visible ? ray.intersectObject(gHandles, true) : [];
+  if (hh.length){
+    pushHist();
+    dragZ = { k: hh[0].object.userData.k };
+    ctl.enabled = false;
+    e.stopPropagation(); e.preventDefault();
+    return;
+  }
+  var hits = ray.intersectObjects([gTarimas, gLineas, gRefs], true);
+  var o = hits.length ? hits[0].object : null;
+  while (o && o.userData.itemId === undefined) o = o.parent;
+  if (!o){ selId = null; marcarSel(); return; }
+  var it = itemPorId(o.userData.itemId), p = pick(e, true);
+  if (it && it.k === 'tarima' && it.rack){ var rkp = itemPorId(it.rack); if (rkp) it = rkp; }
+  if (!it || !p) return;
+  selId = it.id;
+  pushHist();
+  if (it.k === 'linea'){
+    drag = { it: it, kind: 'linea', sx: p.x, sd: p.d, orig: it.pts.map(function(q){ return [q[0], q[1]]; }), moved: false };
+  } else if (it.k === 'ref' || it.k === 'rack'){
+    drag = { it: it, kind: 'ref', sx: p.x, sd: p.d, orig: { x0: it.x0, x1: it.x1, d0: it.d0, d1: it.d1 }, moved: false, pal: (it.k === 'rack') ? items.filter(function(t){ return t.k === 'tarima' && t.rack === it.id; }).map(function(t){ return { t: t, x: t.x, d: t.d }; }) : [] };
+  } else {
+    drag = { it: it, g: o, dx: p.x - it.x, dd: p.d - it.d, moved: false };
+  }
+  ctl.enabled = false;
+  e.stopPropagation(); e.preventDefault();
+  marcarSel();
+}, true);
+window.addEventListener('pointermove', function(e){
+  if (dragZ){ var pz = pick(e, true); if (pz) moverLimite(dragZ.k, pz.d); return; }
+  if (dragR){ var pr = pick(e, true); if (pr){ if (dragR.kind === 'edge') moverBorde(dragR, pr); else if (dragR.kind === 'pend') moverExtremo(dragR, pr); else if (dragR.kind === 'oedge') moverBordeExterior(dragR, pr); else if (dragR.kind === 'zedge') moverLadoZona(dragR, pr); else if (dragR.kind === 'lvert') moverVertice(dragR, pr); else if (dragR.kind === 'lwid') moverAnchoLinea(dragR, pr); else if (dragR.kind === 'lend') moverExtremoLinea(dragR, pr); else if (dragR.kind === 'pwend') moverParedExtremo(dragR, pr); else if (dragR.kind === 'pwmid') moverParedMedio(dragR, pr); else moverDivisor(dragR.id, pr); } return; }
+  if (!drag) return;
+  var p = pick(e, true);
+  if (!p) return;
+  if (drag.kind === 'ref'){
+    var og = drag.orig, rw = og.x1 - og.x0, rl = og.d1 - og.d0;
+    var mxr = Math.round((p.x - drag.sx) / STEP) * STEP, mdr = Math.round((p.d - drag.sd) / STEP) * STEP;
+    mxr = Math.max(-og.x0, Math.min(W - og.x1, mxr)); mdr = Math.max(-og.d0, Math.min(F - og.d1, mdr));
+    var nx0 = Math.round((og.x0 + mxr) * 1000) / 1000, nd0 = Math.round((og.d0 + mdr) * 1000) / 1000;
+    if (nx0 !== drag.it.x0 || nd0 !== drag.it.d0){
+      drag.it.x0 = nx0; drag.it.x1 = Math.round((nx0 + rw) * 1000) / 1000;
+      drag.it.d0 = nd0; drag.it.d1 = Math.round((nd0 + rl) * 1000) / 1000;
+      drag.pal.forEach(function(q){ q.t.x = Math.round((q.x + (nx0 - og.x0)) * 1000) / 1000; q.t.d = Math.round((q.d + (nd0 - og.d0)) * 1000) / 1000; });
+      drag.moved = true; refreshItems();
+    }
+    return;
+  }
+  if (drag.kind === 'linea'){
+    var xs = drag.orig.map(function(q){ return q[0]; }), ds = drag.orig.map(function(q){ return q[1]; });
+    var stp = STEP, mx = Math.round((p.x - drag.sx) / stp) * stp, md = Math.round((p.d - drag.sd) / stp) * stp;
+    mx = Math.max(-Math.min.apply(null, xs), Math.min(W - Math.max.apply(null, xs), mx));
+    md = Math.max(-Math.min.apply(null, ds), Math.min(F - Math.max.apply(null, ds), md));
+    var np = drag.orig.map(function(q){ return [Math.round((q[0] + mx) * 1000) / 1000, Math.round((q[1] + md) * 1000) / 1000]; });
+    if (JSON.stringify(np) !== JSON.stringify(drag.it.pts)){ drag.it.pts = np; drag.moved = true; refreshItems(); }
+    return;
+  }
+  var nx = Math.max(0, Math.min(W, snap(p.x - drag.dx))), nd = Math.max(0, Math.min(F, snap(p.d - drag.dd)));
+  if (nx !== drag.it.x || nd !== drag.it.d){
+    drag.it.x = nx; drag.it.d = nd; drag.moved = true;
+    drag.g.position.copy(V(nx, nd));
+    drag.g.position.y = drag.it.z || 0;
+  }
+});
+window.addEventListener('pointerup', function(){
+  if (dragZ){ ctl.enabled = true; dragZ = null; histFin(); guardar(); volcarForm(); return; }
+  if (dragR){ ctl.enabled = true; dragR = null; histFin(); guardar(); return; }
+  if (!drag) return;
+  ctl.enabled = true;
+  if (drag.moved) guardar();
+  if (drag.moved && drag.it.k === 'tonel') refreshItems();
+  drag = null; histFin();
+});
+var downPos = null;
+cv.addEventListener('pointerdown', function(e){ if (e.button === 0) downPos = { x: e.clientX, y: e.clientY }; });
+cv.addEventListener('pointerup', function(e){
+  if (!downPos || e.button !== 0) return;
+  var mv = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+  downPos = null;
+  if (mv < 5) clic(e);
+});
+cv.addEventListener('pointermove', function(e){
+  cursor = pick(e);
+  $('coord').textContent = cursor ? ('x ' + cursor.x.toFixed(1) + ' m · fondo ' + cursor.d.toFixed(1) + ' m') : '—';
+  actualizarGhost();
+  if (cursor && tool === 'bloque' && draft && draft.p){
+    var a = Math.floor(Math.abs(cursor.x - draft.p[0]) / num('tw', 1.5) + 1e-6), b = Math.floor(Math.abs(cursor.d - draft.p[1]) / num('tl', 1.5) + 1e-6);
+    $('coord').textContent += ' · bloque ' + a + ' × ' + b + ' = ' + (a * b) + ' tarimas';
+  }
+});
+cv.addEventListener('pointerleave', function(){ cursor = null; actualizarGhost(); });
+var rEdit = null;
+function abrirEditorRecinto(it){
+  rEdit = it;
+  [0, 1].forEach(function(i){
+    var z = it.zonas[i];
+    $('rc' + i).value = z.c; $('rn' + i).value = z.n; $('rh' + i).value = z.h || CFG.alto || 2.5;
+  });
+  $('dlgR').style.display = 'flex';
+  setTimeout(function(){ $('rn0').focus(); }, 30);
+}
+function cerrarEditorRecinto(ok){
+  var it = rEdit;
+  $('dlgR').style.display = 'none';
+  rEdit = null;
+  if (!ok || !it) return;
+  pushHist();
+  [0, 1].forEach(function(i){
+    var z = it.zonas[i], n = $('rn' + i).value.trim().toUpperCase().slice(0, 30), h = parseFloat($('rh' + i).value);
+    if (n) z.n = n;
+    z.c = $('rc' + i).value;
+    if (h >= 0.5 && h <= 30) z.h = Math.round(h * 100) / 100;
+  });
+  refreshItems();
+  histFin();
+}
+$('rOk').addEventListener('click', function(){ cerrarEditorRecinto(true); });
+$('rNo').addEventListener('click', function(){ cerrarEditorRecinto(false); });
+$('dlgR').addEventListener('keydown', function(e){
+  if (e.key === 'Enter'){ e.preventDefault(); cerrarEditorRecinto(true); }
+  else if (e.key === 'Escape'){ e.preventDefault(); cerrarEditorRecinto(false); }
+});
+cv.addEventListener('dblclick', function(e){
+  if (tool === 'linea'){ terminarLinea(); return; }
+  if (tool !== 'none') return;
+  setMouse(e);
+  var hr = ray.intersectObject(gHandlesR, true);
+  if (hr.length){
+    var it = itemPorId(hr[0].object.userData.id);
+    if (it && hr[0].object.userData.kind === 'lend'){ editarLargoLinea(it, hr[0].object.userData.pi); return; }
+    if (it && it.k === 'pared'){ editarAlturaPared(it); return; }
+    if (it && hr[0].object.userData.kind === 'div'){
+      var u0 = zExt(it, 0), u1 = zExt(it, 1), ulo = Math.min(u0[0], u1[0]), uhi = Math.max(u0[1], u1[1]);
+      if (it.orient === 'h'){ it.x0 = ulo; it.x1 = uhi; } else { it.d0 = ulo; it.d1 = uhi; }
+      it.zonas.forEach(function(z){ delete z.a; delete z.b; });
+      it.orient = (it.orient === 'h') ? 'v' : 'h';
+      it.pos = Math.round((it.orient === 'h' ? (it.d0 + it.d1) / 2 : (it.x0 + it.x1) / 2) * 20) / 20;
+      refreshItems();
+    }
+    return;
+  }
+  var hli = ray.intersectObject(gLineas, true), ol = hli.length ? hli[0].object : null;
+  while (ol && ol.userData.itemId === undefined) ol = ol.parent;
+  var il = ol ? itemPorId(ol.userData.itemId) : null;
+  if (il && (il.tipo === 'peatonal' || il.tipo === 'montacargas')){
+    dialogo('Ancho del pasillo (m):', 'input', function(v){
+      var w = parseFloat(v);
+      if (w >= 0.3 && w <= 12){ pushHist(); il.w = Math.round(w * 100) / 100; refreshItems(); }
+    }, String(il.w));
+    return;
+  }
+  var ha = ray.intersectObjects([gAreas, gRefs], true);
+  var o = ha.length ? ha[0].object : null;
+  while (o && o.userData.itemId === undefined) o = o.parent;
+  var ia = o ? itemPorId(o.userData.itemId) : null;
+  if (!ia) return;
+  if (ia.k === 'ref') dialogo('Nota para la referencia R' + ia.n + ':', 'input', function(v){ pushHist(); ia.nota = (v || '').trim().slice(0, 40); refreshItems(); }, ia.nota || '');
+  else if (ia.k === 'recinto') abrirEditorRecinto(ia);
+  else if (ia.k === 'area') dialogo('Nombre de la zona:', 'input', function(v){ if (v && v.trim()){ pushHist(); ia.nombre = v.trim().slice(0, 40); if (ia.tipo === 'espacio') ia.color = colorParaNombre(ia.nombre, ia); refreshItems(); } }, ia.nombre);
+});
+
+var HINTS = {
+  none: 'Arrastra una tarima o una línea para moverla (R gira la tarima, Supr borra lo seleccionado). Arrastra las barras teal para mover límites y los extremos de las puertas para cambiar su largo; doble clic en la barra oscura de una zona doble gira la línea, las barras claras laterales cambian el ancho de cada zona y las de los extremos su largo, doble clic en un cajón doble edita nombre, color y alto de sus zonas, los lados de las zonas que dibujas se estiran con las barras claras; doble clic en una zona la renombra. Arrastra el fondo para desplazar la vista; rueda = zoom.',
+  bloque: 'Clic en una esquina y luego en la opuesta: se llena de espacios de tarima. Con ajuste 1.5 m quedan alineados.',
+  tarima: 'Clic = poner un espacio de tarima de 1.5 × 1.5 m (se ajusta a 0.1 m). Tecla R gira 90°.',
+  linea: 'Clic en cada vértice. Doble clic o Enter termina; Esc cancela. Funciona mejor en vista Cenital.',
+  area: 'Una zona llamada PASILLO se marca sola como pasillo peatonal (línea verde del ancho que dibujes). Para marcarme una zona: elige "Referencia" en Qué es, marca dos esquinas y queda numerada (R1, R2…). Doble clic = escribirle una nota; con Mover se arrastra. Para los demás tipos: clic en una esquina y luego en la opuesta; te pedirá el nombre. Úsalo para repartir Bodega y la franja libre.',
+  borrar: 'Clic sobre una tarima, línea o producto para quitarlo. Deshacer lo recupera.',
+  pared: 'Clic donde empieza la pared y clic donde termina (queda recta). Con Mover: extremos = largo, cuadro del medio = posición, doble clic en un cuadro = altura.',
+  pasillo: 'Pasillo peatonal: clic en cada vértice; doble clic o Enter termina. 1.5 m de ancho, bordes de 10 cm y color según la norma elegida.',
+  carga: 'Pasillo de carga (ruta de montacargas): clic en cada vértice; doble clic o Enter termina. Ancho 2.5 m por defecto: ajústalo al vehículo más holgura (después, con Mover: doble clic sobre el pasillo = ancho; cuadros de los lados = ancho; cuadros de los extremos = largo, doble clic en uno para escribirlo).',
+  gradas: 'Gradas: dibuja el recorrido (1.5 m de ancho). Bajan hasta el Nivel 1 y abren el hueco en el piso. Con Mover arrastras sus vértices.',
+  elevador: 'Elevador de carga: marca dos esquinas del hueco. Baja al Nivel 1 con plataforma a medio nivel y pared en los lados libres.',
+  uso: 'Clic sobre una tarima para asignarle su uso: Flameo (rotación alta, línea 1 a 4), Flameado (entrega a Impresión), Merma por línea (rechazo de Empaque), Entregas PT, Pendiente de empaque, Entregas de bodega para trabajar, Rechazos internos, Materia prima molida, Bolsas para reciclaje, Corrugado malo o bueno, o Tapas para flameo (el área elige el color), y marcarla como ocupada.',
+  tonel: 'Clic = un tonel de 55 galones (0.58 m de diámetro, 0.88 m de alto). Con la casilla activa, un clic sobre una tarima pone 4 (2 × 2). Con Mover se arrastran; Borrar los quita.',
+  rack: 'Rack: un clic pone un rack completo en 2 niveles (2 tarimas abajo y 2 arriba, o 1 y 1 si eliges el tamaño de 1 tarima; primera viga a 1.70 m). R lo gira; "Racks seguidos" pone varios en fila. Con Mover se arrastra con sus tarimas.',
+  puerta: 'Clic donde empieza la puerta sobre el muro y clic donde termina (se pega al muro más cercano). Con Mover puedes arrastrar sus extremos para cambiar el largo.'
+};
+var ALIAS_LINEA = { pasillo: 'peatonal', carga: 'montacargas', gradas: 'gradas' };
+function setTool(t){
+  var btn = t;
+  if (ALIAS_LINEA[t]){
+    $('ltipo').value = ALIAS_LINEA[t];
+    $('lw').value = TIPOS[ALIAS_LINEA[t]].w;
+    t = 'linea';
+  }
+  tool = t; draft = null;
+  var bs = document.querySelectorAll('[data-tool]');
+  for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', bs[i].getAttribute('data-tool') === btn);
+  $('optTarima').style.display = (t === 'tarima' || t === 'bloque' || t === 'rack') ? 'block' : 'none';
+  $('optLinea').style.display = (t === 'linea') ? 'block' : 'none';
+  $('optArea').style.display = (t === 'area') ? 'block' : 'none';
+  $('optPared').style.display = (t === 'pared') ? 'block' : 'none';
+  $('optTonel').style.display = (t === 'tonel') ? 'block' : 'none';
+  $('optRack').style.display = (t === 'rack') ? 'block' : 'none';
+  $('hint').textContent = HINTS[btn];
+  gHandles.visible = (t === 'none'); gHandlesR.visible = (t === 'none');
+  cv.style.cursor = (t === 'none') ? 'grab' : 'crosshair';
+  actualizarGhost();
+}
+function undo(){
+  if (draft){ draft = null; actualizarGhost(); return; }
+  if (!hist.length) return;
+  var o = JSON.parse(hist.pop());
+  CFG = o.c; items = o.i; selId = null;
+  volcarForm(); construir(); refreshItems();
+}
+document.addEventListener('keydown', function(e){
+  if ($('dlg').style.display === 'flex' || $('dlgR').style.display === 'flex' || $('dlgU').style.display === 'flex') return;
+  var tg = e.target && e.target.tagName;
+  if (tg === 'INPUT' || tg === 'SELECT' || tg === 'TEXTAREA') return;
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selId !== null){
+    pushHist(); items = items.filter(function(it){ return it.id !== selId; }); selId = null; refreshItems();
+  }
+  else if ((e.key === 'r' || e.key === 'R') && tool === 'rack'){ girarOrientacionRack(); }
+  else if ((e.key === 'r' || e.key === 'R') && selId !== null && tool === 'none' && itemPorId(selId) && itemPorId(selId).k === 'rack'){ rotarRack(itemPorId(selId)); }
+  else if ((e.key === 'r' || e.key === 'R') && selId !== null && tool === 'none'){
+    var st = itemPorId(selId); if (st){ pushHist(); st.rot = (st.rot || 0) + Math.PI / 2; refreshItems(); }
+  }
+  else if (e.key === 'r' || e.key === 'R'){ rot += Math.PI / 2; actualizarGhost(); }
+  else if (e.key === 'Escape'){ if (draft) { draft = null; actualizarGhost(); } else setTool('none'); }
+  else if (e.key === 'Enter'){ if (tool === 'linea') terminarLinea(); }
+  else if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')){ e.preventDefault(); undo(); }
+});
+
+/* ---------- panel ---------- */
+Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'), function(b){
+  b.addEventListener('click', function(){ setTool(b.getAttribute('data-tool')); });
+});
+$('btnUndo').addEventListener('click', undo);
+$('btnRackGirar').addEventListener('click', girarOrientacionRack);
+$('rackOri').addEventListener('change', actualizarGhost);
+$('snapStep').addEventListener('change', function(){ STEP = parseFloat($('snapStep').value) || 0.1; });
+$('btnEnfoque').addEventListener('click', function(){
+  setVista('top');
+  camO.zoom = 1.1;
+  camO.position.set(stripCx, 100, CZ);
+  ctlO.target.set(stripCx, 0, CZ);
+  camO.updateProjectionMatrix();
+  ctlO.update();
+});
+$('btnFin').addEventListener('click', terminarLinea);
+$('cNorma').addEventListener('change', function(){
+  pushHist();
+  CFG.normaPasillo = $('cNorma').value;
+  refreshItems();
+});
+$('ptipo').addEventListener('change', function(){
+  var t = $('ptipo').value;
+  if (t === 'estructural') $('pAlto').value = CFG.altoNave || 5;
+  else if (t === 'media') $('pAlto').value = 1.2;
+});
+$('ltipo').addEventListener('change', function(){ $('lw').value = TIPOS[$('ltipo').value].w; });
+Array.prototype.forEach.call(document.querySelectorAll('[data-capa]'), function(c){
+  c.addEventListener('change', function(){ [].concat(CAPAS[c.getAttribute('data-capa')]).forEach(function(g){ g.visible = c.checked; }); });
+});
+function setVista(v){
+  var top = (v === 'top');
+  cam = top ? camO : camP;
+  ctl = top ? ctlO : ctlP;
+  ctlP.enabled = !top; ctlO.enabled = top;
+  $('v3d').classList.toggle('on', !top);
+  $('vtop').classList.toggle('on', top);
+}
+$('v3d').addEventListener('click', function(){ setVista('3d'); });
+$('vtop').addEventListener('click', function(){ setVista('top'); });
+
+function volcarForm(){
+  $('cBodega').value = CFG.bodega; $('cCajon').value = CFG.cajon; $('cAlto').value = CFG.alto || 2.5; $('cAltoN').value = CFG.altoNave || 5; $('cAltoP').value = CFG.altoPuerta || 2; $('cAltoNiv').value = CFG.altoNivel || 8; $('cAltoM1').value = CFG.altoMurosN1 || 8; $('cAltoEl').value = CFG.altoElev || 1.25; $('cAltoRj').value = CFG.altoReja || 1.5; $('cNorma').value = CFG.normaPasillo || 'iso'; $('cAltoRk1').value = CFG.altoRack1 || 1.7; $('cAltoRk').value = CFG.altoRack || 3.4;
+  $('cLado').value = CFG.lado; $('cInicio').value = CFG.inicio;
+  var box = $('zonasBox');
+  box.innerHTML = '';
+  CFG.zonas.forEach(function(z, i){
+    var r = document.createElement('div'); r.className = 'zrow';
+    var c = document.createElement('input'); c.type = 'color'; c.value = z.c;
+    var n = document.createElement('input'); n.type = 'text'; n.value = z.n; n.maxLength = 30;
+    var l = document.createElement('input'); l.type = 'number'; l.value = z.l; l.step = '0.05'; l.min = '0.5';
+    var x = document.createElement('button'); x.textContent = '✕';
+    x.addEventListener('click', function(){ leerZonas(); CFG.zonas.splice(i, 1); volcarForm(); });
+    var m = document.createElement('button'); m.textContent = '＋↓'; m.title = 'Agregar una zona debajo de esta (hacia el frente), quitándole espacio';
+    m.addEventListener('click', function(){ agregarZonaDebajo(i); });
+    r.appendChild(c); r.appendChild(n); r.appendChild(l); r.appendChild(m); r.appendChild(x);
+    box.appendChild(r);
+  });
+}
+function agregarZonaDebajo(i){
+  pushHist();
+  leerZonas();
+  var z = CFG.zonas[i];
+  if (!z) return;
+  var take = Math.round(Math.min(4, z.l / 2) * 100) / 100;
+  z.l = Math.round((z.l - take) * 100) / 100;
+  var nueva = { n: 'NUEVA ZONA', l: take, c: '#A855F7' };
+  CFG.zonas.splice(CFG.inicio === 'fondo' ? i + 1 : i, 0, nueva);
+  volcarForm(); construir(); guardar();
+}
+function leerZonas(){
+  var rows = $('zonasBox').children, z = [];
+  for (var i = 0; i < rows.length; i++){
+    var ins = rows[i].querySelectorAll('input');
+    var l = parseFloat(ins[2].value);
+    if (isFinite(l) && l > 0) z.push({ c: ins[0].value, n: ins[1].value.trim().toUpperCase() || ('ZONA ' + (i + 1)), l: l });
+  }
+  CFG.zonas = z;
+}
+$('btnAddZona').addEventListener('click', function(){
+  leerZonas();
+  CFG.zonas.push({ n: 'NUEVA ZONA', l: 5, c: '#A855F7' });
+  volcarForm();
+});
+$('btnAplicar').addEventListener('click', function(){
+  var b = parseFloat($('cBodega').value), c = parseFloat($('cCajon').value);
+  if (!(b > 0) || !(c > 0) || b + c > W){ $('aviso').textContent = 'Revisa Bodega + cajón: no pueden pasar de ' + W + ' m.'; return; }
+  pushHist();
+  CFG.bodega = b; CFG.cajon = c; CFG.alto = parseFloat($('cAlto').value) > 0 ? parseFloat($('cAlto').value) : 2.5;
+  CFG.altoNave = parseFloat($('cAltoN').value) > 0 ? parseFloat($('cAltoN').value) : 5;
+  CFG.altoPuerta = parseFloat($('cAltoP').value) > 0 ? parseFloat($('cAltoP').value) : 2;
+  CFG.altoNivel = parseFloat($('cAltoNiv').value) > 0 ? parseFloat($('cAltoNiv').value) : 8;
+  CFG.altoMurosN1 = parseFloat($('cAltoM1').value) > 0 ? parseFloat($('cAltoM1').value) : 8;
+  CFG.altoElev = parseFloat($('cAltoEl').value) > 0 ? parseFloat($('cAltoEl').value) : 1.25;
+  CFG.altoReja = parseFloat($('cAltoRj').value) > 0 ? parseFloat($('cAltoRj').value) : 1.5;
+  CFG.normaPasillo = $('cNorma').value;
+  CFG.altoRack1 = parseFloat($('cAltoRk1').value) > 0 ? parseFloat($('cAltoRk1').value) : 1.7;
+  CFG.altoRack = parseFloat($('cAltoRk').value) > 0 ? parseFloat($('cAltoRk').value) : 3.4; CFG.lado = $('cLado').value; CFG.inicio = $('cInicio').value;
+  leerZonas();
+  construir(); refreshItems(); guardar(); volcarForm();
+});
+
+/* ---------- exportar ---------- */
+function descargar(blob, nombre){
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = nombre;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+}
+var USOS_CATALOGO = [
+  { tipo: 'flameo', nombre: 'FLAMEO · rotación alta', area: 'serig', lineas: [1, 2, 3, 4] },
+  { tipo: 'flameado', nombre: 'FLAMEADO · entrega Flameo, recoge Impresión', area: 'serig', lineas: [1, 2, 3, 4] },
+  { tipo: 'merma', nombre: 'MERMA POR LÍNEA', area: 'serig', lineas: [1, 2, 3, 4] },
+  { tipo: 'entregaspt', nombre: 'ENTREGAS PT', area: 'serig|tapas' },
+  { tipo: 'pendempaque', nombre: 'PENDIENTE DE EMPAQUE', area: 'serig|tapas' },
+  { tipo: 'entbodega', nombre: 'ENTREGAS DE BODEGA PARA TRABAJAR', area: 'serig|tapas|general' },
+  { tipo: 'rechazoint', nombre: 'RECHAZOS INTERNOS', area: 'serig|tapas' },
+  { tipo: 'tapas', nombre: 'TAPAS · para flameo antes de impresión', area: 'tapas' },
+  { tipo: 'mpmolida', nombre: 'MATERIA PRIMA MOLIDA', area: 'general' },
+  { tipo: 'bolsasrec', nombre: 'BOLSAS PARA RECICLAJE', area: 'general' },
+  { tipo: 'corrmalo', nombre: 'CORRUGADO MALO', area: 'general' },
+  { tipo: 'corrbueno', nombre: 'CORRUGADO BUENO', area: 'general' }
+];
+function hex6(n){ return '#' + ('000000' + n.toString(16)).slice(-6); }
+function r3(v){ return Math.round(v * 1000) / 1000; }
+function codigoItem(it){
+  var pre = { tarima: 'T', linea: 'L', area: 'Z', ref: 'R', recinto: 'C', pared: 'P', tonel: 'O', rack: 'K' }[it.k] || 'X';
+  return 'N2-' + pre + it.id;
+}
+function rectPoligono(x0, x1, d0, d1){ return [[r3(x0), r3(d0)], [r3(x1), r3(d0)], [r3(x1), r3(d1)], [r3(x0), r3(d1)], [r3(x0), r3(d0)]]; }
+function tarimaPoligono(t){
+  var th = t.rot || 0, c = Math.cos(th), sn = Math.sin(th), hw = t.w / 2, hl = t.l / 2;
+  return [[-hw, -hl], [hw, -hl], [hw, hl], [-hw, hl], [-hw, -hl]].map(function(q){
+    return [r3(t.x + q[0] * c + q[1] * sn), r3(t.d + q[0] * sn - q[1] * c)];
+  });
+}
+function zonasFijas(){
+  var out = [], xb = CFG.bodega, esDer = (CFG.lado === 'der'), cx0, cx1, sx0, sx1;
+  if (esDer){ cx1 = W; cx0 = W - CFG.cajon; sx0 = xb; sx1 = cx0; } else { cx0 = xb; cx1 = xb + CFG.cajon; sx0 = cx1; sx1 = W; }
+  out.push({ nombre: 'BODEGA', rect: [0, xb, 0, F], color: '#8b7355' });
+  if (sx1 - sx0 > 0.05) out.push({ nombre: 'POR DEFINIR', rect: [sx0, sx1, 0, F], color: '#77756f' });
+  var d = (CFG.inicio === 'fondo') ? F : 0;
+  CFG.zonas.forEach(function(z){
+    var d0, d1;
+    if (CFG.inicio === 'fondo'){ d0 = d - z.l; d1 = d; d -= z.l; } else { d0 = d; d1 = d + z.l; d += z.l; }
+    out.push({ nombre: z.n, rect: [cx0, cx1, d0, d1], color: z.c, cajon: true, alto: CFG.alto || 2.5 });
+  });
+  return out;
+}
+var TIPO_LINEA = { peatonal: 'pasillo_peatonal', montacargas: 'pasillo_carga', gradas: 'gradas', porton: 'puerta', limite: 'limite_seguridad' };
+function datosV2(){
+  var nt = 0, ns = 0;
+  items.forEach(function(it){ if (it.k === 'tarima'){ nt++; if (!it.uso) ns++; } });
+  var notas = {};
+  Object.keys(NOTAS_USO).forEach(function(k){ notas[k] = NOTAS_USO[k]; });
+  return {
+    formato: 'tetrapp-plano', version: 2, nivel: 2, unidades: 'm',
+    generado: new Date().toISOString(),
+    sistema: { origen: 'esquina frontal izquierda de la planta', x: 'hacia la derecha (0 a ' + W + ' m)', d: 'hacia el fondo (0 a ' + F + ' m)', z3d: 'en 3D/GLB: z = -d, y = altura sobre el piso del nivel 2 (negativo hacia el Nivel 1)' },
+    planta: { ancho: W, fondo: F },
+    colores: { serig: hex6(COLOR_TARIMA_SERIG), tapas: hex6(COLOR_TARIMA_TAPAS), general: hex6(COLOR_TARIMA_GENERAL), bodega: '#c9a66b' },
+    catalogoUsos: USOS_CATALOGO, notasUso: notas,
+    resumen: { tarimas: nt, tarimasBodegaSinAsignar: ns, elementos: items.length },
+    cfg: CFG, items: items
+  };
+}
+function geoFeatures(){
+  var f = [];
+  var add = function(tipo, geom, props){ props.tipo = tipo; f.push({ type: 'Feature', geometry: geom, properties: props }); };
+  var poly = function(c){ return { type: 'Polygon', coordinates: [c] }; };
+  add('nave', poly(rectPoligono(0, W, 0, F)), { codigo: 'N2-NAVE', nombre: 'Nivel 2', altura: CFG.altoNave || 5 });
+  zonasFijas().forEach(function(z){
+    add(z.cajon ? 'zona_cajon' : 'zona_fija', poly(rectPoligono(z.rect[0], z.rect[1], z.rect[2], z.rect[3])), { codigo: 'N2-ZF-' + normNombre(z.nombre).replace(/[^A-Z0-9]+/g, '_'), nombre: z.nombre, color: z.color, alto: z.alto || null });
+  });
+  items.forEach(function(it){
+    var cod = codigoItem(it);
+    if (it.k === 'tarima'){
+      add('tarima', poly(tarimaPoligono(it)), { codigo: cod, id: it.id, ancho: it.w, largo: it.l, area: it.uso ? areaUso(it) : 'bodega', uso: it.uso ? it.uso.tipo : null, linea: (it.uso && it.uso.linea) || null, elevacion: it.z || 0, nivel_rack: (it.z || 0) > 0, ocupada: !!it.carga, nombre: it.uso ? usoTexto(it).join(' · ') : 'BODEGA', nota: it.uso ? notaUso(it) : '', sku: null, cantidad: null });
+    } else if (it.k === 'area'){
+      var tp = esElevador(it) ? 'elevador' : (it.tipo === 'techo' ? 'techo_lamina' : (it.tipo === 'producto' ? 'zona_producto' : 'zona'));
+      add(tp, poly(rectPoligono(it.x0, it.x1, it.d0, it.d1)), { codigo: cod, id: it.id, nombre: it.nombre, color: it.color || null, altura: (it.tipo === 'techo') ? it.h : null });
+    } else if (it.k === 'ref'){
+      add('referencia', poly(rectPoligono(it.x0, it.x1, it.d0, it.d1)), { codigo: cod, id: it.id, nombre: 'R' + it.n, nota: it.nota || '' });
+    } else if (it.k === 'recinto'){
+      rectsRecinto(it).forEach(function(r, zi){
+        var z = it.zonas[zi];
+        add('zona_cubo', poly(rectPoligono(r[0], r[1], r[2], r[3])), { codigo: cod + '-' + (zi + 1), id: it.id, nombre: z.n, color: z.c, alto: z.h || CFG.alto || 2.5 });
+      });
+    } else if (it.k === 'linea'){
+      var pr = { codigo: cod, id: it.id, ancho: it.w };
+      if (it.tipo === 'gradas') pr.caida = CFG.altoNivel || 8;
+      if (it.tipo === 'porton') pr.altura = CFG.altoPuerta || 2;
+      add(TIPO_LINEA[it.tipo] || it.tipo, { type: 'LineString', coordinates: it.pts.map(function(q){ return [q[0], q[1]]; }) }, pr);
+    } else if (it.k === 'rack'){
+      add('rack', poly(rectPoligono(it.x0, it.x1, it.d0, it.d1)), { codigo: cod, id: it.id, modulos: it.n, tarimas_por_nivel: Math.round((it.bahia || 3) / (it.prof || 1.5)), orientacion: it.orient, primera_viga: CFG.altoRack1 || 1.7, alto_total: CFG.altoRack || 3.4 });
+    } else if (it.k === 'tonel'){
+      var circ = [], ci;
+      for (ci = 0; ci <= 16; ci++) circ.push([r3(it.x + (TONEL_D / 2) * Math.cos(ci * Math.PI / 8)), r3(it.d + (TONEL_D / 2) * Math.sin(ci * Math.PI / 8))]);
+      add('tonel', poly(circ), { codigo: cod, id: it.id, diametro: TONEL_D, altura: TONEL_H, volumen_galones: 55, sobre_tarima: !!tarimaEn(it.x, it.d), sku: null, cantidad: null });
+    } else if (it.k === 'pared'){
+      add('pared_' + it.tipo, { type: 'LineString', coordinates: it.pts.map(function(q){ return [q[0], q[1]]; }) }, { codigo: cod, id: it.id, altura: it.h });
+    }
+  });
+  return f;
+}
+function datosGeoJSON(){
+  return {
+    type: 'FeatureCollection',
+    name: 'tetrapp-nivel2',
+    crs_local: 'metros desde la esquina frontal izquierda; x derecha, y = fondo (no es WGS84)',
+    properties: { formato: 'tetrapp-plano', version: 2, nivel: 2, unidades: 'm', generado: new Date().toISOString() },
+    features: geoFeatures()
+  };
+}
+function datosSVG(){
+  var esc = function(t){ return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+  var Y = function(d){ return r3(F - d); };
+  var pts = function(c){ return c.map(function(q){ return q[0] + ',' + Y(q[1]); }).join(' '); };
+  var o = [];
+  o.push('<?xml version="1.0" encoding="UTF-8"?>');
+  o.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 ' + (W + 2) + ' ' + (F + 2) + '" width="' + ((W + 2) * 30) + '" height="' + ((F + 2) * 30) + '" font-family="sans-serif">');
+  o.push('<title>TETRAPLASTIC · Nivel 2 · generado ' + new Date().toISOString() + ' · unidades: metros, frente abajo</title>');
+  o.push('<rect x="0" y="0" width="' + W + '" height="' + F + '" fill="#f4f3ef" stroke="#222" stroke-width="0.15" id="nave"/>');
+  o.push('<g id="zonas">');
+  zonasFijas().forEach(function(z){
+    o.push('<rect x="' + z.rect[0] + '" y="' + Y(z.rect[3]) + '" width="' + r3(z.rect[1] - z.rect[0]) + '" height="' + r3(z.rect[3] - z.rect[2]) + '" fill="' + esc(z.color) + '" fill-opacity="0.45" data-nombre="' + esc(z.nombre) + '"/>');
+    o.push('<text x="' + r3((z.rect[0] + z.rect[1]) / 2) + '" y="' + Y((z.rect[2] + z.rect[3]) / 2) + '" font-size="0.9" text-anchor="middle" fill="#111">' + esc(z.nombre) + '</text>');
+  });
+  items.forEach(function(it){
+    if (it.k === 'area' && it.tipo !== 'techo'){
+      o.push('<rect x="' + it.x0 + '" y="' + Y(it.d1) + '" width="' + r3(it.x1 - it.x0) + '" height="' + r3(it.d1 - it.d0) + '" fill="' + esc(it.color || '#a855f7') + '" fill-opacity="0.5" data-codigo="' + codigoItem(it) + '" data-nombre="' + esc(it.nombre) + '"/>');
+      o.push('<text x="' + r3((it.x0 + it.x1) / 2) + '" y="' + Y((it.d0 + it.d1) / 2) + '" font-size="0.6" text-anchor="middle" fill="#111">' + esc(it.nombre) + '</text>');
+    } else if (it.k === 'recinto'){
+      rectsRecinto(it).forEach(function(r, zi){
+        o.push('<rect x="' + r[0] + '" y="' + Y(r[3]) + '" width="' + r3(r[1] - r[0]) + '" height="' + r3(r[3] - r[2]) + '" fill="' + esc(it.zonas[zi].c) + '" fill-opacity="0.5" stroke="#111" stroke-width="0.08" data-codigo="' + codigoItem(it) + '-' + (zi + 1) + '" data-nombre="' + esc(it.zonas[zi].n) + '"/>');
+        o.push('<text x="' + r3((r[0] + r[1]) / 2) + '" y="' + Y((r[2] + r[3]) / 2) + '" font-size="0.5" text-anchor="middle" fill="#111">' + esc(it.zonas[zi].n) + '</text>');
+      });
+    }
+  });
+  o.push('</g>');
+  o.push('<g id="pasillos" fill="none">');
+  items.forEach(function(it){
+    if (it.k !== 'linea') return;
+    var col = { peatonal: hex6(colorPasillo()), montacargas: hex6(SEG_AMARILLO), gradas: '#a8a29e', porton: hex6(SEG_VERDE), limite: hex6(SEG_ROJO) }[it.tipo] || '#888';
+    o.push('<polyline points="' + pts(it.pts) + '" stroke="' + col + '" stroke-opacity="' + (it.tipo === 'porton' || it.tipo === 'limite' ? 1 : 0.35) + '" stroke-width="' + it.w + '" stroke-linejoin="round" data-tipo="' + (TIPO_LINEA[it.tipo] || it.tipo) + '" data-codigo="' + codigoItem(it) + '"/>');
+  });
+  o.push('</g>');
+  o.push('<g id="paredes" stroke-linecap="square">');
+  items.forEach(function(it){
+    if (it.k !== 'pared') return;
+    o.push('<polyline points="' + pts(it.pts) + '" fill="none" stroke="#555" stroke-width="' + (it.tipo === 'estructural' ? 0.3 : 0.2) + '" data-tipo="pared_' + it.tipo + '" data-altura="' + it.h + '" data-codigo="' + codigoItem(it) + '"/>');
+  });
+  o.push('</g>');
+  o.push('<g id="racks">');
+  items.forEach(function(it){
+    if (it.k !== 'rack') return;
+    o.push('<rect x="' + Math.min(it.x0, it.x1) + '" y="' + Y(Math.max(it.d0, it.d1)) + '" width="' + r3(Math.abs(it.x1 - it.x0)) + '" height="' + r3(Math.abs(it.d1 - it.d0)) + '" fill="#f97316" fill-opacity="0.18" stroke="#f97316" stroke-width="0.08" data-codigo="' + codigoItem(it) + '" data-modulos="' + it.n + '" data-primera-viga="' + (CFG.altoRack1 || 1.7) + '"/>');
+  });
+  o.push('</g>');
+  o.push('<g id="tarimas">');
+  items.forEach(function(it){
+    if (it.k !== 'tarima') return;
+    var col = it.uso ? hex6(colorUsoTarima(it)) : '#c9a66b';
+    o.push('<polygon points="' + pts(tarimaPoligono(it)) + '" fill="' + col + '" stroke="#111" stroke-width="0.04" data-codigo="' + codigoItem(it) + '" data-area="' + (it.uso ? areaUso(it) : 'bodega') + '" data-uso="' + (it.uso ? it.uso.tipo : '') + '" data-linea="' + ((it.uso && it.uso.linea) || '') + '" data-ocupada="' + (it.carga ? 1 : 0) + '"/>');
+    if (it.uso) o.push('<text x="' + it.x + '" y="' + (Y(it.d) + 0.1) + '" font-size="0.3" text-anchor="middle" fill="#111">' + esc(usoTexto(it)[0]) + '</text>');
+  });
+  items.forEach(function(it){
+    if (it.k !== 'tonel') return;
+    o.push('<circle cx="' + it.x + '" cy="' + Y(it.d) + '" r="' + (TONEL_D / 2) + '" fill="#2563eb" stroke="#1e3a8a" stroke-width="0.04" data-codigo="' + codigoItem(it) + '" data-tipo="tonel_55gal"/>');
+  });
+  o.push('</g>');
+  o.push('</svg>');
+  return o.join('\n');
+}
+$('eGEO').addEventListener('click', function(){
+  descargar(new Blob([JSON.stringify(datosGeoJSON(), null, 1)], { type: 'application/geo+json' }), 'tetrapp-planta-nivel2.geojson');
+});
+$('eSVG').addEventListener('click', function(){
+  descargar(new Blob([datosSVG()], { type: 'image/svg+xml' }), 'tetrapp-planta-nivel2.svg');
+});
+$('eGLB').addEventListener('click', function(){
+  var ex = new THREE.GLTFExporter();
+  ex.parse(root, function(res){
+    descargar(new Blob([res], { type: 'model/gltf-binary' }), 'tetrapp-planta-nivel2.glb');
+  }, { binary: true });
+});
+$('eJSON').addEventListener('click', function(){
+  var fh = new Date(), z2 = function(n){ return ('0' + n).slice(-2); };
+  descargar(new Blob([JSON.stringify(datosV2(), null, 1)], { type: 'application/json' }), 'tetrapp-planta-nivel2_' + fh.getFullYear() + z2(fh.getMonth() + 1) + z2(fh.getDate()) + '-' + z2(fh.getHours()) + z2(fh.getMinutes()) + '.json');
+});
+$('eImp').addEventListener('click', function(){ $('fileImp').click(); });
+$('fileImp').addEventListener('change', function(e){
+  var f = e.target.files[0];
+  if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    try { aplicarDatos(JSON.parse(fr.result)); volcarForm(); construir(); refreshItems(); }
+    catch (err) { dialogo('El archivo no tiene el formato del plano.', 'info'); }
+  };
+  fr.readAsText(f);
+  e.target.value = '';
+});
+$('ePNG').addEventListener('click', function(){
+  var ppm = 50, w = 37 * ppm, h = 47 * ppm;
+  var rr = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  rr.setPixelRatio(1); rr.setSize(w, h);
+  var oc = new THREE.OrthographicCamera(-18.5, 18.5, 23.5, -23.5, 0.1, 300);
+  oc.up.set(0, 0, -1); oc.position.set(CX, 100, CZ); oc.lookAt(CX, 0, CZ);
+  var bg = scene.background, sc = slabMat.color.getHex(), gv = gGhost.visible, mv = gMuros.visible;
+  scene.background = new THREE.Color(0xFFFFFF);
+  slabMat.color.setHex(SLAB_CLARO);
+  gGhost.visible = false; var hv = gHandles.visible, hr0 = gHandlesR.visible; gHandles.visible = false; gHandlesR.visible = false;
+  rr.render(scene, oc);
+  rr.domElement.toBlob(function(b){
+    descargar(b, 'tetrapp-planta-nivel2.png');
+    rr.dispose(); rr.forceContextLoss();
+  }, 'image/png');
+  scene.background = bg; slabMat.color.setHex(sc); gGhost.visible = gv; gMuros.visible = mv; gHandles.visible = hv; gHandlesR.visible = hr0;
+});
+$('btnLimpiar').addEventListener('click', function(){
+  if (!items.length) return;
+  dialogo('¿Borrar las ' + items.length + ' tarimas, líneas y zonas dibujadas?', 'confirm', function(){ pushHist(); items = []; refreshItems(); });
+});
+
+/* ---------- Nivel 1: modelo importado (referencia, fuera del GLB exportado) ---------- */
+var n1Buf = null, N1KEY = 'tetrapp_plano_n1mod_v1', n1 = { esc: 0.001, x: 0, d: 0, y: 0, rot: 0, tiene: false }, n1Pivot = null, n1Size = null;
+function n1Guardar(){ try { localStorage.setItem(N1KEY, JSON.stringify({ esc: n1.esc, x: n1.x, d: n1.d, y: n1.y, rot: n1.rot })); } catch (e) {} }
+function n1Leer(){ try { var o = JSON.parse(localStorage.getItem(N1KEY) || 'null'); if (o) ['esc', 'x', 'd', 'y', 'rot'].forEach(function(k){ if (isFinite(o[k])) n1[k] = o[k]; }); } catch (e) {} }
+function n1Aplicar(){
+  var rise = CFG.altoNivel || 8;
+  gN1.position.set(n1.x, n1.y - rise, -n1.d);
+  gN1.rotation.set(0, n1.rot * Math.PI / 2, 0);
+  gN1.scale.setScalar(n1.esc);
+  $('n1Esc').value = +n1.esc.toPrecision(6); $('n1X').value = +n1.x.toFixed(3); $('n1D').value = +n1.d.toFixed(3); $('n1Y').value = +n1.y.toFixed(3);
+  if (n1.tiene && n1Size){
+    $('n1Info').textContent = 'Modelo de ' + (n1Size.x * n1.esc).toFixed(1) + ' m (ancho) × ' + (n1Size.y * n1.esc).toFixed(1) + ' m (fondo) × ' + (n1Size.z * n1.esc).toFixed(1) + ' m (alto). Planta: ' + W + ' × ' + F + ' m.';
+  } else $('n1Info').textContent = 'Sin modelo. Es solo una referencia: no se exporta en el GLB del Nivel 2 y se guarda en este navegador.';
+  n1Guardar();
+}
+function n1Vaciar(){ n1Buf = null; clearG(gN1); n1Pivot = null; n1Size = null; n1.tiene = false; }
+function n1Montar(scn){
+  n1Vaciar();
+  var quitar = [];
+  scn.updateMatrixWorld(true);
+  scn.traverse(function(o){
+    if (!o.isMesh) return;
+    var b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3());
+    // figura humana de escala / piezas fuera de la planta, y planos gigantes sueltos
+    if (Math.max(sz.x, sz.y, sz.z) > 60000 || (b.max.x < 0 && b.max.y < 0)) quitar.push(o);
+  });
+  quitar.forEach(function(o){ if (o.parent) o.parent.remove(o); });
+  var mt = new THREE.MeshLambertMaterial({ color: 0xBFC4CC, side: THREE.DoubleSide, transparent: true, opacity: 0.88 });
+  scn.traverse(function(o){ if (o.isMesh){ o.material = mt; o.userData.n1 = 1; } });
+  var box = new THREE.Box3().setFromObject(scn);
+  n1Size = box.getSize(new THREE.Vector3());
+  var inner = new THREE.Group();
+  inner.add(scn);
+  scn.position.set(-box.min.x, -box.min.y, -box.min.z);
+  inner.rotation.x = -Math.PI / 2;   // Z arriba (SketchUp) -> Y arriba
+  gN1.add(inner);
+  n1Pivot = inner; n1.tiene = true;
+  n1Aplicar();
+  return quitar.length;
+}
+function n1Cargar(buf, guardarCopia){
+  try {
+    n1Buf = buf;
+    new THREE.GLTFLoader().parse(buf, '', function(gltf){
+      var q = n1Montar(gltf.scene);
+      if (guardarCopia) n1DB('put', buf);
+      $('n1Info').textContent += ' (' + q + ' piezas ajenas quitadas)';
+    }, function(){ dialogo('No se pudo leer el modelo GLB.', 'info'); });
+  } catch (e) { dialogo('No se pudo leer el modelo GLB.', 'info'); }
+}
+function n1DB(op, data, cb){
+  try {
+    var rq = indexedDB.open('tetrapp_plano_db', 1);
+    rq.onupgradeneeded = function(){ rq.result.createObjectStore('n1'); };
+    rq.onsuccess = function(){
+      var st = rq.result.transaction('n1', 'readwrite').objectStore('n1'), r;
+      if (op === 'put') r = st.put(data, 'glb'); else if (op === 'del') r = st['delete']('glb'); else r = st.get('glb');
+      r.onsuccess = function(){ if (cb) cb(r.result); };
+    };
+  } catch (e) {}
+}
+$('n1Cargar').addEventListener('click', function(){ $('n1File').click(); });
+$('n1File').addEventListener('change', function(e){
+  var f = e.target.files[0]; if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){ n1Cargar(fr.result, true); };
+  fr.readAsArrayBuffer(f); e.target.value = '';
+});
+$('n1Quitar').addEventListener('click', function(){ n1Vaciar(); n1DB('del'); n1Aplicar(); });
+[['n1Esc', 'esc'], ['n1X', 'x'], ['n1D', 'd'], ['n1Y', 'y']].forEach(function(p){
+  $(p[0]).addEventListener('change', function(){ var v = parseFloat(this.value); if (isFinite(v) && (p[1] !== 'esc' || v > 0)) n1[p[1]] = v; n1Aplicar(); });
+});
+$('n1Rot').addEventListener('click', function(){ n1.rot = (n1.rot + 1) % 4; n1Aplicar(); });
+$('n1Fit').addEventListener('click', function(){
+  if (!n1Size) return;
+  var span = (n1.rot % 2) ? n1Size.x : n1Size.y;
+  n1.esc = F / span; n1Aplicar();
+});
+n1Leer();
+n1DB('get', null, function(buf){ if (buf) n1Cargar(buf, false); });
+
+/* ---------- base de datos (tabla planos + bucket planos) ---------- */
+function dbMsg(t){ $('dbEstado').textContent = t; }
+function dbFecha(iso){ var d = new Date(iso), z = function(n){ return ('0' + n).slice(-2); }; return z(d.getDate()) + '/' + z(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+function dbGuardarVersion(intento){
+  if (typeof db === 'undefined' || !TETRA || TETRA.rol !== 'master'){ dialogo('Solo el usuario master puede guardar en la base de datos.', 'info'); return; }
+  dbMsg('Guardando…');
+  db.from('planos').select('version').eq('nivel', 2).order('version', { ascending: false }).limit(1).then(function(r){
+    if (r.error){ dbMsg('No se pudo guardar: ' + r.error.message); return; }
+    var ver = (r.data && r.data.length ? r.data[0].version : 0) + 1;
+    var datos = datosV2(); datos.n1mod = { esc: n1.esc, x: n1.x, d: n1.d, y: n1.y, rot: n1.rot, tiene: n1.tiene };
+    var ruta = (n1Buf && n1.tiene) ? 'nivel2/v' + ver + '/nivel1-modelo.glb' : null;
+    var subir = ruta ? db.storage.from('planos').upload(ruta, new Blob([n1Buf], { type: 'model/gltf-binary' }), { contentType: 'model/gltf-binary', upsert: true }) : Promise.resolve({ error: null });
+    subir.then(function(u){
+      if (u.error){ dbMsg('No se pudo subir el modelo del Nivel 1: ' + u.error.message); return; }
+      return db.from('planos').insert({ nivel: 2, version: ver, nombre: 'Plano de planta · Nivel 2', nota: $('dbNota').value.trim() || null, datos: datos, modelo_path: ruta, n_elementos: items.length }).then(function(i){
+        if (i.error){
+          if (!intento && /duplicate|unique/i.test(i.error.message)) return dbGuardarVersion(1);
+          dbMsg('No se pudo guardar: ' + i.error.message); return;
+        }
+        $('dbNota').value = '';
+        dbMsg('Guardada la versión ' + ver + ' (' + items.length + ' elementos' + (ruta ? ', con el modelo del Nivel 1' : '') + ') · ' + dbFecha(new Date().toISOString()));
+        dbListar(true);
+      });
+    });
+  });
+}
+function dbListar(silencioso){
+  if (typeof db === 'undefined'){ return; }
+  db.from('planos').select('id,version,nota,creado_en,n_elementos,modelo_path').eq('nivel', 2).order('version', { ascending: false }).limit(50).then(function(r){
+    if (r.error){ dbMsg('No se pudieron leer las versiones: ' + r.error.message); return; }
+    var sel = $('dbVersiones');
+    sel.innerHTML = '';
+    (r.data || []).forEach(function(v){
+      var o = document.createElement('option');
+      o.value = v.id;
+      o.textContent = 'v' + v.version + ' · ' + dbFecha(v.creado_en) + ' · ' + (v.n_elementos || '?') + ' elem.' + (v.modelo_path ? ' · +N1' : '') + (v.nota ? ' · ' + v.nota : '');
+      sel.appendChild(o);
+    });
+    var hay = (r.data || []).length > 0;
+    sel.style.display = hay ? 'block' : 'none'; $('dbCargar').style.display = hay ? 'block' : 'none';
+    if (!silencioso) dbMsg(hay ? r.data.length + ' versiones guardadas.' : 'Aún no hay versiones guardadas.');
+  });
+}
+function dbCargarVersion(){
+  var id = $('dbVersiones').value; if (!id) return;
+  dialogo('Cargar esa versión reemplaza el diseño actual de la pantalla (puedes deshacer). ¿Continuar?', 'confirm', function(){
+    db.from('planos').select('datos,modelo_path,version').eq('id', id).single().then(function(r){
+      if (r.error || !r.data){ dbMsg('No se pudo cargar: ' + (r.error ? r.error.message : 'sin datos')); return; }
+      try {
+        pushHist();
+        aplicarDatos(r.data.datos);
+        var m = r.data.datos.n1mod;
+        if (m){ ['esc', 'x', 'd', 'y', 'rot'].forEach(function(k){ if (isFinite(m[k])) n1[k] = m[k]; }); n1Aplicar(); }
+        volcarForm(); construir(); refreshItems();
+        dbMsg('Cargada la versión ' + r.data.version + '.');
+      } catch (e){ dbMsg('El contenido de esa versión no tiene el formato del plano.'); return; }
+      if (r.data.modelo_path){
+        db.storage.from('planos').download(r.data.modelo_path).then(function(d){
+          if (d.error || !d.data){ dbMsg('Se cargó el diseño, pero no el modelo del Nivel 1: ' + (d.error ? d.error.message : '')); return; }
+          d.data.arrayBuffer().then(function(buf){ n1Cargar(buf, true); });
+        });
+      }
+    });
+  });
+}
+$('dbGuardar').addEventListener('click', function(){ dbGuardarVersion(0); });
+$('dbLista').addEventListener('click', function(){ dbListar(false); });
+$('dbCargar').addEventListener('click', dbCargarVersion);
+
+/* ---------- arranque ---------- */
+cargar();
+convertirPasillos();
+normalizarRacks();
+recolorConflictos();
+volcarForm();
+construir();
+refreshItems();
+setTool('none');
+resize();
+window.__plano_ready = true;
+(function loop(){
+  requestAnimationFrame(loop);
+  ctl.update();
+  renderer.render(scene, cam);
+})();
+window.__plano = { n1: n1, n1Cargar: n1Cargar, datosV2: datosV2, datosGeoJSON: datosGeoJSON, datosSVG: datosSVG, cam: function(){ return camO; }, scene: scene, setVista: setVista, items: function(){ return items; } };
+})();
+</script>
+</body>
+</html>
