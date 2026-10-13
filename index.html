@@ -1012,15 +1012,6 @@ async function drvCargarPersonal() {
   return r.data || [];
 }
 
-async function drvLeerHoja(mes) {
-  var r = await fetch('/api/asistencia-drive?mes=' + mes, { headers: { Authorization: await tokenVigente() } });
-  var j = await r.json().catch(function () { return {}; });
-  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-  return j;
-}
-
-function drvDet(msg, clase) {
-  var el = document.getElementById('driveDet');
 // Token de sesión VIGENTE al momento de llamar a las funciones del servidor. HEADERS guarda una copia que
 // auth.js renueva con onAuthStateChange, pero si la pestaña estuvo dormida puede venir vencida y el servidor
 // responde "Sesión inválida"; getSession() renueva la sesión si hace falta.
@@ -1032,10 +1023,19 @@ async function tokenVigente() {
   return HEADERS['Authorization'];
 }
 
+async function drvLeerHoja(mes) {
+  var r = await fetch('/api/asistencia-drive?mes=' + mes, { headers: { Authorization: await tokenVigente() } });
+  var j = await r.json().catch(function () { return {}; });
+  if (r.status === 401) throw new Error('tu sesión venció — recarga la página (Ctrl+F5) o vuelve a iniciar sesión');
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+function drvDet(msg, clase) {
+  var el = document.getElementById('driveDet');
   if (el) { el.textContent = msg; el.className = 'guia-det' + (clase ? ' ' + clase : ''); }
 }
 
-  if (r.status === 401) throw new Error('tu sesión venció — recarga la página (Ctrl+F5) o vuelve a iniciar sesión');
 async function drvSincronizar(manual) {
   if (DRIVE.ejecutando) return DRIVE.promesa;
   DRIVE.ejecutando = true;
