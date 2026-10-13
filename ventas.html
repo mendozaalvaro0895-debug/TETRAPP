@@ -416,6 +416,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="tbl-head">
             <div><div class="tbl-head-t">Top productos del mes</div><div class="tbl-head-s" id="famSub">—</div></div>
           </div>
+          <div id="famMixBar" style="display:none;padding:6px 12px 10px">
+            <div style="font-size:9px;color:var(--gray);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px">Mix por área · top productos</div>
+            <div id="famMixBarTrack" style="height:9px;border-radius:5px;overflow:hidden;display:flex;background:var(--border)"></div>
+            <div id="famMixBarLegend" style="display:flex;gap:12px;margin-top:6px;flex-wrap:wrap"></div>
+          </div>
           <div class="tbl-scroll">
             <table class="tbl" style="min-width:0">
               <thead><tr><th class="num" style="width:22px">#</th><th>Producto</th><th class="num">Quetzales</th><th class="num">% mes</th><th class="num">Unidades</th></tr></thead>
@@ -1009,7 +1014,6 @@ function buildTopProdRow(rowId, idx, sku, dat, total, esPareto, addSep) {
     '<td class="num pct-cell" style="font-size:10px;color:var(--gray);border-left:3px solid ' + borderColor + ';transition:border-color .15s">' + idx + '</td>' +
     '<td class="desc-cell" title="' + escHtml(sku + ' · ' + desc + ' · ' + areaTip) + '">' +
       '<span style="font-family:var(--mono);font-size:9px;color:var(--gray);display:block;line-height:1.1">' +
-        '<span class="area-dot" style="background:' + dotColor + '" title="' + escHtml(areaTip) + '"></span>' +
         escHtml(sku) +
       '</span>' +
       escHtml(desc) + badge +
@@ -1196,6 +1200,38 @@ function renderFamilias(filas, total) {
   });
   document.getElementById('famBody').innerHTML = html ||
     '<tr class="empty-row"><td colspan="5">Sin datos en este periodo</td></tr>';
+
+  // Barra de mix por área
+  var areaTots = {};
+  var totalTopQ = 0;
+  skus.forEach(function(sku) {
+    var area = clasificarArea(sku, porProd[sku].muestra.descripcion_familia) || 'Sin clasificar';
+    areaTots[area] = (areaTots[area] || 0) + porProd[sku].q;
+    totalTopQ += porProd[sku].q;
+  });
+  var barEl = document.getElementById('famMixBar');
+  var trackEl = document.getElementById('famMixBarTrack');
+  var legendEl = document.getElementById('famMixBarLegend');
+  if (barEl && trackEl && legendEl && totalTopQ > 0) {
+    var mixAreas = ['Producción', 'Tapas', 'Serigrafía'];
+    var trackHtml = '';
+    var legendHtml = '';
+    mixAreas.forEach(function(a) {
+      var q = areaTots[a] || 0;
+      if (!q) return;
+      var pct = q / totalTopQ * 100;
+      var col = AREA_COLORES[a];
+      trackHtml += '<span style="width:' + pct.toFixed(2) + '%;background:' + col + ';height:100%;display:inline-block;opacity:.9" title="' + escHtml(a) + ': ' + fmtPct(pct) + '"></span>';
+      legendHtml += '<span style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text)">' +
+        '<span style="width:8px;height:8px;border-radius:2px;background:' + col + ';flex-shrink:0;opacity:.9"></span>' +
+        escHtml(a) + ' ' + fmtPct(pct) + '</span>';
+    });
+    trackEl.innerHTML = trackHtml;
+    legendEl.innerHTML = legendHtml;
+    barEl.style.display = '';
+  } else if (barEl) {
+    barEl.style.display = 'none';
+  }
 }
 
 function toggleTopCliDetalle(rowId) {
