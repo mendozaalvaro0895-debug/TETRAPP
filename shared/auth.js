@@ -170,7 +170,7 @@ function tetraPintarUsuario() {
   pill.title = 'Cerrar sesión (' + (TETRA.email || '') + ')';
   pill.onclick = function () {
     if (confirm('¿Cerrar sesión?')) {
-      db.auth.signOut().then(function () { location.replace('login.html'); });
+      db.auth.signOut({ scope: 'local' }).then(function () { location.replace('login.html'); });
     }
   };
 }
@@ -191,9 +191,11 @@ function tetraMarcarActividad() {
   try { localStorage.setItem(TETRA_IDLE_KEY, String(Date.now())); } catch (e) {}
 }
 
+// scope 'local' en todos los signOut: el default de supabase-js v2 es 'global' y cerraba la sesión
+// del mismo usuario en TODOS sus equipos (un celular dormido sacaba al master de su PC).
 function tetraCerrarPorInactividad() {
   try { localStorage.removeItem(TETRA_IDLE_KEY); } catch (e) {}
-  db.auth.signOut().then(function () { location.replace('login.html?e=inactividad'); });
+  db.auth.signOut({ scope: 'local' }).then(function () { location.replace('login.html?e=inactividad'); });
 }
 
 function tetraVigilarInactividad() {
@@ -221,7 +223,7 @@ function tetraVigilarInactividad() {
     var r = await db.from('perfiles').select('rol,nombre').eq('user_id', session.user.id).single();
     if (r.error || !r.data) {
       // Usuario autenticado pero SIN perfil autorizado → fuera
-      await db.auth.signOut();
+      await db.auth.signOut({ scope: 'local' });
       location.replace('login.html?e=noperfil');
       return;
     }

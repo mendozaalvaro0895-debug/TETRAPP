@@ -820,6 +820,10 @@ barrera real.
 - TETRA_PAGINAS_MASTER (auth.js): páginas restringidas SOLO a master (ej. `gestion`) — cualquier
   otro rol es redirigido a index.html antes de revelar contenido (dato sensible de RRHH)
 - Sesiones expiran a 60 min de inactividad, EXCEPTO roles operativos (pantallas de planta)
+- ⚠️ Todo `signOut()` va con `{ scope: 'local' }` (oct/2026). El default de supabase-js v2 es
+  'global' y cerraba la sesión del usuario en TODOS sus equipos: un celular o pestaña dormida que
+  expiraba por inactividad dejaba a la PC con un token "zombi" (lee tablas, pero `api/*` responde
+  401 porque `auth/v1/user` da 403 → "tu sesión venció" en la sincronización del Drive).
 
 ---
 
