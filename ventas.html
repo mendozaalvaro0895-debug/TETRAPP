@@ -132,6 +132,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mini-bar{height:5px;background:var(--bg2);border-radius:99px;overflow:hidden;margin-top:4px;min-width:70px}
 .mini-bar i{display:block;height:100%;background:var(--ven);border-radius:99px}
 
+/* PARETO 80/20 */
+.pareto-row>td{background:#f0fdf9!important}
+.pareto-row>td:first-child{border-left:3px solid #14b8a6!important}
+.pareto-row .mini-bar i{background:#14b8a6}
+.pareto-sep>td{padding:4px 10px;text-align:center;font-size:10px;font-weight:700;color:#0d9488;background:linear-gradient(to right,#f0fdf9,#ecfdf5,#f0fdf9);border-top:1px dashed #99f6e4;border-bottom:1px dashed #99f6e4;letter-spacing:.4px;white-space:nowrap}
+.area-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle;flex-shrink:0}
+
 /* EMPTY STATE */
 .empty-mod{background:var(--card);border:1.5px dashed var(--border);border-radius:14px;padding:56px 24px;text-align:center;margin-bottom:18px}
 .empty-ico{font-size:52px;margin-bottom:12px}
@@ -980,18 +987,31 @@ function buildProdDetalleHtml(sku) {
   return sections.join('<div style="border-top:1px dashed #e2e8f0;margin:8px 0"></div>');
 }
 
-function buildTopProdRow(rowId, idx, sku, dat, total) {
+var AREA_COLORES = { 'Producción': '#3b82f6', 'Tapas': '#f97316', 'Serigrafía': '#8b5cf6' };
+function buildTopProdRow(rowId, idx, sku, dat, total, esPareto, addSep) {
   var m = dat.muestra;
   var pct = total > 0 ? dat.q / total * 100 : 0;
   var desc = m.descripcion || sku || '—';
   var hasSerig = SERIG_BASE_REVERSE && todasVariantesDeSku(sku).some(function(v){ return (SERIG_BASE_REVERSE[v] || []).length > 0; });
   var badge = hasSerig ? ' <span style="font-size:8px;background:#fef3c7;color:#92400E;border-radius:3px;padding:1px 4px;vertical-align:middle;font-weight:700">+Serig</span>' : '';
-  return '<tr id="prodRow-' + rowId + '" data-sku="' + escHtml(sku) + '" onclick="toggleProdDetalle(' + rowId + ')" style="cursor:pointer" ' +
-    'onmouseenter="this.style.background=\'#eff6ff\';this.firstElementChild.style.borderLeftColor=\'var(--ven)\'" ' +
-    'onmouseleave="this.style.background=\'\';this.firstElementChild.style.borderLeftColor=\'transparent\'">' +
-    '<td class="num pct-cell" style="font-size:10px;color:var(--gray);border-left:3px solid transparent;transition:border-color .15s">' + idx + '</td>' +
-    '<td class="desc-cell" title="' + escHtml(sku + ' · ' + desc) + '">' +
-      '<span style="font-family:var(--mono);font-size:9px;color:var(--gray);display:block;line-height:1.1">' + escHtml(sku) + '</span>' +
+  var area = clasificarArea(sku, m.descripcion_familia);
+  var dotColor = AREA_COLORES[area] || '#cbd5e1';
+  var areaTip = area || 'Sin clasificar';
+  var clsPareto = esPareto ? ' pareto-row' : '';
+  var hoverBg = esPareto ? '#ccfbf1' : '#eff6ff';
+  var borderColor = esPareto ? '#14b8a6' : 'transparent';
+  var sep = addSep
+    ? '<tr class="pareto-sep"><td colspan="5">── 80 % de la venta ──</td></tr>'
+    : '';
+  return '<tr id="prodRow-' + rowId + '" data-sku="' + escHtml(sku) + '" class="' + clsPareto + '" onclick="toggleProdDetalle(' + rowId + ')" style="cursor:pointer" ' +
+    'onmouseenter="this.style.background=\'' + hoverBg + '\';this.firstElementChild.style.borderLeftColor=\'var(--ven)\'" ' +
+    'onmouseleave="this.style.background=\'\';this.firstElementChild.style.borderLeftColor=\'' + borderColor + '\'">' +
+    '<td class="num pct-cell" style="font-size:10px;color:var(--gray);border-left:3px solid ' + borderColor + ';transition:border-color .15s">' + idx + '</td>' +
+    '<td class="desc-cell" title="' + escHtml(sku + ' · ' + desc + ' · ' + areaTip) + '">' +
+      '<span style="font-family:var(--mono);font-size:9px;color:var(--gray);display:block;line-height:1.1">' +
+        '<span class="area-dot" style="background:' + dotColor + '" title="' + escHtml(areaTip) + '"></span>' +
+        escHtml(sku) +
+      '</span>' +
       escHtml(desc) + badge +
     '</td>' +
     '<td class="num">' + fmtQ(dat.q) + '</td>' +
@@ -1001,7 +1021,7 @@ function buildTopProdRow(rowId, idx, sku, dat, total) {
     '</tr>' +
     '<tr id="prodDet-' + rowId + '" style="display:none">' +
       '<td colspan="5" style="padding:8px 12px 12px 28px;background:#f8fafc;border-bottom:1px solid var(--border)"></td>' +
-    '</tr>';
+    '</tr>' + sep;
 }
 
 var AREA_FAM_MAP = {
@@ -1165,7 +1185,15 @@ function renderFamilias(filas, total) {
   var totalSkus = Object.keys(porProd).length;
   document.getElementById('famSub').textContent = mesLabel(mesSel) + ' · top ' + Math.min(TOP_N, totalSkus) + ' de ' + totalSkus + ' SKUs';
   var html = '';
-  skus.forEach(function (sku, i) { html += buildTopProdRow(i, i + 1, sku, porProd[sku], total); });
+  var acumQProd = 0;
+  skus.forEach(function (sku, i) {
+    var cumAntes = total > 0 ? acumQProd / total * 100 : 0;
+    acumQProd += porProd[sku].q;
+    var cumDespues = total > 0 ? acumQProd / total * 100 : 0;
+    var esPareto = cumAntes < 80;
+    var addSep = cumAntes < 80 && cumDespues >= 80;
+    html += buildTopProdRow(i, i + 1, sku, porProd[sku], total, esPareto, addSep);
+  });
   document.getElementById('famBody').innerHTML = html ||
     '<tr class="empty-row"><td colspan="5">Sin datos en este periodo</td></tr>';
 }
@@ -1186,20 +1214,25 @@ function toggleTopCliDetalle(rowId) {
   }
 }
 
-function buildTopCliRow(rowId, nombre, dat, total) {
+function buildTopCliRow(rowId, nombre, dat, total, esPareto, addSep) {
   var pct = total > 0 ? dat.q / total * 100 : 0;
+  var clsPareto = esPareto ? ' pareto-row' : '';
+  var hoverBg = esPareto ? '#ccfbf1' : '#eff6ff';
+  var sep = addSep
+    ? '<tr class="pareto-sep"><td colspan="3">── 80 % de la venta ──</td></tr>'
+    : '';
   return '<tr id="cliTopRow-' + rowId + '" data-nombre="' + escHtml(nombre) + '" data-q="' + dat.q + '"' +
-    ' onclick="toggleTopCliDetalle(' + rowId + ')" style="cursor:pointer"' +
-    ' onmouseenter="this.style.background=\'#eff6ff\';this.firstElementChild.style.borderLeftColor=\'var(--ven)\'"' +
-    ' onmouseleave="this.style.background=\'\';this.firstElementChild.style.borderLeftColor=\'transparent\'">' +
-    '<td class="desc-cell" style="border-left:3px solid transparent;transition:border-color .15s" title="' + escHtml(nombre) + '">' + escHtml(nombreCorto(nombre)) + '</td>' +
+    ' class="' + clsPareto + '" onclick="toggleTopCliDetalle(' + rowId + ')" style="cursor:pointer"' +
+    ' onmouseenter="this.style.background=\'' + hoverBg + '\';this.firstElementChild.style.borderLeftColor=\'var(--ven)\'"' +
+    ' onmouseleave="this.style.background=\'\';this.firstElementChild.style.borderLeftColor=\'' + (esPareto ? '#14b8a6' : 'transparent') + '\'">' +
+    '<td class="desc-cell" style="border-left:3px solid ' + (esPareto ? '#14b8a6' : 'transparent') + ';transition:border-color .15s" title="' + escHtml(nombre) + '">' + escHtml(nombreCorto(nombre)) + '</td>' +
     '<td class="num">' + fmtQ(dat.q) + '</td>' +
     '<td class="num pct-cell">' + fmtPct(pct) +
       ' <span id="cliTopArr-' + rowId + '" style="font-size:10px;color:#cbd5e1;margin-left:4px">▾</span></td>' +
     '</tr>' +
     '<tr id="cliTopDet-' + rowId + '" style="display:none">' +
       '<td colspan="3" style="padding:8px 12px 12px 20px;background:#f8fafc;border-bottom:1px solid var(--border)"></td>' +
-    '</tr>';
+    '</tr>' + sep;
 }
 
 function renderTopClientes(filas, total) {
@@ -1220,7 +1253,15 @@ function renderTopClientes(filas, total) {
 
   document.getElementById('cliTopSub').textContent = mesLabel(mesSel);
   var html = '';
-  noms.forEach(function (n, i) { html += buildTopCliRow(i + 1, n, porCli[n], total); });
+  var acumQ = 0;
+  noms.forEach(function (n, i) {
+    var cumAntes = total > 0 ? acumQ / total * 100 : 0;
+    acumQ += porCli[n].q;
+    var cumDespues = total > 0 ? acumQ / total * 100 : 0;
+    var esPareto = cumAntes < 80;
+    var addSep = cumAntes < 80 && cumDespues >= 80;
+    html += buildTopCliRow(i + 1, n, porCli[n], total, esPareto, addSep);
+  });
   document.getElementById('cliTopBody').innerHTML = html ||
     '<tr class="empty-row"><td colspan="3">Sin datos en este periodo</td></tr>';
 }
