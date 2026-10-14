@@ -7537,7 +7537,7 @@ function abrirFormEditar(solId) {
       procs: (l.procs && l.procs.length) ? l.procs : ['flameado','impresion','secado','empaque'],
       existencia: l.existencia, cap_impresion: l.cap_impresion || 0,
       tiros: l.tiros || 1, linea_id: l.linea_id || 0, es_nuevo: false,
-      sku_base: l.sku_base || ''
+      sku_base: l.sku_base || '', colores: '', formula_tinta: ''
     };
   });
   if (lineas.length === 0) addLinea();
@@ -7874,7 +7874,7 @@ function addLinea() {
   lineas.push({ sku: '', desc: '', cant: 0,
     procs: ['flameado', 'impresion', 'secado', 'empaque'],
     existencia: undefined, cap_impresion: 0, tiros: 1, linea_id: 0, es_nuevo: false,
-    sku_base: '' });
+    sku_base: '', colores: '', formula_tinta: '' });
   renderLineas();
 }
 function removeLinea(idx) { lineas.splice(idx, 1); renderLineas(); calcular(); }
@@ -7934,6 +7934,19 @@ function renderLineas() {
         buildLineaBtnsHtml(i, l.linea_id || 0) +
       '</div>' +
       '</div>';
+    var recetaRow = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:5px">' +
+      '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap" title="No se guarda en la ficha: va directo al Recetario del SKU">Para el Recetario · opcional</span>' +
+      '<div style="display:flex;align-items:center;gap:4px">' +
+        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px">Colores</span>' +
+        '<input type="text" class="fi" placeholder="Ej: Negro + Blanco" value="' + escHtml(l.colores || '') + '" autocomplete="off"' +
+        ' style="width:150px;font-size:11px;padding:3px 6px" oninput="lineas[' + i + '].colores=this.value">' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:4px;flex:1;min-width:200px">' +
+        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Fórmula de tinta</span>' +
+        '<input type="text" class="fi" placeholder="Ej: tinta + catalizador + solvente" value="' + escHtml(l.formula_tinta || '') + '" autocomplete="off"' +
+        ' style="flex:1;font-size:11px;padding:3px 6px;min-width:0" oninput="lineas[' + i + '].formula_tinta=this.value">' +
+      '</div>' +
+      '</div>';
     return '<div style="border-bottom:1px solid var(--border);padding:8px 10px">' +
       '<div style="display:grid;grid-template-columns:1fr 116px 56px 28px;gap:6px;margin-bottom:2px">' +
         '<div class="sku-wrap-s">' +
@@ -7970,6 +7983,7 @@ function renderLineas() {
       '</div>' +
       (l.desc_base ? '<div style="font-size:11px;color:var(--gray);padding:2px 0 0 0;margin-top:1px">📦 ' + escHtml(l.desc_base) + '</div>' : '') +
       lineaRow +
+      recetaRow +
       '</div>';
   }).join('');
   cont.innerHTML = html;
@@ -8349,14 +8363,17 @@ async function ofrecerRecetasDeFicha(lineasGuardadas) {
     lineasGuardadas.forEach(function(l) {
       var sku = String(l.sku || '').trim();
       if (!sku || vistos[sku] || !inventarioCache.some(function(i) { return i.sku === sku; })) return;
-      vistos[sku] = true;
       var partes = construirPartesRecetaSerig(l);
-      if (!partes.length) return;
+      var colores = String(l.colores || '').trim();
+      var formula = String(l.formula_tinta || '').trim();
+      if (!partes.length && !colores && !formula) return;
+      vistos[sku] = true;
       var imprime = (l.procs || []).some(function(p) { return p === 'impresion' || p === 'serigrafia' || p === 'tampografia'; });
-      cand.push({ sku: sku, desc: l.desc || '', partes: partes, tiros: imprime && l.tiros > 0 ? l.tiros : 0 });
+      cand.push({ sku: sku, desc: l.desc || '', partes: partes, tiros: imprime && l.tiros > 0 ? l.tiros : 0, colores: colores, formula: formula });
     });
     if (!cand.length) return;
-    var rr = await db.from('sku_recetas').select('id,sku_fact').in('sku_fact', cand.map(function(c) { return c.sku; }));
+    var skus = cand.map(function(c) { return c.sku; });
+    var rr = await db.from('sku_recetas').select('id,sku_fact').in('sku_fact', skus);
     if (rr.error) return;
     var idDe = {};
     (rr.data || []).forEach(function(r) { idDe[r.sku_fact] = r.id; });
@@ -8370,44 +8387,60 @@ async function ofrecerRecetasDeFicha(lineasGuardadas) {
         tengo[e.receta_id][clavePartesReceta(e.tipo, e.codigo)] = true;
       });
     }
+    var re = await db.from('sku_especificaciones').select('sku,campo,valor').eq('area', 'serigrafia').in('sku', skus);
+    var espec = {}; // espec[sku][campo] = true si ya hay valor: nunca se pisa
+    ((re && re.data) || []).forEach(function(e) {
+      if (e.valor && String(e.valor).trim()) { if (!espec[e.sku]) espec[e.sku] = {}; espec[e.sku][e.campo] = true; }
+    });
     var ofrecer = [], difieren = 0;
     cand.forEach(function(c) {
       var t = idDe[c.sku] ? tengo[idDe[c.sku]] : null;
-      if (!t) { ofrecer.push(c); return; }
-      if (c.partes.some(function(p) { return !t[clavePartesReceta(p.tipo, p.codigo)]; })) difieren++;
+      c.sinPartes = !t && c.partes.length > 0;
+      if (t && c.partes.some(function(p) { return !t[clavePartesReceta(p.tipo, p.codigo)]; })) difieren++;
+      var ya = espec[c.sku] || {};
+      c.specs = [];
+      if (c.sinPartes && c.tiros && !ya['Tiros']) c.specs.push({ campo: 'Tiros', valor: String(c.tiros) });
+      if (c.colores && !ya['Colores']) c.specs.push({ campo: 'Colores', valor: c.colores });
+      if (c.formula && !ya['Fórmula de tinta']) c.specs.push({ campo: 'Fórmula de tinta', valor: c.formula });
+      if (c.sinPartes || c.specs.length) ofrecer.push(c);
     });
     if (difieren) showToast('📖 ' + difieren + ' producto(s) ya tienen receta en el Recetario y esta ficha difiere: no se tocó', '#92400e');
     if (!ofrecer.length) return;
     var resumen = ofrecer.map(function(c) {
-      return c.sku + (c.desc ? ' — ' + c.desc : '') + '\n' + c.partes.map(function(p) { return '   • ' + (p.tipo === 'proceso' ? 'Proceso' : 'Envase base') + ': ' + p.codigo; }).join('\n')
-        + (c.tiros ? '\n   • Tiros: ' + c.tiros : '');
+      var l1 = c.sinPartes ? c.partes.map(function(p) { return '   • ' + (p.tipo === 'proceso' ? 'Proceso' : 'Envase base') + ': ' + p.codigo; }) : [];
+      var l2 = c.specs.map(function(sp) { return '   • ' + sp.campo + ': ' + sp.valor; });
+      return c.sku + (c.desc ? ' — ' + c.desc : '') + '\n' + l1.concat(l2).join('\n');
     }).join('\n\n');
-    if (!confirm('📖 Estos productos todavía no tienen receta con partes en el Recetario.\n\n¿Enviar a la receta lo de esta ficha?\n\n' + resumen
-        + '\n\nQuedarán en "Pendientes" del Recetario para revisarlas.')) return;
+    if (!confirm('📖 ¿Enviar al Recetario lo de esta ficha?\n(Lo que ya está cargado en el Recetario no se pisa.)\n\n' + resumen
+        + '\n\nLas recetas nuevas quedan en "Pendientes" para revisarlas.')) return;
     var quien = (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
     var enviados = 0;
     for (var i = 0; i < ofrecer.length; i++) {
       var c = ofrecer[i];
       var recetaId = idDe[c.sku] || null;
-      if (!recetaId) {
-        var ins = await db.from('sku_recetas').insert({ sku_fact: c.sku, descripcion: c.desc || null, area: 'serigrafia', es_directo: false, guardado: false }).select('id').single();
-        if (ins.error && ins.error.code === '23505') { // otra sesión la creó justo ahora
-          var fe = await db.from('sku_recetas').select('id').eq('sku_fact', c.sku).single();
-          if (fe.error || !fe.data) throw ins.error;
-          recetaId = fe.data.id;
-        } else if (ins.error) { throw ins.error; }
-        else { recetaId = ins.data.id; }
+      if (c.sinPartes) {
+        if (!recetaId) {
+          var ins = await db.from('sku_recetas').insert({ sku_fact: c.sku, descripcion: c.desc || null, area: 'serigrafia', es_directo: false, guardado: false }).select('id').single();
+          if (ins.error && ins.error.code === '23505') { // otra sesión la creó justo ahora
+            var fe = await db.from('sku_recetas').select('id').eq('sku_fact', c.sku).single();
+            if (fe.error || !fe.data) throw ins.error;
+            recetaId = fe.data.id;
+          } else if (ins.error) { throw ins.error; }
+          else { recetaId = ins.data.id; }
+        }
+        var filas = c.partes.map(function(p, k) { return { receta_id: recetaId, orden: k + 1, tipo: p.tipo, codigo: p.codigo, nota: p.nota }; });
+        var ip = await db.from('sku_receta_partes').insert(filas);
+        if (ip.error) throw ip.error;
       }
-      var filas = c.partes.map(function(p, k) { return { receta_id: recetaId, orden: k + 1, tipo: p.tipo, codigo: p.codigo, nota: p.nota }; });
-      var ip = await db.from('sku_receta_partes').insert(filas);
-      if (ip.error) throw ip.error;
-      if (c.tiros) { // especificación Tiros: solo si aún no existe (no pisa lo cargado a mano)
-        await db.from('sku_especificaciones').upsert([{ sku: c.sku, area: 'serigrafia', campo: 'Tiros', valor: String(c.tiros), actualizado_por: quien }],
-          { onConflict: 'sku,area,campo', ignoreDuplicates: true });
+      if (c.specs.length) { // ignoreDuplicates: no pisa lo cargado a mano
+        var up = await db.from('sku_especificaciones').upsert(c.specs.map(function(sp) {
+          return { sku: c.sku, area: 'serigrafia', campo: sp.campo, valor: sp.valor, actualizado_por: quien };
+        }), { onConflict: 'sku,area,campo', ignoreDuplicates: true });
+        if (up.error) throw up.error;
       }
       enviados++;
     }
-    showToast('📖 ' + enviados + ' receta(s) enviada(s) al Recetario (pendientes de revisión)');
+    showToast('📖 ' + enviados + ' producto(s) enviado(s) al Recetario (pendientes de revisión)');
   } catch(e) {
     console.warn('ofrecerRecetasDeFicha:', e);
     showToast('No se pudo enviar la receta al Recetario: ' + (e.message || e), '#92400e');
