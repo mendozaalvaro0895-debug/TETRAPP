@@ -109,13 +109,15 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
     <select id="snapStep">
       <option value="0.1">0.1 m (libre)</option>
       <option value="0.5">0.5 m</option>
+      <option value="1.3">1.3 m (cuadrícula de tarimas)</option>
       <option value="1.5">1.5 m (cuadrícula de tarimas)</option>
     </select>
     <div id="optTarima" class="opt">
       <div class="grid2">
-        <div><label>Ancho del espacio (m)</label><input type="number" id="tw" value="1.5" step="0.05" min="0.2"></div>
-        <div><label>Largo del espacio (m)</label><input type="number" id="tl" value="1.5" step="0.05" min="0.2"></div>
+        <div><label>Ancho del espacio (m)</label><input type="number" id="tw" value="1.3" step="0.05" min="0.2"></div>
+        <div><label>Largo del espacio (m)</label><input type="number" id="tl" value="1.3" step="0.05" min="0.2"></div>
       </div>
+      <button id="tamTodas" style="width:100%;margin:2px 0 6px">Aplicar este tamaño a TODAS las tarimas y racks</button>
       <label class="chk"><input type="checkbox" id="tc"> Con producto encima</label>
       <label>Nivel de la tarima</label>
       <select id="tNivel">
@@ -782,6 +784,26 @@ function rotarRack(rk){
   refreshItems();
   return true;
 }
+function aplicarTamanoTarimas(){
+  var pw = num('tw', 1.3), pl = num('tl', 1.3), hechas = {}, nt = 0, nr = 0;
+  items.forEach(function(rk){
+    if (rk.k !== 'rack') return;
+    var oldP = rk.prof || 1.5, k = pw / oldP, cnt = Math.max(1, Math.round((rk.bahia || 2 * oldP) / oldP));
+    var cx = (rk.x0 + rk.x1) / 2, cd = (rk.d0 + rk.d1) / 2, nb = cnt * pw;
+    var hx = (rk.orient === 'x') ? nb / 2 : pw / 2, hd = (rk.orient === 'x') ? pw / 2 : nb / 2;
+    items.forEach(function(t){
+      if (t.k !== 'tarima' || t.rack !== rk.id) return;
+      if (rk.orient === 'x') t.x = r3(cx + (t.x - cx) * k); else t.d = r3(cd + (t.d - cd) * k);
+      t.w = pw; t.l = pw; hechas[t.id] = 1; nt++;
+    });
+    rk.x0 = r3(cx - hx); rk.x1 = r3(cx + hx); rk.d0 = r3(cd - hd); rk.d1 = r3(cd + hd);
+    rk.prof = pw; rk.bahia = r3(nb); nr++;
+  });
+  items.forEach(function(t){
+    if (t.k === 'tarima' && !hechas[t.id]){ t.w = pw; t.l = pl; nt++; }
+  });
+  return { tarimas: nt, racks: nr };
+}
 function crearTarimasRack(rk){
   var out = [], pw = rk.prof || 1.5, z2 = (CFG.altoRack1 || 1.7) + 0.12, i, cnt = Math.max(1, Math.round((rk.bahia || 2 * pw) / pw));
   var x0 = Math.min(rk.x0, rk.x1), x1 = Math.max(rk.x0, rk.x1), d0 = Math.min(rk.d0, rk.d1), d1 = Math.max(rk.d0, rk.d1);
@@ -1372,7 +1394,7 @@ function actualizarGhost(){
   marker.visible = true;
   marker.position.set(cursor.x, 0.07, -cursor.d);
   if (tool === 'rack'){
-    var gpw = num('tw', 1.5), gb = (parseInt($('rackTam').value, 10) || 2) * gpw, ghor = ($('rackOri').value === 'x'), gN = Math.max(1, Math.min(20, parseInt($('rackN').value, 10) || 1));
+    var gpw = num('tw', 1.3), gb = (parseInt($('rackTam').value, 10) || 2) * gpw, ghor = ($('rackOri').value === 'x'), gN = Math.max(1, Math.min(20, parseInt($('rackN').value, 10) || 1));
     aGhost.visible = true;
     aGhost.scale.set(ghor ? gb * gN : gpw, 1, ghor ? gpw : gb * gN);
     aGhost.position.set(cursor.x + (ghor ? (gN - 1) * gb / 2 : 0), 0.07, -(cursor.d + (ghor ? 0 : (gN - 1) * gb / 2)));
@@ -1386,7 +1408,7 @@ function actualizarGhost(){
   }
   if (tool === 'tarima'){
     tGhost.visible = true;
-    tGhost.scale.set(num('tw', 1.5), 1, num('tl', 1.5));
+    tGhost.scale.set(num('tw', 1.3), 1, num('tl', 1.3));
     tGhost.position.set(cursor.x, 0.07 + elevNivel(), -cursor.d);
     tGhost.rotation.y = rot;
   } else if ((tool === 'linea' || tool === 'puerta' || tool === 'pared') && draft && draft.pts && draft.pts.length){
@@ -1589,7 +1611,7 @@ function clic(e){
   if (!p) return;
   if (tool === 'tarima'){
     pushHist();
-    items.push({ id: nextId++, k: 'tarima', x: p.x, d: p.d, rot: rot, w: num('tw', 1.5), l: num('tl', 1.5), carga: $('tc').checked, z: elevNivel() });
+    items.push({ id: nextId++, k: 'tarima', x: p.x, d: p.d, rot: rot, w: num('tw', 1.3), l: num('tl', 1.3), carga: $('tc').checked, z: elevNivel() });
     refreshItems();
   } else if (tool === 'linea'){
     if (!draft) draft = { pts: [] };
@@ -1598,7 +1620,7 @@ function clic(e){
     draft.pts.push([p.x, p.d]);
     if (draft.pts.length >= 199) terminarLinea();
   } else if (tool === 'rack'){
-    var rpw = num('tw', 1.5), rbahia = (parseInt($('rackTam').value, 10) || 2) * rpw, rhor = ($('rackOri').value === 'x'), rN = Math.max(1, Math.min(20, parseInt($('rackN').value, 10) || 1));
+    var rpw = num('tw', 1.3), rbahia = (parseInt($('rackTam').value, 10) || 2) * rpw, rhor = ($('rackOri').value === 'x'), rN = Math.max(1, Math.min(20, parseInt($('rackN').value, 10) || 1));
     var rcreados = [], rii;
     for (rii = 0; rii < rN; rii++){
       var rcx = p.x + (rhor ? rii * rbahia : 0), rcd = p.d + (rhor ? 0 : rii * rbahia);
@@ -1655,7 +1677,7 @@ function clic(e){
     var bx0 = Math.min(draft.p[0], p.x), bx1 = Math.max(draft.p[0], p.x);
     var bd0 = Math.min(draft.p[1], p.d), bd1 = Math.max(draft.p[1], p.d);
     draft = null;
-    var pw = num('tw', 1.5), pl = num('tl', 1.5);
+    var pw = num('tw', 1.3), pl = num('tl', 1.3);
     var nx = Math.floor((bx1 - bx0) / pw + 1e-6), nd = Math.floor((bd1 - bd0) / pl + 1e-6);
     if (nx < 1 || nd < 1){ actualizarGhost(); return; }
     if (nx * nd > 400){
@@ -1978,7 +2000,7 @@ cv.addEventListener('pointermove', function(e){
   $('coord').textContent = cursor ? ('x ' + cursor.x.toFixed(1) + ' m · fondo ' + cursor.d.toFixed(1) + ' m') : '—';
   actualizarGhost();
   if (cursor && tool === 'bloque' && draft && draft.p){
-    var a = Math.floor(Math.abs(cursor.x - draft.p[0]) / num('tw', 1.5) + 1e-6), b = Math.floor(Math.abs(cursor.d - draft.p[1]) / num('tl', 1.5) + 1e-6);
+    var a = Math.floor(Math.abs(cursor.x - draft.p[0]) / num('tw', 1.3) + 1e-6), b = Math.floor(Math.abs(cursor.d - draft.p[1]) / num('tl', 1.3) + 1e-6);
     $('coord').textContent += ' · bloque ' + a + ' × ' + b + ' = ' + (a * b) + ' tarimas';
   }
 });
@@ -2056,7 +2078,7 @@ cv.addEventListener('dblclick', function(e){
 var HINTS = {
   none: 'Arrastra una tarima o una línea para moverla (R gira la tarima, Supr borra lo seleccionado). Arrastra las barras teal para mover límites y los extremos de las puertas para cambiar su largo; doble clic en la barra oscura de una zona doble gira la línea, las barras claras laterales cambian el ancho de cada zona y las de los extremos su largo, doble clic en un cajón doble edita nombre, color y alto de sus zonas, los lados de las zonas que dibujas se estiran con las barras claras; doble clic en una zona la renombra. Arrastra el fondo para desplazar la vista; rueda = zoom.',
   bloque: 'Clic en una esquina y luego en la opuesta: se llena de espacios de tarima. Con ajuste 1.5 m quedan alineados.',
-  tarima: 'Clic = poner un espacio de tarima de 1.5 × 1.5 m (se ajusta a 0.1 m). Tecla R gira 90°.',
+  tarima: 'Clic = poner un espacio de tarima (por defecto 1.3 × 1.3 m, ajustable arriba) (se ajusta a 0.1 m). Tecla R gira 90°.',
   linea: 'Clic en cada vértice. Doble clic o Enter termina; Esc cancela. Funciona mejor en vista Cenital.',
   area: 'Una zona llamada PASILLO se marca sola como pasillo peatonal (línea verde del ancho que dibujes). Para marcarme una zona: elige "Referencia" en Qué es, marca dos esquinas y queda numerada (R1, R2…). Doble clic = escribirle una nota; con Mover se arrastra. Para los demás tipos: clic en una esquina y luego en la opuesta; te pedirá el nombre. Úsalo para repartir Bodega y la franja libre.',
   borrar: 'Clic sobre una tarima, línea o producto para quitarlo. Deshacer lo recupera.',
@@ -2589,6 +2611,15 @@ function dbCargarVersion(){
     });
   });
 }
+$('tamTodas').addEventListener('click', function(){
+  var pw = num('tw', 1.3), pl = num('tl', 1.3), nt = items.filter(function(t){ return t.k === 'tarima'; }).length, nr = items.filter(function(t){ return t.k === 'rack'; }).length;
+  dialogo('¿Cambiar las ' + nt + ' tarimas y los ' + nr + ' racks a ' + pw + ' × ' + pl + ' m? Deshacer lo recupera.', 'confirm', function(){
+    pushHist();
+    var r = aplicarTamanoTarimas();
+    refreshItems(); guardar();
+    dialogo('Listo: ' + r.tarimas + ' tarimas y ' + r.racks + ' racks pasaron a ' + pw + ' × ' + pl + ' m.', 'info');
+  });
+});
 $('dbGuardar').addEventListener('click', function(){ dbGuardarVersion(0); });
 $('dbLista').addEventListener('click', function(){ dbListar(false); });
 $('dbCargar').addEventListener('click', dbCargarVersion);
