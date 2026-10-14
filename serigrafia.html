@@ -8309,6 +8309,111 @@ function sincronizarTirosHora(lineasValidas) {
   });
 }
 
+// ── Ficha → Recetario ────────────────────────────────────────
+// Cada ficha guardada trae la combinación real producto ↔ envase base ↔ procesos ↔ tiros: con ella se
+// va completando el Recetario (produccion.html → sku_recetas + sku_receta_partes + sku_especificaciones),
+// base de datos que luego servirá para ML/DL. Mismo criterio que tapas.html (ofrecerRecetaDeFicha):
+//  · envase base (sku_base) → parte tipo 'base'; procesos de la línea → partes tipo 'proceso'
+//  · Tiros (solo si lleva Impresión/Serigrafía/Tampografía) → sku_especificaciones campo 'Tiros', SIN pisar uno ya cargado
+//  · la receta nace area='serigrafia', guardado=false (queda en "Pendientes" para revisión humana)
+//  · solo se ofrece si el SKU es real y su receta NO tiene partes; si ya las tiene NUNCA se sobrescribe
+//    (si la ficha difiere solo avisa). Un solo aviso cubre todas las líneas de la ficha.
+function nombreProcesoReceta(val) {
+  var f = ALL_PROCS_SERIG.find(function(pr) { return pr.val === val; });
+  return f ? f.lbl : (val ? val.charAt(0).toUpperCase() + val.slice(1) : val);
+}
+
+function construirPartesRecetaSerig(l) {
+  var partes = [];
+  var base = String(l.sku_base || '').trim();
+  if (base) {
+    var it = inventarioCache.find(function(i) { return i.sku === base; });
+    partes.push({ tipo: 'base', codigo: base + (it && it.descripcion ? ' - ' + it.descripcion : ''), nota: null });
+  }
+  ALL_PROCS_SERIG.forEach(function(pr) {
+    if ((l.procs || []).indexOf(pr.val) >= 0) partes.push({ tipo: 'proceso', codigo: pr.lbl, nota: null });
+  });
+  (l.procs || []).forEach(function(v) { // procesos fuera de la lista fija: no se pierden
+    if (!ALL_PROCS_SERIG.some(function(pr) { return pr.val === v; })) partes.push({ tipo: 'proceso', codigo: nombreProcesoReceta(v), nota: null });
+  });
+  return partes;
+}
+
+function clavePartesReceta(tipo, codigo) {
+  return tipo + '|' + String(codigo || '').split(' - ')[0].trim().toLowerCase();
+}
+
+async function ofrecerRecetasDeFicha(lineasGuardadas) {
+  try {
+    var cand = [], vistos = {};
+    lineasGuardadas.forEach(function(l) {
+      var sku = String(l.sku || '').trim();
+      if (!sku || vistos[sku] || !inventarioCache.some(function(i) { return i.sku === sku; })) return;
+      vistos[sku] = true;
+      var partes = construirPartesRecetaSerig(l);
+      if (!partes.length) return;
+      var imprime = (l.procs || []).some(function(p) { return p === 'impresion' || p === 'serigrafia' || p === 'tampografia'; });
+      cand.push({ sku: sku, desc: l.desc || '', partes: partes, tiros: imprime && l.tiros > 0 ? l.tiros : 0 });
+    });
+    if (!cand.length) return;
+    var rr = await db.from('sku_recetas').select('id,sku_fact').in('sku_fact', cand.map(function(c) { return c.sku; }));
+    if (rr.error) return;
+    var idDe = {};
+    (rr.data || []).forEach(function(r) { idDe[r.sku_fact] = r.id; });
+    var ids = Object.keys(idDe).map(function(k) { return idDe[k]; });
+    var tengo = {};
+    if (ids.length) {
+      var rp = await db.from('sku_receta_partes').select('receta_id,tipo,codigo').in('receta_id', ids);
+      if (rp.error) return;
+      (rp.data || []).forEach(function(e) {
+        if (!tengo[e.receta_id]) tengo[e.receta_id] = {};
+        tengo[e.receta_id][clavePartesReceta(e.tipo, e.codigo)] = true;
+      });
+    }
+    var ofrecer = [], difieren = 0;
+    cand.forEach(function(c) {
+      var t = idDe[c.sku] ? tengo[idDe[c.sku]] : null;
+      if (!t) { ofrecer.push(c); return; }
+      if (c.partes.some(function(p) { return !t[clavePartesReceta(p.tipo, p.codigo)]; })) difieren++;
+    });
+    if (difieren) showToast('📖 ' + difieren + ' producto(s) ya tienen receta en el Recetario y esta ficha difiere: no se tocó', '#92400e');
+    if (!ofrecer.length) return;
+    var resumen = ofrecer.map(function(c) {
+      return c.sku + (c.desc ? ' — ' + c.desc : '') + '\n' + c.partes.map(function(p) { return '   • ' + (p.tipo === 'proceso' ? 'Proceso' : 'Envase base') + ': ' + p.codigo; }).join('\n')
+        + (c.tiros ? '\n   • Tiros: ' + c.tiros : '');
+    }).join('\n\n');
+    if (!confirm('📖 Estos productos todavía no tienen receta con partes en el Recetario.\n\n¿Enviar a la receta lo de esta ficha?\n\n' + resumen
+        + '\n\nQuedarán en "Pendientes" del Recetario para revisarlas.')) return;
+    var quien = (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
+    var enviados = 0;
+    for (var i = 0; i < ofrecer.length; i++) {
+      var c = ofrecer[i];
+      var recetaId = idDe[c.sku] || null;
+      if (!recetaId) {
+        var ins = await db.from('sku_recetas').insert({ sku_fact: c.sku, descripcion: c.desc || null, area: 'serigrafia', es_directo: false, guardado: false }).select('id').single();
+        if (ins.error && ins.error.code === '23505') { // otra sesión la creó justo ahora
+          var fe = await db.from('sku_recetas').select('id').eq('sku_fact', c.sku).single();
+          if (fe.error || !fe.data) throw ins.error;
+          recetaId = fe.data.id;
+        } else if (ins.error) { throw ins.error; }
+        else { recetaId = ins.data.id; }
+      }
+      var filas = c.partes.map(function(p, k) { return { receta_id: recetaId, orden: k + 1, tipo: p.tipo, codigo: p.codigo, nota: p.nota }; });
+      var ip = await db.from('sku_receta_partes').insert(filas);
+      if (ip.error) throw ip.error;
+      if (c.tiros) { // especificación Tiros: solo si aún no existe (no pisa lo cargado a mano)
+        await db.from('sku_especificaciones').upsert([{ sku: c.sku, area: 'serigrafia', campo: 'Tiros', valor: String(c.tiros), actualizado_por: quien }],
+          { onConflict: 'sku,area,campo', ignoreDuplicates: true });
+      }
+      enviados++;
+    }
+    showToast('📖 ' + enviados + ' receta(s) enviada(s) al Recetario (pendientes de revisión)');
+  } catch(e) {
+    console.warn('ofrecerRecetasDeFicha:', e);
+    showToast('No se pudo enviar la receta al Recetario: ' + (e.message || e), '#92400e');
+  }
+}
+
 // Si falta la columna numero_oc, avisar qué SQL correr en vez del error crudo
 function errorOC(err) {
   if (/numero_oc/i.test((err.message || '') + (err.details || ''))) {
@@ -8375,6 +8480,7 @@ async function guardarNuevo(lineasValidas, cliente) {
     cerrarForm();
     await cargarSolicitudes();
     showToast('✅ ' + codigo + ' guardada');
+    ofrecerRecetasDeFicha(lineasValidas); // no bloquea ni rompe el guardado
   } catch(e) {
     console.error('Error guardando:', e);
     // Si la solicitud ya se creó pero las líneas fallaron, eliminar para evitar huérfano
@@ -8407,6 +8513,7 @@ async function guardarEdicion(lineasValidas, cliente) {
     cerrarForm();
     await cargarSolicitudes();
     showToast('✅ ' + (s.id_display || '') + ' actualizada');
+    ofrecerRecetasDeFicha(lineasValidas);
     if (reopenId) mostrarDetalle(reopenId);
   } catch(e) {
     console.error('Error editando:', e);
