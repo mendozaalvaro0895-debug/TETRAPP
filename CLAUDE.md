@@ -92,6 +92,7 @@ Node.js del lado servidor; secretos SOLO por `process.env.*` (nunca hardcodeados
 | `gestion.html` | Gestión de Personal y Planta: tabla unificada tapas+serig+producción+molino+bodega+moldes sobre la misma tabla `personal` + RRHH (locker/EPP/talla) + permisos/incidentes/faltas/capacitaciones/bonos + Lockers + Planta (mejoras_planta, CRUD simple por tarjetas). Master-only. |
 | `bodega.html` | Bodega — Inicio (KPIs) · **Existencias** (ex-`inventario.html`, integrado sep/2026: catálogo Bodega 02/05/07, tablas `inventario`+`insumos_b7`, importación Excel, alertas de bajo stock) · Movimientos (`movimientos_insumos`, área='bodega', destino de los prefijos SICAF `MPI`/`MPS`) · Personal. `inventario.html` ahora es solo un redirect a `bodega.html#existencias` (no borrado, por si hay bookmarks/PWA viejos). |
 | `molino.html` | Molienda/mezcla/distribución de materia prima a máquina: mismo patrón que bodega.html (Inicio · Movimientos `área='molino'` · Personal). Alcance MVP — no modela todavía fórmulas ni distribución por máquina, ver `.claude/docs/contexto-bot-requis.md`. |
+| `plano-nivel2.html` | Plano 3D de la planta (35×45 m): Nivel 2 editable (zonas, pasillos, tarimas con uso, racks, toneles, gradas, elevadores) + modelo del Nivel 1 de SketchUp (GLB) como referencia. Three.js, ficha en index solo para master (la página se restringe sola con `TETRA_PAGINAS_MASTER.push('plano-nivel2')`, sin tocar auth.js). Guarda VERSIONES en la tabla `planos` (una fila por guardado, `datos` = JSON v2; GLB del Nivel 1 en bucket privado `planos`) — `sql/planos_v1.sql`, YA CORRIDO (13-oct-2026); copia de trabajo en localStorage del navegador (por dirección). Exporta GLB/SVG/GeoJSON/JSON. Formato y códigos estables: `.claude/docs/plano-nivel2-formato.md`. Fase futura: ligar tarimas a SKU (tabla `tarimas_mapa`) cuando se estabilice el flujo de entradas/salidas/rechazos. |
 
 Ver `.claude/docs/contexto-bot-requis.md` para el contexto completo del "Bot Cazador de Info"
 (catálogo de prefijos SICAF, reglas de clasificación, mapeo a tablas) — en construcción por fases,
@@ -798,6 +799,7 @@ ya están también en el selector de Área, los filtros, la agrupación de la ta
 - `sql/personal_area_produccion_v1.sql` (28-ago-2026) — agrega 'produccion' al CHECK constraint `personal_area_check`
 - `sql/personal_turno_produccion_v1.sql` (28-ago-2026) — columna `turno_produccion` ('alex'|'gabino') en `personal`
 - `sql/personal_area_molino_bodega_v1.sql` (29-ago-2026) — agrega 'molino'/'bodega' al CHECK constraint `personal_area_check`
+- `sql/planos_v1.sql` (13-oct-2026) — tabla `planos` (versiones del plano de planta) + bucket Storage `planos`, RLS master escribe / con perfil lee
 
 ---
 
