@@ -1930,13 +1930,85 @@ async function guardar() {
       throw rl.error;
     }
 
+    var partesReceta = construirPartesReceta(linea, l); // antes de cerrar: el formulario se reinicia
     cerrarForm();
     await cargarSolicitudes();
     showToast('✅ ' + codigo + ' guardada');
+    ofrecerRecetaDeFicha(linea.sku, linea.descripcion, partesReceta); // no bloquea ni rompe el guardado
   } catch(e) {
     console.error('Error guardando:', e);
     var falta = /column|schema cache/i.test(String(e.message)) ? '\n\nFalta correr sql/solicitud_lineas_componentes_tapas_v1.sql en Supabase.' : '';
     alert('Error al guardar: ' + e.message + falta);
+  }
+}
+
+// ══ FICHA → RECETARIO ═══════════════════════════════════════
+// Cada ficha guardada trae la combinación real producto ↔ Base/Contratapa/Liner/Banda ↔ procesos:
+// con ella se va completando el Recetario (produccion.html → sku_recetas + sku_receta_partes),
+// base de datos que luego servirá para ML/DL. Mapeo: Base → tipo 'base'; Contratapa/Liner/Banda →
+// 'accesorio' (el rol va en `nota`); procesos → 'proceso' (nombres de PROCESOS_FIJOS del Recetario).
+// Solo se ofrece si el producto es un SKU real y NO tiene partes en su receta; la receta nace
+// guardado=false (queda en "Pendientes" del Recetario para que alguien la revise). Si ya hay una
+// receta con partes NUNCA se sobrescribe: a lo mucho se avisa que la ficha difiere.
+var ROL_ACCESORIO_RECETA = { contratapa: 'Contratapa', liner: 'Liner', banda: 'Banda' };
+
+function construirPartesReceta(linea, l) {
+  var partes = [];
+  function cod(st) { return st.sku + (st.desc ? ' - ' + st.desc : ''); }
+  var base = compDe(l, 'base');
+  if (base.sku.trim()) partes.push({ tipo: 'base', codigo: cod(base), nota: null });
+  ['contratapa', 'liner', 'banda'].forEach(function(k) {
+    var st = compDe(l, k);
+    if (st.sku.trim()) partes.push({ tipo: 'accesorio', codigo: cod(st), nota: ROL_ACCESORIO_RECETA[k] });
+  });
+  ALL_PROCS_TAPAS.forEach(function(p) {
+    if ((linea.procesos || []).indexOf(p.val) >= 0) partes.push({ tipo: 'proceso', codigo: p.lbl, nota: null });
+  });
+  return partes;
+}
+
+function clavePartesReceta(tipo, codigo) {
+  return tipo + '|' + String(codigo || '').split(' - ')[0].trim().toLowerCase();
+}
+
+async function ofrecerRecetaDeFicha(sku, desc, partes) {
+  try {
+    if (!sku || !partes.length) return;
+    var rr = await db.from('sku_recetas').select('id').eq('sku_fact', sku).maybeSingle();
+    if (rr.error) return;
+    var recetaId = rr.data ? rr.data.id : null;
+    var existentes = [];
+    if (recetaId) {
+      var rp = await db.from('sku_receta_partes').select('tipo,codigo').eq('receta_id', recetaId);
+      if (rp.error) return;
+      existentes = rp.data || [];
+    }
+    if (existentes.length) {
+      var tengo = {};
+      existentes.forEach(function(e) { tengo[clavePartesReceta(e.tipo, e.codigo)] = true; });
+      var difiere = partes.some(function(p) { return !tengo[clavePartesReceta(p.tipo, p.codigo)]; });
+      if (difiere) showToast('📖 ' + sku + ' ya tiene receta en el Recetario y esta ficha difiere: no se tocó', '#92400e');
+      return;
+    }
+    var resumen = partes.map(function(p) { return '• ' + (p.tipo === 'proceso' ? 'Proceso' : (p.nota || 'Base')) + ': ' + p.codigo; }).join('\n');
+    if (!confirm('📖 ' + sku + ' todavía no tiene receta con partes en el Recetario.\n\n¿Enviar a la receta lo de esta ficha?\n' + resumen
+        + '\n\nQuedará en "Pendientes" del Recetario para revisarla.')) return;
+    if (!recetaId) {
+      var ins = await db.from('sku_recetas').insert({ sku_fact: sku, descripcion: desc || null, area: 'tapas', es_directo: false, guardado: false }).select('id').single();
+      if (ins.error && ins.error.code === '23505') { // otra sesión la creó justo ahora
+        var fe = await db.from('sku_recetas').select('id').eq('sku_fact', sku).single();
+        if (fe.error || !fe.data) throw ins.error;
+        recetaId = fe.data.id;
+      } else if (ins.error) { throw ins.error; }
+      else { recetaId = ins.data.id; }
+    }
+    var filas = partes.map(function(p, i) { return { receta_id: recetaId, orden: i + 1, tipo: p.tipo, codigo: p.codigo, nota: p.nota }; });
+    var ip = await db.from('sku_receta_partes').insert(filas);
+    if (ip.error) throw ip.error;
+    showToast('📖 Receta de ' + sku + ' enviada al Recetario (pendiente de revisión)');
+  } catch(e) {
+    console.warn('ofrecerRecetaDeFicha:', e);
+    showToast('No se pudo enviar la receta al Recetario: ' + (e.message || e), '#92400e');
   }
 }
 
