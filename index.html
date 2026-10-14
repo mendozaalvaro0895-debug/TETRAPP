@@ -89,6 +89,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .a-molino{--acc:#FB923C;--acc-xl:rgba(251,146,60,.12)}
 .a-gestion{--acc:#818CF8;--acc-xl:rgba(129,140,248,.12)}
 .a-dash{--acc:#34D399;--acc-xl:rgba(52,211,153,.11)}
+.a-plano{--acc:#F59E0B;--acc-xl:rgba(245,158,11,.11)}
 .area-icon{width:48px;height:48px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:14px;background:var(--acc-xl);border:1px solid color-mix(in srgb,var(--acc) 28%,transparent)}
 .area-name{font-family:var(--display);font-size:20px;font-weight:700;margin-bottom:6px}
 .area-desc{font-size:13px;color:var(--gray);line-height:1.5;margin-bottom:14px}
@@ -372,6 +373,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     <div class="area-icon">📊</div>
     <div class="area-name">Dashboard</div>
     <div class="area-desc">Vista ejecutiva de KPIs de toda la planta: eficiencia, ranking de operarios y producción por proceso.</div>
+    <div class="area-status active">Activo</div>
+  </a>
+
+  <a href="plano-nivel2.html" class="area-card a-plano" id="cardPlano" style="display:none">
+    <div class="area-arrow">→</div>
+    <div class="area-icon">🗺️</div>
+    <div class="area-name">Plano de planta</div>
+    <div class="area-desc">Plano 3D de los niveles 1 y 2: pasillos, tarimas, racks y zonas. Guarda versiones en la base de datos. Solo master.</div>
     <div class="area-status active">Activo</div>
   </a>
 
@@ -2041,5 +2050,14 @@ async function ciGuardarLinea(d, l) {
 
 </script>
 
+<script>
+// Ficha "Plano de planta": solo se muestra al master (la página además lo exige por su cuenta).
+(async function () {
+  try {
+    for (var i = 0; i < 50 && !TETRA.rol; i++) await new Promise(function (ok) { setTimeout(ok, 100); });
+    if (TETRA.rol === 'master') document.getElementById('cardPlano').style.display = '';
+  } catch (e) {}
+})();
+</script>
 </body>
 </html>
