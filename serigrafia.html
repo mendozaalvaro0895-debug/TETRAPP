@@ -7537,7 +7537,7 @@ function abrirFormEditar(solId) {
       procs: (l.procs && l.procs.length) ? l.procs : ['flameado','impresion','secado','empaque'],
       existencia: l.existencia, cap_impresion: l.cap_impresion || 0,
       tiros: l.tiros || 1, linea_id: l.linea_id || 0, es_nuevo: false,
-      sku_base: l.sku_base || '', colores: '', formula_tinta: ''
+      sku_base: l.sku_base || '', colores: '', formula_tinta: '', empaque: ''
     };
   });
   if (lineas.length === 0) addLinea();
@@ -7874,7 +7874,7 @@ function addLinea() {
   lineas.push({ sku: '', desc: '', cant: 0,
     procs: ['flameado', 'impresion', 'secado', 'empaque'],
     existencia: undefined, cap_impresion: 0, tiros: 1, linea_id: 0, es_nuevo: false,
-    sku_base: '', colores: '', formula_tinta: '' });
+    sku_base: '', colores: '', formula_tinta: '', empaque: '' });
   renderLineas();
 }
 function removeLinea(idx) { lineas.splice(idx, 1); renderLineas(); calcular(); }
@@ -7945,6 +7945,11 @@ function renderLineas() {
         '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Fórmula de tinta</span>' +
         '<input type="text" class="fi" placeholder="Ej: tinta + catalizador + solvente" value="' + escHtml(l.formula_tinta || '') + '" autocomplete="off"' +
         ' style="flex:1;font-size:11px;padding:3px 6px;min-width:0" oninput="lineas[' + i + '].formula_tinta=this.value">' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:4px;flex:1;min-width:200px">' +
+        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px">Empaque</span>' +
+        '<input type="text" class="fi" placeholder="Ej: caja de 500, bolsa de 50" value="' + escHtml(l.empaque || '') + '" autocomplete="off"' +
+        ' style="flex:1;font-size:11px;padding:3px 6px;min-width:0" oninput="lineas[' + i + '].empaque=this.value">' +
       '</div>' +
       '</div>';
     return '<div style="border-bottom:1px solid var(--border);padding:8px 10px">' +
@@ -8366,10 +8371,11 @@ async function ofrecerRecetasDeFicha(lineasGuardadas) {
       var partes = construirPartesRecetaSerig(l);
       var colores = String(l.colores || '').trim();
       var formula = String(l.formula_tinta || '').trim();
-      if (!partes.length && !colores && !formula) return;
+      var empaque = String(l.empaque || '').trim();
+      if (!partes.length && !colores && !formula && !empaque) return;
       vistos[sku] = true;
       var imprime = (l.procs || []).some(function(p) { return p === 'impresion' || p === 'serigrafia' || p === 'tampografia'; });
-      cand.push({ sku: sku, desc: l.desc || '', partes: partes, tiros: imprime && l.tiros > 0 ? l.tiros : 0, colores: colores, formula: formula });
+      cand.push({ sku: sku, desc: l.desc || '', partes: partes, tiros: imprime && l.tiros > 0 ? l.tiros : 0, colores: colores, formula: formula, empaque: empaque });
     });
     if (!cand.length) return;
     var skus = cand.map(function(c) { return c.sku; });
@@ -8402,6 +8408,7 @@ async function ofrecerRecetasDeFicha(lineasGuardadas) {
       if (c.sinPartes && c.tiros && !ya['Tiros']) c.specs.push({ campo: 'Tiros', valor: String(c.tiros) });
       if (c.colores && !ya['Colores']) c.specs.push({ campo: 'Colores', valor: c.colores });
       if (c.formula && !ya['Fórmula de tinta']) c.specs.push({ campo: 'Fórmula de tinta', valor: c.formula });
+      if (c.empaque && !ya['Empaque']) c.specs.push({ campo: 'Empaque', valor: c.empaque });
       if (c.sinPartes || c.specs.length) ofrecer.push(c);
     });
     if (difieren) showToast('📖 ' + difieren + ' producto(s) ya tienen receta en el Recetario y esta ficha difiere: no se tocó', '#92400e');
