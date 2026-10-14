@@ -1020,8 +1020,8 @@ let perdidaSolicitudActual = null;
 
 const ALL_PROCS_TAPAS = [
   {val:'armado', lbl:'Armado'}, {val:'banda', lbl:'Banda'},
-  {val:'liner', lbl:'Liner'}, {val:'impresion', lbl:'Impresión'},
-  {val:'encajado', lbl:'Encajado'}
+  {val:'liner', lbl:'Liner'}, {val:'flameado', lbl:'Flameado'},
+  {val:'impresion', lbl:'Impresión'}, {val:'encajado', lbl:'Encajado'}
 ];
 
 // ── Metas de producción por proceso (und/hora) ───────────────
@@ -1625,28 +1625,40 @@ var COMP_FORM = [
 ];
 
 function nuevaLineaForm() {
-  return { sku: '', desc: '', cant: 0, procs: [], procsAuto: [], procsManual: [], existencia: undefined, comp: {} };
+  return { sku: '', desc: '', cant: 0, procs: [], procsAuto: [], sugVistas: {}, tocados: {}, existencia: undefined, comp: {} };
 }
 
-// Procesos de la ficha: se activan solos según los componentes elegidos
-// (Base o Contratapa → Armado · Liner → Liner · Banda → Banda); Impresión y
-// Encajado (y cualquier otro) se marcan a mano. l.procs es la lista efectiva.
+// Procesos de la ficha: los componentes elegidos SUGIEREN procesos y los marcan solos
+// (Base o Contratapa → Armado · Liner → Liner · Banda → Banda), pero TODO chip se puede
+// apagar o prender a mano (ej. tapa domo de 1 pieza: la Base se imprime y se factura como PT,
+// no se arma). Lo que el usuario toca (l.tocados) ya no lo vuelve a mover un componente.
+// l.procs es la lista efectiva; l.sugVistas recuerda qué sugerencias ya se aplicaron.
 function sincronizarProcs(l) {
   function elegido(k) { return compDe(l, k).ex !== undefined; }
-  var auto = [];
-  if (elegido('base') || elegido('contratapa')) auto.push('armado');
-  if (elegido('liner')) auto.push('liner');
-  if (elegido('banda')) auto.push('banda');
-  l.procsAuto = auto;
-  l.procs = auto.concat(l.procsManual.filter(function(p) { return auto.indexOf(p) < 0; }));
+  var sug = [];
+  if (elegido('base') || elegido('contratapa')) sug.push('armado');
+  if (elegido('liner')) sug.push('liner');
+  if (elegido('banda')) sug.push('banda');
+  sug.forEach(function(p) {
+    if (l.sugVistas[p]) return;
+    l.sugVistas[p] = true;
+    if (!l.tocados[p] && l.procs.indexOf(p) < 0) l.procs.push(p);
+  });
+  Object.keys(l.sugVistas).forEach(function(p) {
+    if (sug.indexOf(p) >= 0) return;
+    delete l.sugVistas[p]; // se quitó el componente que lo sugería
+    if (!l.tocados[p]) l.procs = l.procs.filter(function(x) { return x !== p; });
+  });
+  l.procsAuto = sug;
 }
 
 function toggleLineaProc(procVal) {
   var l = lineas[0];
-  if (!l || l.procsAuto.indexOf(procVal) >= 0) return; // activado por un componente
-  var pos = l.procsManual.indexOf(procVal);
-  if (pos >= 0) l.procsManual.splice(pos, 1);
-  else l.procsManual.push(procVal);
+  if (!l) return;
+  var pos = l.procs.indexOf(procVal);
+  if (pos >= 0) l.procs.splice(pos, 1);
+  else l.procs.push(procVal);
+  l.tocados[procVal] = true;
   renderLineas();
   calcular();
 }
@@ -1726,13 +1738,11 @@ function renderLineas(focusId) {
     + '</div>'
     + '<div class="lin-comp-title">Componentes <span>(opcionales)</span></div>'
     + COMP_FORM.map(function(c) { return buildCompRow(l, c); }).join('')
-    + '<div class="lin-comp-title">Procesos <span>(se activan con los componentes; Impresión y Encajado se marcan a mano)</span></div>'
+    + '<div class="lin-comp-title">Procesos <span>(los componentes sugieren Armado/Liner/Banda; todos se pueden marcar o quitar)</span></div>'
     + '<div style="display:flex;gap:5px;flex-wrap:wrap">'
     + ALL_PROCS_TAPAS.map(function(p) {
-        var auto = l.procsAuto.indexOf(p.val) >= 0;
         var sel = l.procs.indexOf(p.val) >= 0;
-        return '<div class="op-chip' + (sel ? ' sel-proc' : '') + (auto ? ' auto' : '') + '"'
-          + (auto ? ' title="Activado por un componente"' : ' onclick="toggleLineaProc(\'' + p.val + '\')"') + '>' + p.lbl + '</div>';
+        return '<div class="op-chip' + (sel ? ' sel-proc' : '') + '" onclick="toggleLineaProc(\'' + p.val + '\')">' + p.lbl + '</div>';
       }).join('')
     + '</div>'
     + '</div>';
