@@ -310,6 +310,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .fich-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.12)}
 .fich-card.tier-1{border-left-color:#E0A800}
 .fich-card.tier-2{border-left-color:#16A34A;background:#F0FDF4}
+.fich-lote{margin-top:5px;font-size:10px;font-weight:800;color:#1E3A8A;background:#EFF6FF;border:1px solid #2563EB;border-radius:6px;padding:2px 7px;display:inline-block}
 .fich-top{display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap}
 .fich-cod{font-family:var(--mono);font-size:11px;font-weight:800;color:var(--teal)}
 .fich-desc{font-size:12px;font-weight:600;margin-top:4px;line-height:1.3}
@@ -2770,6 +2771,37 @@ function periodoFichaTapas(s) {
 
 function tierFichaTapas(s) { return s.estado === 'lista' ? 2 : (s.estado === 'parcial' ? 1 : 0); }
 
+// Lotes "en proceso" que Tapas marca en la pestaña Pedidos de registro-tapas.html (tabla tapas_lotes,
+// sql/tapas_lotes_v1.sql). Si la tabla aún no existe simplemente no se muestra nada.
+var lotesTapas = [];
+async function cargarLotesTapas() {
+  try {
+    var r = await db.from('tapas_lotes').select('*').order('marcado_en', { ascending: true });
+    lotesTapas = r.error ? [] : (r.data || []);
+  } catch(e) { lotesTapas = []; }
+}
+
+// Unidades aún en proceso de una ficha: cada lote se completa con los ingresos PT vinculados a la ficha
+// posteriores a su marcado (reparto FIFO) — mismo cálculo que pedModelo() de registro-tapas.html.
+function enProcesoDeFicha(s) {
+  var lotes = lotesTapas.filter(function(l) { return l.solicitud_id === s.id; });
+  if (!lotes.length) return 0;
+  var pool = ingresoMovs.filter(function(m) { return m.solicitud_id === s.id && m.area !== 'serig'; })
+    .sort(function(a, b) { return String(a.created_at).localeCompare(String(b.created_at)); })
+    .map(function(m) { return { ts: new Date(m.created_at).getTime(), rem: m.cantidad || 0 }; });
+  var enProc = 0;
+  lotes.forEach(function(lt) {
+    var t0 = new Date(lt.marcado_en).getTime() - 1000, falta = lt.cantidad;
+    pool.forEach(function(it) {
+      if (falta <= 0 || it.rem <= 0 || it.ts < t0) return;
+      var take = Math.min(it.rem, falta);
+      it.rem -= take; falta -= take;
+    });
+    enProc += falta;
+  });
+  return enProc;
+}
+
 function buildFichaCardTapas(s) {
   var tier = tierFichaTapas(s);
   var comps = '';
@@ -2784,6 +2816,7 @@ function buildFichaCardTapas(s) {
     + '<div class="fich-desc">' + escHtml(s.sku) + ' — ' + escHtml(s.desc) + '</div>'
     + '<div class="fich-meta"><b>' + s.cant.toLocaleString() + ' und</b><span>🗓 ' + escHtml(s.ingreso || '—') + '</span></div>'
     + (comps ? '<div class="fich-chips">' + comps + '</div>' : '')
+    + (function() { var ep = enProcesoDeFicha(s); return ep > 0 ? '<div class="fich-lote">▶ ' + ep.toLocaleString() + ' en proceso</div>' : ''; })()
     + (s.prog > 0 ? '<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:' + s.prog + '%"></div></div><div class="pr-pct">' + s.prog + '%</div></div>' : '')
     + '</div>';
 }
@@ -4090,8 +4123,10 @@ async function cargarMovimientos() {
     var ing = await db.from('movimientos_materiales').select('*').eq('tipo','entrada_pt').order('created_at', { ascending: false });
     salidaMovs  = sal.data || [];
     ingresoMovs = ing.data || [];
+    await cargarLotesTapas();
     renderMov(movVistaActual);
     renderEntregadosTapas();
+    renderFichasTapas();
   } catch(e) { console.error('cargarMovimientos:', e); }
 }
 
