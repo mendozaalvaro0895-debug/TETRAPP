@@ -2687,6 +2687,24 @@ function povMarcaPon(x, d, yaw){
   povMarca.position.set(x, 0.35, -d);
   povMarca.rotation.set(0, yaw, 0);
 }
+/* paredes casi opacas mientras se camina (se restauran al salir) */
+var POV_OPACIDAD_PARED = 0.94, povOpac = [];
+function povParedes(solidas){
+  if (!solidas){
+    povOpac.forEach(function(q){ q.m.opacity = q.op; q.m.transparent = q.tr; q.m.depthWrite = q.dw; q.m.needsUpdate = true; });
+    povOpac = [];
+    return;
+  }
+  var vistos = [];
+  [gMuros, gPlanta].forEach(function(g){
+    g.traverse(function(o){
+      if (!o.isMesh || !o.material || o.material.opacity >= POV_OPACIDAD_PARED || vistos.indexOf(o.material) !== -1) return;
+      vistos.push(o.material);
+      povOpac.push({ m: o.material, op: o.material.opacity, tr: o.material.transparent, dw: o.material.depthWrite });
+      o.material.opacity = POV_OPACIDAD_PARED; o.material.transparent = true; o.material.depthWrite = true; o.material.needsUpdate = true;
+    });
+  });
+}
 function povTexto(){
   var nc = $('povNoclip').checked;
   if (pov.elegir){
@@ -2787,6 +2805,7 @@ function povEntrar(){
   camP.fov = 72; camP.near = 0.05; camP.far = 600; camP.rotation.order = 'YXZ'; camP.updateProjectionMatrix();
   pov.on = true; pov.nivel = 0; pov.pitch = 0; pov.t = performance.now();
   povConstruirChoques();
+  povParedes(true);
   $('povHud').style.display = 'block'; $('povMira').style.display = 'block';
   $('vpov').classList.add('on');
   povTexto();
@@ -2800,6 +2819,7 @@ function povSalir(){
   camP.position.copy(pov.prev.pos); ctlP.target.copy(pov.prev.tgt); ctlP.enabled = true; ctlP.update();
   gHandles.visible = pov.vis.h; gHandlesR.visible = pov.vis.hr; gGhost.visible = pov.vis.g;
   pov.col = [];
+  povParedes(false);
   $('povHud').style.display = 'none'; $('povMira').style.display = 'none';
   $('vpov').classList.remove('on');
 }
