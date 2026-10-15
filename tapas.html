@@ -224,6 +224,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .lin-grp-no{background:#FFF3D6;color:#7A4800}
 .lin-item{padding:7px 12px;cursor:pointer;border-bottom:1px solid var(--bg)}
 .lin-item:hover{background:var(--teal-xl)}
+.lin-nuevo{background:#F0FDF4;border-top:1px dashed #16A34A;font-size:12px;font-weight:700;color:#166534}
+.lin-nuevo span{display:block;font-weight:500;color:#3A3A38;font-size:11px}
 .lin-item-sku{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--teal)}
 .lin-item-sku span{font-family:var(--font);font-weight:500;color:var(--gray);font-size:10px}
 .lin-item-desc{font-size:11px;color:var(--gray)}
@@ -1788,8 +1790,14 @@ function buildFormDropHtml(kind, query, onSel) {
     var texto = normBusqueda((i.sku || '') + ' ' + (i.descripcion || ''));
     return toks.every(function(t) { return texto.indexOf(t) !== -1; });
   });
+  // Liner/Banda (Bodega 7): si el insumo no existe se puede crear un SKU extraordinario (EXT-###) al vuelo
+  var extra = '';
+  if (b7 && !onSel) {
+    extraSkuTxt[kind] = query;
+    extra = '<div class="lin-item lin-nuevo" onmousedown="crearSkuExtraB7(\'' + kind + '\')">➕ Crear SKU extraordinario<span>“' + escHtml(String(query).trim().toUpperCase()) + '”</span></div>';
+  }
   if (!res.length) {
-    return '<div class="lin-vacio">Sin coincidencias' + (kind === 'prod' ? ' — se guardará como producto nuevo' : '') + '</div>';
+    return '<div class="lin-vacio">Sin coincidencias' + (kind === 'prod' ? ' — se guardará como producto nuevo' : '') + '</div>' + extra;
   }
   var fact = res.filter(function(i) { return i.facturable !== false; });
   var noFact = res.filter(function(i) { return i.facturable === false; });
@@ -1799,10 +1807,40 @@ function buildFormDropHtml(kind, query, onSel) {
       + '<div class="lin-item-desc">' + escHtml(i.descripcion || '') + '</div></div>';
   }
   var html = '<div class="lin-count">' + res.length + ' coincidencia' + (res.length === 1 ? '' : 's') + (b7 ? ' · Bodega 7' : '') + '</div>';
-  if (b7) return html + res.map(item).join('');
+  if (b7) return html + res.map(item).join('') + extra;
   if (fact.length) html += '<div class="lin-grp lin-grp-ok">✅ Facturables · ' + fact.length + '</div>' + fact.map(item).join('');
   if (noFact.length) html += '<div class="lin-grp lin-grp-no">⚠️ No facturables · ' + noFact.length + '</div>' + noFact.map(item).join('');
   return html;
+}
+
+// ── SKU extraordinario (Bodega 7) ─────────────────────────────
+// Caso aislado: un cliente compra la tapa terminada (armada + liner) con un liner que NO existe en el
+// catálogo. Se da de alta en insumos_b7 con código EXT-### (existencia 0, activo) y queda elegido en la
+// ficha. Cuando llegue el material se le carga existencia desde Bodega → Existencias; si ya no se usa
+// se desactiva ahí mismo. Solo Liner/Banda (Bodega 7): el catálogo de inventario facturable (SICAF) no se toca.
+var extraSkuTxt = {};
+
+function siguienteSkuExtra() {
+  var max = 0;
+  insumosB7Cache.forEach(function(i) {
+    var m = String(i.sku || '').match(/^EXT-(\d+)$/i);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  });
+  return 'EXT-' + String(max + 1).padStart(3, '0');
+}
+
+async function crearSkuExtraB7(kind) {
+  var desc = String(extraSkuTxt[kind] || '').trim().replace(/\s+/g, ' ').toUpperCase();
+  if (desc.length < 5) { showToast('⚠️ Escribe la descripción completa del insumo (mín. 5 letras)', '#B83232'); return; }
+  cerrarFormDrop();
+  await cargarInsumosB7(); // por si otro equipo ya creó EXT-### y el consecutivo cambió
+  var sku = siguienteSkuExtra();
+  if (!confirm('➕ Crear SKU extraordinario en Bodega 7\n\n' + sku + ' — ' + desc + '\nExistencia inicial: 0\n\n¿Crearlo y usarlo en esta ficha?')) return;
+  var r = await db.from('insumos_b7').insert({ sku: sku, descripcion: desc, existencia: 0, activo: true }).select('sku,descripcion,existencia').single();
+  if (r.error) { showToast('❌ No se pudo crear el SKU: ' + r.error.message, '#B83232'); return; }
+  insumosB7Cache.push(r.data);
+  showToast('✅ ' + sku + ' creado en Bodega 7');
+  formSkuSelect(kind, sku);
 }
 
 function formSkuInput(kind, el, escribiendo) {
