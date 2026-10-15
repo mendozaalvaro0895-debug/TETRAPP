@@ -68,6 +68,7 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
       <button id="v3d" class="on">3D</button>
       <button id="vtop">Cenital 2D</button>
       <button id="btnEnfoque" style="grid-column:1/3">Enfocar "Por definir"</button>
+      <button id="vpov" style="grid-column:1/3">🚶 Recorrer en primera persona</button>
     </div>
     <div style="margin-top:8px">
       <div class="grid2">
@@ -265,6 +266,8 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
     <div class="hint" id="conteo"></div>
   </div>
   <div id="wrap"><div id="coord">—</div>
+    <div id="povHud" style="display:none;position:absolute;left:50%;top:10px;transform:translateX(-50%);background:rgba(12,12,11,.85);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.5;text-align:center;z-index:4;max-width:92%"><span id="povTxt"></span> <button id="povSalir" style="margin-left:8px;padding:3px 10px">Salir</button></div>
+    <div id="povMira" style="display:none;position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border:1px solid rgba(255,255,255,.7);border-radius:50%;pointer-events:none;z-index:3"></div>
     <div id="dlgU" style="display:none;position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:5">
       <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(380px,92%)">
         <div style="margin-bottom:4px;font-weight:600">Uso de la tarima</div>
@@ -1608,6 +1611,7 @@ function muroCercano(x){
   return best;
 }
 function clic(e){
+  if (pov.on) return;
   if (tool === 'none') return;
   if (tool === 'borrar'){ borrarEn(e); return; }
   if (tool === 'uso'){
@@ -1915,7 +1919,7 @@ function marcarSel(){
   });
 }
 wrap.addEventListener('pointerdown', function(e){
-  if (e.button !== 0 || tool !== 'none') return;
+  if (e.button !== 0 || tool !== 'none' || pov.on) return;
   setMouse(e);
   var hr = gHandlesR.visible ? ray.intersectObject(gHandlesR, true) : [];
   if (hr.length){
@@ -2048,6 +2052,7 @@ $('dlgR').addEventListener('keydown', function(e){
   else if (e.key === 'Escape'){ e.preventDefault(); cerrarEditorRecinto(false); }
 });
 cv.addEventListener('dblclick', function(e){
+  if (pov.on) return;
   if (tool === 'linea'){ terminarLinea(); return; }
   if (tool !== 'none') return;
   setMouse(e);
@@ -2157,6 +2162,7 @@ function empujarSeleccion(mx, md){
   $('coord').textContent = 'Movido ' + (mx ? 'X ' + (mx > 0 ? '+' : '') + r(mx) + ' m ' : '') + (md ? 'Fondo ' + (md > 0 ? '+' : '') + r(md) + ' m' : '');
 }
 document.addEventListener('keydown', function(e){
+  if (pov.on) return;
   if ($('dlg').style.display === 'flex' || $('dlgR').style.display === 'flex' || $('dlgU').style.display === 'flex') return;
   var tg = e.target && e.target.tagName;
   if (tg === 'INPUT' || tg === 'SELECT' || tg === 'TEXTAREA') return;
@@ -2664,6 +2670,86 @@ $('dbGuardar').addEventListener('click', function(){ dbGuardarVersion(0); });
 $('dbLista').addEventListener('click', function(){ dbListar(false); });
 $('dbCargar').addEventListener('click', dbCargarVersion);
 
+/* ---------- primera persona (POV) ---------- */
+var pov = { on: false, yaw: 0, pitch: 0, x: 21.5, d: 8, nivel: 0, teclas: {}, t: 0, prev: null, vis: null };
+var POV_OJOS = 1.7, POV_VEL = 3.5;
+function povTexto(){
+  $('povTxt').innerHTML = 'Primera persona · ' + (pov.nivel ? 'Nivel 1' : 'Nivel 2') + ' · <b>↑ ↓ ← →</b> (o W A S D) mover · <b>Mayús</b> correr · <b>N</b> cambiar de nivel · ' + (document.pointerLockElement === cv ? 'el mouse dirige la vista · Esc suelta el mouse' : 'clic en el plano y mueve el mouse para mirar · Esc sale');
+}
+function povEntrar(){
+  if (pov.on) return;
+  pov.prev = { pos: camP.position.clone(), tgt: ctlP.target.clone(), fov: camP.fov, near: camP.near, far: camP.far };
+  pov.vis = { h: gHandles.visible, hr: gHandlesR.visible, g: gGhost.visible };
+  setTool('none');
+  selId = null; marcarSel();
+  setVista('3d');
+  ctlP.enabled = false;
+  gHandles.visible = false; gHandlesR.visible = false; gGhost.visible = false;
+  camP.fov = 72; camP.near = 0.05; camP.far = 600; camP.rotation.order = 'YXZ'; camP.updateProjectionMatrix();
+  pov.on = true; pov.nivel = 0; pov.yaw = 0; pov.pitch = 0; pov.t = performance.now();
+  $('povHud').style.display = 'block'; $('povMira').style.display = 'block';
+  $('vpov').classList.add('on');
+  povTexto();
+}
+function povSalir(){
+  if (!pov.on) return;
+  pov.on = false; pov.teclas = {};
+  if (document.pointerLockElement === cv && document.exitPointerLock) document.exitPointerLock();
+  camP.rotation.order = 'XYZ';
+  camP.fov = pov.prev.fov; camP.near = pov.prev.near; camP.far = pov.prev.far; camP.updateProjectionMatrix();
+  camP.position.copy(pov.prev.pos); ctlP.target.copy(pov.prev.tgt); ctlP.enabled = true; ctlP.update();
+  gHandles.visible = pov.vis.h; gHandlesR.visible = pov.vis.hr; gGhost.visible = pov.vis.g;
+  $('povHud').style.display = 'none'; $('povMira').style.display = 'none';
+  $('vpov').classList.remove('on');
+}
+function povPaso(){
+  var ahora = performance.now(), dt = Math.min(0.1, (ahora - pov.t) / 1000); pov.t = ahora;
+  var k = pov.teclas, av = (k.ArrowUp || k.w ? 1 : 0) - (k.ArrowDown || k.s ? 1 : 0), la = (k.ArrowRight || k.d ? 1 : 0) - (k.ArrowLeft || k.a ? 1 : 0);
+  if (av || la){
+    var v = POV_VEL * (k.Shift ? 2 : 1) * dt, n = Math.hypot(av, la);
+    var fx = -Math.sin(pov.yaw), fz = -Math.cos(pov.yaw), rx = Math.cos(pov.yaw), rz = -Math.sin(pov.yaw);
+    var mx = (fx * av + rx * la) / n * v, mz = (fz * av + rz * la) / n * v;
+    pov.x = Math.max(0.3, Math.min(W - 0.3, pov.x + mx));
+    pov.d = Math.max(0.3, Math.min(F - 0.3, pov.d - mz));
+  }
+  camP.position.set(pov.x, POV_OJOS - (pov.nivel ? (CFG.altoNivel || 8) : 0), -pov.d);
+  camP.rotation.set(pov.pitch, pov.yaw, 0);
+}
+function povMirar(dx, dy){
+  pov.yaw -= dx * 0.0022;
+  pov.pitch = Math.max(-1.45, Math.min(1.45, pov.pitch - dy * 0.0022));
+}
+$('vpov').addEventListener('click', function(){ if (pov.on) povSalir(); else povEntrar(); });
+$('povSalir').addEventListener('click', povSalir);
+cv.addEventListener('click', function(){
+  if (!pov.on || document.pointerLockElement === cv) return;
+  try { var pr = cv.requestPointerLock(); if (pr && pr.catch) pr.catch(function(){}); } catch (e) {}
+});
+document.addEventListener('pointerlockchange', function(){ if (pov.on) povTexto(); });
+var povArr = null;
+cv.addEventListener('pointerdown', function(e){ if (pov.on && e.button === 0 && document.pointerLockElement !== cv) povArr = { x: e.clientX, y: e.clientY }; });
+window.addEventListener('pointerup', function(){ povArr = null; });
+window.addEventListener('pointermove', function(e){
+  if (!pov.on) return;
+  if (document.pointerLockElement === cv) povMirar(e.movementX || 0, e.movementY || 0);
+  else if (povArr){ povMirar(e.clientX - povArr.x, e.clientY - povArr.y); povArr = { x: e.clientX, y: e.clientY }; }
+});
+window.addEventListener('keydown', function(e){
+  if (!pov.on) return;
+  var tg = e.target && e.target.tagName;
+  if (tg === 'INPUT' || tg === 'SELECT' || tg === 'TEXTAREA') return;
+  var kk = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (kk === 'Escape'){ povSalir(); return; }
+  if (kk === 'n'){ pov.nivel = pov.nivel ? 0 : 1; povTexto(); return; }
+  if (/^Arrow/.test(kk) || 'wasd'.indexOf(kk) !== -1 && kk.length === 1){ pov.teclas[kk] = true; e.preventDefault(); }
+  if (kk === 'Shift') pov.teclas.Shift = true;
+});
+window.addEventListener('keyup', function(e){
+  var kk = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  delete pov.teclas[kk];
+});
+window.addEventListener('blur', function(){ pov.teclas = {}; });
+
 /* ---------- arranque ---------- */
 cargar();
 convertirPasillos();
@@ -2678,7 +2764,7 @@ resize();
 window.__plano_ready = true;
 (function loop(){
   requestAnimationFrame(loop);
-  ctl.update();
+  if (pov.on) povPaso(); else ctl.update();
   renderer.render(scene, cam);
 })();
 window.__plano = { n1: n1, n1Cargar: n1Cargar, datosV2: datosV2, datosGeoJSON: datosGeoJSON, datosSVG: datosSVG, cam: function(){ return camO; }, scene: scene, setVista: setVista, items: function(){ return items; } };
