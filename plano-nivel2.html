@@ -2170,7 +2170,12 @@ var HINTS = {
   puerta: 'Clic donde empieza la puerta sobre el muro y clic donde termina (se pega al muro más cercano). Si arrastras a lo largo del muro (de lado a lado) la puerta queda horizontal; si arrastras hacia arriba o abajo, vertical. Abre cualquier pared recta: las del cajón, las que dibujes con Pared y la franja. Con Mover puedes arrastrar sus extremos para cambiar el largo.'
 };
 var ALIAS_LINEA = { pasillo: 'peatonal', carga: 'montacargas', gradas: 'gradas' };
+function povCortar(){
+  if (typeof pov === 'undefined' || !pov) return;
+  if (pov.on) povSalir(); else if (pov.elegir) povCancelar();
+}
 function setTool(t){
+  povCortar();
   var btn = t;
   if (ALIAS_LINEA[t]){
     $('ltipo').value = ALIAS_LINEA[t];
@@ -2278,6 +2283,7 @@ Array.prototype.forEach.call(document.querySelectorAll('[data-capa]'), function(
   c.addEventListener('change', function(){ [].concat(CAPAS[c.getAttribute('data-capa')]).forEach(function(g){ g.visible = c.checked; }); });
 });
 function setVista(v){
+  povCortar();
   var top = (v === 'top');
   cam = top ? camO : camP;
   ctl = top ? ctlO : ctlP;
