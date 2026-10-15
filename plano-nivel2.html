@@ -45,6 +45,7 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
 .chk input{margin:0}
 .hint{color:var(--mut);font-size:11px;line-height:1.45;margin-top:8px;min-height:30px}
 .warn{color:#F59E0B;font-size:11px;margin-top:4px}
+.leyenda{position:absolute;left:0;top:0;white-space:nowrap;pointer-events:none;font-weight:800;color:#fff;line-height:1.15;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 0 3px #000;will-change:transform}
 #coord{position:absolute;left:12px;bottom:10px;background:rgba(12,12,11,.8);border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-family:ui-monospace,Consolas,monospace;font-size:12px;pointer-events:none}
 #tabla{width:100%;border-collapse:collapse;font-size:11px}
 #tabla td{padding:3px 0;border-bottom:1px solid var(--line)}
@@ -266,7 +267,7 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
     <button id="btnLimpiar" style="margin-top:6px;width:100%">Borrar todo lo dibujado</button>
     <div class="hint" id="conteo"></div>
   </div>
-  <div id="wrap"><div id="coord">—</div>
+  <div id="wrap"><div id="leyendas" style="position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;pointer-events:none;z-index:2"></div><div id="coord">—</div>
     <div id="povHud" style="display:none;position:absolute;left:50%;top:10px;transform:translateX(-50%);background:rgba(12,12,11,.85);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.5;text-align:center;z-index:4;max-width:92%"><span id="povTxt"></span> <button id="povSalir" style="margin-left:8px;padding:3px 10px">Salir</button></div>
     <div id="povMira" style="display:none;position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border:1px solid rgba(255,255,255,.7);border-radius:50%;pointer-events:none;z-index:3"></div>
     <div id="dlgU" style="display:none;position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:5">
@@ -287,9 +288,9 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
           <option value="m2">MERMA POR LÍNEA · rechazo de Empaque · Línea 2</option>
           <option value="m3">MERMA POR LÍNEA · rechazo de Empaque · Línea 3</option>
           <option value="m4">MERMA POR LÍNEA · rechazo de Empaque · Línea 4</option>
-          <option value="pt">ENTREGAS PT · producto terminado</option>
+          <option value="pt">INGRESOS PT · producto terminado</option>
           <option value="pe">PENDIENTE DE EMPAQUE</option>
-          <option value="eb">ENTREGAS DE BODEGA PARA TRABAJAR</option>
+          <option value="eb">SALIDAS · entrega de Bodega para trabajar</option>
           <option value="ri">RECHAZOS INTERNOS</option>
           <option value="mp">MATERIA PRIMA MOLIDA</option>
           <option value="br">BOLSAS PARA RECICLAJE</option>
@@ -736,9 +737,9 @@ var NOTAS_USO = {
   flameo: 'Envase que Bodega entrega a Flameo para atender la requi de salida de Serigrafía. Rotación alta, 1 tarima por línea.',
   flameado: 'Flameo entrega aquí el envase flameado e Impresión lo recoge. 1 tarima por línea.',
   merma: 'Empaque deja aquí el envase rechazado por mala impresión. Cada línea lo limpia y lo deja listo para reprocesar; si no lo limpia, se lleva a Molino y se cobra a la línea operativa por gramo.',
-  entregaspt: 'Zona de entregas de producto terminado (PT).',
+  entregaspt: 'Ingresos PT: producto terminado que el área entrega a Bodega (antes "Entregas PT").',
   pendempaque: 'Producto pendiente de empaque, en espera de ser empacado.',
-  entbodega: 'Entregas de Bodega para trabajar: material que Bodega entrega al área para su proceso.',
+  entbodega: 'Salidas: material que Bodega entrega al área para trabajar en su proceso (antes "Entregas de Bodega").',
   rechazoint: 'Tarimas para rechazos internos del área.',
   mpmolida: 'Materia prima molida.',
   bolsasrec: 'Bolsas para reciclaje.',
@@ -769,20 +770,35 @@ function usoCodigo(it){
   if (it.uso.tipo === 'corrbueno') return 'CORRUGADO_BUENO';
   return 'FLAMEO_L' + it.uso.linea;
 }
+/* Leyenda corta de la tarima (una sola línea; el área ya se ve por el color: verde Serigrafía, amarillo Tapas, azul General) */
+function usoCorto(it){
+  var t = it.uso.tipo, l = it.uso.linea;
+  if (t === 'tapas') return 'TAP';
+  if (t === 'flameado') return 'FD L' + l;
+  if (t === 'merma') return 'ME L' + l;
+  if (t === 'entregaspt') return 'ING';
+  if (t === 'pendempaque') return 'PEND';
+  if (t === 'entbodega') return 'SAL';
+  if (t === 'rechazoint') return 'RECH';
+  if (t === 'mpmolida') return 'MP';
+  if (t === 'bolsasrec') return 'BOLS';
+  if (t === 'corrmalo') return 'COR-';
+  if (t === 'corrbueno') return 'COR+';
+  return 'FL L' + l;
+}
 function usoTexto(it){
-  if (it.uso.tipo === 'tapas') return ['TAPAS', 'p/ flameo'];
-  if (it.uso.tipo === 'flameado') return ['FLAMEADO L' + it.uso.linea, 'p/ impresión'];
-  if (it.uso.tipo === 'merma') return ['MERMA L' + it.uso.linea, 'rechazo empaque'];
-  var sa = (areaUso(it) === 'tapas') ? ' · tapas' : '';
-  if (it.uso.tipo === 'entregaspt') return ['ENTREGAS PT', 'prod. terminado' + sa];
-  if (it.uso.tipo === 'pendempaque') return ['PEND. EMPAQUE', 'por empacar' + sa];
-  if (it.uso.tipo === 'entbodega') return ['ENTREGA BODEGA', 'p/ trabajar' + sa];
-  if (it.uso.tipo === 'rechazoint') return ['RECHAZO INTERNO', (sa ? 'tapas' : 'serigrafía')];
-  if (it.uso.tipo === 'mpmolida') return ['MP MOLIDA', 'materia prima'];
-  if (it.uso.tipo === 'bolsasrec') return ['BOLSAS', 'para reciclaje'];
+  if (it.uso.tipo === 'tapas') return ['TAPAS', ''];
+  if (it.uso.tipo === 'flameado') return ['FLAMEADO L' + it.uso.linea, ''];
+  if (it.uso.tipo === 'merma') return ['MERMA L' + it.uso.linea, ''];
+  if (it.uso.tipo === 'entregaspt') return ['INGRESOS PT', ''];
+  if (it.uso.tipo === 'pendempaque') return ['PEND. EMPAQUE', ''];
+  if (it.uso.tipo === 'entbodega') return ['SALIDAS', ''];
+  if (it.uso.tipo === 'rechazoint') return ['RECHAZO INTERNO', ''];
+  if (it.uso.tipo === 'mpmolida') return ['MP MOLIDA', ''];
+  if (it.uso.tipo === 'bolsasrec') return ['BOLSAS', ''];
   if (it.uso.tipo === 'corrmalo') return ['CORRUGADO MALO', ''];
   if (it.uso.tipo === 'corrbueno') return ['CORRUGADO BUENO', ''];
-  return ['FLAMEO L' + it.uso.linea, 'rot. alta'];
+  return ['FLAMEO L' + it.uso.linea, ''];
 }
 function cargaColorTarima(it){
   if (!it.uso) return 0xE5E2DA;
@@ -797,7 +813,7 @@ function pintarUsos(){
   var lin = [];
   items.forEach(function(it){
     if (it.k !== 'tarima' || !it.uso) return;
-    lin.push(usoTexto(it).join(' · ') + (it.carga ? ' (ocupada)' : ' (libre)') + ' — x ' + fmt(it.x) + ', fondo ' + fmt(it.d));
+    lin.push(usoTexto(it)[0] + ' · ' + ({ serig: 'serigrafía', tapas: 'tapas', general: 'general' }[areaUso(it)] || '') + (it.carga ? ' (ocupada)' : ' (libre)') + ' — x ' + fmt(it.x) + ', fondo ' + fmt(it.d));
   });
   lin.sort();
   var nb = 0;
@@ -920,6 +936,31 @@ function buildTonel(it){
   g.position.copy(V(it.x, it.d));
   return g;
 }
+var etiquetasUso = [];
+function makeLabelUso(t1, t2, w){
+  var c = document.createElement('canvas');
+  c.width = 512; c.height = 160;
+  var x = c.getContext('2d');
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+  var fs = t2 ? 84 : 112;
+  x.font = '800 ' + fs + 'px sans-serif';
+  while (x.measureText(t1).width > 488 && fs > 28){ fs -= 4; x.font = '800 ' + fs + 'px sans-serif'; }
+  x.lineWidth = Math.max(8, fs / 7); x.strokeStyle = 'rgba(0,0,0,.9)'; x.fillStyle = '#fff';
+  var y1 = t2 ? 56 : 80;
+  x.strokeText(t1, 256, y1); x.fillText(t1, 256, y1);
+  if (t2){
+    x.font = '700 46px sans-serif'; x.lineWidth = 8;
+    x.strokeText(t2, 256, 128); x.fillText(t2, 256, 128);
+  }
+  var tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 8;
+  var g = new THREE.PlaneGeometry(w, w * 160 / 512);
+  g.rotateX(-Math.PI / 2);
+  var m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  m.name = 'rotulo_' + t1;
+  m.renderOrder = 2;
+  return m;
+}
 function buildTarima(it){
   var g = new THREE.Group();
   g.userData.itemId = it.id; g.name = 'tarima_' + it.id + '_' + (it.uso ? usoCodigo(it) : 'BODEGA');
@@ -936,9 +977,11 @@ function buildTarima(it){
     g.userData.uso = it.uso.tipo + (it.uso.linea ? ' L' + it.uso.linea : '');
     g.userData.nota = notaUso(it);
     var ut = usoTexto(it);
-    var ulb = makeLabel(ut[0], ut[1] + (it.carga ? ' · ocup.' : ''), Math.max(0.6, Math.min(it.w * 0.92, 1.8)));
+    var ulb = makeLabelUso(ut[0], ut[1], Math.max(0.6, Math.min(it.w * 0.92, 1.8)));
     ulb.position.y = (it.carga ? 1.18 : 0.17);
+    ulb.visible = false;
     g.add(ulb);
+    etiquetasUso.push({ m: ulb, texto: ut[0], corto: usoCorto(it), x: it.x, y: (it.z || 0) + (it.carga ? 1.45 : 0.3), z: -it.d });
   }
   var hw = it.w / 2, hl = it.l / 2;
   var bg = new THREE.BufferGeometry();
@@ -1355,6 +1398,7 @@ function buildTechoLamina(it){
   return m;
 }
 function refreshItems(){
+  etiquetasUso = [];
   clearG(gTarimas); clearG(gLineas); clearG(gAreas);
   items.forEach(function(it){
     if (it.k === 'tarima') gTarimas.add(buildTarima(it));
@@ -1364,6 +1408,7 @@ function refreshItems(){
     else if (it.k === 'area' && it.tipo !== 'techo') gAreas.add(buildArea(it));
     else if (it.k === 'recinto') gAreas.add(buildRecinto(it));
   });
+  reconstruirLeyendas();
   clearG(gRefs);
   items.forEach(function(it){ if (it.k === 'ref') gRefs.add(buildRef(it)); });
   pintarRefList();
@@ -2373,9 +2418,9 @@ var USOS_CATALOGO = [
   { tipo: 'flameo', nombre: 'FLAMEO · rotación alta', area: 'serig', lineas: [1, 2, 3, 4] },
   { tipo: 'flameado', nombre: 'FLAMEADO · entrega Flameo, recoge Impresión', area: 'serig', lineas: [1, 2, 3, 4] },
   { tipo: 'merma', nombre: 'MERMA POR LÍNEA', area: 'serig', lineas: [1, 2, 3, 4] },
-  { tipo: 'entregaspt', nombre: 'ENTREGAS PT', area: 'serig|tapas' },
+  { tipo: 'entregaspt', nombre: 'INGRESOS PT', area: 'serig|tapas' },
   { tipo: 'pendempaque', nombre: 'PENDIENTE DE EMPAQUE', area: 'serig|tapas' },
-  { tipo: 'entbodega', nombre: 'ENTREGAS DE BODEGA PARA TRABAJAR', area: 'serig|tapas|general' },
+  { tipo: 'entbodega', nombre: 'SALIDAS · entrega de Bodega para trabajar', area: 'serig|tapas|general' },
   { tipo: 'rechazoint', nombre: 'RECHAZOS INTERNOS', area: 'serig|tapas' },
   { tipo: 'tapas', nombre: 'TAPAS · para flameo antes de impresión', area: 'tapas' },
   { tipo: 'mpmolida', nombre: 'MATERIA PRIMA MOLIDA', area: 'general' },
@@ -2542,7 +2587,9 @@ $('eSVG').addEventListener('click', function(){
 });
 $('eGLB').addEventListener('click', function(){
   var ex = new THREE.GLTFExporter();
+  etiquetasUso.forEach(function(q){ q.m.visible = true; });
   ex.parse(root, function(res){
+    etiquetasUso.forEach(function(q){ q.m.visible = false; });
     descargar(new Blob([res], { type: 'model/gltf-binary' }), 'tetrapp-planta-nivel2.glb');
   }, { binary: true });
 });
@@ -2572,7 +2619,9 @@ $('ePNG').addEventListener('click', function(){
   scene.background = new THREE.Color(0xFFFFFF);
   slabMat.color.setHex(SLAB_CLARO);
   gGhost.visible = false; var hv = gHandles.visible, hr0 = gHandlesR.visible; gHandles.visible = false; gHandlesR.visible = false;
+  etiquetasUso.forEach(function(q){ q.m.visible = true; });
   rr.render(scene, oc);
+  etiquetasUso.forEach(function(q){ q.m.visible = false; });
   rr.domElement.toBlob(function(b){
     descargar(b, 'tetrapp-planta-nivel2.png');
     rr.dispose(); rr.forceContextLoss();
@@ -2742,6 +2791,68 @@ $('tamTodas').addEventListener('click', function(){
 $('dbGuardar').addEventListener('click', function(){ dbGuardarVersion(0); });
 $('dbLista').addEventListener('click', function(){ dbListar(false); });
 $('dbCargar').addEventListener('click', dbCargarVersion);
+
+/* Leyendas de tarimas en pantalla: texto de tamaño legible sin importar el zoom (12 a 19 px); si por la distancia se
+   encimarían, se muestran las más cercanas y las demás reaparecen al acercar. La etiqueta plana de cada tarima
+   (oculta) se usa solo en las exportaciones PNG y GLB. */
+var leyEls = [], _lv = new THREE.Vector3();
+function reconstruirLeyendas(){
+  var box = $('leyendas');
+  box.innerHTML = ''; leyEls = [];
+  etiquetasUso.forEach(function(e){
+    var d = document.createElement('div');
+    d.className = 'leyenda'; d.textContent = e.texto; d.style.display = 'none';
+    box.appendChild(d);
+    leyEls.push({ el: d, e: e, on: false, tx: '', fs: 0, modo: 'full' });
+  });
+}
+function ajustarLeyendas(){
+  var n = leyEls.length, i, j, L, e;
+  if (!n) return;
+  if (!gTarimas.visible){ for (i = 0; i < n; i++){ if (leyEls[i].on){ leyEls[i].el.style.display = 'none'; leyEls[i].on = false; } } return; }
+  var Wc = wrap.clientWidth, Hc = wrap.clientHeight, ortho = (cam === camO), tanF = Math.tan(camP.fov * Math.PI / 360);
+  var base = ortho ? Hc / ((camO.top - camO.bottom) / camO.zoom) : 0, cand = [], dx, dy, dz, dist, ppm, fs, tw, th;
+  cam.updateMatrixWorld();
+  for (i = 0; i < n; i++){
+    L = leyEls[i]; e = L.e;
+    _lv.set(e.x, e.y, e.z);
+    dx = cam.position.x - e.x; dy = cam.position.y - e.y; dz = cam.position.z - e.z;
+    dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    _lv.project(cam);
+    if (_lv.z > 1 || _lv.z < -1 || Math.abs(_lv.x) > 1.08 || Math.abs(_lv.y) > 1.08 || (!ortho && dist > 60)){ L.vis = false; continue; }
+    ppm = ortho ? base : Hc / (2 * Math.max(0.3, dist) * tanF);
+    fs = Math.max(12, Math.min(19, ppm * 0.2));
+    th = fs * 1.3;
+    L.vis = true; L.sx = (_lv.x + 1) / 2 * Wc; L.sy = (1 - _lv.y) / 2 * Hc; L.fs = fs; L.th = th; L.dist = dist;
+    L.twF = e.texto.length * fs * 0.66 + 10; L.twC = e.corto.length * fs * 0.66 + 10;
+    cand.push(L);
+  }
+  cand.sort(function(a, b){ return a.dist - b.dist; });
+  var colocadas = [];
+  for (i = 0; i < cand.length; i++){
+    L = cand[i];
+    var modos = [['full', L.twF], ['corto', L.twC]], mi, puesta = false;
+    for (mi = 0; mi < modos.length && !puesta; mi++){
+      var x0 = L.sx - modos[mi][1] / 2, x1 = L.sx + modos[mi][1] / 2, y0 = L.sy - L.th / 2, y1 = L.sy + L.th / 2, choca = false;
+      for (j = 0; j < colocadas.length; j++){
+        var q = colocadas[j];
+        if (x0 < q.x1 && x1 > q.x0 && y0 < q.y1 && y1 > q.y0){ choca = true; break; }
+      }
+      if (!choca){ colocadas.push({ x0: x0, x1: x1, y0: y0, y1: y1 }); L.modoNuevo = modos[mi][0]; puesta = true; }
+    }
+    if (!puesta) L.vis = false;
+  }
+  for (i = 0; i < n; i++){
+    L = leyEls[i];
+    if (!L.vis){ if (L.on){ L.el.style.display = 'none'; L.on = false; } continue; }
+    var tx = 'translate(' + Math.round(L.sx) + 'px,' + Math.round(L.sy) + 'px) translate(-50%,-50%)';
+    if (!L.on){ L.el.style.display = 'block'; L.on = true; }
+    if (L.modo !== L.modoNuevo){ L.el.textContent = (L.modoNuevo === 'corto') ? L.e.corto : L.e.texto; L.modo = L.modoNuevo; }
+    if (L.tx !== tx){ L.el.style.transform = tx; L.tx = tx; }
+    var f = Math.round(L.fs * 2) / 2;
+    if (L.fsA !== f){ L.el.style.fontSize = f + 'px'; L.fsA = f; }
+  }
+}
 
 /* ---------- primera persona (POV) ---------- */
 var pov = { on: false, elegir: false, yaw: 0, pitch: 0, x: 21.5, d: 8, nivel: 0, teclas: {}, t: 0, prev: null, vis: null, col: [], aviso: 0, arr: null };
@@ -2992,6 +3103,7 @@ window.__plano_ready = true;
 (function loop(){
   requestAnimationFrame(loop);
   if (pov.on) povPaso(); else ctl.update();
+  ajustarLeyendas();
   renderer.render(scene, cam);
 })();
 window.__plano = { refrescar: refreshItems, pov: pov, n1: n1, n1Cargar: n1Cargar, datosV2: datosV2, datosGeoJSON: datosGeoJSON, datosSVG: datosSVG, cam: function(){ return camO; }, scene: scene, setVista: setVista, items: function(){ return items; } };
