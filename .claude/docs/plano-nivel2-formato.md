@@ -50,6 +50,7 @@ Pendiente de diseñar (fase 2): tabla `tarimas_mapa` (tarima, sku, cantidad, req
   nombre `PASILLO*` se convierte en pasillo peatonal.
 - `recinto` = zona doble (cubo) con línea móvil. `pared` (`estructural`/`media`, altura `h`). `ref` = referencia de diseño.
 - `tonel` = tonel de 55 galones (Ø 0.58 m, 0.88 m); sobre una tarima queda apoyado a 0.14 m.
+- `mulita` (`N2-M<id>`) = mulita de carga (transpaleta manual): `{ x, d, rot }`, huella 1.55 × 0.60 m (horquillas hacia +x con `rot` 0), alto ~1.3 m con la barra. En GeoJSON/SVG sale como polígono rotado (`tipo: mulita_carga`).
 - `rack` (`N2-K<id>`) = estructura metálica de 2 niveles, **un rack = 1 módulo**: **2 tarimas abajo + 2 arriba** (por defecto)
   o **1 abajo + 1 arriba** (rack de 1 tarima): `{ x0, x1, d0, d1, orient, n: 1, bahia, prof }`; `bahia` = 1 o 2 × ancho de tarima
   de largo y 1 de fondo (`tarimas_por_nivel` en GeoJSON); postes en cada módulo;
