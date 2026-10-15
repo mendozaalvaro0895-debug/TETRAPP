@@ -45,6 +45,7 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
 .chk input{margin:0}
 .hint{color:var(--mut);font-size:11px;line-height:1.45;margin-top:8px;min-height:30px}
 .warn{color:#F59E0B;font-size:11px;margin-top:4px}
+.leyenda.sku{color:#FEF08A}
 .leyenda{position:absolute;left:0;top:0;white-space:nowrap;pointer-events:none;font-weight:800;color:#fff;line-height:1.15;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000,0 0 3px #000;will-change:transform}
 #coord{position:absolute;left:12px;bottom:10px;background:rgba(12,12,11,.8);border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-family:ui-monospace,Consolas,monospace;font-size:12px;pointer-events:none}
 #tabla{width:100%;border-collapse:collapse;font-size:11px}
@@ -105,6 +106,7 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
       <button data-tool="gradas">Gradas</button>
       <button data-tool="elevador">Elevador</button>
       <button data-tool="uso" style="grid-column:1/3">Asignar uso a una tarima</button>
+      <button data-tool="producto" style="grid-column:1/3">Asignar producto a una tarima</button>
       <button data-tool="tonel" style="grid-column:1/3">Tonel de 55 galones</button>
       <button data-tool="mulita" style="grid-column:1/3">Mulita de carga (transpaleta)</button>
       <button data-tool="rack" style="grid-column:1/3">Rack (2 niveles de tarimas)</button>
@@ -308,6 +310,24 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
         <div id="uNota" style="color:var(--mut);font-size:11px;line-height:1.45;margin-top:8px"></div>
         <label class="chk" style="margin-top:10px"><input type="checkbox" id="uOcup"> Ocupada (con producto)</label>
         <div class="row" style="margin-top:12px"><button id="uNo">Cancelar</button><button id="uOk" class="pri">Aceptar</button></div>
+      </div>
+    </div>
+    <div id="dlgP" style="display:none;position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:5">
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(420px,92%)">
+        <div style="margin-bottom:4px;font-weight:600">Asignar producto a la tarima</div>
+        <div id="pInfo" style="color:var(--mut);font-size:11px;margin-bottom:10px"></div>
+        <label>SKU del producto</label>
+        <input type="text" id="pSku" maxlength="30" autocomplete="off" placeholder="Escribe el SKU (o parte del nombre)">
+        <div id="pRes" style="margin-top:10px;min-height:70px;font-size:12px;line-height:1.5"></div>
+        <div class="row" style="margin-top:12px"><button id="pQuitar">Quitar producto</button><button id="pNo">Cancelar</button><button id="pOk" class="pri" disabled>Asignar</button></div>
+      </div>
+    </div>
+    <div id="dlgI" style="display:none;position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:5">
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;width:min(400px,92%)">
+        <div style="margin-bottom:10px;font-weight:600">Producto en la tarima</div>
+        <div id="iCuerpo" style="font-size:13px;line-height:1.6"></div>
+        <div id="iPie" style="color:var(--mut);font-size:11px;margin-top:10px;line-height:1.5"></div>
+        <div class="row" style="margin-top:12px"><button id="iCambiar">Cambiar producto</button><button id="iOk" class="pri">Cerrar</button></div>
       </div>
     </div>
     <div id="dlgR" style="display:none;position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:5">
@@ -819,6 +839,9 @@ function pintarUsos(){
   lin.sort();
   var nb = 0;
   items.forEach(function(it){ if (it.k === 'tarima' && !it.uso) nb++; });
+  var np = 0;
+  items.forEach(function(it){ if (it.k === 'tarima' && it.producto) np++; });
+  lin.push('Con producto (SKU) asignado: ' + np + ' tarimas');
   lin.push('Bodega (sin asignar): ' + nb + ' tarimas');
   $('usoList').textContent = lin.join('\n');
 }
@@ -1004,12 +1027,16 @@ function buildTarima(it){
   if (it.uso){
     g.userData.uso = it.uso.tipo + (it.uso.linea ? ' L' + it.uso.linea : '');
     g.userData.nota = notaUso(it);
-    var ut = usoTexto(it);
-    var ulb = makeLabelUso(ut[0], ut[1], Math.max(0.6, Math.min(it.w * 0.92, 1.8)));
+  }
+  if (it.producto && it.producto.sku) g.userData.sku = it.producto.sku;
+  var etTxt = (it.producto && it.producto.sku) ? it.producto.sku : (it.uso ? usoTexto(it)[0] : null);
+  if (etTxt){
+    var ulb = makeLabelUso(etTxt, '', Math.max(0.6, Math.min(it.w * 0.92, 1.8)));
     ulb.position.y = (it.carga ? 1.18 : 0.17);
     ulb.visible = false;
+    ulb.raycast = function(){};
     g.add(ulb);
-    etiquetasUso.push({ m: ulb, texto: ut[0], corto: usoCorto(it), x: it.x, y: (it.z || 0) + (it.carga ? 1.45 : 0.3), z: -it.d });
+    etiquetasUso.push({ m: ulb, texto: etTxt, corto: (it.producto && it.producto.sku) ? etTxt : usoCorto(it), esSku: !!(it.producto && it.producto.sku), x: it.x, y: (it.z || 0) + (it.carga ? 1.45 : 0.3), z: -it.d });
   }
   var hw = it.w / 2, hl = it.l / 2;
   var bg = new THREE.BufferGeometry();
@@ -1517,7 +1544,7 @@ var aGhost = new THREE.Mesh(aGeo, new THREE.MeshBasicMaterial({ color: 0x14B8A6,
 
 function actualizarGhost(){
   marker.visible = tGhost.visible = lGhost.visible = aGhost.visible = oGhost.visible = false;
-  if (!cursor || tool === 'none' || tool === 'borrar' || tool === 'uso') return;
+  if (!cursor || tool === 'none' || tool === 'borrar' || tool === 'uso' || tool === 'producto') return;
   marker.visible = true;
   marker.position.set(cursor.x, 0.07, -cursor.d);
   if (tool === 'rack'){
@@ -1627,6 +1654,103 @@ $('uTipo').addEventListener('change', function(){
   else if (v !== 'pt' && v !== 'eb' && v !== 'ri' && v !== 'libre') $('uArea').value = 'serig';
   actualizarNotaUso();
 });
+/* ---------- producto de la tarima (SKU del inventario B2) ---------- */
+var pEdit = null, pHallado = null, pSeq = 0, pTimer = null, iEdit = null;
+function fmtExist(n){ return (n === null || n === undefined) ? '—' : Number(n).toLocaleString('es-GT'); }
+function fmtFechaIso(f){ var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(f || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
+function buscarSku(sku, cb){
+  if (typeof db === 'undefined'){ cb({ error: 'Sin conexión con la base de datos (inicia sesión).' }); return; }
+  db.from('inventario').select('sku,descripcion,existencia,existencia_fecha,activo').eq('bodega', 'B2').eq('sku', sku).maybeSingle().then(function(r){
+    if (r.error) cb({ error: r.error.message }); else cb({ fila: r.data || null });
+  });
+}
+function sugerirSku(q, cb){
+  if (typeof db === 'undefined'){ cb([]); return; }
+  var l = q.replace(/[,()%*]/g, ' ').trim();
+  if (l.length < 2){ cb([]); return; }
+  db.from('inventario').select('sku,descripcion,existencia').eq('bodega', 'B2').or('sku.ilike.%' + l + '%,descripcion.ilike.%' + l + '%').order('sku').limit(6).then(function(r){ cb(r.error ? [] : (r.data || [])); });
+}
+function tarjetaProducto(box, f){
+  box.innerHTML = '';
+  [['SKU', f.sku], ['Descripción', f.descripcion || '—'], ['Cantidad en inventario B2', fmtExist(f.existencia) + ' und' + (f.existencia_fecha ? '  (al ' + fmtFechaIso(f.existencia_fecha) + ')' : '')]].forEach(function(par){
+    var d = document.createElement('div');
+    var a = document.createElement('span'); a.style.color = 'var(--mut)'; a.textContent = par[0] + ': ';
+    var b = document.createElement('b'); b.textContent = par[1];
+    d.appendChild(a); d.appendChild(b); box.appendChild(d);
+  });
+}
+function abrirProducto(it){
+  pEdit = it; pHallado = null;
+  $('pInfo').textContent = 'Tarima ' + codigoItem(it) + ' · x ' + fmt(it.x) + ' m, fondo ' + fmt(it.d) + ' m';
+  $('pSku').value = (it.producto && it.producto.sku) || '';
+  $('pRes').textContent = ''; $('pOk').disabled = true;
+  $('pQuitar').style.display = it.producto ? '' : 'none';
+  $('dlgP').style.display = 'flex';
+  $('pSku').focus();
+  if ($('pSku').value) pBuscar();
+}
+function pBuscar(){
+  var q = $('pSku').value.trim(), id = ++pSeq, box = $('pRes');
+  pHallado = null; $('pOk').disabled = true;
+  if (!q){ box.textContent = ''; return; }
+  box.textContent = 'Buscando…';
+  buscarSku(q, function(r){
+    if (id !== pSeq) return;
+    if (r.error){ box.textContent = r.error; return; }
+    if (r.fila){ pHallado = r.fila; tarjetaProducto(box, r.fila); $('pOk').disabled = false; return; }
+    box.textContent = 'El SKU "' + q + '" no existe en el inventario B2.';
+    sugerirSku(q, function(lista){
+      if (id !== pSeq || !lista.length) return;
+      var t = document.createElement('div'); t.style.cssText = 'margin-top:6px;color:var(--mut)'; t.textContent = '¿Quisiste decir…?'; box.appendChild(t);
+      lista.forEach(function(f){
+        var b = document.createElement('button'); b.style.cssText = 'display:block;width:100%;text-align:left;margin-top:4px;padding:5px 8px';
+        b.textContent = f.sku + ' — ' + (f.descripcion || '') + ' · ' + fmtExist(f.existencia) + ' und';
+        b.addEventListener('click', function(){ $('pSku').value = f.sku; pBuscar(); });
+        box.appendChild(b);
+      });
+    });
+  });
+}
+function cerrarProducto(){ $('dlgP').style.display = 'none'; pEdit = null; pHallado = null; pSeq++; }
+$('pSku').addEventListener('input', function(){ clearTimeout(pTimer); pTimer = setTimeout(pBuscar, 280); });
+$('pSku').addEventListener('keydown', function(e){
+  if (e.key === 'Enter'){ e.preventDefault(); if (!$('pOk').disabled) $('pOk').click(); else pBuscar(); }
+  else if (e.key === 'Escape') cerrarProducto();
+});
+$('pOk').addEventListener('click', function(){
+  if (!pEdit || !pHallado) return;
+  pushHist();
+  pEdit.producto = { sku: pHallado.sku };
+  pEdit.carga = true;
+  cerrarProducto();
+  refreshItems();
+});
+$('pQuitar').addEventListener('click', function(){
+  if (!pEdit) return;
+  pushHist();
+  delete pEdit.producto;
+  cerrarProducto();
+  refreshItems();
+});
+$('pNo').addEventListener('click', cerrarProducto);
+function abrirInfoProducto(it){
+  if (!it || !it.producto) return;
+  iEdit = it;
+  var cuerpo = $('iCuerpo');
+  cuerpo.textContent = 'Cargando datos del inventario B2…';
+  $('iPie').textContent = 'Tarima ' + codigoItem(it) + (it.uso ? ' · ' + usoTexto(it)[0] : ' · Bodega') + ' · x ' + fmt(it.x) + ' m, fondo ' + fmt(it.d) + ' m';
+  $('dlgI').style.display = 'flex';
+  var sku = it.producto.sku;
+  buscarSku(sku, function(r){
+    if (!iEdit || iEdit.producto.sku !== sku) return;
+    if (r.error){ cuerpo.textContent = 'SKU ' + sku + ' — no se pudo leer el inventario: ' + r.error; return; }
+    if (!r.fila){ cuerpo.textContent = 'SKU ' + sku + ' — ya no existe en el inventario B2.'; return; }
+    tarjetaProducto(cuerpo, r.fila);
+  });
+}
+function cerrarInfoProducto(){ $('dlgI').style.display = 'none'; iEdit = null; }
+$('iOk').addEventListener('click', cerrarInfoProducto);
+$('iCambiar').addEventListener('click', function(){ var it = iEdit; cerrarInfoProducto(); if (it) abrirProducto(it); });
 function abrirUsoTarima(it){
   uEdit = it;
   var v = 'libre';
@@ -1747,6 +1871,14 @@ function clic(e){
   if (pov.on || pov.elegir) return;
   if (tool === 'none') return;
   if (tool === 'borrar'){ borrarEn(e); return; }
+  if (tool === 'producto'){
+    setMouse(e);
+    var hpr = ray.intersectObject(gTarimas, true), opr = hpr.length ? hpr[0].object : null;
+    while (opr && opr.userData.itemId === undefined) opr = opr.parent;
+    var ipr = opr ? itemPorId(opr.userData.itemId) : null;
+    if (ipr && ipr.k === 'tarima') abrirProducto(ipr);
+    return;
+  }
   if (tool === 'uso'){
     setMouse(e);
     var hu = ray.intersectObject(gTarimas, true), ou = hu.length ? hu[0].object : null;
@@ -2094,6 +2226,7 @@ wrap.addEventListener('pointerdown', function(e){
   while (o && o.userData.itemId === undefined) o = o.parent;
   if (!o){ selId = null; marcarSel(); return; }
   var it = itemPorId(o.userData.itemId), p = pick(e, true);
+  var tcl0 = (it && it.k === 'tarima') ? it : null;
   if (it && it.k === 'tarima' && it.rack){ var rkp = itemPorId(it.rack); if (rkp) it = rkp; }
   if (!it || !p) return;
   selId = it.id;
@@ -2105,6 +2238,7 @@ wrap.addEventListener('pointerdown', function(e){
   } else {
     drag = { it: it, g: o, dx: p.x - it.x, dd: p.d - it.d, moved: false };
   }
+  drag.tc = (tcl0 && tcl0.producto) ? tcl0 : null;
   ctl.enabled = false;
   e.stopPropagation(); e.preventDefault();
   marcarSel();
@@ -2151,7 +2285,9 @@ window.addEventListener('pointerup', function(){
   ctl.enabled = true;
   if (drag.moved) guardar();
   if (drag.moved && drag.it.k === 'tonel') refreshItems();
+  var tcl = (!drag.moved && drag.tc) ? drag.tc : null;
   drag = null; histFin();
+  if (tcl) abrirInfoProducto(tcl);
 });
 var downPos = null;
 cv.addEventListener('pointerdown', function(e){ if (e.button === 0) downPos = { x: e.clientX, y: e.clientY }; });
@@ -2255,6 +2391,7 @@ var HINTS = {
   gradas: 'Gradas: dibuja el recorrido (1.5 m de ancho). Bajan hasta el Nivel 1 y abren el hueco en el piso. Con Mover arrastras sus vértices.',
   elevador: 'Elevador de carga: marca dos esquinas del hueco. Baja al Nivel 1 con plataforma a medio nivel y pared en los lados libres.',
   uso: 'Clic sobre una tarima para asignarle su uso: Flameo (rotación alta, línea 1 a 4), Flameado (entrega a Impresión), Merma por línea (rechazo de Empaque), Entregas PT, Pendiente de empaque, Entregas de bodega para trabajar, Rechazos internos, Materia prima molida, Bolsas para reciclaje, Corrugado malo o bueno, o Tapas para flameo (el área elige el color), y marcarla como ocupada.',
+  producto: 'Clic sobre una tarima para asignarle un producto: escribe el SKU y el plano trae su descripción y la existencia del inventario B2. En la tarima se ve solo el SKU; con Mover, un clic sobre ella abre el detalle.',
   mulita: 'Clic = poner una mulita de carga (transpaleta manual de 1.55 × 0.60 m, horquillas hacia la derecha). R la gira 90°; con Mover se arrastra, las flechas del teclado la mueven y Supr la borra.',
   tonel: 'Clic = un tonel de 55 galones (0.58 m de diámetro, 0.88 m de alto). Con la casilla activa, un clic sobre una tarima pone 4 (2 × 2). Con Mover se arrastran; Borrar los quita.',
   rack: 'Rack: un clic pone un rack completo en 2 niveles (2 tarimas abajo y 2 arriba, o 1 y 1 si eliges el tamaño de 1 tarima; primera viga a 1.70 m). R lo gira; "Racks seguidos" pone varios en fila. Con Mover se arrastra con sus tarimas.',
@@ -2320,7 +2457,7 @@ function empujarSeleccion(mx, md){
 }
 document.addEventListener('keydown', function(e){
   if (pov.on || pov.elegir) return;
-  if ($('dlg').style.display === 'flex' || $('dlgR').style.display === 'flex' || $('dlgU').style.display === 'flex') return;
+  if ($('dlg').style.display === 'flex' || $('dlgR').style.display === 'flex' || $('dlgU').style.display === 'flex' || $('dlgP').style.display === 'flex' || $('dlgI').style.display === 'flex') return;
   var tg = e.target && e.target.tagName;
   if (tg === 'INPUT' || tg === 'SELECT' || tg === 'TEXTAREA') return;
   if (selId !== null && tool === 'none' && /^Arrow(Left|Right|Up|Down)$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey){
@@ -2522,7 +2659,7 @@ function geoFeatures(){
   items.forEach(function(it){
     var cod = codigoItem(it);
     if (it.k === 'tarima'){
-      add('tarima', poly(tarimaPoligono(it)), { codigo: cod, id: it.id, ancho: it.w, largo: it.l, area: it.uso ? areaUso(it) : 'bodega', uso: it.uso ? it.uso.tipo : null, linea: (it.uso && it.uso.linea) || null, elevacion: it.z || 0, nivel_rack: (it.z || 0) > 0, ocupada: !!it.carga, nombre: it.uso ? usoTexto(it).join(' · ') : 'BODEGA', nota: it.uso ? notaUso(it) : '', sku: null, cantidad: null });
+      add('tarima', poly(tarimaPoligono(it)), { codigo: cod, id: it.id, ancho: it.w, largo: it.l, area: it.uso ? areaUso(it) : 'bodega', uso: it.uso ? it.uso.tipo : null, linea: (it.uso && it.uso.linea) || null, elevacion: it.z || 0, nivel_rack: (it.z || 0) > 0, ocupada: !!it.carga, nombre: it.uso ? usoTexto(it).join(' · ') : 'BODEGA', nota: it.uso ? notaUso(it) : '', sku: (it.producto && it.producto.sku) || null, cantidad: null });
     } else if (it.k === 'area'){
       var tp = esElevador(it) ? 'elevador' : (it.tipo === 'techo' ? 'techo_lamina' : (it.tipo === 'producto' ? 'zona_producto' : 'zona'));
       add(tp, poly(rectPoligono(it.x0, it.x1, it.d0, it.d1)), { codigo: cod, id: it.id, nombre: it.nombre, color: it.color || null, altura: (it.tipo === 'techo') ? it.h : null });
@@ -2847,7 +2984,7 @@ function reconstruirLeyendas(){
   box.innerHTML = ''; leyEls = [];
   etiquetasUso.forEach(function(e){
     var d = document.createElement('div');
-    d.className = 'leyenda'; d.textContent = e.texto; d.style.display = 'none';
+    d.className = 'leyenda' + (e.esSku ? ' sku' : ''); d.textContent = e.texto; d.style.display = 'none';
     box.appendChild(d);
     leyEls.push({ el: d, e: e, on: false, tx: '', fs: 0, modo: 'full' });
   });

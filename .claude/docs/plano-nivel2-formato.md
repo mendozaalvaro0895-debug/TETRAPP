@@ -39,7 +39,9 @@ Impresión, líneas 1–4) · `merma` (rechazo de Empaque, líneas 1–4) · `en
 `rechazoint` · `tapas` (para flameo) · `mpmolida` · `bolsasrec` · `corrmalo` · `corrbueno`.
 Las notas operativas de cada uso están en `notasUso`.
 
-**Campos reservados para la integración** (hoy `null`, ya presentes en GeoJSON): `sku`, `cantidad`.
+**Producto de la tarima (oct/2026):** herramienta "Asignar producto a una tarima" → `producto: { sku }` en la tarima (solo el SKU; la descripción y la existencia se leen EN VIVO de `inventario` Bodega B2 al abrir el detalle, no se guardan en el plano). En pantalla la tarima muestra solo el SKU; un clic con Mover abre el detalle (SKU, descripción, cantidad en inventario). En GeoJSON la propiedad `sku` sale llena; `cantidad` sigue `null` (la existencia del inventario es global del SKU, no por tarima).
+
+**Campos reservados para la integración** (`cantidad` aún `null`; `sku` ya se llena con el producto asignado):
 Pendiente de diseñar (fase 2): tabla `tarimas_mapa` (tarima, sku, cantidad, requi, línea, estado) y capa "Inventario".
 
 ## Otros elementos
