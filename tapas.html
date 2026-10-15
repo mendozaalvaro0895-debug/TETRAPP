@@ -114,6 +114,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .sc-meta{display:flex;gap:12px;margin-top:6px;font-size:10px;color:var(--gray)}
 .sc-qty{font-family:var(--mono);font-weight:700;color:var(--teal)}
 .sc-date{display:flex;align-items:center;gap:3px}
+.lim-venc{color:#B83232;font-weight:800}
+.lim-pronto{color:#B87200;font-weight:700}
 .pr-row{display:flex;align-items:center;gap:8px;margin-top:8px}
 .pr-wrap{flex:1;background:var(--bg);border-radius:4px;height:4px;overflow:hidden}
 .pr-bar{height:4px;border-radius:4px;transition:width .3s}
@@ -733,8 +735,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           </select>
         </div>
         <div class="fg">
-          <div class="fl">Fecha de ingreso</div>
-          <input class="fi" id="fIngreso" type="date" disabled title="Se registra sola, con la fecha de hoy">
+          <div class="fl">Fecha límite de entrega *</div>
+          <input class="fi" id="fLimite" type="date" title="Obligatoria: cuándo se le debe entregar al cliente">
         </div>
       </div>
 
@@ -1121,6 +1123,7 @@ async function cargarSolicitudes() {
         dbId: s.id,
         id_display: s.codigo,
         createdAt: s.created_at,
+        fechaLimite: s.fecha_limite || '',
         periodoEfectivo: s.periodo_efectivo || '',
         area: s.area,
         cliente: s.cliente_nombre,
@@ -1184,7 +1187,7 @@ function renderListas() {
       </div>
       <div class="sc-meta">
         <span class="sc-qty">${s.cant.toLocaleString()} und</span>
-        <span class="sc-date">🗓 ${escHtml(s.ingreso || '—')}</span>
+        <span class="sc-date ${limiteFichaTapas(s).cls}" title="Fecha límite de entrega">⏳ Límite ${escHtml(limiteFichaTapas(s).txt)}</span>
         <span class="sc-date">⏱ ${calcularHoras(s.cant, 1, s.lineas.flatMap(l => l.procs || [])).toFixed(1)}h</span>
       </div>
       ${s.prog > 0 ? `<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:${s.prog}%"></div></div><div class="pr-pct">${s.prog}%</div></div>` : ''}
@@ -1384,6 +1387,17 @@ async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
 }
 
 // ══ MOSTRAR DETALLE ═════════════════════════════════════════
+async function cambiarFechaLimiteTapas(id, valor) {
+  var s = solicitudes.find(function(x) { return x.id === id; });
+  if (!s || !valor) return;
+  var r = await db.from('solicitudes').update({ fecha_limite: valor }).eq('id', s.dbId).select('id');
+  if (r.error || !(r.data || []).length) { showToast('❌ No se pudo cambiar la fecha límite' + (r.error ? ': ' + r.error.message : ' (sin permiso)'), '#B83232'); return; }
+  s.fechaLimite = valor;
+  renderListas();
+  renderFichasTapas();
+  showToast('✅ Fecha límite: ' + valor);
+}
+
 async function mostrarDetalle(id) {
   const s = solicitudes.find(x => x.id === id);
   if (!s) return;
@@ -1414,7 +1428,7 @@ async function mostrarDetalle(id) {
     <div class="ph" style="flex-shrink:0">
       <div>
         <div class="ph-title">${escHtml(s.id_display || s.id.slice(0,8))} — ${escHtml(s.cliente)}</div>
-        <div class="ph-sub">${escHtml(s.sku)} · ${s.cant.toLocaleString()} unidades</div>
+        <div class="ph-sub">${escHtml(s.sku)} · ${s.cant.toLocaleString()} unidades · ⏳ Límite <input type="date" class="fi" style="padding:1px 6px;font-size:11px" value="${escHtml(s.fechaLimite || '')}" onchange="cambiarFechaLimiteTapas('${escHtml(s.id)}', this.value)"></div>
       </div>
       <div class="ph-r">
         ${s.estado === 'nueva' ? `<button class="btn btn-t btn-xs" onclick="cambiarEstado('${s.id}','proceso')">▶ Iniciar</button>` : ''}
@@ -1671,7 +1685,7 @@ function abrirForm() {
   lineas = [nuevaLineaForm()];
   document.getElementById('fCli').value = '';
   document.getElementById('fNotas').value = '';
-  document.getElementById('fIngreso').value = fechaHoy();
+  var fl = document.getElementById('fLimite'); fl.value = ''; fl.min = fechaHoy(); // obligatoria: se elige al ingresar la solicitud
   document.getElementById('fPrioSelect').value = 'normal';
   renderLineas();
   document.getElementById('overlay').classList.add('open');
@@ -1920,6 +1934,8 @@ async function guardar() {
 
   const l = lineas[0];
   if (!l || !(l.cant > 0)) { alert('Indica la cantidad'); return; }
+  const fLimite = document.getElementById('fLimite').value;
+  if (!fLimite) { alert('Indica la fecha límite de entrega'); document.getElementById('fLimite').focus(); return; }
 
   // Los componentes deben ser SKUs reales (inventario, o Bodega 7 para Liner y Banda): las alertas de stock los buscan por SKU
   var sinSku = COMP_FORM.filter(function(c) {
@@ -1936,7 +1952,7 @@ async function guardar() {
   const cabecera = {
     codigo, area: 'tapas',
     cliente_nombre: cliente,
-    fecha_limite: fechaHoy(), // la ficha ya no pide fecha límite: queda la fecha de ingreso
+    fecha_limite: fLimite,
     prioridad: document.getElementById('fPrioSelect').value,
     estado: 'nueva',
     progreso_pct: 0,
@@ -2807,6 +2823,18 @@ function periodoFichaTapas(s) {
   return { key: key, largo: (MESES_FICHA_L[m] || '—') + ' ' + y };
 }
 
+// Fecha límite de entrega: en rojo si ya venció y la ficha sigue viva, en ámbar si vence en ≤2 días
+function limiteFichaTapas(s) {
+  var f = s.fechaLimite || '';
+  if (!f) return { txt: 'sin fecha límite', cls: '' };
+  var cls = '';
+  if (fichaViva(s)) {
+    var dias = Math.round((new Date(f + 'T12:00:00') - new Date(fechaHoy() + 'T12:00:00')) / 86400000);
+    cls = dias < 0 ? 'lim-venc' : (dias <= 2 ? 'lim-pronto' : '');
+  }
+  return { txt: f, cls: cls };
+}
+
 function tierFichaTapas(s) { return s.estado === 'lista' ? 2 : (s.estado === 'parcial' ? 1 : 0); }
 
 // Lotes "en proceso" que Tapas marca en la pestaña Pedidos de registro-tapas.html (tabla tapas_lotes,
@@ -2852,7 +2880,7 @@ function buildFichaCardTapas(s) {
     + '<div class="fich-top"><span class="fich-cod">' + escHtml(s.id_display || s.id.slice(0, 8)) + '</span>'
     +   '<span>' + estadoPill(s.estado) + ' ' + prioridadPill(s.prio) + '</span></div>'
     + '<div class="fich-desc">' + escHtml(s.sku) + ' — ' + escHtml(s.desc) + '</div>'
-    + '<div class="fich-meta"><b>' + s.cant.toLocaleString() + ' und</b><span>🗓 ' + escHtml(s.ingreso || '—') + '</span></div>'
+    + '<div class="fich-meta"><b>' + s.cant.toLocaleString() + ' und</b><span class="' + limiteFichaTapas(s).cls + '" title="Fecha límite de entrega">⏳ Límite ' + escHtml(limiteFichaTapas(s).txt) + '</span></div>'
     + (comps ? '<div class="fich-chips">' + comps + '</div>' : '')
     + (function() { var ep = enProcesoDeFicha(s); return ep > 0 ? '<div class="fich-lote">▶ ' + ep.toLocaleString() + ' en proceso</div>' : ''; })()
     + (s.prog > 0 ? '<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:' + s.prog + '%"></div></div><div class="pr-pct">' + s.prog + '%</div></div>' : '')
@@ -2974,7 +3002,7 @@ async function imprimirFichasTapas() {
       + '<td>' + desc + '</td>'
       + '<td class="sm">' + (comps || '—') + '</td>'
       + '<td class="r"><b>' + entTxt + '</b></td>'
-      + '<td class="c">' + escHtml(s.ingreso || '—') + '</td>'
+      + '<td class="c">' + escHtml(limiteFichaTapas(s).txt) + '</td>'
       + '<td class="c">' + (s.prog > 0 ? s.prog + '%' : '—') + '</td>'
       + '<td class="c"><span class="tag" style="background:' + t.bg + ';color:' + t.clr + '">' + t.lbl + ' · ' + (ESTADO[s.estado] || escHtml(s.estado)) + '</span></td>'
       + '</tr>';
@@ -3002,7 +3030,7 @@ async function imprimirFichasTapas() {
     return '<div class="sec"><h2>' + escHtml(cli) + ' <span class="badge">' + items.length + ' ficha' + (items.length !== 1 ? 's' : '')
       + ' · ' + und.toLocaleString() + ' und · ' + pct + '% entregado</span></h2>'
       + '<table><thead><tr><th>Código</th><th>Descripción</th><th>Componentes</th><th class="r">Cant. (entreg. / pedida)</th>'
-      + '<th class="c">Ingreso</th><th class="c">Prog.</th><th class="c">Estado</th></tr></thead><tbody>'
+      + '<th class="c">Fecha límite</th><th class="c">Prog.</th><th class="c">Estado</th></tr></thead><tbody>'
       + items.map(filaFicha).join('') + '</tbody></table></div>';
   }).join('');
 
