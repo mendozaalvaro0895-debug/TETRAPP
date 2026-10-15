@@ -61,3 +61,8 @@ create policy planos_storage_update on storage.objects for update
   using (bucket_id = 'planos' and es_master()) with check (bucket_id = 'planos' and es_master());
 create policy planos_storage_delete on storage.objects for delete
   using (bucket_id = 'planos' and es_master());
+
+-- ── v2 (oct/2026): copia de trabajo compartida ──────────────────
+-- La fila version = 0 de cada nivel es la COPIA DE TRABAJO que ve cualquier equipo
+-- (el plano la sobrescribe solo con cada cambio). version >= 1 son las versiones guardadas.
+alter table public.planos add column if not exists actualizado_en timestamptz not null default now();

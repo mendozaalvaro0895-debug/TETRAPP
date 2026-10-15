@@ -64,6 +64,7 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
   <div id="panel">
     <h1>PLANO DE PLANTA · NIVEL 2</h1>
     <div class="sub">Tetraplastic · 35 m frente × 45 m fondo · unidades en metros</div>
+    <div id="syncEstado" class="hint" style="margin:2px 0 6px">Base de datos: conectando…</div>
 
     <h2 style="margin-top:6px;border-top:0;padding-top:0">Vista</h2>
     <div class="grid2">
@@ -254,7 +255,7 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
     <div class="row"><button id="dbGuardar" class="pri">Guardar versión</button><button id="dbLista">Ver versiones</button></div>
     <select id="dbVersiones" style="display:none;margin-top:6px"></select>
     <button id="dbCargar" style="display:none;margin-top:6px;width:100%">Cargar la versión elegida</button>
-    <div class="hint" id="dbEstado">Cada guardado crea una versión nueva; no pisa las anteriores. Incluye el modelo del Nivel 1 si está cargado. Solo el usuario master puede guardar.</div>
+    <div class="hint" id="dbEstado">Todo cambio se guarda solo en la base (copia de trabajo) y se ve en cualquier equipo al abrir el plano. "Guardar versión" crea además un punto de restauración numerado; no pisa las anteriores. Incluye el modelo del Nivel 1 si está cargado. Solo el usuario master puede guardar.</div>
 
     <h2>Exportar / guardar</h2>
     <div class="grid2">
@@ -389,6 +390,7 @@ function fmt(v){ return (Math.round(v * 100) / 100).toString(); }
 /* ---------- persistencia ---------- */
 function guardar(){
   try { localStorage.setItem(KEY, JSON.stringify({ cfg: CFG, items: items })); } catch (e) {}
+  if (typeof syncMarcar === 'function') syncMarcar();
 }
 function cargar(){
   try {
@@ -1223,7 +1225,17 @@ function colorParaNombre(nombre, excluir){
 function normalizarRacks(){
   var z2 = (CFG.altoRack1 || 1.7) + 0.12, nuevos = [], quitar = {}, cambios = false;
   var casi = function(a, b){ return Math.abs(a - b) < 0.06; };
+  var solapaOtro = function(rk){
+    var ax0 = Math.min(rk.x0, rk.x1), ax1 = Math.max(rk.x0, rk.x1), ad0 = Math.min(rk.d0, rk.d1), ad1 = Math.max(rk.d0, rk.d1), i, o;
+    for (i = 0; i < items.length; i++){
+      o = items[i];
+      if (o.k !== 'rack' || o.id === rk.id) continue;
+      if (Math.min(ax1, Math.max(o.x0, o.x1)) - Math.max(ax0, Math.min(o.x0, o.x1)) > 0.05 && Math.min(ad1, Math.max(o.d0, o.d1)) - Math.max(ad0, Math.min(o.d0, o.d1)) > 0.05) return true;
+    }
+    return false;
+  };
   var asegurar = function(rk){
+    if (solapaOtro(rk)) return;   // racks encimados: no se inventan tarimas hasta que se acomoden
     crearTarimasRack(rk).forEach(function(q){
       var hallada = null;
       items.concat(nuevos).forEach(function(t){
@@ -1817,21 +1829,23 @@ function borrarEn(e){
   }
 }
 var dlgCb = null;
-function dialogo(msg, modo, cb, valor){
+var dlgCbNo = null;
+function dialogo(msg, modo, cb, valor, cbNo){
   $('dlgMsg').textContent = msg;
   $('dlgIn').style.display = (modo === 'input') ? 'block' : 'none';
   $('dlgIn').value = valor || '';
   $('dlgNo').style.display = (modo === 'info') ? 'none' : 'inline-block';
   $('dlg').style.display = 'flex';
-  dlgCb = cb || null;
+  dlgCb = cb || null; dlgCbNo = cbNo || null;
   setTimeout(function(){ if (modo === 'input') $('dlgIn').focus(); else $('dlgOk').focus(); }, 30);
 }
 function cerrarDlg(ok){
   var v = null;
   if (ok) v = ($('dlgIn').style.display === 'none') ? true : $('dlgIn').value;
   $('dlg').style.display = 'none';
-  var cb = dlgCb; dlgCb = null;
+  var cb = dlgCb, cbN = dlgCbNo; dlgCb = null; dlgCbNo = null;
   if (cb && v !== null) cb(v);
+  else if (cbN && v === null) cbN();
 }
 $('dlgOk').addEventListener('click', function(){ cerrarDlg(true); });
 $('dlgNo').addEventListener('click', function(){ cerrarDlg(false); });
@@ -2817,7 +2831,7 @@ $('btnLimpiar').addEventListener('click', function(){
 });
 
 /* ---------- Nivel 1: modelo importado (referencia, fuera del GLB exportado) ---------- */
-var n1Buf = null, N1KEY = 'tetrapp_plano_n1mod_v1', n1 = { esc: 0.001, x: 0, d: 0, y: 0, rot: 0, tiene: false }, n1Pivot = null, n1Size = null;
+var n1Cambio = null, n1Buf = null, N1KEY = 'tetrapp_plano_n1mod_v1', n1 = { esc: 0.001, x: 0, d: 0, y: 0, rot: 0, tiene: false }, n1Pivot = null, n1Size = null;
 function n1Guardar(){ try { localStorage.setItem(N1KEY, JSON.stringify({ esc: n1.esc, x: n1.x, d: n1.d, y: n1.y, rot: n1.rot })); } catch (e) {} }
 function n1Leer(){ try { var o = JSON.parse(localStorage.getItem(N1KEY) || 'null'); if (o) ['esc', 'x', 'd', 'y', 'rot'].forEach(function(k){ if (isFinite(o[k])) n1[k] = o[k]; }); } catch (e) {} }
 function n1Aplicar(){
@@ -2830,6 +2844,7 @@ function n1Aplicar(){
     $('n1Info').textContent = 'Modelo de ' + (n1Size.x * n1.esc).toFixed(1) + ' m (ancho) × ' + (n1Size.y * n1.esc).toFixed(1) + ' m (fondo) × ' + (n1Size.z * n1.esc).toFixed(1) + ' m (alto). Planta: ' + W + ' × ' + F + ' m.';
   } else $('n1Info').textContent = 'Sin modelo. Es solo una referencia: no se exporta en el GLB del Nivel 2 y se guarda en este navegador.';
   n1Guardar();
+  if (typeof syncMarcar === 'function') syncMarcar();
 }
 function n1Vaciar(){ n1Buf = null; clearG(gN1); n1Pivot = null; n1Size = null; n1.tiene = false; }
 function n1Montar(scn){
@@ -2881,10 +2896,10 @@ $('n1Cargar').addEventListener('click', function(){ $('n1File').click(); });
 $('n1File').addEventListener('change', function(e){
   var f = e.target.files[0]; if (!f) return;
   var fr = new FileReader();
-  fr.onload = function(){ n1Cargar(fr.result, true); };
+  fr.onload = function(){ n1Cargar(fr.result, true); n1Cambio = 'subir'; if (typeof syncMarcar === 'function') syncMarcar(); };
   fr.readAsArrayBuffer(f); e.target.value = '';
 });
-$('n1Quitar').addEventListener('click', function(){ n1Vaciar(); n1DB('del'); n1Aplicar(); });
+$('n1Quitar').addEventListener('click', function(){ n1Vaciar(); n1DB('del'); n1Aplicar(); n1Cambio = 'quitar'; if (typeof syncMarcar === 'function') syncMarcar(); });
 [['n1Esc', 'esc'], ['n1X', 'x'], ['n1D', 'd'], ['n1Y', 'y']].forEach(function(p){
   $(p[0]).addEventListener('change', function(){ var v = parseFloat(this.value); if (isFinite(v) && (p[1] !== 'esc' || v > 0)) n1[p[1]] = v; n1Aplicar(); });
 });
@@ -2925,7 +2940,7 @@ function dbGuardarVersion(intento){
 }
 function dbListar(silencioso){
   if (typeof db === 'undefined'){ return; }
-  db.from('planos').select('id,version,nota,creado_en,n_elementos,modelo_path').eq('nivel', 2).order('version', { ascending: false }).limit(50).then(function(r){
+  db.from('planos').select('id,version,nota,creado_en,n_elementos,modelo_path').eq('nivel', 2).gt('version', 0).order('version', { ascending: false }).limit(50).then(function(r){
     if (r.error){ dbMsg('No se pudieron leer las versiones: ' + r.error.message); return; }
     var sel = $('dbVersiones');
     sel.innerHTML = '';
@@ -3270,6 +3285,154 @@ window.addEventListener('keyup', function(e){
 });
 window.addEventListener('blur', function(){ pov.teclas = {}; });
 
+/* ---------- copia de trabajo compartida (fila planos.version = 0): cualquier equipo ve los mismos avances ---------- */
+var SYNC_META = KEY + '_meta', syncAplicando = false, syncTimer = null, syncOcupado = false, syncActivo = false, SYNC_MODELO = 'nivel2/trabajo/nivel1-modelo.glb';
+function syncMeta(){ try { return JSON.parse(localStorage.getItem(SYNC_META) || 'null'); } catch (e) { return null; } }
+function syncMetaPon(m){ try { localStorage.setItem(SYNC_META, JSON.stringify(m)); } catch (e) {} }
+function syncEstadoTxt(t){ var el = $('syncEstado'); if (el) el.textContent = 'Base de datos: ' + t; }
+function syncHora(){ var d = new Date(), z = function(n){ return ('0' + n).slice(-2); }; return z(d.getHours()) + ':' + z(d.getMinutes()); }
+function syncHash(){
+  var t = JSON.stringify({ c: CFG, i: items, n: [n1.esc, n1.x, n1.d, n1.y, n1.rot, n1.tiene] }), h = 5381, i;
+  for (i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0;
+  return String(h);
+}
+function syncMarcar(){
+  if (syncAplicando) return;
+  var m = syncMeta() || {}, h = syncHash();
+  m.sucio = (m.hash === undefined) ? true : (h !== m.hash);
+  if (!m.sucio){ syncMetaPon(m); return; }
+  m.t = new Date().toISOString();
+  syncMetaPon(m);
+  if (!syncActivo) return;
+  syncEstadoTxt('cambios pendientes…');
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(function(){ syncSubir(false); }, 2500);
+}
+function syncDatos(){
+  var d = datosV2();
+  d.n1mod = { esc: n1.esc, x: n1.x, d: n1.d, y: n1.y, rot: n1.rot, tiene: n1.tiene };
+  return d;
+}
+function syncLeer(cb){
+  db.from('planos').select('id,datos,modelo_path,actualizado_en,n_elementos').eq('nivel', 2).eq('version', 0).maybeSingle().then(function(r){ cb(r.error ? { error: r.error.message } : { fila: r.data || null }); });
+}
+function syncSubir(forzar){
+  if (!syncActivo || syncOcupado) return;
+  var m = syncMeta() || {};
+  if (!m.sucio && !forzar) return;
+  syncOcupado = true; syncEstadoTxt('guardando…');
+  var terminar = function(txt){ syncOcupado = false; if (txt) syncEstadoTxt(txt); };
+  var subir = function(){
+    var modelo = m.modeloPath || null, cambio = n1Cambio, hSub = syncHash();
+    var escribir = function(){
+      var datos = syncDatos();
+      db.from('planos').upsert({ nivel: 2, version: 0, nombre: 'Plano de planta · Nivel 2 (copia de trabajo)', datos: datos, modelo_path: modelo, n_elementos: items.length, actualizado_en: new Date().toISOString() }, { onConflict: 'nivel,version' }).select('actualizado_en').single().then(function(r){
+        if (r.error || !r.data){ terminar('sin conexión (' + (r.error ? r.error.message : 'sin respuesta') + ') · queda en este equipo'); return; }
+        var m2 = syncMeta() || {};
+        m2.hash = hSub; m2.sucio = (syncHash() !== hSub);
+        m2.remoto = r.data.actualizado_en; m2.modeloPath = modelo;
+        syncMetaPon(m2);
+        if (cambio === n1Cambio) n1Cambio = null;
+        terminar('guardado ' + syncHora() + ' · visible en cualquier equipo');
+        if (m2.sucio) syncSubir(false);
+      });
+    };
+    if (cambio === 'subir' && n1Buf){
+      db.storage.from('planos').upload(SYNC_MODELO, new Blob([n1Buf], { type: 'model/gltf-binary' }), { contentType: 'model/gltf-binary', upsert: true }).then(function(u){
+        if (u.error){ terminar('no se pudo subir el modelo del Nivel 1: ' + u.error.message); return; }
+        modelo = SYNC_MODELO; escribir();
+      });
+    } else { if (cambio === 'quitar') modelo = null; escribir(); }
+  };
+  // otro equipo guardó antes que nosotros?
+  db.from('planos').select('actualizado_en').eq('nivel', 2).eq('version', 0).maybeSingle().then(function(r){
+    if (r.error){ terminar('sin conexión · queda en este equipo'); return; }
+    if (!forzar && r.data && m.remoto && r.data.actualizado_en !== m.remoto){
+      syncOcupado = false;
+      dialogo('Otro equipo guardó cambios en el plano mientras trabajabas aquí.\n\nAceptar = traer los de la base (se pierden los cambios hechos aquí desde la última sincronización).\nCancelar = quedarse con este equipo y reemplazar los de la base.', 'confirm',
+        function(){ syncTraer(); }, null, function(){ syncSubir(true); });
+      return;
+    }
+    subir();
+  });
+}
+function syncAplicar(fila){
+  syncAplicando = true;
+  try {
+    aplicarDatos(fila.datos); convertirPasillos(); normalizarRacks(); migrarTamanoTarimas(); recolorConflictos();
+    var mo = fila.datos.n1mod;
+    if (mo){ ['esc', 'x', 'd', 'y', 'rot'].forEach(function(k){ if (isFinite(mo[k])) n1[k] = mo[k]; }); n1Aplicar(); }
+    selId = null; hist.length = 0;
+    volcarForm(); construir(); refreshItems();
+    guardar();
+  } catch (e) { syncAplicando = false; syncEstadoTxt('el plano de la base no tiene el formato esperado'); return; }
+  syncAplicando = false;
+  var m = syncMeta() || {};
+  m.sucio = false; m.hash = syncHash(); m.remoto = fila.actualizado_en; m.modeloPath = fila.modelo_path || null;
+  syncMetaPon(m);
+  // modelo del Nivel 1 (GLB) guardado en la base
+  if (fila.modelo_path && (!n1Buf || m.modeloLocal !== fila.actualizado_en)){
+    db.storage.from('planos').download(fila.modelo_path).then(function(d){
+      if (d.error || !d.data) return;
+      d.data.arrayBuffer().then(function(buf){ n1Cargar(buf, true); var m3 = syncMeta() || {}; m3.modeloLocal = fila.actualizado_en; syncMetaPon(m3); });
+    });
+  } else if (!fila.modelo_path && n1Buf && !n1Cambio){ n1Vaciar(); n1DB('del'); n1Aplicar(); }
+  syncEstadoTxt('actualizado ' + syncHora() + ' · al día con la base');
+}
+function syncTraer(){
+  syncLeer(function(r){
+    if (r.error || !r.fila){ syncEstadoTxt('no se pudo leer la base'); return; }
+    syncAplicar(r.fila);
+  });
+}
+function syncInicio(){
+  syncLeer(function(r){
+    if (r.error){ syncEstadoTxt('sin conexión (' + r.error + ') · trabajando en este equipo'); return; }
+    var fila = r.fila, m = syncMeta(), hayLocal = items.length > 0;
+    var sucio = !m || m.hash === undefined || m.hash !== syncHash();
+    if (!fila){
+      if (hayLocal){ var m0 = m || {}; m0.sucio = true; m0.remoto = null; m0.t = new Date().toISOString(); syncMetaPon(m0); n1Cambio = n1Buf ? 'subir' : null; syncSubir(true); }
+      else syncEstadoTxt('sin datos todavía');
+      return;
+    }
+    if (!hayLocal){ syncAplicar(fila); return; }
+    if (m && m.remoto && m.remoto === fila.actualizado_en){
+      if (sucio){ m.sucio = true; m.t = new Date().toISOString(); syncMetaPon(m); syncSubir(false); } else syncEstadoTxt('al día con la base · ' + syncHora());
+      return;
+    }
+    if (m && m.remoto && !sucio){ syncAplicar(fila); return; }   // otro equipo guardó y aquí no hay cambios pendientes
+    var cuando = fila.actualizado_en ? new Date(fila.actualizado_en).toLocaleString('es-GT') : '';
+    dialogo('La base de datos tiene un plano guardado el ' + cuando + ' (' + (fila.n_elementos || '?') + ' elementos) y este equipo tiene otro distinto (' + items.length + ' elementos).\n\nAceptar = usar el de la base.\nCancelar = conservar este equipo y subirlo a la base.', 'confirm',
+      function(){ syncAplicar(fila); }, null, function(){ var m1 = syncMeta() || {}; m1.sucio = true; m1.t = new Date().toISOString(); syncMetaPon(m1); n1Cambio = n1Buf ? 'subir' : null; syncSubir(true); });
+  });
+}
+function syncRevisar(){
+  if (!syncActivo || syncOcupado || document.hidden) return;
+  if (drag || dragR || dragZ || pov.on || pov.elegir) return;
+  var m = syncMeta() || {};
+  if (m.hash === undefined || syncHash() !== m.hash) return;
+  db.from('planos').select('actualizado_en').eq('nivel', 2).eq('version', 0).maybeSingle().then(function(r){
+    if (r.error || !r.data || r.data.actualizado_en === m.remoto) return;
+    syncTraer();
+  });
+}
+function iniciarSync(){
+  if (typeof db === 'undefined' || typeof TETRA === 'undefined'){ syncEstadoTxt('no disponible'); return; }
+  var n = 0;
+  (function esperar(){
+    if (TETRA.rol){
+      if (TETRA.rol !== 'master'){ syncEstadoTxt('solo lectura (rol ' + TETRA.rol + ')'); return; }
+      syncActivo = true; syncInicio();
+      setInterval(syncRevisar, 45000);
+      document.addEventListener('visibilitychange', function(){ if (!document.hidden) syncRevisar(); });
+      window.addEventListener('online', function(){ var mm = syncMeta() || {}; if (mm.sucio) syncSubir(false); });
+      return;
+    }
+    if (++n > 100){ syncEstadoTxt('sin sesión · trabajando en este equipo'); return; }
+    setTimeout(esperar, 100);
+  })();
+}
+
 /* ---------- arranque ---------- */
 cargar();
 convertirPasillos();
@@ -3282,6 +3445,7 @@ refreshItems();
 setTool('none');
 setVista('3d');
 resize();
+iniciarSync();
 window.__plano_ready = true;
 (function loop(){
   requestAnimationFrame(loop);

@@ -19,7 +19,9 @@ Este documento fija el **contrato de datos** para que esa integración no requie
 | GeoJSON · 2D | `…geojson` | FeatureCollection con geometría y propiedades por elemento. Coordenadas locales `[x, d]` |
 | Datos · JSON | `…json` | Diseño completo y versionado (`formato: "tetrapp-plano"`, `version: 2`). **Es el que se importa de vuelta** |
 
-La copia de trabajo vive en `localStorage` (clave `tetrapp_plano_n2_v1`) del navegador: **respaldar con JSON**.
+La copia local vive en `localStorage` (clave `tetrapp_plano_n2_v1`, más `_meta` con el estado de sincronización) del navegador.
+
+**Sincronización entre equipos (oct/2026):** la fila `planos` con `nivel = 2` y `version = 0` es la COPIA DE TRABAJO compartida. Cada cambio se sube solo (2.5 s después, `syncSubir`); al abrir el plano en otro equipo se descarga (`syncInicio`) y cada 45 s / al volver a la pestaña se revisa si otro equipo guardó (`syncRevisar`). Un cambio local se detecta por hash del contenido (`syncHash`) y, si dos equipos editaron a la vez, se pregunta cuál conservar. Las versiones numeradas (`version >= 1`) son los puntos de restauración del botón "Guardar versión". El modelo GLB del Nivel 1 se sube a `planos/nivel2/trabajo/nivel1-modelo.glb`.
 
 **Base de datos (oct/2026):** botón "Guardar versión" del plano inserta una fila en `planos` (`nivel`, `version`, `datos` = JSON v2 + `n1mod` con escala/posición del modelo del Nivel 1, `modelo_path` = GLB en el bucket privado `planos`). Cada guardado es una versión nueva; "Ver versiones" las lista y "Cargar" reemplaza el diseño en pantalla. Solo master escribe. Ver `sql/planos_v1.sql`.
 
