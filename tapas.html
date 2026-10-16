@@ -343,6 +343,33 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .plz-nums div{background:var(--bg);border-radius:8px;padding:6px;text-align:center}
 .plz-nums b{display:block;font-family:var(--mono);font-size:14px}
 .plz-nums span{font-size:9px;color:var(--gray);text-transform:uppercase;letter-spacing:.3px}
+.cp-sec{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);margin:4px 0 6px;display:flex;gap:8px;align-items:baseline}
+.cp-sec i{font-style:normal;font-weight:500;letter-spacing:0;text-transform:none;color:var(--gray-l)}
+.cp-proc{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-bottom:14px}
+.cp-pc{border:1.5px solid #2563EB;background:#EFF6FF;border-radius:10px;padding:6px 9px;cursor:pointer}
+.cp-pc-t{display:flex;justify-content:space-between;gap:6px;font-size:11px;font-weight:800;color:#1E3A8A}
+.cp-pc-t b{font-family:var(--mono)}
+.cp-pc-d{font-size:10.5px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:1px 0 3px}
+.cp-pc-p{font-size:10px;color:#1E3A8A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.cp-bar{height:6px;background:#DBEAFE;border-radius:4px;overflow:hidden}
+.cp-bar i{display:block;height:100%;background:#2563EB}
+.cp-grid{display:grid;gap:10px;align-items:start}
+.cp-col{background:var(--card);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;min-width:0}
+.cp-col-h{background:var(--teal-xl);padding:6px 8px;border-bottom:1px solid var(--teal-l)}
+.cp-col-n{font-size:11px;font-weight:800;color:var(--teal);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cp-col-s{font-size:9.5px;color:var(--gray)}
+.cp-chips{padding:6px;display:flex;flex-direction:column;gap:5px}
+.cp-chip{border:1.5px solid var(--border);border-radius:8px;padding:4px 7px;cursor:pointer;background:var(--card);line-height:1.3;transition:border-color .12s}
+.cp-chip:hover{border-color:var(--teal)}
+.cp-chip.proc{border-color:#2563EB;background:#EFF6FF}
+.cp-chip-t{display:flex;justify-content:space-between;gap:4px;font-size:11px;font-weight:800;align-items:baseline}
+.cp-chip-t b{font-family:var(--mono);font-size:12px;color:var(--teal)}
+.cp-chip.proc .cp-chip-t b{color:#1E3A8A}
+.cp-lim{font-family:var(--mono);font-size:9.5px;font-weight:600;color:var(--gray);margin-left:5px;white-space:nowrap}
+.cp-lim.esp{color:#1E3A8A;font-weight:800}
+.cp-chip-d{font-size:10px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cp-chip-s{font-size:9.5px;font-family:var(--mono);color:var(--ink)}
+.cp-chip.proc .cp-chip-s{color:#1E3A8A;font-weight:700}
 .fich-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .fich-chip{font-family:var(--mono);font-size:10.5px;font-weight:700;background:var(--teal-xl);color:var(--teal);border-radius:5px;padding:2px 8px}
 .fich-chip i{font-style:normal;font-family:var(--font);font-weight:600;font-size:9.5px;letter-spacing:.3px;text-transform:uppercase;color:var(--gray);margin-right:3px}
@@ -743,22 +770,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 </div>
 </div>
 
-<!-- MODAL FORMULARIO -->
 <!-- MODAL DETALLE DE FICHA (como en Serigrafía: ventana flotante en vez de cambiar de pestaña) -->
-<!-- MODAL PLAZO / TRABAJAR PARCIAL (clic en el recuadro de límite de la ficha) -->
-<div class="overlay" id="modalPlazoTapas" onclick="if(event.target===this)cerrarPlazoFicha()">
-  <div class="modal" style="max-width:480px;width:94%">
-    <div class="mh">
-      <div>
-        <div class="mh-title" id="plzTitulo">—</div>
-        <div class="ph-sub" id="plzSub"></div>
-      </div>
-      <button class="m-close" onclick="cerrarPlazoFicha()">✕</button>
-    </div>
-    <div class="mb" id="plzCuerpo"></div>
-  </div>
-</div>
-
 <div class="overlay" id="modalFichaTapas" onclick="if(event.target===this)cerrarFichaTapas()">
   <div class="modal" style="max-width:860px;width:94%">
     <div class="mh">
@@ -775,6 +787,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 </div>
 
+<!-- MODAL PLAZO / TRABAJAR PARCIAL (clic en el recuadro de límite de la ficha) -->
+<div class="overlay" id="modalPlazoTapas" onclick="if(event.target===this)cerrarPlazoFicha()">
+  <div class="modal" style="max-width:480px;width:94%">
+    <div class="mh">
+      <div>
+        <div class="mh-title" id="plzTitulo">—</div>
+        <div class="ph-sub" id="plzSub"></div>
+      </div>
+      <button class="m-close" onclick="cerrarPlazoFicha()">✕</button>
+    </div>
+    <div class="mb" id="plzCuerpo"></div>
+  </div>
+</div>
+
+<!-- MODAL FORMULARIO -->
 <div class="overlay" id="overlay">
   <div class="modal">
     <div class="mh">
@@ -1572,6 +1599,7 @@ async function mostrarDetalle(id) {
   const titulo = `${escHtml(s.id_display || s.id.slice(0,8))} — ${escHtml(s.cliente)}`;
   const sub = `${escHtml(s.sku)} · ${s.cant.toLocaleString()} unidades · ${plazoDetalleHtml(s)}`;
   const acciones = `
+        <button class="btn btn-t btn-xs" onclick="abrirPlazoFicha('${s.id}')" title="Arrancar un parcial de esta ficha o cambiar el plazo">▶ Trabajar parcial</button>
         <button class="btn btn-g btn-xs" onclick="editarFichaTapas('${s.id}')">✏️ Editar</button>
         ${DETALLE_FICHA_EXTRAS && s.estado === 'nueva' ? `<button class="btn btn-t btn-xs" onclick="cambiarEstado('${s.id}','proceso')">▶ Iniciar</button>` : ''}
         ${s.estado === 'proceso' ? `<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista')">✓ Lista</button>` : ''}
@@ -3281,11 +3309,14 @@ function tierFichaTapas(s) { return s.estado === 'lista' ? 2 : (s.estado === 'pa
 // Lotes "en proceso" que Tapas marca en la pestaña Pedidos de registro-tapas.html (tabla tapas_lotes,
 // sql/tapas_lotes_v1.sql). Si la tabla aún no existe simplemente no se muestra nada.
 var lotesTapas = [];
+var lotesTareasTapas = [];
 async function cargarLotesTapas() {
   try {
     var r = await db.from('tapas_lotes').select('*').order('marcado_en', { ascending: true });
     lotesTapas = r.error ? [] : (r.data || []);
-  } catch(e) { lotesTapas = []; }
+    var rt = await db.from('tapas_lote_tareas').select('*').order('iniciado_en', { ascending: true });
+    lotesTareasTapas = rt.error ? [] : (rt.data || []);
+  } catch(e) { lotesTapas = []; lotesTareasTapas = []; }
 }
 
 // Unidades aún en proceso de una ficha: cada lote se completa con los ingresos PT vinculados a la ficha
@@ -3351,7 +3382,112 @@ function abrirFichaTapas(id) {
   mostrarDetalle(id);
 }
 
+// ── Vista COMPACTA de Fichas de Trabajo (oct/2026) ─────────────────────────────
+// Misma vista que la pestaña "Pedidos" de la sesión tapas@tetrapp.app (registro-tapas.html): chips chicos,
+// una columna por cliente, y arriba lo que está EN PROCESO. Solo fichas vivas con saldo por entregar.
+// Clic en un chip = detalle de la ficha en ventana flotante. FICHAS_VISTA_COMPACTA=false vuelve a la
+// grilla anterior (cliente × mes con tarjetas grandes). Los "Completados" no se repiten aquí: ya están
+// en el bloque Entregados de abajo.
+var FICHAS_VISTA_COMPACTA = true;
+
+function modeloFichasCompactas() {
+  var ingPor = {};
+  ingresoMovs.forEach(function(m) {
+    if (m.area === 'serig' || !m.solicitud_id) return;
+    (ingPor[m.solicitud_id] = ingPor[m.solicitud_id] || []).push(m);
+  });
+  return solicitudes.map(function(s) {
+    var ings = (ingPor[s.id] || []).slice().sort(function(a, b) { return String(a.created_at).localeCompare(String(b.created_at)); });
+    var ent = ings.reduce(function(a, m) { return a + (m.cantidad || 0); }, 0);
+    var pool = ings.map(function(m) { return { ts: new Date(m.created_at).getTime(), rem: m.cantidad || 0 }; });
+    var abiertos = [];
+    lotesTapas.filter(function(l) { return l.solicitud_id === s.id; }).forEach(function(lt) {
+      var t0 = new Date(lt.marcado_en).getTime() - 1000, falta = lt.cantidad, hecho = 0;
+      pool.forEach(function(it) {
+        if (falta <= 0 || it.rem <= 0 || it.ts < t0) return;
+        var take = Math.min(it.rem, falta);
+        it.rem -= take; falta -= take; hecho += take;
+      });
+      if (hecho < lt.cantidad) abiertos.push({ id: lt.id, cantidad: lt.cantidad, hecho: hecho, tareas: lotesTareasTapas.filter(function(t) { return t.lote_id === lt.id; }) });
+    });
+    var l0 = s.lineas[0] || {};
+    return { s: s, id: s.id, codigo: s.id_display || String(s.id).slice(0, 6), cliente: s.cliente || '—', cant: s.cant, ent: ent,
+             saldo: Math.max(0, s.cant - ent), abiertos: abiertos,
+             enProc: abiertos.reduce(function(a, l) { return a + (l.cantidad - l.hecho); }, 0),
+             desc: (l0.sku ? l0.sku + ' · ' : '') + (s.lineas.length > 1 ? (l0.desc || '') + ' (+' + (s.lineas.length - 1) + ')' : (l0.desc || s.desc || '')),
+             viva: fichaViva(s) };
+  });
+}
+
+function limiteCompactoHtml(s) {
+  var lim = limiteFichaTapas(s);
+  if (s.plazoTipo === 'parciales') return '<span class="cp-lim esp" title="OC abierta: el cliente va pidiendo por parciales">⏳ Parciales</span>';
+  if (s.plazoTipo === 'pendiente') return '<span class="cp-lim esp" title="Sin fecha definida">⏳ Pendiente</span>';
+  if (!s.fechaLimite) return '<span class="cp-lim" title="Sin fecha límite">⏳ —</span>';
+  return '<span class="cp-lim ' + lim.cls + '" title="Fecha límite de entrega: ' + escHtml(lim.txt) + ' · ' + escHtml(lim.rel) + '">⏳ ' + escHtml(lim.corta.replace(' ', '-')) + '</span>';
+}
+
+function tareasResumenCompacto(tareas) {
+  var corto = function(n) { var w = String(n || '').trim().split(/\s+/); return w.length > 1 ? w[0] + ' ' + w[1].charAt(0).toUpperCase() + '.' : (w[0] || '—'); };
+  var lbl = { armado: 'Armado', banda: 'Banda', liner: 'Liner', flameado: 'Flameado', impresion: 'Impresión', encajado: 'Encajado' };
+  var ult = tareas.slice(-2).map(function(t) { return escHtml(lbl[t.proceso] || t.proceso) + ' · ' + escHtml(corto(t.operario_nombre)); });
+  return ult.join(' | ') + (tareas.length > 2 ? ' (+' + (tareas.length - 2) + ')' : '');
+}
+
+function renderFichasCompactasTapas() {
+  var wrap = document.getElementById('fichasTapas');
+  if (!wrap) return;
+  var modelo = modeloFichasCompactas();
+  var vivas = modelo.filter(function(x) { return x.viva && x.saldo > 0; });
+
+  var proc = [];
+  vivas.forEach(function(x) { x.abiertos.forEach(function(l) { proc.push({ x: x, l: l }); }); });
+  var htmlProc = proc.length ? '<div class="cp-proc">' + proc.map(function(p) {
+    var pct = Math.min(100, Math.round(p.l.hecho / p.l.cantidad * 100));
+    return '<div class="cp-pc" onclick="abrirFichaTapas(\'' + escHtml(String(p.x.id)) + '\')">'
+      + '<div class="cp-pc-t"><span>' + escHtml(p.x.cliente) + ' · ' + escHtml(p.x.codigo) + limiteCompactoHtml(p.x.s) + '</span><b>' + p.l.cantidad.toLocaleString() + '</b></div>'
+      + '<div class="cp-pc-d">' + escHtml(p.x.desc) + '</div>'
+      + (p.l.tareas.length ? '<div class="cp-pc-p">' + tareasResumenCompacto(p.l.tareas) + '</div>' : '')
+      + '<div class="cp-bar"><i style="width:' + pct + '%"></i></div></div>';
+  }).join('') + '</div>' : '';
+
+  var porCli = {}, clis = [];
+  vivas.forEach(function(x) {
+    if (!porCli[x.cliente]) { porCli[x.cliente] = []; clis.push(x.cliente); }
+    porCli[x.cliente].push(x);
+  });
+  clis.sort(function(a, b) { return a.localeCompare(b); });
+  var cols = clis.map(function(c) {
+    var items = porCli[c].slice().sort(function(a, b) {
+      return (b.abiertos.length > 0) - (a.abiertos.length > 0) || (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt));
+    });
+    var saldoTot = items.reduce(function(a, x) { return a + x.saldo; }, 0);
+    return '<div class="cp-col"><div class="cp-col-h"><div class="cp-col-n">' + escHtml(c) + '</div>'
+      + '<div class="cp-col-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo ' + saldoTot.toLocaleString() + '</div></div>'
+      + '<div class="cp-chips">' + items.map(function(x) {
+        var enProc = x.abiertos.length > 0;
+        return '<div class="cp-chip' + (enProc ? ' proc' : '') + '" onclick="abrirFichaTapas(\'' + escHtml(String(x.id)) + '\')">'
+          + '<div class="cp-chip-t"><span>' + escHtml(x.codigo) + limiteCompactoHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
+          + '<div class="cp-chip-d">' + escHtml(x.desc) + '</div>'
+          + '<div class="cp-chip-s">' + (enProc ? '▶ ' + x.enProc.toLocaleString() + ' en proceso' : 'de ' + x.cant.toLocaleString() + (x.ent ? ' · ent. ' + x.ent.toLocaleString() : '')) + '</div>'
+          + '</div>';
+      }).join('') + '</div></div>';
+  }).join('');
+
+  wrap.innerHTML = '<div class="fich-wrap">'
+    + '<div class="fich-hdr"><span class="fich-title">📋 Fichas de Trabajo</span>'
+    +   '<span class="fich-count">' + vivas.length + ' pedido' + (vivas.length !== 1 ? 's' : '') + ' con saldo · ' + clis.length + ' cliente' + (clis.length !== 1 ? 's' : '') + '</span>'
+    +   '<button class="btn btn-t btn-sm" style="margin-left:auto" onclick="abrirForm()">+ Nueva Solicitud</button></div>'
+    + '<div class="fich-body">'
+    + (proc.length ? '<div class="cp-sec">🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc : '')
+    + '<div class="cp-sec">Todos los pedidos por cliente <i>clic para ver el detalle de la ficha</i></div>'
+    + (clis.length ? '<div class="cp-grid" style="grid-template-columns:repeat(' + clis.length + ',minmax(170px,300px))">' + cols + '</div>'
+                   : '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>')
+    + '</div></div>';
+}
+
 function renderFichasTapas() {
+  if (FICHAS_VISTA_COMPACTA) { renderFichasCompactasTapas(); return; }
   var wrap = document.getElementById('fichasTapas');
   if (!wrap) return;
   var perHoy = periodoFichaTapas({ createdAt: new Date().toISOString() }).key;
