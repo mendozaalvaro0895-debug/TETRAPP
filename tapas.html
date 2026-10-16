@@ -212,6 +212,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .lin-in-wrap{min-width:0}
 .lin-in-wrap .fi{width:100%;box-sizing:border-box}
 .lin-ta{resize:none;overflow:hidden;line-height:1.35;font-family:var(--font);display:block;min-height:34px}
+.lin-auto{margin-top:6px;font-size:11px;color:#1E3A8A;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:4px 9px}
 .lin-comp-title{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--teal);margin:12px 0 4px;padding-top:8px;border-top:1px dashed var(--border)}
 .lin-comp-title span{font-weight:500;color:var(--gray-l);text-transform:none;letter-spacing:0}
 .lin-comp{display:grid;grid-template-columns:78px 1fr auto auto;gap:8px;align-items:center;margin-top:5px}
@@ -747,7 +748,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="fr">
         <div class="fg">
           <div class="fl">Cliente</div>
-          <select class="fs" id="fCli">
+          <select class="fs" id="fCli" onchange="autorrellenarDesdeFichas(true)">
             <option value="">— Selecciona cliente —</option>
           </select>
         </div>
@@ -1778,6 +1779,55 @@ var COMP_FORM = [
   { k: 'banda',      campo: 'sku_banda',      lbl: 'Banda' }
 ];
 
+// ── Autorrellenar desde fichas anteriores ─────────────────────
+// Cada ficha guardada es dato para las siguientes: al pedir un SKU para un cliente que ya lo había pedido,
+// se copian sus componentes (Base/Contratapa/Liner/Banda) y procesos de la ficha MÁS RECIENTE de ese mismo
+// cliente + SKU. Todo queda editable; solo corre en solicitudes nuevas y nunca pisa lo que el usuario ya
+// tocó (si cambia el cliente o el producto, se descarta lo autorrellenado y se vuelve a buscar).
+function fichaPreviaDe(cliente, sku) {
+  var cand = solicitudes.filter(function(x) {
+    return x.cliente === cliente && x.lineas.some(function(l) { return l.sku === sku; });
+  }).sort(function(a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+  if (!cand.length) return null;
+  return { s: cand[0], l: cand[0].lineas.find(function(l) { return l.sku === sku; }) };
+}
+
+function autorrellenarDesdeFichas(cambioCliente) {
+  if (editandoFichaId) return;
+  var l = lineas[0];
+  if (!l) return;
+  if (l.autoDe) { // descartar lo que se había autorrellenado antes (otro cliente u otro producto)
+    l.comp = {}; l.procs = []; l.procsAuto = []; l.sugVistas = {}; l.tocados = {}; l.autoDe = '';
+  }
+  var cliente = document.getElementById('fCli').value;
+  if (!cliente || !l.sku) { if (cambioCliente) renderLineas(); return; }
+  var tocado = Object.keys(l.tocados || {}).length > 0 || COMP_FORM.some(function(c) { return compDe(l, c.k).sku; });
+  if (tocado) { if (cambioCliente) renderLineas(); return; } // el usuario ya empezó a llenar: no se pisa
+  var prev = fichaPreviaDe(cliente, l.sku);
+  if (!prev) { if (cambioCliente) renderLineas(); return; }
+  var comp = { base: prev.l.skuBase, contratapa: prev.l.skuContratapa, liner: prev.l.skuLiner, banda: prev.l.skuBanda };
+  var algo = false;
+  COMP_FORM.forEach(function(c) {
+    var sku = String(comp[c.k] || '').trim();
+    if (!sku) return;
+    var item = esKindB7(c.k) ? insumosB7Cache.find(function(i) { return i.sku === sku; }) : invB2DeTapas(sku);
+    if (!item) return; // ya no existe en el catálogo: no se copia (el guardado exige SKUs reales)
+    l.comp[c.k] = { sku: sku, desc: item.descripcion || '', ex: item.existencia || 0 };
+    algo = true;
+  });
+  var procs = (prev.l.procs || []).slice();
+  if (procs.length) {
+    l.procs = procs;
+    procs.forEach(function(p) { l.tocados[p] = true; }); // lo copiado no lo mueve un componente
+    algo = true;
+  }
+  if (l.comp.base || l.comp.contratapa) l.sugVistas.armado = true;
+  if (l.comp.liner) l.sugVistas.liner = true;
+  if (l.comp.banda) l.sugVistas.banda = true;
+  if (algo) l.autoDe = prev.s.id_display || String(prev.s.id).slice(0, 8);
+  if (cambioCliente) { renderLineas(); calcular(); }
+}
+
 function nuevaLineaForm() {
   return { sku: '', desc: '', cant: 0, procs: [], procsAuto: [], sugVistas: {}, tocados: {}, existencia: undefined, comp: {} };
 }
@@ -1974,6 +2024,7 @@ function renderLineas(focusId) {
     +   '<input class="fi" type="number" min="0" placeholder="Cant" value="' + (l.cant || '') + '" onchange="lineas[0].cant=parseInt(this.value)||0;renderLineas();calcular()">'
     +   '<div style="font-size:11px;text-align:right;color:' + exColor + '">' + (l.existencia !== undefined ? l.existencia.toLocaleString() : '—') + '</div>'
     + '</div>'
+    + (l.autoDe ? '<div class="lin-auto">↺ Rellenado con la ficha <b>' + escHtml(l.autoDe) + '</b> (misma tapa y mismo cliente): revisa y cambia lo que haga falta</div>' : '')
     + '<div class="lin-comp-title">Componentes <span>(opcionales)</span></div>'
     + COMP_FORM.map(function(c) { return buildCompRow(l, c); }).join('')
     + '<div class="lin-comp-title">Procesos <span>(los componentes sugieren Armado/Liner/Banda; todos se pueden marcar o quitar)</span></div>'
@@ -2122,6 +2173,7 @@ function formSkuSelect(kind, sku) {
   if (!item || !l) return;
   if (kind === 'prod') {
     l.sku = item.sku; l.desc = item.descripcion || ''; l.existencia = item.existencia || 0;
+    autorrellenarDesdeFichas(false);
   } else {
     l.comp[kind] = { sku: item.sku, desc: item.descripcion || '', ex: item.existencia || 0 };
   }
