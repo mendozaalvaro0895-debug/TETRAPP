@@ -321,8 +321,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .fich-desc{font-size:12px;font-weight:600;margin-top:4px;line-height:1.3}
 .fich-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--gray);margin-top:4px}
 .fich-meta b{color:var(--ink);font-family:var(--mono)}
+.fich-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.fich-stat{border-radius:8px;padding:5px 9px;background:var(--bg);border:1px solid var(--border);line-height:1.15}
+.fich-stat b{display:block;font-family:var(--mono);font-size:19px;font-weight:800;color:var(--ink)}
+.fich-stat span{font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--gray);text-transform:uppercase}
+.fich-und b{color:var(--teal)}
+.fich-lim.lim-venc{background:#FEE2E2;border-color:#B83232}
+.fich-lim.lim-venc b,.fich-lim.lim-venc span{color:#B83232}
+.fich-lim.lim-pronto{background:#FEF3C7;border-color:#B87200}
+.fich-lim.lim-pronto b,.fich-lim.lim-pronto span{color:#92400E}
 .fich-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-.fich-chip{font-family:var(--mono);font-size:10px;background:var(--teal-xl);color:var(--teal);border-radius:5px;padding:1px 7px}
+.fich-chip{font-family:var(--mono);font-size:10.5px;font-weight:700;background:var(--teal-xl);color:var(--teal);border-radius:5px;padding:2px 8px}
+.fich-chip i{font-style:normal;font-family:var(--font);font-weight:600;font-size:9.5px;letter-spacing:.3px;text-transform:uppercase;color:var(--gray);margin-right:3px}
 
 
 /* Personal y Roles — termómetro de producción */
@@ -3100,13 +3110,13 @@ function periodoFichaTapas(s) {
 // Fecha límite de entrega: en rojo si ya venció y la ficha sigue viva, en ámbar si vence en ≤2 días
 function limiteFichaTapas(s) {
   var f = s.fechaLimite || '';
-  if (!f) return { txt: 'sin fecha límite', cls: '' };
-  var cls = '';
-  if (fichaViva(s)) {
-    var dias = Math.round((new Date(f + 'T12:00:00') - new Date(fechaHoy() + 'T12:00:00')) / 86400000);
-    cls = dias < 0 ? 'lim-venc' : (dias <= 2 ? 'lim-pronto' : '');
-  }
-  return { txt: f, cls: cls };
+  if (!f) return { txt: 'sin fecha límite', cls: '', corta: '—', dias: null, rel: 'sin fecha' };
+  var cls = '', dias = Math.round((new Date(f + 'T12:00:00') - new Date(fechaHoy() + 'T12:00:00')) / 86400000);
+  if (fichaViva(s)) cls = dias < 0 ? 'lim-venc' : (dias <= 2 ? 'lim-pronto' : '');
+  var MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  var corta = parseInt(f.slice(8, 10), 10) + ' ' + MES[parseInt(f.slice(5, 7), 10) - 1];
+  var rel = dias === 0 ? 'vence hoy' : (dias === 1 ? 'mañana' : (dias > 1 ? 'en ' + dias + ' días' : (dias === -1 ? 'venció ayer' : 'venció hace ' + (-dias) + ' días')));
+  return { txt: f, cls: cls, corta: corta, dias: dias, rel: fichaViva(s) ? rel : 'completada' };
 }
 
 function tierFichaTapas(s) { return s.estado === 'lista' ? 2 : (s.estado === 'parcial' ? 1 : 0); }
@@ -3146,15 +3156,21 @@ function buildFichaCardTapas(s) {
   var tier = tierFichaTapas(s);
   var comps = '';
   var l0 = s.lineas[0] || {};
-  if (l0.skuBase)       comps += '<span class="fich-chip">📦 ' + escHtml(l0.skuBase) + '</span>';
-  if (l0.skuContratapa) comps += '<span class="fich-chip">🔘 ' + escHtml(l0.skuContratapa) + '</span>';
-  if (l0.skuLiner)      comps += '<span class="fich-chip">◎ ' + escHtml(l0.skuLiner) + '</span>';
-  if (l0.skuBanda)      comps += '<span class="fich-chip">▭ ' + escHtml(l0.skuBanda) + '</span>';
+  if (l0.skuBase)       comps += '<span class="fich-chip"><i>Base</i> ' + escHtml(l0.skuBase) + '</span>';
+  if (l0.skuContratapa) comps += '<span class="fich-chip"><i>Contratapa</i> ' + escHtml(l0.skuContratapa) + '</span>';
+  if (l0.skuLiner)      comps += '<span class="fich-chip"><i>Liner</i> ' + escHtml(l0.skuLiner) + '</span>';
+  if (l0.skuBanda)      comps += '<span class="fich-chip"><i>Banda</i> ' + escHtml(l0.skuBanda) + '</span>';
   return '<div class="fich-card tier-' + tier + '" onclick="abrirFichaTapas(\'' + escHtml(s.id) + '\')">'
     + '<div class="fich-top"><span class="fich-cod">' + escHtml(s.id_display || s.id.slice(0, 8)) + '</span>'
     +   '<span>' + estadoPill(s.estado) + ' ' + prioridadPill(s.prio) + '</span></div>'
     + '<div class="fich-desc">' + escHtml(s.sku) + ' — ' + escHtml(s.desc) + '</div>'
-    + '<div class="fich-meta"><b>' + s.cant.toLocaleString() + ' und</b><span class="' + limiteFichaTapas(s).cls + '" title="Fecha límite de entrega">⏳ Límite ' + escHtml(limiteFichaTapas(s).txt) + '</span></div>'
+    + (function() {
+        var lim = limiteFichaTapas(s);
+        return '<div class="fich-stats">'
+          + '<div class="fich-stat fich-und"><b>' + s.cant.toLocaleString() + '</b><span>Unidades</span></div>'
+          + '<div class="fich-stat fich-lim ' + lim.cls + '" title="Fecha límite de entrega: ' + escHtml(lim.txt) + '"><b>⏳ ' + escHtml(lim.corta) + '</b><span>Límite · ' + escHtml(lim.rel) + '</span></div>'
+          + '</div>';
+      })()
     + (comps ? '<div class="fich-chips">' + comps + '</div>' : '')
     + (function() { var ep = enProcesoDeFicha(s); return ep > 0 ? '<div class="fich-lote">▶ ' + ep.toLocaleString() + ' en proceso</div>' : ''; })()
     + (s.prog > 0 ? '<div class="pr-row"><div class="pr-wrap"><div class="pr-bar pb-t" style="width:' + s.prog + '%"></div></div><div class="pr-pct">' + s.prog + '%</div></div>' : '')
