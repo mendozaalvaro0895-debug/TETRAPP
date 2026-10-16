@@ -1420,6 +1420,70 @@ async function cambiarFechaLimiteTapas(id, valor) {
 // prefijo 'm' para no chocar con el panel.
 var fichaModalId = null;
 
+// Qué hay que pedir a Bodega para esta ficha: la tapa (referencia) + Base/Contratapa/Liner/Banda de cada
+// línea, con lo que ya salió (movimientos salida_bodega por SKU), lo que falta pedir y el stock actual
+// (B2 para Base/Contratapa, Bodega 7 para Liner/Banda). 1 unidad de componente por unidad de tapa.
+var bodegaFilasFicha = {};
+function filasBodegaFicha(s, movs) {
+  var salido = {};
+  (movs || []).forEach(function(m) {
+    if (m.tipo === 'salida_bodega' && m.sku_original) salido[m.sku_original] = (salido[m.sku_original] || 0) + (m.cantidad || 0);
+  });
+  var filas = [];
+  s.lineas.forEach(function(l) {
+    var cant = l.cant || 0;
+    var it = invB2DeTapas(l.sku);
+    if (l.sku) filas.push({ rol: 'Tapa', sku: l.sku, desc: l.desc || (it ? it.descripcion : ''), cant: cant, stock: it ? (it.existencia || 0) : null, salido: null });
+    [['Base', l.skuBase, false], ['Contratapa', l.skuContratapa, false], ['Liner', l.skuLiner, true], ['Banda', l.skuBanda, true]].forEach(function(c) {
+      if (!c[1]) return;
+      var item = c[2] ? insumosB7Cache.find(function(i) { return i.sku === c[1]; }) : invB2DeTapas(c[1]);
+      filas.push({ rol: c[0], sku: c[1], desc: item ? (item.descripcion || '') : '', cant: cant, stock: item ? (item.existencia || 0) : null, salido: salido[c[1]] || 0, b7: c[2] });
+    });
+  });
+  return filas;
+}
+
+function buildBloqueBodegaFicha(s, filas) {
+  if (!filas.length) return '';
+  var trs = filas.map(function(f) {
+    var esTapa = f.rol === 'Tapa';
+    var pedir = esTapa ? null : Math.max(0, f.cant - (f.salido || 0));
+    var falta = !esTapa && f.stock !== null && pedir > f.stock ? pedir - f.stock : 0;
+    return '<tr' + (esTapa ? ' style="background:var(--teal-xl)"' : '') + '>'
+      + '<td><span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--teal)">' + f.rol + '</span></td>'
+      + '<td style="font-family:var(--mono);font-weight:800;font-size:13px">' + escHtml(f.sku) + '</td>'
+      + '<td style="font-size:11px">' + escHtml(f.desc || '—') + '</td>'
+      + '<td style="text-align:right;font-family:var(--mono)">' + f.cant.toLocaleString() + '</td>'
+      + '<td style="text-align:right;font-family:var(--mono);color:var(--gray)">' + (esTapa ? '—' : (f.salido || 0).toLocaleString()) + '</td>'
+      + '<td style="text-align:right;font-family:var(--mono);font-weight:800;color:' + (esTapa ? 'var(--gray)' : (pedir > 0 ? 'var(--amber)' : 'var(--green)')) + '">' + (esTapa ? '—' : pedir.toLocaleString()) + '</td>'
+      + '<td style="text-align:right;font-family:var(--mono);color:' + (falta > 0 ? 'var(--red)' : 'var(--gray)') + '">' + (f.stock === null ? '—' : f.stock.toLocaleString()) + (f.b7 ? ' <span style="font-size:9px">B7</span>' : '') + (falta > 0 ? '<div style="font-size:9px;font-weight:800">FALTAN ' + falta.toLocaleString() + '</div>' : '') + '</td>'
+      + '</tr>';
+  }).join('');
+  return '<div class="dc" style="border-color:var(--teal);border-width:2px">'
+    + '<div class="dc-h" style="background:var(--teal-xl);color:var(--teal);display:flex;align-items:center;justify-content:space-between;gap:8px">'
+    +   '<span>📦 SKUs para pedir a Bodega</span>'
+    +   '<button class="btn btn-t btn-xs" style="text-transform:none;letter-spacing:0" onclick="copiarPedidoBodega(\'' + escHtml(s.id) + '\')">📋 Copiar pedido</button></div>'
+    + '<div class="dc-b" style="padding:6px 10px"><table class="dt"><thead><tr><th></th><th>SKU</th><th>Descripción</th><th style="text-align:right">Necesita</th><th style="text-align:right">Ya salió</th><th style="text-align:right">Por pedir</th><th style="text-align:right">Stock</th></tr></thead><tbody>' + trs + '</tbody></table></div></div>';
+}
+
+// Texto listo para pegar en el mensaje a Bodega: solo lo que aún falta sacar
+function copiarPedidoBodega(id) {
+  var s = solicitudes.find(function(x) { return x.id === id; });
+  var filas = bodegaFilasFicha_cache(id);
+  if (!s || !filas) return;
+  var lineas = filas.filter(function(f) { return f.rol !== 'Tapa'; }).map(function(f) {
+    return { f: f, pedir: Math.max(0, f.cant - (f.salido || 0)) };
+  }).filter(function(x) { return x.pedir > 0; });
+  if (!lineas.length) { showToast('Esta ficha no tiene nada pendiente de pedir a Bodega', '#92400e'); return; }
+  var tapa = filas.find(function(f) { return f.rol === 'Tapa'; });
+  var txt = 'Pedido a Bodega · ' + (s.id_display || '') + ' · ' + (s.cliente || '') + (tapa ? '\nTapa: ' + tapa.sku + ' — ' + tapa.desc : '') + '\n'
+    + lineas.map(function(x) { return '• ' + x.f.rol + ' ' + x.f.sku + ' — ' + (x.f.desc || '') + ' — ' + x.pedir.toLocaleString() + ' und'; }).join('\n');
+  var listo = function() { showToast('📋 Pedido copiado: pégalo en el mensaje a Bodega'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(listo, function() { prompt('Copia el pedido:', txt); });
+  else prompt('Copia el pedido:', txt);
+}
+function bodegaFilasFicha_cache(id) { return bodegaFilasFicha[id] || null; }
+
 async function mostrarDetalle(id) {
   const s = solicitudes.find(x => x.id === id);
   if (!s) return;
@@ -1432,6 +1496,7 @@ async function mostrarDetalle(id) {
 
   let fugas = { salidas: 0, entradas: 0, perdidas: 0, fugaTotal: 0 };
   let ingresos = [];
+  let movsFicha = [];
   try {
     const { data } = await db
       .from('movimientos_materiales')
@@ -1439,6 +1504,7 @@ async function mostrarDetalle(id) {
       .eq('solicitud_id', s.dbId);
 
     if (data) {
+      movsFicha = data;
       fugas.salidas = data.filter(m => m.tipo === 'salida_bodega').reduce((sum, m) => sum + (m.cantidad || 0), 0);
       fugas.entradas = data.filter(m => m.tipo === 'entrada_pt').reduce((sum, m) => sum + (m.cantidad || 0), 0);
       fugas.perdidas = data.filter(m => m.tipo === 'perdida').reduce((sum, m) => sum + (m.cantidad || 0), 0);
@@ -1455,6 +1521,7 @@ async function mostrarDetalle(id) {
   const titulo = `${escHtml(s.id_display || s.id.slice(0,8))} — ${escHtml(s.cliente)}`;
   const sub = `${escHtml(s.sku)} · ${s.cant.toLocaleString()} unidades · ⏳ Límite <input type="date" class="fi" style="padding:1px 6px;font-size:11px" value="${escHtml(s.fechaLimite || '')}" onchange="cambiarFechaLimiteTapas('${escHtml(s.id)}', this.value)">`;
   const acciones = `
+        <button class="btn btn-g btn-xs" onclick="editarFichaTapas('${s.id}')">✏️ Editar</button>
         ${s.estado === 'nueva' ? `<button class="btn btn-t btn-xs" onclick="cambiarEstado('${s.id}','proceso')">▶ Iniciar</button>` : ''}
         ${s.estado === 'proceso' ? `<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista')">✓ Lista</button>` : ''}
         ${s.estado === 'lista' ? `<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada')">📦 Entregar</button>` : ''}
@@ -1472,7 +1539,10 @@ async function mostrarDetalle(id) {
         </div>
       </div>` : '';
 
+  const filasBod = filasBodegaFicha(s, movsFicha);
+  bodegaFilasFicha[s.id] = filasBod;
   const cuerpo = `
+      ${buildBloqueBodegaFicha(s, filasBod)}
       <div class="tbox tt">
         <div class="tbox-lbl">Tiempo estimado</div>
         <div class="tbox-val tc">${horas.toFixed(1)} horas</div>
@@ -1735,7 +1805,12 @@ function toggleLineaProc(procVal) {
   calcular();
 }
 
+var editandoFichaId = null; // id de la ficha que se está editando (null = solicitud nueva)
+
 function abrirForm() {
+  editandoFichaId = null;
+  document.getElementById('mTitle').textContent = 'Nueva solicitud · Tapas';
+  document.getElementById('btnSave').textContent = 'Guardar';
   cargarInsumosB7(); // refresca el stock de B7 en segundo plano
   lineas = [nuevaLineaForm()];
   document.getElementById('fCli').value = '';
@@ -1750,7 +1825,86 @@ function abrirForm() {
 
 function cerrarForm() {
   cerrarFormDrop();
+  editandoFichaId = null;
   document.getElementById('overlay').classList.remove('open');
+}
+
+// Editar una ficha: mismo formulario que "Nueva solicitud", precargado. Solo se edita la PRIMERA línea
+// (las fichas nuevas tienen una sola; las viejas con varias conservan las demás sin tocar).
+async function editarFichaTapas(id) {
+  var s = solicitudes.find(function(x) { return x.id === id; });
+  if (!s || !s.lineas.length) return;
+  await cargarInsumosB7(); // el stock de Liner/Banda sale de Bodega 7
+  var l0 = s.lineas[0];
+  var it = invB2DeTapas(l0.sku);
+  var l = nuevaLineaForm();
+  l.sku = l0.sku || ''; l.desc = l0.desc || ''; l.cant = l0.cant || 0;
+  l.existencia = it ? (it.existencia || 0) : (l0.existencia || 0);
+  l.procs = (l0.procs || []).slice();
+  l.procs.forEach(function(p) { l.tocados[p] = true; }); // lo ya guardado no lo mueve un componente
+  var comp = { base: l0.skuBase, contratapa: l0.skuContratapa, liner: l0.skuLiner, banda: l0.skuBanda };
+  COMP_FORM.forEach(function(c) {
+    var sku = String(comp[c.k] || '').trim();
+    if (!sku) return;
+    var item = esKindB7(c.k) ? insumosB7Cache.find(function(i) { return i.sku === sku; }) : invB2DeTapas(sku);
+    l.comp[c.k] = { sku: sku, desc: item ? (item.descripcion || '') : '', ex: item ? (item.existencia || 0) : 0 };
+  });
+  // las sugerencias de los componentes ya existentes se dan por vistas: solo cuentan los componentes NUEVOS
+  if (l.comp.base || l.comp.contratapa) l.sugVistas.armado = true;
+  if (l.comp.liner) l.sugVistas.liner = true;
+  if (l.comp.banda) l.sugVistas.banda = true;
+  lineas = [l];
+  sincronizarProcs(l);
+  editandoFichaId = s.id;
+  document.getElementById('mTitle').textContent = 'Editar · ' + (s.id_display || String(s.id).slice(0, 8));
+  document.getElementById('btnSave').textContent = 'Guardar cambios';
+  var selCli = document.getElementById('fCli');
+  if (s.cliente && !Array.from(selCli.options).some(function(o) { return o.value === s.cliente; })) {
+    var op = document.createElement('option'); op.value = s.cliente; op.textContent = s.cliente; selCli.appendChild(op);
+  }
+  selCli.value = s.cliente || '';
+  document.getElementById('fNotas').value = s.notas || '';
+  var fl = document.getElementById('fLimite'); fl.min = ''; fl.value = s.fechaLimite || '';
+  document.getElementById('fPrioSelect').value = s.prio || 'normal';
+  renderLineas();
+  document.getElementById('overlay').classList.add('open');
+  autoAjustarCamposSku();
+  calcular();
+  if (s.lineas.length > 1) showToast('⚠️ Esta ficha tiene ' + s.lineas.length + ' líneas (formato anterior): solo se edita la primera', '#92400e');
+}
+
+async function guardarEdicionFicha(l, cliente, fLimite) {
+  var s = solicitudes.find(function(x) { return x.id === editandoFichaId; });
+  if (!s || !s.lineas[0]) { alert('No se encontró la ficha a editar'); return; }
+  var texto = (l.sku || '').trim();
+  var enInv = inventarioCache.find(function(i) { return i.sku === texto; });
+  var linea = {
+    sku: enInv ? enInv.sku : '',
+    descripcion: enInv ? (enInv.descripcion || '') : texto,
+    cantidad: l.cant, existencia_snap: l.existencia || 0,
+    procesos: l.procs || []
+  };
+  COMP_FORM.forEach(function(c) { linea[c.campo] = compDe(l, c.k).sku.trim() || null; }); // vaciar un componente lo quita
+  try {
+    var r = await db.from('solicitudes').update({
+      cliente_nombre: cliente, fecha_limite: fLimite,
+      prioridad: document.getElementById('fPrioSelect').value,
+      notas: document.getElementById('fNotas').value
+    }).eq('id', s.dbId).select('id');
+    if (r.error || !(r.data || []).length) throw r.error || new Error('sin permiso para editar (solo master)');
+    var rl = await db.from('solicitud_lineas').update(linea).eq('id', s.lineas[0].id).select('id');
+    if (rl.error || !(rl.data || []).length) throw rl.error || new Error('no se pudo actualizar la línea');
+    var partesReceta = construirPartesReceta(linea, l);
+    cerrarForm();
+    await cargarSolicitudes();
+    if (fichaModalId === s.id || selId === s.id) mostrarDetalle(s.id);
+    showToast('✅ ' + (s.id_display || '') + ' actualizada');
+    ofrecerRecetaDeFicha(linea.sku, linea.descripcion, partesReceta);
+  } catch(e) {
+    console.error('Error editando:', e);
+    var falta = /column|schema cache/i.test(String(e.message)) ? '\n\nFalta correr sql/solicitud_lineas_componentes_tapas_v1.sql en Supabase.' : '';
+    alert('Error al guardar los cambios: ' + e.message + falta);
+  }
 }
 
 // Sin tildes y en minúsculas — "elíptica" encuentra "eliptica" y viceversa
@@ -2000,6 +2154,7 @@ async function guardar() {
   if (sinSku.length) { alert('Elige de la lista el SKU de: ' + sinSku.join(', ') + ' (o deja el campo vacío)'); return; }
 
   sincronizarProcs(l);
+  if (editandoFichaId) { await guardarEdicionFicha(l, cliente, fLimite); return; }
   const codigo = await generarCodigo('tapas');
   const texto  = (l.sku || '').trim();
   const enInv  = inventarioCache.find(function(i) { return i.sku === texto; });
