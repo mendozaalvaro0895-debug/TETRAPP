@@ -223,6 +223,13 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-lim.venc{color:#B83232;font-weight:800}
 .ped-lim.pronto{color:#B87200;font-weight:800}
 .ped-chip.proc .ped-chip-t b{color:#1E3A8A}
+.ped-k{display:flex;gap:4px;align-items:baseline;font-size:9.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ped-k i{font-style:normal;font-weight:800;text-transform:uppercase;letter-spacing:.2px;color:#6B6B6A}
+.ped-k b{font-family:'DM Mono',monospace;color:#0C0C0B}
+.ped-k em{font-style:normal;font-weight:800}
+.ped-k.ok em{color:#166534}
+.ped-k.mal em{color:#B83232}
+.ped-k.n em{color:#9A9A98}
 .ped-chip-d{font-size:10px;color:#6B6B6A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ped-chip-s{font-size:9.5px;font-family:'DM Mono',monospace;color:#3A3A38}
 .ped-chip.proc .ped-chip-s{color:#1E3A8A;font-weight:700}
@@ -1179,7 +1186,7 @@ async function guardarRegistro() {
 // ficha (movimientos_materiales entrada_pt, bloque Entregados de tapas.html). Reparto de ingresos a lotes
 // = FIFO por fecha de marcado (solo cuentan ingresos posteriores al marcado). Abajo se listan los ingresos
 // ya hechos con su requi, marcados Parcial / Completa según lo acumulado de la ficha.
-var PED = { tipos: {}, sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, form: null, selOp: [], selProc: [], cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40 };
+var PED = { stockInv: {}, stockB7: {}, salidas: [], tipos: {}, sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, form: null, selOp: [], selProc: [], cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40 };
 var PED_VIVOS = ['nueva', 'proceso', 'parcial'];
 
 // TIPO / SUBFAMILIA de tapa — ESPEJO de tapas.html (detectarTipoTapa/tipoDeSkuTapa): el tipo guardado en el
@@ -1225,11 +1232,15 @@ function pedAutoRefresco(activo) {
 
 async function cargarPedidos(silencioso) {
   try {
-    var colsSol = 'id,codigo,cliente_nombre,estado,created_at,fecha_limite,solicitud_lineas(sku,descripcion,cantidad,procesos)';
-    var rs = await db.from('solicitudes').select(colsSol.replace('fecha_limite,', 'fecha_limite,plazo_tipo,'))
-      .eq('area', 'tapas').order('created_at', { ascending: true });
-    if (rs.error) { // sin la columna plazo_tipo (sql/solicitudes_plazo_tipo_v1.sql): se pide sin ella
-      rs = await db.from('solicitudes').select(colsSol).eq('area', 'tapas').order('created_at', { ascending: true });
+    // Con componentes (sku_base…) y plazo_tipo; si alguna columna aún no existe (SQL #29 / #37 sin correr) se reintenta sin ella
+    var cBase = 'id,codigo,cliente_nombre,estado,created_at,fecha_limite';
+    var lin = 'sku,descripcion,cantidad,procesos', linC = lin + ',sku_base,sku_contratapa,sku_liner,sku_banda';
+    var intentos = [cBase + ',plazo_tipo,solicitud_lineas(' + linC + ')', cBase + ',solicitud_lineas(' + linC + ')',
+                    cBase + ',plazo_tipo,solicitud_lineas(' + lin + ')', cBase + ',solicitud_lineas(' + lin + ')'];
+    var rs = null;
+    for (var q = 0; q < intentos.length; q++) {
+      rs = await db.from('solicitudes').select(intentos[q]).eq('area', 'tapas').order('created_at', { ascending: true });
+      if (!rs.error) break;
     }
     if (rs.error) throw rs.error;
     var ri = await db.from('movimientos_materiales').select('id,solicitud_id,cantidad,num_documento,observaciones,created_at,area')
@@ -1246,6 +1257,7 @@ async function cargarPedidos(silencioso) {
     }
     PED.lotesOk = !rl.error;
     PED.sols = rs.data || [];
+    await pedCargarStock(PED.sols);
     PED.ing = ri.data || [];
     PED.lotes = rl.error ? [] : (rl.data || []);
     renderPedidos();
@@ -1253,6 +1265,59 @@ async function cargarPedidos(silencioso) {
     console.error('cargarPedidos:', e);
     if (!silencioso) document.getElementById('pedCuerpo').innerHTML = '<div class="ped-vacio">No se pudieron cargar los pedidos: ' + escHtml(e.message || String(e)) + '</div>';
   }
+}
+
+// Existencia ACTUAL de los componentes de las fichas (B2 para Base/Contratapa, Bodega 7 para Liner/Banda) y las salidas
+// de bodega vinculadas a cada ficha: con eso cada chip dice si el componente ALCANZA, igual que en tapas.html.
+async function pedCargarStock(sols) {
+  var skInv = {}, skB7 = {};
+  sols.forEach(function(x) {
+    (x.solicitud_lineas || []).forEach(function(l) {
+      [l.sku_base, l.sku_contratapa].forEach(function(k) { if (k) skInv[k] = 1; });
+      [l.sku_liner, l.sku_banda].forEach(function(k) { if (k) skB7[k] = 1; });
+    });
+  });
+  PED.stockInv = {}; PED.stockB7 = {}; PED.salidas = [];
+  try {
+    var ki = Object.keys(skInv);
+    if (ki.length) {
+      var r = await db.from('inventario').select('sku,descripcion,existencia,bodega').in('sku', ki);
+      (r.data || []).forEach(function(row) { if (!PED.stockInv[row.sku] || !row.bodega || row.bodega === 'B2') PED.stockInv[row.sku] = { ex: row.existencia || 0, desc: row.descripcion || '' }; });
+    }
+    var kb = Object.keys(skB7);
+    if (kb.length) {
+      var r7 = await db.from('insumos_b7').select('sku,descripcion,existencia').in('sku', kb);
+      (r7.data || []).forEach(function(row) { PED.stockB7[row.sku] = { ex: row.existencia || 0, desc: row.descripcion || '' }; });
+    }
+    var rsal = await db.from('movimientos_materiales').select('solicitud_id,sku_original,cantidad,area')
+      .eq('tipo', 'salida_bodega').not('solicitud_id', 'is', null).limit(3000);
+    PED.salidas = (rsal.data || []).filter(function(m) { return m.area !== 'serig'; });
+  } catch(e) { console.warn('pedCargarStock:', e); }
+}
+
+// ESPEJO de componentesStockHtml() de tapas.html: "BASE 10258 · 51,500 und · ✓ alcanza" / "✗ insuficiente: faltan N" /
+// "✓ ya retirada" — stock actual vs. lo que aún falta SACAR de bodega para la ficha (cantidad − salidas ya vinculadas, por SKU).
+function pedCompStockHtml(x) {
+  var salido = {};
+  (PED.salidas || []).forEach(function(m) { if (m.solicitud_id === x.id && m.sku_original) salido[m.sku_original] = (salido[m.sku_original] || 0) + (m.cantidad || 0); });
+  var out = '';
+  (x.s.solicitud_lineas || []).forEach(function(l) {
+    var cant = l.cantidad || 0;
+    [['Base', l.sku_base, false], ['Contratapa', l.sku_contratapa, false], ['Liner', l.sku_liner, true], ['Banda', l.sku_banda, true]].forEach(function(c) {
+      if (!c[1]) return;
+      var it = (c[2] ? PED.stockB7 : PED.stockInv)[c[1]];
+      var stock = it ? it.ex : null;
+      var porSacar = Math.max(0, cant - (salido[c[1]] || 0));
+      var estado, txt;
+      if (stock === null) { estado = 'n'; txt = 'sin dato de stock'; }
+      else if (porSacar === 0) { estado = 'ok'; txt = '✓ ya retirada'; }
+      else if (stock >= porSacar) { estado = 'ok'; txt = '✓ alcanza'; }
+      else { estado = 'mal'; txt = '✗ insuficiente: faltan ' + pedNum(porSacar - stock); }
+      out += '<div class="ped-k ' + estado + '" title="' + escHtml((it && it.desc) || '') + ' · por sacar de bodega: ' + pedNum(porSacar) + '"><i>' + c[0] + '</i> <b>' + escHtml(c[1]) + '</b>'
+        + (stock === null ? '' : ' · ' + pedNum(stock) + ' und') + ' · <em>' + txt + '</em></div>';
+    });
+  });
+  return out;
 }
 
 function pedModelo() {
@@ -1340,6 +1405,7 @@ function renderPedidos() {
       + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + pedLimiteHtml(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
       + '<div class="ped-chip-d">' + escHtml((x.sku ? x.sku + ' · ' : '') + x.desc) + '</div>'
       + '<div class="ped-chip-s">' + (proc ? '▶ ' + pedNum(x.enProc) + ' en proceso' : 'de ' + pedNum(x.cant) + (x.entregado ? ' · ent. ' + pedNum(x.entregado) : '')) + '</div>'
+      + pedCompStockHtml(x)
       + '</div>';
   };
   var htmlGrid;
