@@ -199,6 +199,13 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-sub{font-size:11px;color:#9A9A98}
 .ped-ref{margin-left:auto;background:#fff;border:1.5px solid #E0DED8;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;color:#1A6B5B}
 .ped-aviso{background:#FFF3D6;color:#7A4800;border:1px solid #E8C468;border-radius:8px;padding:7px 10px;font-size:11px;margin:6px 0}
+.ped-chev{display:inline-block;width:12px;font-size:10px;color:#1A6B5B;transition:transform .12s}
+.ped-tipo.col .ped-chev,.ped-col.col .ped-chev,.ped-sec-t.col .ped-chev{transform:rotate(-90deg)}
+.ped-tipo.col .ped-tipo-c{display:none}
+.ped-tipo.col .ped-tipo-h{border-radius:8px}
+.ped-col.col .ped-chips{display:none}
+.ped-proc.col,.ped-comp.col,.ped-mas.col{display:none}
+.ped-tipo-h,.ped-col-h,.ped-sec-t.clic{cursor:pointer;user-select:none}
 .ped-sec-t{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#6B6B6A;margin:14px 0 6px;display:flex;gap:8px;align-items:baseline}
 .ped-sec-t i{font-style:normal;font-weight:500;letter-spacing:0;text-transform:none;color:#9A9A98}
 .ped-proc{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
@@ -1193,6 +1200,26 @@ var PED_VIVOS = ['nueva', 'proceso', 'parcial'];
 // Recetario (sku_especificaciones, area 'tapas', campo 'Familia') manda; si el SKU no tiene, se sugiere por
 // palabras clave de la descripción. Cualquier cambio de reglas hay que hacerlo en AMBOS archivos.
 var PED_TIPO_SIN = 'Sin clasificar';
+
+// Bloques COLAPSABLES — ESPEJO de tapas.html (misma clave de localStorage `tapas_fichas_colapsados`): clic en el encabezado
+// de un tipo / cliente / "En proceso" / "Completados" oculta o muestra sus chips; el encabezado con totales queda visible.
+var pedColapsados = {};
+try { pedColapsados = JSON.parse(localStorage.getItem('tapas_fichas_colapsados') || '{}') || {}; } catch(e) {}
+var pedClavesVista = [];
+function pedCol(k) { return pedColapsados[k] ? ' col' : ''; }
+function pedGuardarColapsados() { try { localStorage.setItem('tapas_fichas_colapsados', JSON.stringify(pedColapsados)); } catch(e) {} }
+function toggleBloquePed(kEnc) {
+  var k = decodeURIComponent(kEnc);
+  if (pedColapsados[k]) delete pedColapsados[k]; else pedColapsados[k] = 1;
+  pedGuardarColapsados();
+  renderPedidos();
+}
+function colapsarTodoPed(colapsar) {
+  pedClavesVista.forEach(function(k) { if (colapsar) pedColapsados[k] = 1; else delete pedColapsados[k]; });
+  pedGuardarColapsados();
+  renderPedidos();
+}
+function pedClic(k) { return ' onclick="toggleBloquePed(\'' + escHtml(encodeURIComponent(k)) + '\')"'; }
 var pedAgrupar = 'tipo'; // 'tipo' (default) | 'cliente'
 try { pedAgrupar = localStorage.getItem('tapas_fichas_agrupar') === 'cliente' ? 'cliente' : 'tipo'; } catch(e) {}
 
@@ -1408,6 +1435,8 @@ function renderPedidos() {
       + pedCompStockHtml(x)
       + '</div>';
   };
+  pedClavesVista = (proc.length ? ['proc'] : []).concat(['comp']).concat(pedAgrupar === 'tipo'
+    ? vivas.map(function(x) { return 'tipo:' + tipoDeSkuTapa(x.sku, x.desc); }) : clis.map(function(c) { return 'cli:' + c; }));
   var htmlGrid;
   if (pedAgrupar === 'tipo') {
     var porTipo = {}, tipos = [];
@@ -1425,7 +1454,7 @@ function renderPedidos() {
     }).join('');
     var secciones = tipos.map(function(t) {
       var items = porTipo[t].slice().sort(ordenChips);
-      return '<div class="ped-tipo" id="' + escHtml(idDe(t)) + '"><div class="ped-tipo-h"><span class="ped-tipo-n">' + escHtml(t) + '</span>'
+      return '<div class="ped-tipo' + pedCol('tipo:' + t) + '" id="' + escHtml(idDe(t)) + '"><div class="ped-tipo-h"' + pedClic('tipo:' + t) + '><span class="ped-chev">▾</span><span class="ped-tipo-n">' + escHtml(t) + '</span>'
         + '<span class="ped-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + pedNum(saldoDe(t)) + '</b> und</span></div>'
         + '<div class="ped-tipo-c">' + items.map(function(x) { return chip(x, true); }).join('') + '</div></div>';
     }).join('');
@@ -1436,7 +1465,7 @@ function renderPedidos() {
     var cols = clis.map(function(c) {
       var items = porCli[c].slice().sort(ordenChips);
       var saldoTot = items.reduce(function(a, x) { return a + x.saldo; }, 0);
-      return '<div class="ped-col"><div class="ped-col-h"><div class="ped-col-n">' + escHtml(c) + '</div>'
+      return '<div class="ped-col' + pedCol('cli:' + c) + '"><div class="ped-col-h"' + pedClic('cli:' + c) + '><div class="ped-col-n"><span class="ped-chev">▾</span>' + escHtml(c) + '</div>'
         + '<div class="ped-col-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo ' + pedNum(saldoTot) + '</div></div>'
         + '<div class="ped-chips">' + items.map(function(x) { return chip(x, false); }).join('') + '</div></div>';
     }).join('');
@@ -1445,7 +1474,9 @@ function renderPedidos() {
       : '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
   }
   var modoBtns = '<span class="ped-modo"><button class="' + (pedAgrupar === 'tipo' ? 'act' : '') + '" onclick="setPedAgrupar(\'tipo\')">Por tipo</button>'
-    + '<button class="' + (pedAgrupar === 'cliente' ? 'act' : '') + '" onclick="setPedAgrupar(\'cliente\')">Por cliente</button></span>';
+    + '<button class="' + (pedAgrupar === 'cliente' ? 'act' : '') + '" onclick="setPedAgrupar(\'cliente\')">Por cliente</button></span>'
+    + '<span class="ped-modo" style="margin-left:6px"><button onclick="colapsarTodoPed(true)" title="Ocultar los chips de todos los bloques">Colapsar todo</button>'
+    + '<button onclick="colapsarTodoPed(false)" title="Mostrar todos los bloques">Expandir todo</button></span>';
 
   // 3) Completados: ingresos PT con su requi, agrupados por requi + ficha
   var grupos = {}, orden = [];
@@ -1474,9 +1505,9 @@ function renderPedidos() {
     : '<div class="ped-vacio">Todavía no hay ingresos PT vinculados a pedidos.</div>';
 
   document.getElementById('pedCuerpo').innerHTML =
-    '<div class="ped-sec-t">🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc
+    '<div class="ped-sec-t clic' + pedCol('proc') + '"' + pedClic('proc') + '><span class="ped-chev">▾</span>🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc.replace('class="ped-proc"', 'class="ped-proc' + pedCol('proc') + '"')
     + '<div class="ped-sec-t">📋 ' + (pedAgrupar === 'tipo' ? 'Por entregar según el tipo de tapa' : 'Todos los pedidos por cliente') + ' <i>toca un pedido para marcarlo en proceso</i>' + modoBtns + '</div>' + htmlGrid
-    + '<div class="ped-sec-t">✅ Completados — ingresos PT con su requi <i>(' + orden.length + ')</i></div>' + htmlComp;
+    + '<div class="ped-sec-t clic' + pedCol('comp') + '"' + pedClic('comp') + '><span class="ped-chev">▾</span>✅ Completados — ingresos PT con su requi <i>(' + orden.length + ')</i></div>' + htmlComp.replace('class="ped-comp"', 'class="ped-comp' + pedCol('comp') + '"').replace('class="ped-mas"', 'class="ped-mas' + pedCol('comp') + '"');
 
   if (document.getElementById('pedOv').classList.contains('open') && PED.abierto) pintarPedido();
 }
