@@ -1180,8 +1180,12 @@ function pedAutoRefresco(activo) {
 
 async function cargarPedidos(silencioso) {
   try {
-    var rs = await db.from('solicitudes').select('id,codigo,cliente_nombre,estado,created_at,fecha_limite,solicitud_lineas(sku,descripcion,cantidad,procesos)')
+    var colsSol = 'id,codigo,cliente_nombre,estado,created_at,fecha_limite,solicitud_lineas(sku,descripcion,cantidad,procesos)';
+    var rs = await db.from('solicitudes').select(colsSol.replace('fecha_limite,', 'fecha_limite,plazo_tipo,'))
       .eq('area', 'tapas').order('created_at', { ascending: true });
+    if (rs.error) { // sin la columna plazo_tipo (sql/solicitudes_plazo_tipo_v1.sql): se pide sin ella
+      rs = await db.from('solicitudes').select(colsSol).eq('area', 'tapas').order('created_at', { ascending: true });
+    }
     if (rs.error) throw rs.error;
     var ri = await db.from('movimientos_materiales').select('id,solicitud_id,cantidad,num_documento,observaciones,created_at,area')
       .eq('tipo', 'entrada_pt').not('solicitud_id', 'is', null).order('created_at', { ascending: true }).limit(3000);
@@ -1231,7 +1235,7 @@ function pedModelo() {
     return { s: s, id: s.id, codigo: s.codigo || String(s.id).slice(0, 6), cliente: s.cliente_nombre || '—', cant: cant, entregado: entregado,
              saldo: saldo, enProc: enProc, libre: Math.max(0, saldo - enProc), abiertos: abiertos, ings: ings,
              sku: l0.sku || '', desc: (l0.descripcion || '') + (lins.length > 1 ? ' (+' + (lins.length - 1) + ')' : ''),
-             viva: PED_VIVOS.indexOf(s.estado) >= 0, limite: s.fecha_limite || '',
+             viva: PED_VIVOS.indexOf(s.estado) >= 0, limite: s.fecha_limite || '', plazo: s.plazo_tipo || 'fecha',
              procs: pedProcsDe(lins) };
   });
 }
@@ -1239,6 +1243,8 @@ function pedModelo() {
 // Fecha límite de entrega: "20-oct" (rojo si ya venció, ámbar si vence en ≤2 días)
 var PED_MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 function pedLimiteHtml(x) {
+  if (x.plazo === 'parciales') return '<span class="ped-lim" style="color:#1E3A8A;font-weight:800" title="OC abierta: el cliente va pidiendo por parciales">⏳ Parciales</span>';
+  if (x.plazo === 'pendiente') return '<span class="ped-lim" style="color:#1E3A8A;font-weight:800" title="Sin fecha definida">⏳ Pendiente</span>';
   if (!x.limite) return '<span class="ped-lim" title="Sin fecha límite">⏳ —</span>';
   var dias = Math.round((new Date(x.limite + 'T12:00:00') - new Date(fechaGT() + 'T12:00:00')) / 86400000);
   var cls = dias < 0 ? ' venc' : (dias <= 2 ? ' pronto' : '');
