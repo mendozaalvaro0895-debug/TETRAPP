@@ -720,6 +720,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 </div>
 
 <!-- MODAL FORMULARIO -->
+<!-- MODAL DETALLE DE FICHA (como en Serigrafía: ventana flotante en vez de cambiar de pestaña) -->
+<div class="overlay" id="modalFichaTapas" onclick="if(event.target===this)cerrarFichaTapas()">
+  <div class="modal" style="max-width:860px;width:94%">
+    <div class="mh">
+      <div>
+        <div class="mh-title" id="fichaTitulo">—</div>
+        <div class="ph-sub" id="fichaSub"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="ph-r" id="fichaAcc"></div>
+        <button class="m-close" onclick="cerrarFichaTapas()">✕</button>
+      </div>
+    </div>
+    <div class="mb" id="fichaCuerpo"></div>
+  </div>
+</div>
+
 <div class="overlay" id="overlay">
   <div class="modal">
     <div class="mh">
@@ -1398,53 +1415,70 @@ async function cambiarFechaLimiteTapas(id, valor) {
   showToast('✅ Fecha límite: ' + valor);
 }
 
+// Detalle de una ficha. Se pinta en el panel derecho de la pestaña Pedidos o, si la ficha está abierta
+// en la ventana flotante (fichaModalId, desde Fichas de Trabajo), en el modal: mismo contenido, ids con
+// prefijo 'm' para no chocar con el panel.
+var fichaModalId = null;
+
 async function mostrarDetalle(id) {
   const s = solicitudes.find(x => x.id === id);
   if (!s) return;
-  selId = s.id;
-  renderListas();
-  
+  const enModal = fichaModalId === s.id;
+  const pre = enModal ? 'm' : '';
+  if (!enModal) {
+    selId = s.id;
+    renderListas();
+  }
+
   let fugas = { salidas: 0, entradas: 0, perdidas: 0, fugaTotal: 0 };
+  let ingresos = [];
   try {
     const { data } = await db
       .from('movimientos_materiales')
       .select('*')
       .eq('solicitud_id', s.dbId);
-    
+
     if (data) {
       fugas.salidas = data.filter(m => m.tipo === 'salida_bodega').reduce((sum, m) => sum + (m.cantidad || 0), 0);
       fugas.entradas = data.filter(m => m.tipo === 'entrada_pt').reduce((sum, m) => sum + (m.cantidad || 0), 0);
       fugas.perdidas = data.filter(m => m.tipo === 'perdida').reduce((sum, m) => sum + (m.cantidad || 0), 0);
       fugas.fugaTotal = fugas.salidas - fugas.entradas - fugas.perdidas;
+      ingresos = data.filter(m => m.tipo === 'entrada_pt')
+        .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
     }
   } catch(e) {}
-  
-  const det = document.getElementById('detTapas');
+
   const allProcs = s.lineas.flatMap(l => l.procs || []);
   const metaSol  = metaParaProcesos(allProcs);
   const horas = calcularHoras(s.cant, 1, allProcs);
-  
-  det.innerHTML = `
-    <div class="ph" style="flex-shrink:0">
-      <div>
-        <div class="ph-title">${escHtml(s.id_display || s.id.slice(0,8))} — ${escHtml(s.cliente)}</div>
-        <div class="ph-sub">${escHtml(s.sku)} · ${s.cant.toLocaleString()} unidades · ⏳ Límite <input type="date" class="fi" style="padding:1px 6px;font-size:11px" value="${escHtml(s.fechaLimite || '')}" onchange="cambiarFechaLimiteTapas('${escHtml(s.id)}', this.value)"></div>
-      </div>
-      <div class="ph-r">
+
+  const titulo = `${escHtml(s.id_display || s.id.slice(0,8))} — ${escHtml(s.cliente)}`;
+  const sub = `${escHtml(s.sku)} · ${s.cant.toLocaleString()} unidades · ⏳ Límite <input type="date" class="fi" style="padding:1px 6px;font-size:11px" value="${escHtml(s.fechaLimite || '')}" onchange="cambiarFechaLimiteTapas('${escHtml(s.id)}', this.value)">`;
+  const acciones = `
         ${s.estado === 'nueva' ? `<button class="btn btn-t btn-xs" onclick="cambiarEstado('${s.id}','proceso')">▶ Iniciar</button>` : ''}
         ${s.estado === 'proceso' ? `<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista')">✓ Lista</button>` : ''}
         ${s.estado === 'lista' ? `<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada')">📦 Entregar</button>` : ''}
-        <button class="btn btn-del btn-xs" onclick="confirmarBorrar('${s.id}')">🗑</button>
-      </div>
-    </div>
-    <div class="det-scroll">
-      
+        <button class="btn btn-del btn-xs" onclick="confirmarBorrar('${s.id}')">🗑</button>`;
+
+  const filasIng = ingresos.map(m =>
+    `<tr><td style="font-family:var(--mono)">${escHtml(parseFechaDoc(m.observaciones) || formatFecha(m.created_at))}</td>`
+    + `<td style="font-family:var(--mono);font-weight:700">${escHtml(m.num_documento || '—')}</td>`
+    + `<td style="text-align:right;font-family:var(--mono);font-weight:700;color:var(--green)">${(m.cantidad || 0).toLocaleString()}</td></tr>`).join('');
+  const bloqueIngresos = ingresos.length ? `
+      <div class="dc">
+        <div class="dc-h">Ingresos PT de esta ficha (${fugas.entradas.toLocaleString()} de ${s.cant.toLocaleString()} und)</div>
+        <div class="dc-b">
+          <table class="dt"><thead><tr><th>Fecha</th><th>Requi</th><th style="text-align:right">Unidades</th></tr></thead><tbody>${filasIng}</tbody></table>
+        </div>
+      </div>` : '';
+
+  const cuerpo = `
       <div class="tbox tt">
         <div class="tbox-lbl">Tiempo estimado</div>
         <div class="tbox-val tc">${horas.toFixed(1)} horas</div>
         <div class="tbox-sub">${Math.ceil(horas/12)} turno(s) · Meta: ${metaSol.toLocaleString()} und/h · Entrega est.: ${fechaEst(Math.ceil(horas/12))}</div>
       </div>
-      
+
       <div class="dc" style="border-color:var(--amber)">
         <div class="dc-h" style="background:var(--amber-l);color:var(--amber)">📉 Trazabilidad de fugas</div>
         <div class="dc-b">
@@ -1461,7 +1495,7 @@ async function mostrarDetalle(id) {
           </div>
         </div>
       </div>
-      
+      ${bloqueIngresos}
       <div class="dc">
         <div class="dc-h">Líneas del pedido</div>
         <div class="dc-b">
@@ -1481,28 +1515,48 @@ async function mostrarDetalle(id) {
           </table>
         </div>
       </div>
-      
+
       <div class="dc">
         <div class="dc-h">Progreso</div>
         <div class="dc-b">
-          <input type="range" id="sldr_${s.id}" min="0" max="100" value="${s.prog}" style="width:100%">
+          <input type="range" id="sldr_${pre}${s.id}" min="0" max="100" value="${s.prog}" style="width:100%">
           <div style="display:flex;justify-content:space-between;margin-top:6px">
-            <span id="sldrV_${s.id}">${s.prog}%</span>
+            <span id="sldrV_${pre}${s.id}">${s.prog}%</span>
             <button class="btn btn-t btn-xs" onclick="actualizarProg('${s.id}')">Actualizar</button>
           </div>
         </div>
       </div>
-      
-      ${s.notas ? `<div class="dc"><div class="dc-h">Notas</div><div class="dc-b">${escHtml(s.notas)}</div></div>` : ''}
+
+      ${s.notas ? `<div class="dc"><div class="dc-h">Notas</div><div class="dc-b">${escHtml(s.notas)}</div></div>` : ''}`;
+
+  if (enModal) {
+    document.getElementById('fichaTitulo').innerHTML = titulo;
+    document.getElementById('fichaSub').innerHTML = sub;
+    document.getElementById('fichaAcc').innerHTML = acciones;
+    document.getElementById('fichaCuerpo').innerHTML = cuerpo;
+  } else {
+    document.getElementById('detTapas').innerHTML = `
+    <div class="ph" style="flex-shrink:0">
+      <div>
+        <div class="ph-title">${titulo}</div>
+        <div class="ph-sub">${sub}</div>
+      </div>
+      <div class="ph-r">${acciones}</div>
     </div>
-  `;
-  
-  const slider = document.getElementById(`sldr_${s.id}`);
+    <div class="det-scroll">${cuerpo}</div>`;
+  }
+
+  const slider = document.getElementById(`sldr_${pre}${s.id}`);
   if (slider) {
     slider.oninput = (e) => {
-      document.getElementById(`sldrV_${s.id}`).textContent = e.target.value + '%';
+      document.getElementById(`sldrV_${pre}${s.id}`).textContent = e.target.value + '%';
     };
   }
+}
+
+function cerrarFichaTapas() {
+  document.getElementById('modalFichaTapas').classList.remove('open');
+  fichaModalId = null;
 }
 
 // ══ ACCIONES ════════════════════════════════════════════════
@@ -1596,7 +1650,7 @@ async function cambiarEstado(id, nuevoEstado) {
 
 async function actualizarProg(id) {
   const s = solicitudes.find(x => x.id === id);
-  const slider = document.getElementById(`sldr_${id}`);
+  const slider = document.getElementById(`sldr_${fichaModalId === id ? 'm' : ''}${id}`);
   if (!s || !slider) return;
   
   const prog = parseInt(slider.value);
@@ -1623,6 +1677,7 @@ async function confirmarBorrar(id) {
       document.getElementById('detTapas').innerHTML = '<div class="det-empty"><div class="det-empty-ico">🗑️</div><div class="det-empty-txt">Solicitud eliminada</div></div>';
       showToast('🗑 Solicitud eliminada');
       selId = null;
+      cerrarFichaTapas();
     } catch(e) {
       showToast('❌ Error al eliminar', '#B83232');
     }
@@ -2898,7 +2953,8 @@ function textoComponentes(l) {
 }
 
 function abrirFichaTapas(id) {
-  switchTab('tapas');
+  fichaModalId = id;
+  document.getElementById('modalFichaTapas').classList.add('open');
   mostrarDetalle(id);
 }
 
