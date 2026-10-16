@@ -1178,7 +1178,9 @@ function buildImportRow(r) {
              : '<span style="color:var(--gray)">±0</span>';
   return '<tr><td><span class="tag-upd">ACT</span></td>' +
     '<td style="font-family:var(--mono);font-weight:700">' + escHtml(r.sku) + '</td>' +
-    '<td>' + escHtml(r.desc.substring(0,45)) + '</td>' +
+    '<td>' + (r.cambiaDesc
+      ? '<span style="color:var(--gray-l);text-decoration:line-through;font-size:11px">' + escHtml(r.descAntes.substring(0, 45)) + '</span><br><b>' + escHtml(r.desc.substring(0, 45)) + '</b>'
+      : escHtml(r.desc.substring(0,45))) + '</td>' +
     '<td style="text-align:right;font-family:var(--mono)">' + fmtExist(r.existAntes) + ' → ' + fmtExist(r.existDespues) + ' ' + diffStr + '</td></tr>';
 }
 
@@ -1194,7 +1196,11 @@ function mostrarPreviewImport(productos, filename) {
   var nuevos       = [];
   productos.forEach(function(p) {
     if (skuActuales[p.sku]) {
-      actualizados.push({ sku: p.sku, desc: p.descripcion, existAntes: skuActuales[p.sku].existencia || 0, existDespues: p.existencia });
+      // SICAF manda en la descripción (bodegas 2/5; Bodega 7 tiene descripciones corregidas a mano y no se toca)
+      var descAntes = String(skuActuales[p.sku].descripcion || '').trim();
+      var cambiaDesc = importBodega !== 'bodega7' && !!p.descripcion && p.descripcion !== descAntes.toUpperCase();
+      actualizados.push({ sku: p.sku, desc: p.descripcion, existAntes: skuActuales[p.sku].existencia || 0, existDespues: p.existencia,
+                          cambiaDesc: cambiaDesc, descAntes: descAntes });
     } else {
       nuevos.push(p);
     }
@@ -1204,11 +1210,12 @@ function mostrarPreviewImport(productos, filename) {
 
   var cambiados = actualizados.filter(function(r) { return r.existDespues !== r.existAntes; });
   var sinCambio = actualizados.filter(function(r) { return r.existDespues === r.existAntes; });
+  var descCambian = actualizados.filter(function(r) { return r.cambiaDesc; });
   var todos     = actualizados.concat(nuevos);
 
   var preview5 = actualizados.slice(0, 5).concat(nuevos.slice(0, 3));
   importPreviewCats = {
-    todos: todos, cambiados: cambiados, nuevos: nuevos, sinCambio: sinCambio,
+    todos: todos, cambiados: cambiados, nuevos: nuevos, sinCambio: sinCambio, descCambian: descCambian,
     sampleHtml: preview5.map(buildImportRow).join(''), sampleN: preview5.length
   };
   importPreviewFiltro = null;
@@ -1224,6 +1231,7 @@ function mostrarPreviewImport(productos, filename) {
       '<div class="imp-stat" data-filtro="cambiados" onclick="filtrarImportPreview(\'cambiados\')"><strong>' + cambiados.length + '</strong><span>Existencias cambian</span></div>' +
       '<div class="imp-stat new" data-filtro="nuevos" onclick="filtrarImportPreview(\'nuevos\')"><strong>' + nuevos.length + '</strong><span>Productos nuevos</span></div>' +
       '<div class="imp-stat" data-filtro="sinCambio" onclick="filtrarImportPreview(\'sinCambio\')"><strong>' + sinCambio.length + '</strong><span>Sin cambio</span></div>' +
+      (descCambian.length ? '<div class="imp-stat" data-filtro="descCambian" onclick="filtrarImportPreview(\'descCambian\')" title="La descripción de SICAF reemplaza a la de TETRAPP"><strong>' + descCambian.length + '</strong><span>Descripciones cambian</span></div>' : '') +
     '</div>' +
     '<div class="imp-table-wrap">' +
       '<table class="imp-table"><thead><tr><th></th><th>SKU</th><th>Descripción</th><th style="text-align:right">Existencia</th></tr></thead>' +
@@ -1369,8 +1377,9 @@ async function confirmarImport() {
 
     var skuActuales = {};
     todosLosItems.forEach(function(i) {
-      if ((i.bodega || 'B2') === bodeganKey) skuActuales[i.sku] = true;
+      if ((i.bodega || 'B2') === bodeganKey) skuActuales[i.sku] = i;
     });
+    var descActualizadas = 0;
 
     var existentes = importPendiente.filter(function(p) { return skuActuales[p.sku]; });
     var nuevos     = importPendiente.filter(function(p) { return !skuActuales[p.sku]; });
@@ -1379,7 +1388,10 @@ async function confirmarImport() {
     for (var i = 0; i < existentes.length; i += PARALLEL) {
       var chunk = existentes.slice(i, i + PARALLEL);
       var results = await Promise.all(chunk.map(function(p) {
-        return db.from('inventario').update({ existencia: p.existencia })
+        var cambio = { existencia: p.existencia };
+        var antes = String((skuActuales[p.sku] && skuActuales[p.sku].descripcion) || '').trim();
+        if (p.descripcion && p.descripcion !== antes.toUpperCase()) { cambio.descripcion = p.descripcion; descActualizadas++; }
+        return db.from('inventario').update(cambio)
           .eq('sku', p.sku).eq('bodega', bodeganKey);
       }));
       results.forEach(function(r) { if (r.error) errores++; });
@@ -1402,6 +1414,7 @@ async function confirmarImport() {
 
     var msg = total + ' productos actualizados';
     if (nuevos.length) msg += ' · ' + nuevos.length + ' nuevos agregados';
+    if (descActualizadas) msg += ' · ' + descActualizadas + ' descripciones actualizadas';
     if (errores) msg += ' · ' + errores + ' errores';
     toast(msg, errores ? 'err' : 'ok');
     if (!errores) {
