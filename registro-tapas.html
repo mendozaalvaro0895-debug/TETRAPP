@@ -256,6 +256,16 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-add{display:flex;gap:8px;margin-top:10px}
 .ped-add input{flex:1;border:1.5px solid #C8C6C0;border-radius:10px;padding:11px 12px;font-size:16px;font-family:'DM Mono',monospace;min-width:0}
 .ped-add button{background:#2563EB;color:#fff;border:none;border-radius:10px;padding:0 16px;font-size:13px;font-weight:700;cursor:pointer}
+.ped-chs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.ped-ch{border:1.5px solid #C8C6C0;background:#fff;border-radius:18px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;color:#3A3A38;-webkit-tap-highlight-color:transparent}
+.ped-ch.sel{background:#2563EB;border-color:#2563EB;color:#fff}
+.ped-lbl{font-size:11px;font-weight:700;color:#3A3A38;margin-top:8px}
+.ped-lote-w{margin-bottom:8px}
+.ped-lote-w .ped-lote{margin-bottom:2px}
+.ped-tar{font-size:10.5px;color:#1E3A8A;margin:1px 0 0 14px}
+.ped-link{background:none;border:none;color:#2563EB;font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline;padding:3px 0 0 14px}
+.ped-pc-p{font-size:10px;color:#1E3A8A;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ped-add-btn{display:block;width:100%;margin-top:6px;background:#2563EB;color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
 .ped-cerrar{display:block;margin:12px auto 0;background:none;border:none;color:#6B6B6A;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline}
 /* ── Time Picker 12h ── */
 </style>
@@ -1153,7 +1163,7 @@ async function guardarRegistro() {
 // ficha (movimientos_materiales entrada_pt, bloque Entregados de tapas.html). Reparto de ingresos a lotes
 // = FIFO por fecha de marcado (solo cuentan ingresos posteriores al marcado). Abajo se listan los ingresos
 // ya hechos con su requi, marcados Parcial / Completa según lo acumulado de la ficha.
-var PED = { sols: [], ing: [], lotes: [], lotesOk: true, modelo: [], timer: null, masComp: 40 };
+var PED = { sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, form: null, selOp: '', selProc: '', cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40 };
 var PED_VIVOS = ['nueva', 'proceso', 'parcial'];
 
 function pedFechaMov(m) {
@@ -1170,13 +1180,16 @@ function pedAutoRefresco(activo) {
 
 async function cargarPedidos(silencioso) {
   try {
-    var rs = await db.from('solicitudes').select('id,codigo,cliente_nombre,estado,created_at,fecha_limite,solicitud_lineas(sku,descripcion,cantidad)')
+    var rs = await db.from('solicitudes').select('id,codigo,cliente_nombre,estado,created_at,fecha_limite,solicitud_lineas(sku,descripcion,cantidad,procesos)')
       .eq('area', 'tapas').order('created_at', { ascending: true });
     if (rs.error) throw rs.error;
     var ri = await db.from('movimientos_materiales').select('id,solicitud_id,cantidad,num_documento,observaciones,created_at,area')
       .eq('tipo', 'entrada_pt').not('solicitud_id', 'is', null).order('created_at', { ascending: true }).limit(3000);
     if (ri.error) throw ri.error;
     var rl = await db.from('tapas_lotes').select('*').order('marcado_en', { ascending: true });
+    var rt = await db.from('tapas_lote_tareas').select('*').order('iniciado_en', { ascending: true });
+    PED.tareasOk = !rt.error;
+    PED.tareas = rt.error ? [] : (rt.data || []);
     PED.lotesOk = !rl.error;
     PED.sols = rs.data || [];
     PED.ing = ri.data || [];
@@ -1208,7 +1221,8 @@ function pedModelo() {
         var take = Math.min(it.rem, falta);
         it.rem -= take; falta -= take; hecho += take;
       });
-      return { id: lt.id, cantidad: lt.cantidad, hecho: hecho, completo: hecho >= lt.cantidad, por: lt.marcado_por || '' };
+      return { id: lt.id, cantidad: lt.cantidad, hecho: hecho, completo: hecho >= lt.cantidad, por: lt.marcado_por || '',
+               tareas: PED.tareas.filter(function(t) { return t.lote_id === lt.id; }) };
     });
     var abiertos = lotes.filter(function(l) { return !l.completo; });
     var enProc = abiertos.reduce(function(a, l) { return a + (l.cantidad - l.hecho); }, 0);
@@ -1217,7 +1231,8 @@ function pedModelo() {
     return { s: s, id: s.id, codigo: s.codigo || String(s.id).slice(0, 6), cliente: s.cliente_nombre || '—', cant: cant, entregado: entregado,
              saldo: saldo, enProc: enProc, libre: Math.max(0, saldo - enProc), abiertos: abiertos, ings: ings,
              sku: l0.sku || '', desc: (l0.descripcion || '') + (lins.length > 1 ? ' (+' + (lins.length - 1) + ')' : ''),
-             viva: PED_VIVOS.indexOf(s.estado) >= 0, limite: s.fecha_limite || '' };
+             viva: PED_VIVOS.indexOf(s.estado) >= 0, limite: s.fecha_limite || '',
+             procs: pedProcsDe(lins) };
   });
 }
 
@@ -1250,6 +1265,7 @@ function renderPedidos() {
     return '<div class="ped-pc" onclick="abrirPedido(\'' + escHtml(String(p.x.id)) + '\')">'
       + '<div class="ped-pc-t"><span>' + escHtml(p.x.cliente) + ' · ' + escHtml(p.x.codigo) + pedLimiteHtml(p.x) + '</span><b>' + pedNum(p.l.cantidad) + '</b></div>'
       + '<div class="ped-pc-d">' + escHtml((p.x.sku ? p.x.sku + ' — ' : '') + p.x.desc) + '</div>'
+      + (p.l.tareas.length ? '<div class="ped-pc-p">' + pedTareasResumen(p.l.tareas) + '</div>' : '')
       + '<div class="ped-bar"><i style="width:' + pct + '%"></i></div></div>';
   }).join('') + '</div>' : '<div class="ped-vacio">Nada marcado en proceso. Toca un pedido de abajo para marcarlo.</div>';
 
@@ -1309,25 +1325,107 @@ function renderPedidos() {
     + '<div class="ped-sec-t">📋 Todos los pedidos por cliente <i>toca uno para marcarlo en proceso</i></div>' + htmlGrid
     + '<div class="ped-sec-t">✅ Completados — ingresos PT con su requi <i>(' + orden.length + ')</i></div>' + htmlComp;
 
-  if (document.getElementById('pedOv').classList.contains('open') && PED.abierto) abrirPedido(PED.abierto);
+  if (document.getElementById('pedOv').classList.contains('open') && PED.abierto) pintarPedido();
 }
 
-// ── Popup de un pedido: números + lotes en proceso + marcar uno nuevo ──
+// ── Popup de un pedido: números + lotes en proceso (con quién hace qué) + marcar/iniciar ──
+var PED_PROC_LBL = { armado: 'Armado', banda: 'Banda', liner: 'Liner', flameado: 'Flameado', impresion: 'Impresión', encajado: 'Encajado' };
+var PED_PROC_ORDEN = ['armado', 'banda', 'liner', 'flameado', 'impresion', 'encajado'];
+
+// Procesos de la ficha (los que se marcaron al crearla); si no trae ninguno, se ofrecen todos
+function pedProcsDe(lins) {
+  var set = {};
+  (lins || []).forEach(function(l) { (l.procesos || []).forEach(function(p) { set[p] = true; }); });
+  var out = PED_PROC_ORDEN.filter(function(p) { return set[p]; });
+  Object.keys(set).forEach(function(p) { if (out.indexOf(p) < 0) out.push(p); });
+  return out.length ? out : PED_PROC_ORDEN.slice();
+}
+
+function pedProcLbl(p) { return PED_PROC_LBL[p] || p; }
+
+// "Yenifer Lopez Espinal" → "Yenifer L."
+function pedCorto(n) {
+  var w = String(n || '').trim().split(/\s+/);
+  return w.length > 1 ? w[0] + ' ' + w[1].charAt(0).toUpperCase() + '.' : (w[0] || '—');
+}
+
+function pedHora(ts) {
+  var d = new Date(ts);
+  return isNaN(d.getTime()) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function pedTareasResumen(tareas) {
+  var ult = tareas.slice(-2).map(function(t) { return escHtml(pedProcLbl(t.proceso)) + ' · ' + escHtml(pedCorto(t.operario_nombre)); });
+  return ult.join(' | ') + (tareas.length > 2 ? ' (+' + (tareas.length - 2) + ')' : '');
+}
+
+function pedChips(lista, sel, tipo) {
+  return '<div class="ped-chs">' + lista.map(function(o) {
+    return '<div class="ped-ch' + (o.v === sel ? ' sel' : '') + '" title="' + escHtml(o.title || '') + '" onclick="pedSel(\'' + tipo + '\',\'' + escHtml(String(o.v).replace(/'/g, '')) + '\')">' + escHtml(o.t) + '</div>';
+  }).join('') + '</div>';
+}
+
+function pedSel(tipo, v) {
+  var c = document.getElementById('pedCant');
+  if (c) PED.cantTmp = c.value;
+  if (tipo === 'op') PED.selOp = v; else PED.selProc = v;
+  pintarPedido();
+}
+
+function pedForm(loteId) {
+  var c = document.getElementById('pedCant');
+  if (c) PED.cantTmp = c.value;
+  PED.form = loteId ? { lote: loteId } : null;
+  pintarPedido();
+}
+
 function abrirPedido(id) {
-  var x = PED.modelo.find(function(m) { return String(m.id) === String(id); });
-  if (!x) return;
-  PED.abierto = x.id;
+  PED.abierto = id;
+  PED.form = null; PED.selOp = ''; PED.selProc = ''; PED.cantTmp = null;
+  pintarPedido();
+}
+
+function pintarPedido() {
+  var x = PED.modelo.find(function(m) { return String(m.id) === String(PED.abierto); });
+  if (!x) { cerrarPedido(); return; }
+  var tarea = PED.form ? x.abiertos.find(function(l) { return String(l.id) === String(PED.form.lote); }) : null;
+  if (PED.form && !tarea) PED.form = null; // el lote ya se completó o se quitó
+
   var lotes = x.abiertos.map(function(l) {
-    return '<div class="ped-lote"><span>▶ ' + pedNum(l.cantidad) + ' und'
-      + (l.hecho ? ' · ya ingresadas ' + pedNum(l.hecho) : '') + (l.por ? ' · ' + escHtml(l.por) : '') + '</span>'
-      + '<button onclick="quitarLote(\'' + escHtml(String(l.id)) + '\')">Quitar</button></div>';
+    var tars = l.tareas.map(function(t) {
+      return '<div class="ped-tar">• ' + escHtml(pedProcLbl(t.proceso)) + ' · ' + escHtml(pedCorto(t.operario_nombre)) + ' · ' + pedHora(t.iniciado_en) + '</div>';
+    }).join('');
+    return '<div class="ped-lote-w"><div class="ped-lote"><span>▶ ' + pedNum(l.cantidad) + ' und'
+      + (l.hecho ? ' · ya ingresadas ' + pedNum(l.hecho) : '') + '</span>'
+      + '<button onclick="quitarLote(\'' + escHtml(String(l.id)) + '\')">Quitar</button></div>'
+      + tars
+      + (PED.lotesOk && PED.tareasOk ? '<button class="ped-link" onclick="pedForm(\'' + escHtml(String(l.id)) + '\')">＋ Iniciar otro proceso / operario en este lote</button>' : '')
+      + '</div>';
   }).join('');
-  var form = !PED.lotesOk ? '<div class="ped-aviso">Falta correr sql/tapas_lotes_v1.sql para poder marcar.</div>'
-    : (x.libre > 0
-      ? '<div class="field" style="margin-top:8px"><label>¿Cuántas unidades se trabajan ahora?</label></div>'
-        + '<div class="ped-add"><input type="number" inputmode="numeric" id="pedCant" min="1" max="' + x.libre + '" value="' + x.libre + '">'
-        + '<button onclick="marcarLote()">▶ Marcar en proceso</button></div>'
-      : '<div class="ped-vacio">Todo el saldo ya está en proceso.</div>');
+
+  // ¿quién inicia? + ¿qué proceso? (obligatorios cuando existe la tabla de tareas)
+  var ops = operarios.map(function(o) { return { v: o.codigo, t: pedCorto(o.nombre), title: o.nombre }; });
+  var procs = x.procs.map(function(p) { return { v: p, t: pedProcLbl(p) }; });
+  var quien = !PED.tareasOk
+    ? '<div class="ped-aviso">Falta correr sql/tapas_lote_tareas_v1.sql para registrar qué operario inicia qué proceso.</div>'
+    : '<div class="ped-lbl">¿Quién inicia?</div>' + pedChips(ops, PED.selOp, 'op')
+      + '<div class="ped-lbl">¿Qué proceso?</div>' + pedChips(procs, PED.selProc, 'proc');
+
+  var form;
+  if (!PED.lotesOk) form = '<div class="ped-aviso">Falta correr sql/tapas_lotes_v1.sql para poder marcar.</div>';
+  else if (tarea) {
+    form = '<div class="ped-sec-t" style="margin-top:8px">Iniciar proceso en el lote de ' + pedNum(tarea.cantidad) + ' und</div>' + quien
+      + '<button class="ped-add-btn" onclick="iniciarTarea()">▶ Iniciar</button>'
+      + '<button class="ped-link" style="padding-left:0" onclick="pedForm(\'\')">← Marcar un lote nuevo</button>';
+  } else if (x.libre > 0) {
+    var cant = PED.cantTmp != null ? PED.cantTmp : x.libre;
+    form = '<div class="ped-sec-t" style="margin-top:8px">Marcar un lote nuevo en proceso</div>'
+      + '<div class="ped-lbl">¿Cuántas unidades se trabajan ahora?</div>'
+      + '<div class="ped-add" style="margin-top:4px"><input type="number" inputmode="numeric" id="pedCant" min="1" max="' + x.libre + '" value="' + escHtml(String(cant)) + '"></div>'
+      + quien
+      + '<button class="ped-add-btn" onclick="marcarLote()">▶ Marcar en proceso</button>';
+  } else form = '<div class="ped-vacio">Todo el saldo ya está en proceso.</div>';
+
   document.getElementById('pedBox').innerHTML =
     '<h3>' + escHtml(x.codigo) + ' · ' + escHtml(x.cliente) + pedLimiteHtml(x) + '</h3>'
     + '<div class="pd"><b>' + escHtml(x.sku) + '</b> ' + escHtml(x.desc) + '</div>'
@@ -1345,8 +1443,17 @@ function cerrarPedido() {
 }
 
 function pedErrorSql(e) {
-  return /relation|does not exist|schema cache|tapas_lotes/i.test(String((e && e.message) || e))
-    ? 'Falta correr sql/tapas_lotes_v1.sql en Supabase' : ((e && e.message) || String(e));
+  return /relation|does not exist|schema cache|tapas_lote/i.test(String((e && e.message) || e))
+    ? 'Falta correr el SQL de lotes (tapas_lotes_v1.sql / tapas_lote_tareas_v1.sql) en Supabase' : ((e && e.message) || String(e));
+}
+
+// operario + proceso elegidos (obligatorios si la tabla de tareas existe)
+function pedOpProc() {
+  if (!PED.tareasOk) return { ok: true, fila: null };
+  if (!PED.selOp) { showToast('⚠️ Elige quién inicia la tarea', '#B83232'); return { ok: false }; }
+  if (!PED.selProc) { showToast('⚠️ Elige qué proceso se inicia', '#B83232'); return { ok: false }; }
+  var o = operarios.find(function(p) { return p.codigo === PED.selOp; });
+  return { ok: true, fila: { proceso: PED.selProc, operario_codigo: PED.selOp, operario_nombre: o ? o.nombre : PED.selOp } };
 }
 
 async function marcarLote() {
@@ -1355,10 +1462,29 @@ async function marcarLote() {
   var cant = parseInt((document.getElementById('pedCant') || {}).value, 10) || 0;
   if (cant < 1) { showToast('⚠️ Escribe una cantidad mayor a 0', '#B83232'); return; }
   if (cant > x.libre) { showToast('⚠️ Solo quedan ' + pedNum(x.libre) + ' unidades sin iniciar en este pedido', '#B83232'); return; }
+  var op = pedOpProc();
+  if (!op.ok) return;
   var quien = (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
-  var r = await db.from('tapas_lotes').insert({ solicitud_id: x.id, cantidad: cant, marcado_por: quien });
+  var r = await db.from('tapas_lotes').insert({ solicitud_id: x.id, cantidad: cant, marcado_por: quien }).select('id').single();
   if (r.error) { showToast('❌ ' + pedErrorSql(r.error), '#B83232'); return; }
-  showToast('▶ ' + pedNum(cant) + ' und marcadas en proceso');
+  if (op.fila) {
+    var rt = await db.from('tapas_lote_tareas').insert(Object.assign({ lote_id: r.data.id }, op.fila));
+    if (rt.error) showToast('⚠️ Lote marcado, pero no se guardó el operario/proceso: ' + pedErrorSql(rt.error), '#B83232');
+  }
+  PED.selOp = ''; PED.selProc = ''; PED.cantTmp = null;
+  if (!op.fila || !PED.tareasOk) showToast('▶ ' + pedNum(cant) + ' und marcadas en proceso');
+  else showToast('▶ ' + pedNum(cant) + ' und · ' + pedProcLbl(op.fila.proceso) + ' · ' + pedCorto(op.fila.operario_nombre));
+  await cargarPedidos(true);
+}
+
+async function iniciarTarea() {
+  if (!PED.form) return;
+  var op = pedOpProc();
+  if (!op.ok || !op.fila) return;
+  var r = await db.from('tapas_lote_tareas').insert(Object.assign({ lote_id: PED.form.lote }, op.fila));
+  if (r.error) { showToast('❌ ' + pedErrorSql(r.error), '#B83232'); return; }
+  showToast('▶ ' + pedProcLbl(op.fila.proceso) + ' · ' + pedCorto(op.fila.operario_nombre));
+  PED.form = null; PED.selOp = ''; PED.selProc = '';
   await cargarPedidos(true);
 }
 
