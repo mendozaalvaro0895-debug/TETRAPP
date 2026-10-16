@@ -343,6 +343,22 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .plz-nums div{background:var(--bg);border-radius:8px;padding:6px;text-align:center}
 .plz-nums b{display:block;font-family:var(--mono);font-size:14px}
 .plz-nums span{font-size:9px;color:var(--gray);text-transform:uppercase;letter-spacing:.3px}
+.cp-modo{display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
+.cp-modo button{border:none;background:var(--card);padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--gray)}
+.cp-modo button.act{background:var(--teal);color:#fff}
+.cp-resumen{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px}
+.cp-res{border:1.5px solid var(--border);background:var(--card);border-radius:10px;padding:5px 10px;cursor:pointer;line-height:1.2}
+.cp-res:hover{border-color:var(--teal)}
+.cp-res b{display:block;font-family:var(--mono);font-size:16px;color:var(--teal)}
+.cp-res span{font-size:10px;font-weight:700;color:var(--ink)}
+.cp-res i{font-style:normal;font-size:9.5px;color:var(--gray);display:block}
+.cp-tipo{margin-bottom:14px}
+.cp-tipo-h{display:flex;align-items:baseline;gap:10px;padding:6px 10px;background:var(--teal-xl);border:1px solid var(--teal-l);border-radius:8px 8px 0 0}
+.cp-tipo-n{font-size:12px;font-weight:800;color:var(--teal);text-transform:uppercase;letter-spacing:.3px}
+.cp-tipo-s{font-size:11px;color:var(--gray)}
+.cp-tipo-s b{font-family:var(--mono);color:var(--ink);font-size:13px}
+.cp-tipo-c{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px;padding:8px;border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;background:var(--bg)}
+.cp-chip-c{font-size:10px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cp-sec{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gray);margin:4px 0 6px;display:flex;gap:8px;align-items:baseline}
 .cp-sec i{font-style:normal;font-weight:500;letter-spacing:0;text-transform:none;color:var(--gray-l)}
 .cp-proc{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-bottom:14px}
@@ -1944,6 +1960,83 @@ function toggleLineaProc(procVal) {
   calcular();
 }
 
+// ── TIPO / SUBFAMILIA DE TAPA ────────────────────────────────────────────────
+// Las tapas se agrupan por tipo (Press top 33/415, Press top 28/410, Push Pull, Elípticas, Domo, Flip top…)
+// para ver cuánto se debe de cada una. El tipo es de cada SKU (no de la ficha): se guarda en el Recetario
+// (`sku_especificaciones`, area 'tapas', campo 'Familia') al guardar la ficha, y se autorrellena la próxima
+// vez que se pida ese SKU. Mientras un SKU no tenga tipo guardado se SUGIERE por palabras clave de su
+// descripción (detectarTipoTapa); el usuario lo confirma o lo cambia en el formulario ("Otro tipo…" crea uno nuevo).
+var TIPOS_BASE_TAPAS = ['Press top 33/415', 'Press top 28/410', 'Push Pull', 'Elípticas', 'Domo', 'Flip top 20/415'];
+var TIPO_SIN_CLASIFICAR = 'Sin clasificar';
+var tipoSpecTapas = {}; // sku → tipo guardado en el Recetario
+
+function detectarTipoTapa(desc) {
+  var t = normBusqueda(desc);
+  var med = t.match(/(\d{2})\s*\/\s*(\d{3})/);
+  var medida = med ? med[1] + '/' + med[2] : '';
+  if (/press\s*-?\s*top/.test(t)) return 'Press top' + (medida ? ' ' + medida : '');
+  if (/flip\s*-?\s*top/.test(t)) return 'Flip top' + (medida ? ' ' + medida : '');
+  if (/push\s*-?\s*pull/.test(t)) return 'Push Pull';
+  if (/eliptic/.test(t)) return 'Elípticas';
+  if (/domo/.test(t)) return 'Domo';
+  return TIPO_SIN_CLASIFICAR;
+}
+
+// Tipo guardado en el Recetario > detectado por palabras clave > "Sin clasificar"
+function tipoDeSkuTapa(sku, desc) {
+  return (sku && tipoSpecTapas[sku]) || detectarTipoTapa(desc);
+}
+
+function tipoDeFicha(s) {
+  var l0 = s.lineas[0] || {};
+  return tipoDeSkuTapa(l0.sku, (l0.desc || '') + ' ' + (s.desc || ''));
+}
+
+function listaTiposTapas(extra) {
+  var set = {};
+  TIPOS_BASE_TAPAS.forEach(function(t) { set[t] = true; });
+  Object.keys(tipoSpecTapas).forEach(function(k) { set[tipoSpecTapas[k]] = true; });
+  solicitudes.forEach(function(x) { set[tipoDeFicha(x)] = true; });
+  if (extra) set[extra] = true;
+  delete set[TIPO_SIN_CLASIFICAR];
+  return Object.keys(set).filter(Boolean).sort(function(a, b) { return a.localeCompare(b); });
+}
+
+async function cargarTiposTapa() {
+  try {
+    var r = await db.from('sku_especificaciones').select('sku,valor').eq('area', 'tapas').eq('campo', 'Familia');
+    if (r.error) return;
+    tipoSpecTapas = {};
+    (r.data || []).forEach(function(e) { if (e.valor && String(e.valor).trim()) tipoSpecTapas[e.sku] = String(e.valor).trim(); });
+  } catch(e) { /* sin Recetario: queda la detección por palabras clave */ }
+}
+
+// Al guardar la ficha: el tipo elegido queda en el Recetario para ese SKU (futuras fichas y ML)
+async function guardarTipoTapa(sku, tipo) {
+  try {
+    tipo = String(tipo || '').trim();
+    if (!sku || !tipo || tipo === TIPO_SIN_CLASIFICAR) return;
+    if (tipoSpecTapas[sku] === tipo) return;
+    var quien = (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
+    var r = await db.from('sku_especificaciones').upsert([{ sku: sku, area: 'tapas', campo: 'Familia', valor: tipo, actualizado_por: quien }], { onConflict: 'sku,area,campo' });
+    if (!r.error) tipoSpecTapas[sku] = tipo;
+    else console.warn('guardarTipoTapa:', r.error.message);
+  } catch(e) { console.warn('guardarTipoTapa:', e); }
+}
+
+function setTipoLinea(v) {
+  var l = lineas[0];
+  if (!l) return;
+  if (v === '__otro__') {
+    var n = prompt('Nombre del nuevo tipo de tapa (ej. Press top 38/400, Rosca lisa…):');
+    n = String(n || '').trim();
+    if (!n) { renderLineas(); return; }
+    l.tipo = n;
+  } else l.tipo = v;
+  l.tipoOrigen = 'manual';
+  renderLineas();
+}
+
 // Desplegable de clientes ordenado por FRECUENCIA DE USO: los que más fichas tienen primero (conteo real sobre
 // las solicitudes de Tapas, no un contador local), y a igual uso, alfabético. Los que nunca se han usado
 // quedan al final, también alfabéticos. Un cliente que está en fichas pero no en la lista fija CLIENTES se
@@ -2006,6 +2099,8 @@ async function editarFichaTapas(id) {
   var l = nuevaLineaForm();
   l.sku = l0.sku || ''; l.desc = l0.desc || ''; l.cant = l0.cant || 0;
   l.existencia = it ? (it.existencia || 0) : (l0.existencia || 0);
+  l.tipo = tipoDeSkuTapa(l.sku, l.desc);
+  l.tipoOrigen = tipoSpecTapas[l.sku] ? 'guardado' : (l.tipo === TIPO_SIN_CLASIFICAR ? '' : 'sugerido');
   l.procs = (l0.procs || []).slice();
   l.procs.forEach(function(p) { l.tocados[p] = true; }); // lo ya guardado no lo mueve un componente
   var comp = { base: l0.skuBase, contratapa: l0.skuContratapa, liner: l0.skuLiner, banda: l0.skuBanda };
@@ -2060,6 +2155,7 @@ async function guardarEdicionFicha(l, cliente, fLimite) {
     var rl = await db.from('solicitud_lineas').update(linea).eq('id', s.lineas[0].id).select('id');
     if (rl.error || !(rl.data || []).length) throw rl.error || new Error('no se pudo actualizar la línea');
     var partesReceta = construirPartesReceta(linea, l);
+    await guardarTipoTapa(linea.sku, l.tipo);
     cerrarForm();
     await cargarSolicitudes();
     if (fichaModalId === s.id || selId === s.id) mostrarDetalle(s.id);
@@ -2128,6 +2224,13 @@ function renderLineas(focusId) {
     +   '<input class="fi" type="number" min="0" placeholder="Cant" value="' + (l.cant || '') + '" onchange="lineas[0].cant=parseInt(this.value)||0;renderLineas();calcular()">'
     +   '<div style="font-size:11px;text-align:right;color:' + exColor + '">' + (l.existencia !== undefined ? l.existencia.toLocaleString() : '—') + '</div>'
     + '</div>'
+    + (function() {
+        var opts = listaTiposTapas(l.tipo).map(function(t) { return '<option value="' + escHtml(t) + '"' + (t === l.tipo ? ' selected' : '') + '>' + escHtml(t) + '</option>'; }).join('');
+        var nota = l.tipoOrigen === 'guardado' ? 'guardado en el Recetario' : (l.tipoOrigen === 'sugerido' ? 'sugerido por la descripción: confírmalo o cámbialo' : (l.tipoOrigen === 'manual' ? 'se guardará en el Recetario para este SKU' : 'elige el tipo para ordenar las fichas'));
+        return '<div class="lin-comp"><span class="lin-comp-lbl">Tipo</span>'
+          + '<select class="fs" style="font-size:12px;padding:5px 8px" onchange="setTipoLinea(this.value)"><option value=""' + (l.tipo ? '' : ' selected') + '>' + TIPO_SIN_CLASIFICAR + '</option>' + opts + '<option value="__otro__">＋ Otro tipo…</option></select>'
+          + '<span class="lin-stk">' + nota + '</span></div>';
+      })()
     + (l.autoDe ? '<div class="lin-auto">↺ Rellenado con la ficha <b>' + escHtml(l.autoDe) + '</b> (misma tapa y mismo cliente): revisa y cambia lo que haga falta</div>' : '')
     + '<div class="lin-comp-title">Componentes <span>(opcionales)</span></div>'
     + COMP_FORM.map(function(c) { return buildCompRow(l, c); }).join('')
@@ -2277,6 +2380,8 @@ function formSkuSelect(kind, sku) {
   if (!item || !l) return;
   if (kind === 'prod') {
     l.sku = item.sku; l.desc = item.descripcion || ''; l.existencia = item.existencia || 0;
+    l.tipo = tipoDeSkuTapa(l.sku, l.desc);
+    l.tipoOrigen = tipoSpecTapas[l.sku] ? 'guardado' : (l.tipo === TIPO_SIN_CLASIFICAR ? '' : 'sugerido');
     autorrellenarDesdeFichas(false);
   } else {
     l.comp[kind] = { sku: item.sku, desc: item.descripcion || '', ex: item.existencia || 0 };
@@ -2365,6 +2470,7 @@ async function guardar() {
     }
 
     var partesReceta = construirPartesReceta(linea, l); // antes de cerrar: el formulario se reinicia
+    guardarTipoTapa(linea.sku, l.tipo);
     cerrarForm();
     await cargarSolicitudes();
     showToast('✅ ' + codigo + ' guardada');
@@ -3404,6 +3510,28 @@ function abrirFichaTapas(id) {
 // grilla anterior (cliente × mes con tarjetas grandes). Los "Completados" no se repiten aquí: ya están
 // en el bloque Entregados de abajo.
 var FICHAS_VISTA_COMPACTA = true;
+var fichasAgrupar = 'tipo'; // 'tipo' (default) | 'cliente'
+try { fichasAgrupar = localStorage.getItem('tapas_fichas_agrupar') === 'cliente' ? 'cliente' : 'tipo'; } catch(e) {}
+function setFichasAgrupar(m) {
+  fichasAgrupar = m;
+  try { localStorage.setItem('tapas_fichas_agrupar', m); } catch(e) {}
+  renderFichasTapas();
+}
+
+// Un chip de pedido; en la vista por tipo lleva además el nombre del cliente
+function buildChipCompacto(x, conCliente) {
+  var enProc = x.abiertos.length > 0;
+  return '<div class="cp-chip' + (enProc ? ' proc' : '') + '" onclick="abrirFichaTapas(\'' + escHtml(String(x.id)) + '\')">'
+    + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
+    + '<div class="cp-chip-t"><span>' + escHtml(x.codigo) + limiteCompactoHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
+    + '<div class="cp-chip-d">' + escHtml(x.desc) + '</div>'
+    + '<div class="cp-chip-s">' + (enProc ? '▶ ' + x.enProc.toLocaleString() + ' en proceso' : 'de ' + x.cant.toLocaleString() + (x.ent ? ' · ent. ' + x.ent.toLocaleString() : '')) + '</div>'
+    + '</div>';
+}
+
+function ordenChipsCompactos(a, b) {
+  return (b.abiertos.length > 0) - (a.abiertos.length > 0) || (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt));
+}
 
 function modeloFichasCompactas() {
   var ingPor = {};
@@ -3472,32 +3600,55 @@ function renderFichasCompactasTapas() {
     porCli[x.cliente].push(x);
   });
   clis.sort(function(a, b) { return a.localeCompare(b); });
-  var cols = clis.map(function(c) {
-    var items = porCli[c].slice().sort(function(a, b) {
-      return (b.abiertos.length > 0) - (a.abiertos.length > 0) || (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt));
+
+  var cuerpo;
+  if (fichasAgrupar === 'tipo') {
+    // Por TIPO de tapa: cuánto se debe de cada una (saldo por entregar), el tipo con más pendiente primero
+    var porTipo = {}, tipos = [];
+    vivas.forEach(function(x) {
+      var t = tipoDeFicha(x.s);
+      if (!porTipo[t]) { porTipo[t] = []; tipos.push(t); }
+      porTipo[t].push(x);
     });
-    var saldoTot = items.reduce(function(a, x) { return a + x.saldo; }, 0);
-    return '<div class="cp-col"><div class="cp-col-h"><div class="cp-col-n">' + escHtml(c) + '</div>'
-      + '<div class="cp-col-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo ' + saldoTot.toLocaleString() + '</div></div>'
-      + '<div class="cp-chips">' + items.map(function(x) {
-        var enProc = x.abiertos.length > 0;
-        return '<div class="cp-chip' + (enProc ? ' proc' : '') + '" onclick="abrirFichaTapas(\'' + escHtml(String(x.id)) + '\')">'
-          + '<div class="cp-chip-t"><span>' + escHtml(x.codigo) + limiteCompactoHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
-          + '<div class="cp-chip-d">' + escHtml(x.desc) + '</div>'
-          + '<div class="cp-chip-s">' + (enProc ? '▶ ' + x.enProc.toLocaleString() + ' en proceso' : 'de ' + x.cant.toLocaleString() + (x.ent ? ' · ent. ' + x.ent.toLocaleString() : '')) + '</div>'
-          + '</div>';
-      }).join('') + '</div></div>';
-  }).join('');
+    var saldoDe = function(t) { return porTipo[t].reduce(function(a, x) { return a + x.saldo; }, 0); };
+    tipos.sort(function(a, b) {
+      return (a === TIPO_SIN_CLASIFICAR) - (b === TIPO_SIN_CLASIFICAR) || saldoDe(b) - saldoDe(a) || a.localeCompare(b);
+    });
+    var resumen = tipos.map(function(t) {
+      return '<div class="cp-res" onclick="document.getElementById(\'cptipo-' + escHtml(t.replace(/[^A-Za-z0-9]/g, '_')) + '\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">'
+        + '<b>' + saldoDe(t).toLocaleString() + '</b><span>' + escHtml(t) + '</span><i>' + porTipo[t].length + ' pedido' + (porTipo[t].length !== 1 ? 's' : '') + '</i></div>';
+    }).join('');
+    var secciones = tipos.map(function(t) {
+      var items = porTipo[t].slice().sort(ordenChipsCompactos);
+      return '<div class="cp-tipo" id="cptipo-' + escHtml(t.replace(/[^A-Za-z0-9]/g, '_')) + '"><div class="cp-tipo-h"><span class="cp-tipo-n">' + escHtml(t) + '</span>'
+        + '<span class="cp-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + saldoDe(t).toLocaleString() + '</b> und</span></div>'
+        + '<div class="cp-tipo-c">' + items.map(function(x) { return buildChipCompacto(x, true); }).join('') + '</div></div>';
+    }).join('');
+    cuerpo = tipos.length
+      ? '<div class="cp-sec">Por entregar según el tipo de tapa <i>clic en un total para ir a su grupo</i></div><div class="cp-resumen">' + resumen + '</div>' + secciones
+      : '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>';
+  } else {
+    var cols = clis.map(function(c) {
+      var items = porCli[c].slice().sort(ordenChipsCompactos);
+      var saldoTot = items.reduce(function(a, x) { return a + x.saldo; }, 0);
+      return '<div class="cp-col"><div class="cp-col-h"><div class="cp-col-n">' + escHtml(c) + '</div>'
+        + '<div class="cp-col-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo ' + saldoTot.toLocaleString() + '</div></div>'
+        + '<div class="cp-chips">' + items.map(function(x) { return buildChipCompacto(x, false); }).join('') + '</div></div>';
+    }).join('');
+    cuerpo = '<div class="cp-sec">Todos los pedidos por cliente <i>clic para ver el detalle de la ficha</i></div>'
+      + (clis.length ? '<div class="cp-grid" style="grid-template-columns:repeat(' + clis.length + ',minmax(170px,300px))">' + cols + '</div>'
+                     : '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>');
+  }
 
   wrap.innerHTML = '<div class="fich-wrap">'
     + '<div class="fich-hdr"><span class="fich-title">📋 Fichas de Trabajo</span>'
     +   '<span class="fich-count">' + vivas.length + ' pedido' + (vivas.length !== 1 ? 's' : '') + ' con saldo · ' + clis.length + ' cliente' + (clis.length !== 1 ? 's' : '') + '</span>'
-    +   '<button class="btn btn-t btn-sm" style="margin-left:auto" onclick="abrirForm()">+ Nueva Solicitud</button></div>'
+    +   '<span class="cp-modo" style="margin-left:auto"><button class="' + (fichasAgrupar === 'tipo' ? 'act' : '') + '" onclick="setFichasAgrupar(\'tipo\')">Por tipo</button>'
+    +   '<button class="' + (fichasAgrupar === 'cliente' ? 'act' : '') + '" onclick="setFichasAgrupar(\'cliente\')">Por cliente</button></span>'
+    +   '<button class="btn btn-t btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button></div>'
     + '<div class="fich-body">'
     + (proc.length ? '<div class="cp-sec">🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc : '')
-    + '<div class="cp-sec">Todos los pedidos por cliente <i>clic para ver el detalle de la ficha</i></div>'
-    + (clis.length ? '<div class="cp-grid" style="grid-template-columns:repeat(' + clis.length + ',minmax(170px,300px))">' + cols + '</div>'
-                   : '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>')
+    + cuerpo
     + '</div></div>';
 }
 
@@ -4657,6 +4808,7 @@ async function init() {
   await cargarInsumosB7();
   await cargarPersonal();
   await cargarFeriados();
+  await cargarTiposTapa();
   await cargarSolicitudes();
   await cargarMovimientos(); // alimenta el bloque "Entregados" del Inicio
   await cargarRechazos();
