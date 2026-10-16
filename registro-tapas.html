@@ -219,6 +219,9 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-chip.proc{border-color:#2563EB;background:#EFF6FF}
 .ped-chip-t{display:flex;justify-content:space-between;gap:4px;font-size:11px;font-weight:800}
 .ped-chip-t b{font-family:'DM Mono',monospace;color:#1A6B5B}
+.ped-lim{font-family:'DM Mono',monospace;font-size:9.5px;font-weight:600;color:#6B6B6A;margin-left:5px;white-space:nowrap}
+.ped-lim.venc{color:#B83232;font-weight:800}
+.ped-lim.pronto{color:#B87200;font-weight:800}
 .ped-chip.proc .ped-chip-t b{color:#1E3A8A}
 .ped-chip-d{font-size:10px;color:#6B6B6A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ped-chip-s{font-size:9.5px;font-family:'DM Mono',monospace;color:#3A3A38}
@@ -1167,7 +1170,7 @@ function pedAutoRefresco(activo) {
 
 async function cargarPedidos(silencioso) {
   try {
-    var rs = await db.from('solicitudes').select('id,codigo,cliente_nombre,estado,created_at,solicitud_lineas(sku,descripcion,cantidad)')
+    var rs = await db.from('solicitudes').select('id,codigo,cliente_nombre,estado,created_at,fecha_limite,solicitud_lineas(sku,descripcion,cantidad)')
       .eq('area', 'tapas').order('created_at', { ascending: true });
     if (rs.error) throw rs.error;
     var ri = await db.from('movimientos_materiales').select('id,solicitud_id,cantidad,num_documento,observaciones,created_at,area')
@@ -1214,8 +1217,18 @@ function pedModelo() {
     return { s: s, id: s.id, codigo: s.codigo || String(s.id).slice(0, 6), cliente: s.cliente_nombre || '—', cant: cant, entregado: entregado,
              saldo: saldo, enProc: enProc, libre: Math.max(0, saldo - enProc), abiertos: abiertos, ings: ings,
              sku: l0.sku || '', desc: (l0.descripcion || '') + (lins.length > 1 ? ' (+' + (lins.length - 1) + ')' : ''),
-             viva: PED_VIVOS.indexOf(s.estado) >= 0 };
+             viva: PED_VIVOS.indexOf(s.estado) >= 0, limite: s.fecha_limite || '' };
   });
+}
+
+// Fecha límite de entrega: "20-oct" (rojo si ya venció, ámbar si vence en ≤2 días)
+var PED_MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+function pedLimiteHtml(x) {
+  if (!x.limite) return '<span class="ped-lim" title="Sin fecha límite">⏳ —</span>';
+  var dias = Math.round((new Date(x.limite + 'T12:00:00') - new Date(fechaGT() + 'T12:00:00')) / 86400000);
+  var cls = dias < 0 ? ' venc' : (dias <= 2 ? ' pronto' : '');
+  var txt = parseInt(x.limite.slice(8, 10), 10) + '-' + PED_MESES[parseInt(x.limite.slice(5, 7), 10) - 1];
+  return '<span class="ped-lim' + cls + '" title="Fecha límite de entrega: ' + escHtml(x.limite) + '">⏳ ' + txt + '</span>';
 }
 
 function pedNum(n) { return (n || 0).toLocaleString(); }
@@ -1235,7 +1248,7 @@ function renderPedidos() {
   var htmlProc = proc.length ? '<div class="ped-proc">' + proc.map(function(p) {
     var pct = Math.min(100, Math.round(p.l.hecho / p.l.cantidad * 100));
     return '<div class="ped-pc" onclick="abrirPedido(\'' + escHtml(String(p.x.id)) + '\')">'
-      + '<div class="ped-pc-t"><span>' + escHtml(p.x.cliente) + ' · ' + escHtml(p.x.codigo) + '</span><b>' + pedNum(p.l.cantidad) + '</b></div>'
+      + '<div class="ped-pc-t"><span>' + escHtml(p.x.cliente) + ' · ' + escHtml(p.x.codigo) + pedLimiteHtml(p.x) + '</span><b>' + pedNum(p.l.cantidad) + '</b></div>'
       + '<div class="ped-pc-d">' + escHtml((p.x.sku ? p.x.sku + ' — ' : '') + p.x.desc) + '</div>'
       + '<div class="ped-bar"><i style="width:' + pct + '%"></i></div></div>';
   }).join('') + '</div>' : '<div class="ped-vacio">Nada marcado en proceso. Toca un pedido de abajo para marcarlo.</div>';
@@ -1248,14 +1261,14 @@ function renderPedidos() {
   });
   clis.sort(function(a, b) { return a.localeCompare(b); });
   var cols = clis.map(function(c) {
-    var items = porCli[c].slice().sort(function(a, b) { return (b.abiertos.length > 0) - (a.abiertos.length > 0) || String(a.s.created_at).localeCompare(String(b.s.created_at)); });
+    var items = porCli[c].slice().sort(function(a, b) { return (b.abiertos.length > 0) - (a.abiertos.length > 0) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at)); });
     var saldoTot = items.reduce(function(a, x) { return a + x.saldo; }, 0);
     return '<div class="ped-col"><div class="ped-col-h"><div class="ped-col-n">' + escHtml(c) + '</div>'
       + '<div class="ped-col-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo ' + pedNum(saldoTot) + '</div></div>'
       + '<div class="ped-chips">' + items.map(function(x) {
         var proc = x.abiertos.length > 0;
         return '<div class="ped-chip' + (proc ? ' proc' : '') + '" onclick="abrirPedido(\'' + escHtml(String(x.id)) + '\')">'
-          + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
+          + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + pedLimiteHtml(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
           + '<div class="ped-chip-d">' + escHtml((x.sku ? x.sku + ' · ' : '') + x.desc) + '</div>'
           + '<div class="ped-chip-s">' + (proc ? '▶ ' + pedNum(x.enProc) + ' en proceso' : 'de ' + pedNum(x.cant) + (x.entregado ? ' · ent. ' + pedNum(x.entregado) : '')) + '</div>'
           + '</div>';
@@ -1316,7 +1329,7 @@ function abrirPedido(id) {
         + '<button onclick="marcarLote()">▶ Marcar en proceso</button></div>'
       : '<div class="ped-vacio">Todo el saldo ya está en proceso.</div>');
   document.getElementById('pedBox').innerHTML =
-    '<h3>' + escHtml(x.codigo) + ' · ' + escHtml(x.cliente) + '</h3>'
+    '<h3>' + escHtml(x.codigo) + ' · ' + escHtml(x.cliente) + pedLimiteHtml(x) + '</h3>'
     + '<div class="pd"><b>' + escHtml(x.sku) + '</b> ' + escHtml(x.desc) + '</div>'
     + '<div class="ped-nums"><div><b>' + pedNum(x.cant) + '</b><span>Pedido</span></div><div><b>' + pedNum(x.entregado) + '</b><span>Entregado</span></div>'
     + '<div><b>' + pedNum(x.enProc) + '</b><span>En proceso</span></div><div><b>' + pedNum(x.libre) + '</b><span>Sin iniciar</span></div></div>'
