@@ -692,8 +692,8 @@ async function guiaOmitirHoy() {
 setInterval(cargarGuia, 60000);
 
 // ══ INDICADORES POR FICHA — Serigrafía y Tapas (oct/2026) ═══════════════
-// Personal, Ausentismo del mes, Unidades del mes y Q facturado. Ninguno depende de captura diaria manual:
-// la asistencia llega sola desde la hoja del Drive (asistencia_diaria) y las unidades/ventas de las requis.
+// Personal, Rotación del mes, Unidades del mes y Q facturado. Ninguno depende de captura diaria manual:
+// el personal (altas/bajas) se mantiene solo con la hoja del Drive y las unidades/ventas salen de las requis.
 // (Se retiró "Efectividad": con datos de producción atrasados mostraba 0% aunque la planta trabajara.)
 // Solo cuentan días hábiles (sin domingos ni feriados). Si una fuente falla se muestra "—", nunca 0%.
 var IND_PRESENTE = { presente: 1, tarde: 1, velada: 1 };
@@ -783,21 +783,25 @@ async function indProdUnidades(ctx) {
   return { und: null, sub: ult && ult.length ? 'sin carga desde ' + indFechaCorta(ult[0].fecha) : 'sin registros de producción' };
 }
 
-// ── Ausentismo del mes = ausencias ÷ días-persona registrados (días hábiles hasta el último día hábil) ──
-// Sale de asistencia_diaria, que se alimenta sola desde la hoja del Drive. PERMISO ya se guarda como
-// presente (no cuenta como falta) y "tarde"/"velada" tampoco son ausencia.
-function indAusentismo(area, asistRows, ctx) {
-  if (asistRows === null) return null;
-  var habil = {};
-  ctx.diasMes.forEach(function (f) { habil[f] = true; });
-  var faltas = 0, total = 0;
-  asistRows.forEach(function (a) {
-    if (a.area !== area || !habil[a.fecha]) return;
-    total++;
-    if (a.estado === 'ausente') faltas++;
+// ── Rotación del mes = bajas del mes ÷ plantilla promedio × 100 ──
+// Plantilla promedio = (activos al inicio del mes + activos hoy) ÷ 2, con activos al inicio = activos hoy + bajas − ingresos
+// del mes. Bajas = fichas inactivas con `fecha_baja` dentro del mes; ingresos = fichas con `fecha_inicio` dentro del mes.
+// Las bajas antiguas sin `fecha_baja` no cuentan (no se sabe cuándo fueron). Sale de `personal`, que la hoja del Drive
+// mantiene al día (altas y bajas confirmadas desde el inicio).
+function indRotacion(area, personalRows, ctx) {
+  if (personalRows === null) return null;
+  var delArea = personalRows.filter(function (p) { return p.area === area; });
+  if (!delArea.length || delArea[0].fecha_baja === undefined) return null;   // columnas no disponibles
+  var activos = 0, bajas = 0, ingresos = 0;
+  delArea.forEach(function (p) {
+    if (p.activo) activos++;
+    if (!p.activo && p.fecha_baja && p.fecha_baja >= ctx.mesIni && p.fecha_baja <= ctx.hoy) bajas++;
+    if (p.fecha_inicio && p.fecha_inicio >= ctx.mesIni && p.fecha_inicio <= ctx.hoy) ingresos++;
   });
-  if (!total) return null;
-  return { pct: faltas / total * 100, faltas: faltas, total: total };
+  var alInicio = activos + bajas - ingresos;
+  var promedio = (alInicio + activos) / 2;
+  if (promedio <= 0) return null;
+  return { pct: bajas / promedio * 100, bajas: bajas, ingresos: ingresos };
 }
 
 // ── Personal: presentes del último día hábil ÷ activos del área ──
@@ -870,9 +874,9 @@ function indCelda(label, valor, sub, clase) {
     '<div class="ind-v">' + valor + '</div><div class="ind-s">' + sub + '</div></div>';
 }
 // Umbrales propios: hasta 3% bien, hasta 6% atención, más de 6% alto
-function indClaseAus(p) { return p === null ? '' : (p <= 3 ? 'ok' : (p <= 6 ? 'mid' : 'low')); }
+function indClaseRot(p) { return p === null ? '' : (p <= 3 ? 'ok' : (p <= 6 ? 'mid' : 'low')); }
 
-function indPintarFicha(id, und, aus, pers, q, ctx, nombreUnd, vacantes) {
+function indPintarFicha(id, und, rot, pers, q, ctx, nombreUnd, vacantes) {
   var cont = document.getElementById(id);
   if (!cont) return;
   var pv = pers && pers.hayDia ? pers.pres + '/' + pers.total : '—';
@@ -880,22 +884,23 @@ function indPintarFicha(id, und, aus, pers, q, ctx, nombreUnd, vacantes) {
   if (vacantes !== null && vacantes !== undefined) {
     ps += vacantes > 0 ? '<span class="ind-vac">' + vacantes + (vacantes === 1 ? ' vacante' : ' vacantes') + '</span>' : '<span class="ind-vac ninguna">sin vacantes</span>';
   }
-  var av = aus ? aus.pct.toFixed(1) + '%' : '—';
-  var as = aus ? aus.faltas + (aus.faltas === 1 ? ' falta' : ' faltas') + ' · ' + indFmt(aus.total) + ' días-persona' : 'sin asistencia del mes';
+  var rv = rot ? rot.pct.toFixed(1) + '%' : '—';
+  var rs = rot ? rot.bajas + (rot.bajas === 1 ? ' baja' : ' bajas') + ' · ' + rot.ingresos + (rot.ingresos === 1 ? ' ingreso' : ' ingresos') : 'no disponible';
   var uv = und !== null ? indFmt(und) : '—';
   var qv = q ? indFmtQ(q.valor) : '—';
   var qs = q ? 'facturado al ' + indFechaCorta(q.ultima) + ' · sin IVA' : 'no disponible';
   cont.innerHTML =
     indCelda('Personal', pv, ps, '') +
-    indCelda('Ausentismo mes', av, as, indClaseAus(aus ? aus.pct : null)) +
+    indCelda('Rotación mes', rv, rs, indClaseRot(rot ? rot.pct : null)) +
     indCelda('Unidades mes', uv, nombreUnd, '') +
     indCelda('Q mes', qv, qs, '');
 }
 
 async function indCargarPersonal() {
-  var cols = 'codigo,area,activo,turno_produccion,plaza_vacante';
-  var r = await db.from('personal').select(cols).in('area', ['tapas', 'serig', 'produccion']);
-  if (r.error) r = await db.from('personal').select('codigo,area,activo,turno_produccion').in('area', ['tapas', 'serig', 'produccion']);
+  var areas = ['tapas', 'serig', 'produccion'];
+  var r = await db.from('personal').select('codigo,area,activo,turno_produccion,plaza_vacante,fecha_baja,fecha_inicio').in('area', areas);
+  if (r.error) r = await db.from('personal').select('codigo,area,activo,turno_produccion,fecha_baja,fecha_inicio').in('area', areas);
+  if (r.error) r = await db.from('personal').select('codigo,area,activo,turno_produccion').in('area', areas);
   return r.error ? null : (r.data || []);
 }
 
@@ -922,11 +927,11 @@ async function cargarIndicadores() {
     var undSerig = await indSerigUnidades(ctx);
     var undTapas = await indTapasUnidades(ctx);
     var prod = await indProdUnidades(ctx);
-    indPintarFicha('ind-serig', undSerig, indAusentismo('serig', asist, ctx), indPersonal('serig', activos, asist, ayer),
+    indPintarFicha('ind-serig', undSerig, indRotacion('serig', activos, ctx), indPersonal('serig', activos, asist, ayer),
       ventas ? { valor: ventas['Serigrafía'], ultima: ventas.ultima } : null, ctx, 'und entregadas (PT)', indVacantes('serig', activos));
-    indPintarFicha('ind-tapas', undTapas, indAusentismo('tapas', asist, ctx), indPersonal('tapas', activos, asist, ayer),
+    indPintarFicha('ind-tapas', undTapas, indRotacion('tapas', activos, ctx), indPersonal('tapas', activos, asist, ayer),
       ventas ? { valor: ventas['Tapas'], ultima: ventas.ultima } : null, ctx, 'und ingreso PT', indVacantes('tapas', activos));
-    indPintarFicha('ind-prod', prod.und, indAusentismo('produccion', asist, ctx), indPersonal('produccion', activos, asist, ayer),
+    indPintarFicha('ind-prod', prod.und, indRotacion('produccion', activos, ctx), indPersonal('produccion', activos, asist, ayer),
       ventas ? { valor: ventas['Producción'], ultima: ventas.ultima } : null, ctx, prod.sub, indVacantes('produccion', activos));
   } catch (e) {
     console.error('Indicadores:', e);
