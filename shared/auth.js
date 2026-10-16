@@ -210,6 +210,20 @@ function tetraVigilarInactividad() {
   }, 60 * 1000);
 }
 
+// ── Acceso al Plano de planta en el menú de áreas (solo master, oct/2026) ──
+// El menú desplegable (#logoNav) está repetido en cada módulo; se agrega aquí una sola vez.
+function tetraNavPlano() {
+  try {
+    if (TETRA.rol !== 'master') return;
+    var n = document.getElementById('logoNav');
+    if (!n || n.querySelector('a[href="plano-nivel2.html"]')) return;
+    var a = document.createElement('a');
+    a.href = 'plano-nivel2.html';
+    a.textContent = '🗺️ Plano de planta';
+    n.appendChild(a);
+  } catch (e) {}
+}
+
 // ── Validación de sesión y carga de rol ──────────────────────────
 (async function tetraGuard() {
   try {
@@ -257,6 +271,7 @@ function tetraVigilarInactividad() {
       if (TETRA.esVisor) tetraBannerVisor();
       else if (TETRA.esProdEditor) tetraBannerProd();
       tetraPintarUsuario();
+      tetraNavPlano();
       tetraRevelar();
     };
     if (document.body) pintar();

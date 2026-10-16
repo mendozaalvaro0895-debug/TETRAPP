@@ -62,6 +62,21 @@ button.pri{background:var(--acc-d);border-color:var(--acc)}
 <body>
 <div id="app">
   <div id="panel">
+    <div class="row" style="margin-bottom:8px">
+      <button id="btnSalir" title="Volver al inicio de TETRAPP">← Inicio TETRAPP</button>
+      <select id="irArea" title="Ir a otra área" style="flex:1.2">
+        <option value="">Ir a otra área…</option>
+        <option value="index.html">🏠 Inicio</option>
+        <option value="serigrafia.html">🎨 Serigrafía</option>
+        <option value="tapas.html">🏷 Tapas</option>
+        <option value="dashboard.html">📊 Dashboard</option>
+        <option value="produccion.html">🏭 Producción</option>
+        <option value="ventas.html">💼 Ventas</option>
+        <option value="gestion.html">🧑‍💼 Gestión</option>
+        <option value="bodega.html">📦 Bodega</option>
+        <option value="molino.html">⚙️ Molino</option>
+      </select>
+    </div>
     <h1>PLANO DE PLANTA · NIVEL 2</h1>
     <div class="sub">Tetraplastic · 35 m frente × 45 m fondo · unidades en metros</div>
     <div id="syncEstado" class="hint" style="margin:2px 0 6px">Base de datos: conectando…</div>
@@ -3432,6 +3447,18 @@ function iniciarSync(){
     setTimeout(esperar, 100);
   })();
 }
+
+/* ---------- salir del plano (a TETRAPP) ---------- */
+function salirA(url){
+  var m = (typeof syncMeta === 'function') ? syncMeta() : null;
+  if (typeof syncActivo !== 'undefined' && syncActivo && m && m.sucio){
+    syncEstadoTxt('guardando antes de salir…');
+    syncSubir(false);
+    setTimeout(function(){ location.href = url; }, 1400);
+  } else location.href = url;
+}
+$('btnSalir').addEventListener('click', function(){ salirA('index.html'); });
+$('irArea').addEventListener('change', function(){ var u = this.value; this.value = ''; if (u) salirA(u); });
 
 /* ---------- arranque ---------- */
 cargar();
