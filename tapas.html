@@ -1419,7 +1419,7 @@ async function cambiarFechaLimiteTapas(id, valor) {
 // en la ventana flotante (fichaModalId, desde Fichas de Trabajo), en el modal: mismo contenido, ids con
 // prefijo 'm' para no chocar con el panel.
 var fichaModalId = null;
-var DETALLE_FICHA_EXTRAS = false; // true = vuelve Trazabilidad de fugas + Progreso + botón Iniciar en el detalle de la ficha
+var DETALLE_FICHA_EXTRAS = false; // true = vuelve Tiempo estimado + Trazabilidad de fugas + Progreso + botón Iniciar en el detalle de la ficha
 
 // Qué hay que pedir a Bodega para esta ficha: la tapa (referencia) + Base/Contratapa/Liner/Banda de cada
 // línea, con lo que ya salió (movimientos salida_bodega por SKU), lo que falta pedir y el stock actual
@@ -1540,8 +1540,15 @@ async function mostrarDetalle(id) {
         </div>
       </div>` : '';
 
-  // Ocultos por ahora (a pedido): Trazabilidad de fugas, barra de Progreso y botón Iniciar. Para volver a
+  // Ocultos por ahora (a pedido): Tiempo estimado, Trazabilidad de fugas, barra de Progreso y botón Iniciar. Para volver a
   // mostrarlos basta poner DETALLE_FICHA_EXTRAS = true (el código sigue intacto).
+  const bloqueTiempo = DETALLE_FICHA_EXTRAS ? `
+      <div class="tbox tt">
+        <div class="tbox-lbl">Tiempo estimado</div>
+        <div class="tbox-val tc">${horas.toFixed(1)} horas</div>
+        <div class="tbox-sub">${Math.ceil(horas/12)} turno(s) · Meta: ${metaSol.toLocaleString()} und/h · Entrega est.: ${fechaEst(Math.ceil(horas/12))}</div>
+      </div>
+      ` : '';
   const bloqueFugas = DETALLE_FICHA_EXTRAS ? `
       <div class="dc" style="border-color:var(--amber)">
         <div class="dc-h" style="background:var(--amber-l);color:var(--amber)">📉 Trazabilidad de fugas</div>
@@ -1576,11 +1583,7 @@ async function mostrarDetalle(id) {
   bodegaFilasFicha[s.id] = filasBod;
   const cuerpo = `
       ${buildBloqueBodegaFicha(s, filasBod)}
-      <div class="tbox tt">
-        <div class="tbox-lbl">Tiempo estimado</div>
-        <div class="tbox-val tc">${horas.toFixed(1)} horas</div>
-        <div class="tbox-sub">${Math.ceil(horas/12)} turno(s) · Meta: ${metaSol.toLocaleString()} und/h · Entrega est.: ${fechaEst(Math.ceil(horas/12))}</div>
-      </div>
+      ${bloqueTiempo}
 
       ${bloqueFugas}
       ${bloqueIngresos}
