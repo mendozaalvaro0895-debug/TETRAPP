@@ -383,6 +383,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-chip.proc .cp-chip-t b{color:#1E3A8A}
 .cp-lim{font-family:var(--mono);font-size:9.5px;font-weight:600;color:var(--gray);margin-left:5px;white-space:nowrap}
 .cp-lim.esp{color:#1E3A8A;font-weight:800}
+.cp-k{display:flex;gap:4px;align-items:baseline;font-size:9.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cp-k i{font-style:normal;font-weight:800;text-transform:uppercase;letter-spacing:.2px;color:var(--gray)}
+.cp-k b{font-family:var(--mono);color:var(--ink)}
+.cp-k em{font-style:normal;font-weight:800}
+.cp-k.ok em{color:#166534}
+.cp-k.mal em{color:#B83232}
+.cp-k.n em{color:var(--gray-l)}
 .cp-chip-d{font-size:10px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cp-chip-s{font-size:9.5px;font-family:var(--mono);color:var(--ink)}
 .cp-chip.proc .cp-chip-s{color:#1E3A8A;font-weight:700}
@@ -3519,6 +3526,24 @@ function setFichasAgrupar(m) {
 }
 
 // Un chip de pedido; en la vista por tipo lleva además el nombre del cliente
+// Componentes de la ficha con su existencia y si ALCANZAN (como la ficha de Serigrafía: "214579 · 155.167 und · alcanza").
+// Se compara el stock actual (B2 para Base/Contratapa, Bodega 7 para Liner/Banda) con lo que aún falta SACAR de
+// bodega para esta ficha = cantidad pedida − lo que ya salió (salidas de bodega vinculadas a la ficha, por SKU).
+// No descuenta lo que necesiten otras fichas que usen el mismo SKU (eso lo ve el bloque de Alertas de bajo stock).
+function componentesStockHtml(s) {
+  var movs = salidaMovs.filter(function(m) { return m.solicitud_id === s.id && m.area !== 'serig'; });
+  return filasBodegaFicha(s, movs).filter(function(f) { return f.rol !== 'Tapa'; }).map(function(f) {
+    var porSacar = Math.max(0, f.cant - (f.salido || 0));
+    var estado, txt;
+    if (f.stock === null) { estado = 'n'; txt = 'sin dato de stock'; }
+    else if (porSacar === 0) { estado = 'ok'; txt = '✓ ya retirada'; }
+    else if (f.stock >= porSacar) { estado = 'ok'; txt = '✓ alcanza'; }
+    else { estado = 'mal'; txt = '✗ insuficiente: faltan ' + (porSacar - f.stock).toLocaleString(); }
+    return '<div class="cp-k ' + estado + '" title="' + escHtml(f.desc || '') + ' · por sacar de bodega: ' + porSacar.toLocaleString() + '"><i>' + f.rol + '</i> <b>' + escHtml(f.sku) + '</b>'
+      + (f.stock === null ? '' : ' · ' + f.stock.toLocaleString() + ' und') + ' · <em>' + txt + '</em></div>';
+  }).join('');
+}
+
 function buildChipCompacto(x, conCliente) {
   var enProc = x.abiertos.length > 0;
   return '<div class="cp-chip' + (enProc ? ' proc' : '') + '" onclick="abrirFichaTapas(\'' + escHtml(String(x.id)) + '\')">'
@@ -3526,6 +3551,7 @@ function buildChipCompacto(x, conCliente) {
     + '<div class="cp-chip-t"><span>' + escHtml(x.codigo) + limiteCompactoHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
     + '<div class="cp-chip-d">' + escHtml(x.desc) + '</div>'
     + '<div class="cp-chip-s">' + (enProc ? '▶ ' + x.enProc.toLocaleString() + ' en proceso' : 'de ' + x.cant.toLocaleString() + (x.ent ? ' · ent. ' + x.ent.toLocaleString() : '')) + '</div>'
+    + componentesStockHtml(x.s)
     + '</div>';
 }
 
