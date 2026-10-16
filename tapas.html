@@ -1944,6 +1944,25 @@ function toggleLineaProc(procVal) {
   calcular();
 }
 
+// Desplegable de clientes ordenado por FRECUENCIA DE USO: los que más fichas tienen primero (conteo real sobre
+// las solicitudes de Tapas, no un contador local), y a igual uso, alfabético. Los que nunca se han usado
+// quedan al final, también alfabéticos. Un cliente que está en fichas pero no en la lista fija CLIENTES se
+// agrega igual. Se vuelve a armar cada vez que se abre el formulario (las fichas nuevas cambian el orden).
+function poblarClientesTapas(seleccionado) {
+  var sel = document.getElementById('fCli');
+  if (!sel) return;
+  var uso = {};
+  (typeof solicitudes !== 'undefined' ? solicitudes : []).forEach(function(x) { if (x.cliente) uso[x.cliente] = (uso[x.cliente] || 0) + 1; });
+  var lista = CLIENTES.slice();
+  Object.keys(uso).forEach(function(c) { if (lista.indexOf(c) < 0) lista.push(c); });
+  lista.sort(function(a, b) { return (uso[b] || 0) - (uso[a] || 0) || a.localeCompare(b); });
+  var actual = seleccionado !== undefined ? seleccionado : sel.value;
+  sel.innerHTML = '<option value="">— Selecciona cliente —</option>' + lista.map(function(c) {
+    return '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>';
+  }).join('');
+  sel.value = actual || '';
+}
+
 var editandoFichaId = null; // id de la ficha que se está editando (null = solicitud nueva)
 var plazoForm = 'fecha';    // 'fecha' | 'parciales' | 'pendiente' (OC abierta / sin fecha)
 
@@ -1959,7 +1978,7 @@ function abrirForm() {
   document.getElementById('btnSave').textContent = 'Guardar';
   cargarInsumosB7(); // refresca el stock de B7 en segundo plano
   lineas = [nuevaLineaForm()];
-  document.getElementById('fCli').value = '';
+  poblarClientesTapas('');
   document.getElementById('fNotas').value = '';
   var fl = document.getElementById('fLimite'); fl.value = ''; fl.min = fechaHoy(); // obligatoria (salvo parciales/pendiente): se elige al ingresar la solicitud
   setPlazoForm('fecha');
@@ -2005,11 +2024,7 @@ async function editarFichaTapas(id) {
   editandoFichaId = s.id;
   document.getElementById('mTitle').textContent = 'Editar · ' + (s.id_display || String(s.id).slice(0, 8));
   document.getElementById('btnSave').textContent = 'Guardar cambios';
-  var selCli = document.getElementById('fCli');
-  if (s.cliente && !Array.from(selCli.options).some(function(o) { return o.value === s.cliente; })) {
-    var op = document.createElement('option'); op.value = s.cliente; op.textContent = s.cliente; selCli.appendChild(op);
-  }
-  selCli.value = s.cliente || '';
+  poblarClientesTapas(s.cliente || '');
   document.getElementById('fNotas').value = s.notas || '';
   var fl = document.getElementById('fLimite'); fl.min = ''; fl.value = s.fechaLimite || '';
   setPlazoForm(s.plazoTipo || 'fecha');
@@ -4626,16 +4641,8 @@ function showToast(msg, color = '#1A6B5B') {
 
 // ══ INICIO ══════════════════════════════════════════════════
 async function init() {
-  // Cargar clientes
-  const clientesSelect = document.getElementById('fCli');
-  if (clientesSelect) {
-    CLIENTES.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c;
-      opt.textContent = c;
-      clientesSelect.appendChild(opt);
-    });
-  }
+  // Clientes del formulario: se ordenan por frecuencia de uso al abrirlo (poblarClientesTapas)
+  poblarClientesTapas();
   
   // Fechas por defecto para filtros (mes actual)
   const hoyStr    = fechaHoy();
