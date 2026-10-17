@@ -395,6 +395,9 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
   .exito-ico{font-size:46px}
   .toast-msg{white-space:normal;max-width:90vw;text-align:center;bottom:84px}
 }
+.ped-urg{font-style:normal;font-size:9.5px;font-weight:800;color:#B83232;background:#FEE2E2;border-radius:6px;padding:1px 6px;margin-right:3px}
+.ped-tipo-h.urg{background:#FEE2E2;border-color:#B83232}
+.ped-tipo-h.urg .ped-tipo-n{color:#B83232}
 .ped-cerrar{display:block;margin:12px auto 0;background:none;border:none;color:#6B6B6A;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline}
 /* ── Time Picker 12h ── */
 </style>
@@ -1316,8 +1319,16 @@ function toggleBloquePed(kEnc) {
   renderPedidos();
 }
 function pedClic(k) { return ' onclick="toggleBloquePed(\'' + escHtml(encodeURIComponent(k)) + '\')"'; }
-var pedAgrupar = 'cliente'; // 'cliente' (default en el perfil de Tapas) | 'tipo'
-try { pedAgrupar = localStorage.getItem('tapas_fichas_agrupar') === 'tipo' ? 'tipo' : 'cliente'; } catch(e) {}
+var pedAgrupar = 'cliente'; // 'cliente' (default en el perfil de Tapas) | 'tipo' | 'prioridad'
+try { var _ag = localStorage.getItem('tapas_fichas_agrupar'); pedAgrupar = (_ag === 'tipo' || _ag === 'prioridad') ? _ag : 'cliente'; } catch(e) {}
+// Vista "Por prioridad": ordenar por 'fecha' (límite más cercana primero) o por 'urgente' (urgentes primero, luego por fecha)
+var pedOrdenPrio = 'fecha';
+try { pedOrdenPrio = localStorage.getItem('tapas_fichas_orden_prio') === 'urgente' ? 'urgente' : 'fecha'; } catch(e) {}
+function setPedOrdenPrio(o) {
+  pedOrdenPrio = o;
+  try { localStorage.setItem('tapas_fichas_orden_prio', o); } catch(e) {}
+  renderPedidos();
+}
 
 function detectarTipoTapa(desc) {
   var t = acNorm(desc);
@@ -1356,7 +1367,7 @@ function pedAutoRefresco(activo) {
 async function cargarPedidos(silencioso) {
   try {
     // Con componentes (sku_base…) y plazo_tipo; si alguna columna aún no existe (SQL #29 / #37 sin correr) se reintenta sin ella
-    var cBase = 'id,codigo,cliente_nombre,estado,created_at,fecha_limite';
+    var cBase = 'id,codigo,cliente_nombre,estado,created_at,fecha_limite,prioridad';
     var lin = 'sku,descripcion,cantidad,procesos', linC = lin + ',sku_base,sku_contratapa,sku_liner,sku_banda';
     var intentos = [cBase + ',plazo_tipo,solicitud_lineas(' + linC + ')', cBase + ',solicitud_lineas(' + linC + ')',
                     cBase + ',plazo_tipo,solicitud_lineas(' + lin + ')', cBase + ',solicitud_lineas(' + lin + ')'];
@@ -1493,7 +1504,7 @@ function pedModelo() {
     return { s: s, id: s.id, codigo: s.codigo || String(s.id).slice(0, 6), cliente: s.cliente_nombre || '—', cant: cant, entregado: entregado,
              saldo: saldo, enProc: enProc, libre: Math.max(0, saldo - enProc), abiertos: abiertos, ings: ings,
              sku: l0.sku || '', desc: (l0.descripcion || '') + (lins.length > 1 ? ' (+' + (lins.length - 1) + ')' : ''),
-             viva: PED_VIVOS.indexOf(s.estado) >= 0, limite: s.fecha_limite || '', plazo: s.plazo_tipo || 'fecha',
+             viva: PED_VIVOS.indexOf(s.estado) >= 0, limite: s.fecha_limite || '', plazo: s.plazo_tipo || 'fecha', urgente: s.prioridad === 'urgente',
              procs: pedProcsDe(lins) };
   });
 }
@@ -1546,7 +1557,7 @@ function renderPedidos() {
     var idq = escHtml(String(x.id));
     return '<div class="ped-chip' + (proc ? ' proc' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
-      + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + pedLimiteHtml(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
+      + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
       + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
       + '<div class="ped-resum">' + (proc ? '<span class="ped-res-b proc">▶ ' + pedNum(x.enProc) + ' en proceso</span>' : '') + pedCompResumenHtml(x) + '</div>'
       + '<div class="ped-more">'
@@ -1580,6 +1591,23 @@ function renderPedidos() {
     htmlGrid = tipos.length
       ? '<div class="ped-resumen">' + resumen + '</div>' + secciones
       : '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
+  } else if (pedAgrupar === 'prioridad') {
+    // Por PRIORIDAD: una sola lista, o ordenada por fecha límite, o con los URGENTES primero (y dentro de cada grupo por fecha)
+    var porFecha = function(a, b) { return (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at)); };
+    var bloque = function(titulo, items, cls) {
+      return '<div class="ped-tipo' + pedCol('prio:' + titulo) + '"><div class="ped-tipo-h' + (cls || '') + '"' + pedClic('prio:' + titulo) + '><span class="ped-chev">▾</span><span class="ped-tipo-n">' + titulo + '</span>'
+        + '<span class="ped-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + pedNum(items.reduce(function(a, x) { return a + x.saldo; }, 0)) + '</b> und</span></div>'
+        + '<div class="ped-tipo-c">' + items.map(function(x) { return chip(x, true); }).join('') + '</div></div>';
+    };
+    if (!vivas.length) htmlGrid = '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
+    else if (pedOrdenPrio === 'urgente') {
+      var urg = vivas.filter(function(x) { return x.urgente; }).sort(porFecha);
+      var resto = vivas.filter(function(x) { return !x.urgente; }).sort(porFecha);
+      htmlGrid = (urg.length ? bloque('🔴 Urgentes', urg, ' urg') : '<div class="ped-vacio">No hay pedidos urgentes.</div>')
+        + (resto.length ? bloque('Demás pedidos', resto, '') : '');
+    } else {
+      htmlGrid = bloque('📅 Por fecha límite', vivas.slice().sort(porFecha), '');
+    }
   } else {
     var cols = clis.map(function(c) {
       var items = porCli[c].slice().sort(ordenChips);
@@ -1593,7 +1621,10 @@ function renderPedidos() {
       : '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
   }
   var modoBtns = '<span class="ped-modo"><button class="' + (pedAgrupar === 'tipo' ? 'act' : '') + '" onclick="setPedAgrupar(\'tipo\')">Por tipo</button>'
-    + '<button class="' + (pedAgrupar === 'cliente' ? 'act' : '') + '" onclick="setPedAgrupar(\'cliente\')">Por cliente</button></span>';
+    + '<button class="' + (pedAgrupar === 'cliente' ? 'act' : '') + '" onclick="setPedAgrupar(\'cliente\')">Por cliente</button>'
+    + '<button class="' + (pedAgrupar === 'prioridad' ? 'act' : '') + '" onclick="setPedAgrupar(\'prioridad\')">Por prioridad</button></span>'
+    + (pedAgrupar === 'prioridad' ? '<span class="ped-modo"><button class="' + (pedOrdenPrio === 'fecha' ? 'act' : '') + '" onclick="setPedOrdenPrio(\'fecha\')">📅 Por fecha</button>'
+      + '<button class="' + (pedOrdenPrio === 'urgente' ? 'act' : '') + '" onclick="setPedOrdenPrio(\'urgente\')">🔴 Urgentes primero</button></span>' : '');
 
   // 3) Completados: ingresos PT con su requi, agrupados por requi + ficha
   var grupos = {}, orden = [];
@@ -1623,7 +1654,7 @@ function renderPedidos() {
 
   document.getElementById('pedCuerpo').innerHTML =
     '<div class="ped-sec-t clic' + pedCol('proc') + '"' + pedClic('proc') + '><span class="ped-chev">▾</span>🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc.replace('class="ped-proc"', 'class="ped-proc' + pedCol('proc') + '"')
-    + '<div class="ped-sec-t">📋 ' + (pedAgrupar === 'tipo' ? 'Por entregar según el tipo de tapa' : 'Todos los pedidos por cliente') + ' <i>toca un pedido para marcarlo en proceso</i>' + modoBtns + '</div>' + htmlGrid
+    + '<div class="ped-sec-t">📋 ' + (pedAgrupar === 'tipo' ? 'Por entregar según el tipo de tapa' : (pedAgrupar === 'prioridad' ? 'Pedidos por prioridad' : 'Todos los pedidos por cliente')) + ' <i>toca un pedido para marcarlo en proceso</i>' + modoBtns + '</div>' + htmlGrid
     + '<div class="ped-sec-t clic' + pedCol('comp') + '"' + pedClic('comp') + '><span class="ped-chev">▾</span>✅ Completados — ingresos PT con su requi <i>(' + orden.length + ')</i></div>' + htmlComp.replace('class="ped-comp"', 'class="ped-comp' + pedCol('comp') + '"').replace('class="ped-mas"', 'class="ped-mas' + pedCol('comp') + '"');
 
   if (document.getElementById('pedOv').classList.contains('open') && PED.abierto) pintarPedido();
