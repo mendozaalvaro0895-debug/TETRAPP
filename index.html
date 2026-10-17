@@ -146,6 +146,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .guia-led.warn{background:#F59E0B;box-shadow:0 0 8px #F59E0B}
 .guia-led.bad{background:#F87171;box-shadow:0 0 8px #F87171}
 .guia-det.pend-txt{color:#FBBF24}
+.ci-ficha{width:190px}
+.ci-ficha-ok{border-color:#4ADE80!important}
+#ciFichaDrop{display:none;position:fixed;z-index:3000;background:var(--card);border:1px solid rgba(126,206,192,.4);border-radius:6px;max-height:280px;overflow-y:auto;box-shadow:0 12px 32px rgba(0,0,0,.6)}
+#ciFichaDrop.open{display:block}
+.ci-fi{padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--border);font-size:12px}
+.ci-fi:hover{background:var(--bg2)}
+.ci-fi b{font-family:var(--mono);font-size:11px}
+.ci-fi-sub{color:var(--gray);font-size:11px;margin-top:2px}
+.ci-fi-chip{float:right;font-family:var(--mono);font-size:10px;margin-left:8px}
+.ci-fi-sec{padding:6px 10px;font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:#7ECEC0;background:var(--bg2);position:sticky;top:0}
 .areas-grid.locked .area-card{pointer-events:none;filter:grayscale(1) brightness(.55)}
 
 .footer-info{padding:32px 24px 48px;max-width:1100px;margin:0 auto;text-align:center;color:var(--gray);font-size:12px}
@@ -474,6 +484,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
     </div>
   </div>
 </div>
+
+<div id="ciFichaDrop"></div>
 
 <div class="footer-info">
   <p>Sistema base · Última actualización: <code id="last-update">cargando...</code></p>
@@ -1533,6 +1545,7 @@ async function ciCargarPersonalProd() {
 function ciAbrir() {
   ciArchivos = [];
   ciDocumentos = [];
+  CI_FICHAS.lista = null;   // fichas y entregado se leen frescos en cada sesión de la Central
   document.getElementById('ciFiles').innerHTML = '';
   document.getElementById('ciStatusSubir').textContent = '';
   document.getElementById('ciStatusPie').textContent = '';
@@ -1873,9 +1886,11 @@ async function ciPrecalcularReconciliacion(docs) {
 
 /* ── Render de la pantalla de revisión ─────────────────────────── */
 function ciRenderDocs() {
+  if (CI_FICHAS.lista) ciAutoVincular();
   document.getElementById('ciDocsWrap').innerHTML = ciDocumentos.map(function(d, di) {
     return ciRenderUnDoc(d, di);
   }).join('');
+  ciAsegurarFichas();
 }
 
 function ciRenderUnDoc(d, di) {
@@ -1922,13 +1937,7 @@ function ciFilaAccion(d, di, l, li) {
   }).join('');
   var extra = '';
   if (l.accion === 'serig_entrega') {
-    extra = '<input type="text" placeholder="Cliente…" value="' + escHtml(l.cliente || '') + '" onchange="ciSetCampo(' + di + ',' + li + ',\'cliente\',this.value)" style="width:110px"> ' +
-      '<select title="Línea de producción (obligatoria)" onchange="ciSetCampo(' + di + ',' + li + ',\'linea\',this.value)" style="width:72px">' +
-        '<option value="">Línea *</option>' +
-        ['1', '2', '3', '4'].map(function(n) {
-          return '<option value="' + n + '"' + (String(l.linea) === n ? ' selected' : '') + '>L' + n + '</option>';
-        }).join('') +
-      '</select>';
+    extra = ciExtraSerig(d, di, li, l);
   } else if (l.accion === 'prod_completar') {
     extra = ciExtraProduccion(d, di, li, l);
   } else if (l.reconciliacion) {
@@ -1952,13 +1961,254 @@ function ciSetCampo(di, li, campo, valor) {
   ciDocumentos[di].lineas[li][campo] = valor;
 }
 
+/* ── Central de Ingreso: vincular cada línea de Serigrafía con su FICHA DE TRABAJO (oct/2026) ──
+   Misma vinculación que "Registrar entregado" de serigrafia.html: `entregas_serig.sol_id/sol_codigo` y, por línea,
+   `lineas[].solId/solCodigo`. Eso es lo que muestra el avance de la ficha y la pasa sola a COMPLETADA (estado en
+   `solicitudes` Y en `solicitud_lineas`) cuando lo entregado alcanza lo pedido. Igual que allá, una entrega parcial
+   NO cambia el estado a "parcial" solo. */
+var CI_FICHAS = { lista: null, cargando: false, error: false, entregado: {} };
+var CI_FICHA_CTX = { di: -1, li: -1, sucio: false };
+var CI_ACTIVAS = ['nueva', 'proceso', 'parcial'];
+
+async function ciCargarFichas() {
+  if (CI_FICHAS.cargando) return;
+  CI_FICHAS.cargando = true;
+  try {
+    var sol = await indPaginar(function () {
+      return db.from('solicitudes')
+        .select('id,codigo,cliente_nombre,estado,created_at,solicitud_lineas(sku,descripcion,cantidad,linea_id)')
+        .eq('area', 'serig').is('deleted_at', null).order('created_at', { ascending: false });
+    });
+    var ent = await indPaginar(function () { return db.from('entregas_serig').select('id,cant,sol_id,lineas'); });
+    if (sol === null) throw new Error('solicitudes');
+    CI_FICHAS.entregado = ent === null ? {} : ciEntregadoPorFicha(ent);
+    CI_FICHAS.lista = sol.map(function (s) {
+      var ls = s.solicitud_lineas || [];
+      var primera = ls[0] ? (ls[0].descripcion || '') : '';
+      var ln = ls[0] && ls[0].linea_id != null ? String(ls[0].linea_id) : '';
+      return {
+        id: s.id, codigo: s.codigo || String(s.id).slice(0, 8), cliente: s.cliente_nombre || '', estado: s.estado || 'nueva',
+        skus: ls.map(function (l) { return String(l.sku || '').trim(); }).filter(Boolean),
+        desc: ls.length > 1 ? primera + ' (+' + (ls.length - 1) + ')' : primera,
+        cant: ls.reduce(function (t, l) { return t + (l.cantidad || 0); }, 0),
+        linea: ['1', '2', '3', '4'].indexOf(ln) >= 0 ? ln : ''
+      };
+    });
+    CI_FICHAS.error = false;
+  } catch (e) {
+    console.error('[ciCargarFichas]', e);
+    CI_FICHAS.lista = [];
+    CI_FICHAS.error = true;
+  } finally {
+    CI_FICHAS.cargando = false;
+  }
+}
+
+// Unidades entregadas por ficha: mismo criterio que entregadoDeSolicitud() de serigrafia.html
+function ciEntregadoPorFicha(filas) {
+  var m = {};
+  filas.forEach(function (e) {
+    if (e.lineas && e.lineas.length) {
+      e.lineas.forEach(function (l) { if (l.solId) m[l.solId] = (m[l.solId] || 0) + (l.cant || 0); });
+    } else if (e.sol_id) {
+      m[e.sol_id] = (m[e.sol_id] || 0) + (e.cant || 0);
+    }
+  });
+  return m;
+}
+
+function ciFichaPorId(id) {
+  return (CI_FICHAS.lista || []).find(function (f) { return f.id === id; }) || null;
+}
+
+// Fichas que llevan ese SKU. SICAF a veces factura con un dígito extra: si no hay exacta se prueba sin el último.
+function ciFichasPorSku(sku, soloActivas) {
+  var s = String(sku || '').trim();
+  if (!s) return { exactas: [], aprox: [] };
+  var base = soloActivas ? (CI_FICHAS.lista || []).filter(function (f) { return CI_ACTIVAS.indexOf(f.estado) >= 0; }) : (CI_FICHAS.lista || []);
+  var exactas = base.filter(function (f) { return f.skus.indexOf(s) >= 0; });
+  var aprox = (!exactas.length && s.length > 1) ? base.filter(function (f) { return f.skus.indexOf(s.slice(0, -1)) >= 0; }) : [];
+  return { exactas: exactas, aprox: aprox };
+}
+
+function ciAsignarFicha(l, f, auto) {
+  l.solId = f.id; l.solCodigo = f.codigo; l.solAuto = !!auto;
+  l.cliente = f.cliente || l.cliente || '';
+  if (f.linea && !l.linea) l.linea = f.linea;
+}
+
+// Si UNA sola ficha activa lleva el SKU de la línea, queda vinculada de entrada (el usuario puede cambiarla)
+function ciAutoVincular() {
+  if (!CI_FICHAS.lista) return;
+  ciDocumentos.forEach(function (d) {
+    d.lineas.forEach(function (l) {
+      if (l.accion !== 'serig_entrega' || l.guardado || l.solId || l.solManual) return;
+      var c = ciFichasPorSku(l.codigo, true);
+      if (c.exactas.length === 1) ciAsignarFicha(l, c.exactas[0], true);
+    });
+  });
+}
+
+function ciAsegurarFichas() {
+  var hay = ciDocumentos.some(function (d) {
+    return d.lineas.some(function (l) { return l.accion === 'serig_entrega' && !l.guardado; });
+  });
+  if (!hay || CI_FICHAS.lista || CI_FICHAS.cargando) return;
+  ciCargarFichas().then(function () { ciAutoVincular(); ciRenderDocs(); });
+}
+
+/* ── Celda "Extra" de una línea de Serigrafía ── */
+function ciExtraSerig(d, di, li, l) {
+  var f = l.solId ? ciFichaPorId(l.solId) : null;
+  var txt = l.solId ? (l.solCodigo + ' · ' + (l.cliente || '')).slice(0, 36) : '';
+  var ph = CI_FICHAS.error ? 'Fichas no disponibles' : (CI_FICHAS.lista ? 'Buscar ficha de trabajo…' : 'Cargando fichas…');
+  var h = '<div style="display:flex;gap:6px;align-items:center;margin-bottom:5px">' +
+    '<input type="text" class="ci-ficha' + (l.solId ? ' ci-ficha-ok' : '') + '" placeholder="' + ph + '" value="' + escHtml(txt) + '" autocomplete="off" ' +
+      'onfocus="ciFichaAbrir(' + di + ',' + li + ',this)" oninput="ciFichaAbrir(' + di + ',' + li + ',this)" onblur="ciFichaCerrar()">' +
+    (l.solId ? '<button type="button" class="guia-go" title="Quitar el vínculo con la ficha" onclick="ciQuitarFicha(' + di + ',' + li + ')">✕</button>' : '') +
+    '<select title="Línea de producción (obligatoria)" onchange="ciSetCampo(' + di + ',' + li + ',\'linea\',this.value)" style="width:72px">' +
+      '<option value="">Línea *</option>' +
+      ['1', '2', '3', '4'].map(function (n) {
+        return '<option value="' + n + '"' + (String(l.linea) === n ? ' selected' : '') + '>L' + n + '</option>';
+      }).join('') +
+    '</select></div>';
+  if (l.solId && f) {
+    var ya = CI_FICHAS.entregado[f.id] || 0, con = ya + (l.cantidad || 0);
+    h += '<div class="ci-fi-sub">' + ciIconoEstado(f.estado) + ' Entregado ' + indFmt(ya) + ' + ' + indFmt(l.cantidad || 0) + ' = ' + indFmt(con) +
+      ' / ' + indFmt(f.cant) + ' und' + (f.cant > 0 && con >= f.cant ? ' · <b style="color:#4ADE80">completará la ficha</b>' : '') +
+      (l.solAuto ? ' · ✓ vinculada por SKU' : '') + '</div>';
+  } else {
+    h += '<input type="text" placeholder="Cliente (sin ficha)…" value="' + escHtml(l.cliente || '') + '" onchange="ciSetCampo(' + di + ',' + li + ',\'cliente\',this.value)" style="width:100%">';
+  }
+  return h;
+}
+
+function ciIconoEstado(e) { return e === 'proceso' ? '🟢' : (e === 'parcial' ? '🟡' : (e === 'lista' ? '✅' : '⚪')); }
+
+/* ── Desplegable de búsqueda (posición fija: la tabla de la Central tiene scroll propio) ── */
+function ciFichaItemHtml(f, sku) {
+  var ent = CI_FICHAS.entregado[f.id] || 0;
+  var clr = f.cant > 0 && ent >= f.cant ? '#4ADE80' : (ent > 0 ? '#FBBF24' : 'var(--gray)');
+  return '<div class="ci-fi" onmousedown="ciFichaElegir(\'' + escHtml(f.id) + '\')">' +
+    '<span class="ci-fi-chip" style="color:' + clr + '">' + indFmt(ent) + ' / ' + indFmt(f.cant) + ' und</span>' +
+    ciIconoEstado(f.estado) + ' <b>' + escHtml(f.codigo) + '</b> · ' + escHtml(f.cliente) +
+    '<div class="ci-fi-sub">' + escHtml((f.desc || '').slice(0, 60)) + '</div></div>';
+}
+
+function ciFichaAbrir(di, li, inp) {
+  var drop = document.getElementById('ciFichaDrop');
+  if (!drop) return;
+  var l = ciDocumentos[di].lineas[li];
+  if (l.solId && inp.value !== (l.solCodigo + ' · ' + (l.cliente || '')).slice(0, 36)) {   // empezó a escribir: se suelta el vínculo
+    l.solId = ''; l.solCodigo = ''; l.solAuto = false; l.solManual = true;
+    CI_FICHA_CTX.sucio = true;
+  }
+  CI_FICHA_CTX.di = di; CI_FICHA_CTX.li = li;
+  if (!CI_FICHAS.lista) { drop.classList.remove('open'); return; }
+  var q = ((l.solId ? '' : inp.value) || '').trim().toLowerCase();
+  var porSku = ciFichasPorSku(l.codigo, false);
+  var sugeridas = porSku.exactas.concat(porSku.aprox);
+  var activas = CI_FICHAS.lista.filter(function (f) { return CI_ACTIVAS.indexOf(f.estado) >= 0 && sugeridas.indexOf(f) < 0; });
+  function coincide(f) {
+    return !q || (f.codigo + ' ' + f.cliente + ' ' + f.desc).toLowerCase().indexOf(q) >= 0;
+  }
+  var html = '';
+  var s1 = sugeridas.filter(coincide).slice(0, 8);
+  if (s1.length) html += '<div class="ci-fi-sec">Coinciden por SKU ' + escHtml(l.codigo || '') + '</div>' + s1.map(ciFichaItemHtml).join('');
+  var s2 = activas.filter(coincide).slice(0, 20);
+  if (s2.length) html += '<div class="ci-fi-sec">Fichas activas</div>' + s2.map(ciFichaItemHtml).join('');
+  if (q) {   // completadas solo al escribir (sirven para cargar un sobrante a una ficha ya entregada)
+    var s3 = CI_FICHAS.lista.filter(function (f) { return CI_ACTIVAS.indexOf(f.estado) < 0 && sugeridas.indexOf(f) < 0 && coincide(f); }).slice(0, 8);
+    if (s3.length) html += '<div class="ci-fi-sec">Completadas</div>' + s3.map(ciFichaItemHtml).join('');
+  }
+  if (!html) html = '<div class="ci-fi-sub" style="padding:10px">Sin fichas que coincidan</div>';
+  drop.innerHTML = html;
+  var r = inp.getBoundingClientRect();
+  drop.style.top = (r.bottom + 2) + 'px';
+  drop.style.left = r.left + 'px';
+  drop.style.width = Math.max(r.width, 340) + 'px';
+  drop.classList.add('open');
+}
+
+function ciFichaCerrar() {
+  var drop = document.getElementById('ciFichaDrop');
+  if (drop) drop.classList.remove('open');
+  if (CI_FICHA_CTX.sucio) { CI_FICHA_CTX.sucio = false; setTimeout(ciRenderDocs, 0); }
+}
+
+function ciFichaElegir(id) {
+  var f = ciFichaPorId(id);
+  var l = ciDocumentos[CI_FICHA_CTX.di] && ciDocumentos[CI_FICHA_CTX.di].lineas[CI_FICHA_CTX.li];
+  if (!f || !l) return;
+  ciAsignarFicha(l, f, false);
+  l.solManual = true;
+  CI_FICHA_CTX.sucio = false;
+  var drop = document.getElementById('ciFichaDrop');
+  if (drop) drop.classList.remove('open');
+  ciRenderDocs();
+}
+
+function ciQuitarFicha(di, li) {
+  var l = ciDocumentos[di].lineas[li];
+  l.solId = ''; l.solCodigo = ''; l.solAuto = false; l.solManual = true;
+  ciRenderDocs();
+}
+
+/* ── Al guardar ── */
+// Entregado real de una ficha leído de la base (otra persona pudo registrar entregas desde Serigrafía)
+async function ciEntregadoDeFicha(solId) {
+  var r = await db.from('entregas_serig').select('id,cant,sol_id,lineas').contains('lineas', [{ solId: solId }]);
+  var filas = r.error ? null : (r.data || []);
+  var r2 = await db.from('entregas_serig').select('id,cant,sol_id,lineas').eq('sol_id', solId);
+  if (filas === null || r2.error) {
+    var todas = await indPaginar(function () { return db.from('entregas_serig').select('id,cant,sol_id,lineas'); });
+    return todas === null ? null : (ciEntregadoPorFicha(todas)[solId] || 0);
+  }
+  var vistos = {}, unicas = [];
+  filas.concat(r2.data || []).forEach(function (e) { if (!vistos[e.id]) { vistos[e.id] = true; unicas.push(e); } });
+  return ciEntregadoPorFicha(unicas)[solId] || 0;
+}
+
+// Devuelve true si la ficha quedó COMPLETADA con esta entrega
+async function ciCompletarFichaSiCorresponde(solId) {
+  var f = ciFichaPorId(solId);
+  var ent = await ciEntregadoDeFicha(solId);
+  if (ent !== null) CI_FICHAS.entregado[solId] = ent;
+  if (!f || ent === null || CI_ACTIVAS.indexOf(f.estado) < 0) return false;
+  if (!(f.cant > 0 && ent >= f.cant)) return false;
+  var r1 = await db.from('solicitudes').update({ estado: 'lista' }).eq('id', solId);
+  if (r1.error) throw r1.error;
+  var r2 = await db.from('solicitud_lineas').update({ estado: 'lista' }).eq('solicitud_id', solId);   // la LÍNEA manda en el tablero
+  if (r2.error) throw r2.error;
+  f.estado = 'lista';
+  return true;
+}
+
+// Requis de Serigrafía que ya están registradas (aviso antes de duplicar, como serigrafia.html)
+async function ciRequisSerigYaRegistradas() {
+  var nums = [];
+  ciDocumentos.forEach(function (d) {
+    var pend = d.lineas.some(function (l) { return l.accion === 'serig_entrega' && !l.guardado; });
+    var yaGuardo = d.lineas.some(function (l) { return l.accion === 'serig_entrega' && l.guardado; });
+    if (pend && !yaGuardo && d.documento && nums.indexOf(d.documento) < 0) nums.push(d.documento);
+  });
+  if (!nums.length) return [];
+  var r = await db.from('entregas_serig').select('requi,fecha,cliente').in('requi', nums);
+  return r.error ? [] : (r.data || []);
+}
+
 /* ── Guardar: reparte cada línea a su tabla según la acción ───── */
 async function ciGuardarTodo() {
   var btn = document.getElementById('ciBtnGuardar');
   btn.disabled = true;
   var status = document.getElementById('ciStatusPie');
-  var ok = 0, err = 0, ignoradas = 0;
+  var ok = 0, err = 0, ignoradas = 0, completadas = 0;
   try {
+    var dups = await ciRequisSerigYaRegistradas();
+    if (dups.length) {
+      var detalle = dups.map(function(x) { return x.requi + ' (' + indFechaCorta(x.fecha) + (x.cliente ? ' · ' + x.cliente : '') + ')'; }).join('\n');
+      if (!confirm('⚠️ Estas requis de Serigrafía ya están registradas:\n' + detalle + '\n¿Guardar de todas formas?')) return;
+    }
     for (var di = 0; di < ciDocumentos.length; di++) {
       var d = ciDocumentos[di];
       for (var li = 0; li < d.lineas.length; li++) {
@@ -1967,9 +2217,10 @@ async function ciGuardarTodo() {
         if (l.accion === 'ignorar' || l.accion === 'reconciliar') { ignoradas++; continue; }
         status.textContent = 'Guardando ' + (ok + err + 1) + '…';
         try {
-          await ciGuardarLinea(d, l);
+          var res = await ciGuardarLinea(d, l);
           l.guardado = true;
           ok++;
+          if (res === 'ficha_completa') completadas++;
         } catch (e) {
           console.error('[ciGuardarTodo]', e.message);
           err++;
@@ -1978,6 +2229,7 @@ async function ciGuardarTodo() {
     }
     ciRenderDocs();
     status.textContent = '✅ ' + ok + ' guardadas' + (err ? ' · ⚠️ ' + err + ' con error' : '') +
+      (completadas ? ' · 🟢 ' + completadas + (completadas === 1 ? ' ficha completada' : ' fichas completadas') : '') +
       (ignoradas ? ' · ' + ignoradas + ' sin acción' : '');
   } finally {
     btn.disabled = false;
@@ -2010,13 +2262,18 @@ async function ciGuardarLinea(d, l) {
 
   if (l.accion === 'serig_entrega') {
     if (!l.linea) throw new Error('Falta elegir la línea de producción');
+    var solId = l.solId || '', solCod = l.solCodigo || '';
     var r2 = await db.from('entregas_serig').insert({
       requi: d.documento, cliente: l.cliente || '—', cant: l.cantidad, fecha: d.fecha || fechaHoyLocal(),
-      nota: d.descripcion || null, sol_id: null, sol_codigo: '',
-      lineas: [{ cliente: l.cliente || '—', sku: l.codigo, desc: l.producto, cant: l.cantidad, solId: '', solCodigo: '', linea: String(l.linea) }]
+      nota: d.descripcion || null, sol_id: solId || null, sol_codigo: solCod,
+      lineas: [{ cliente: l.cliente || '—', sku: l.codigo, desc: l.producto, cant: l.cantidad, solId: solId, solCodigo: solCod, linea: String(l.linea) }]
     });
     if (r2.error) throw r2.error;
-    return;
+    if (solId) {
+      try { return (await ciCompletarFichaSiCorresponde(solId)) ? 'ficha_completa' : null; }
+      catch (e) { console.warn('[ciCompletarFicha] la entrega se guardó, pero no se pudo cerrar la ficha:', e.message); }
+    }
+    return null;
   }
 
   if (l.accion.indexOf('insumo_') === 0) {
