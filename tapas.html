@@ -372,6 +372,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-pc{border:1.5px solid #2563EB;background:#EFF6FF;border-radius:10px;padding:6px 9px;cursor:pointer}
 .cp-pc-t{display:flex;justify-content:space-between;gap:6px;font-size:11px;font-weight:800;color:#1E3A8A}
 .cp-pc-t b{font-family:var(--mono)}
+.cp-pc-t{align-items:center}
+.cp-pc-q{flex-shrink:0;background:#FEE2E2;border:none;color:#B83232;border-radius:6px;padding:3px 8px;font-size:10.5px;font-weight:800;cursor:pointer;font-family:inherit}
+.cp-pc-q:hover{background:#FECACA}
+.plz-lote{display:flex;align-items:center;gap:8px;border:1.5px solid #2563EB;background:#EFF6FF;border-radius:8px;padding:6px 10px;margin-bottom:6px;font-size:12px}
+.plz-lote span{flex:1;color:#1E3A8A;font-weight:700}
+.plz-lote button{background:#FEE2E2;border:none;color:#B83232;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer}
 .cp-pc-d{font-size:10.5px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:1px 0 3px}
 .cp-pc-p{font-size:10px;color:#1E3A8A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
 .cp-bar{height:6px;background:#DBEAFE;border-radius:4px;overflow:hidden}
@@ -2618,10 +2624,35 @@ function pintarPlazoFicha() {
   document.getElementById('plzCuerpo').innerHTML =
     '<div class="plz-nums"><div><b>' + s.cant.toLocaleString() + '</b><span>Pedido</span></div><div><b>' + r.ent.toLocaleString() + '</b><span>Entregado</span></div>'
     + '<div><b>' + r.enProc.toLocaleString() + '</b><span>En proceso</span></div><div><b>' + r.libre.toLocaleString() + '</b><span>Sin iniciar</span></div></div>'
+    + lotesAbiertosPlazoHtml(s)
     + '<div class="plz-sec">Trabajar parcial</div>' + parcial
     + '<div class="plz-sec">Plazo de entrega</div><div class="plz-chs">' + chips + '</div>'
     + (PLZ.tipo === 'fecha' ? '<input class="fi" type="date" id="plzFecha" value="' + escHtml(fecha) + '" style="margin-bottom:8px">' : '')
     + '<button class="btn btn-g btn-sm" onclick="guardarPlazoFicha()">Guardar plazo</button>';
+}
+
+// Lotes "en proceso" de la ficha dentro del popup de plazo, cada uno con su botón Quitar
+function lotesAbiertosPlazoHtml(s) {
+  var m = modeloFichasCompactas().find(function(x) { return x.id === s.id; });
+  var ab = m ? m.abiertos : [];
+  if (!ab.length) return '';
+  return '<div class="plz-sec">Lotes en proceso</div>' + ab.map(function(l) {
+    return '<div class="plz-lote"><span>▶ ' + (l.cantidad - l.hecho).toLocaleString() + ' und'
+      + (l.tareas.length ? ' · ' + tareasResumenCompacto(l.tareas) : '') + '</span>'
+      + '<button onclick="quitarLoteTapas(\'' + escHtml(String(l.id)) + '\')">✕ Quitar</button></div>';
+  }).join('');
+}
+
+// Quita un lote marcado "en proceso" (por error o porque ya no va). Master puede borrar por RLS; sus tareas caen con él.
+async function quitarLoteTapas(loteId) {
+  if (!confirm('¿Quitar este lote de "en proceso"?\n(Las unidades vuelven a quedar sin iniciar; no se borra ningún ingreso PT.)')) return;
+  var r = await db.from('tapas_lotes').delete().eq('id', loteId).select('id');
+  if (r.error || !(r.data || []).length) { showToast('❌ ' + (r.error ? r.error.message : 'No se pudo quitar (sin permiso)'), '#B83232'); return; }
+  await cargarLotesTapas();
+  renderFichasTapas();
+  if (PLZ.id) pintarPlazoFicha();
+  if (fichaModalId) mostrarDetalle(fichaModalId);
+  showToast('Lote quitado');
 }
 
 async function trabajarParcialFicha() {
@@ -3727,7 +3758,8 @@ function renderFichasCompactasTapas() {
   var htmlProc = proc.length ? '<div class="cp-proc">' + proc.map(function(p) {
     var pct = Math.min(100, Math.round(p.l.hecho / p.l.cantidad * 100));
     return '<div class="cp-pc" onclick="abrirFichaTapas(\'' + escHtml(String(p.x.id)) + '\')">'
-      + '<div class="cp-pc-t"><span>' + escHtml(p.x.cliente) + ' · ' + escHtml(p.x.codigo) + limiteCompactoHtml(p.x.s) + '</span><b>' + p.l.cantidad.toLocaleString() + '</b></div>'
+      + '<div class="cp-pc-t"><span>' + escHtml(p.x.cliente) + ' · ' + escHtml(p.x.codigo) + limiteCompactoHtml(p.x.s) + '</span><b>' + p.l.cantidad.toLocaleString() + '</b>'
+      +   '<button class="cp-pc-q" title="Quitar este lote de &quot;en proceso&quot;" onclick="event.stopPropagation();quitarLoteTapas(\'' + escHtml(String(p.l.id)) + '\')">✕ Quitar</button></div>'
       + '<div class="cp-pc-d">' + escHtml(p.x.desc) + '</div>'
       + (p.l.tareas.length ? '<div class="cp-pc-p">' + tareasResumenCompacto(p.l.tareas) + '</div>' : '')
       + '<div class="cp-bar"><i style="width:' + pct + '%"></i></div></div>';
