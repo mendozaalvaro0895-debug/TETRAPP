@@ -365,6 +365,36 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
   .ped-cerrar{padding:10px;font-size:13px}
   .ped-comp-r{padding:8px 10px}
 }
+/* ── VISTA CELULAR: selección de operario, termómetro, formulario y éxito (≤700px) ── */
+@media(max-width:700px){
+  .wrap{padding:12px 10px 40px}
+  .titulo{font-size:19px}
+  .subtitulo{margin-bottom:12px;font-size:12px}
+  .op-grid{grid-template-columns:minmax(0,1fr);gap:8px}
+  .op-sel-card{display:grid;grid-template-columns:44px minmax(0,1fr);column-gap:12px;align-items:center;text-align:left;padding:10px 14px;min-height:60px}
+  .op-sel-av{grid-row:1/4;margin:0;width:44px;height:44px;font-size:15px}
+  .op-sel-nombre{font-size:15px}
+  .op-sel-card:hover,.op-sel-card:active{transform:none}
+  .mtx-wrap{padding:12px;margin-top:16px}
+  .term-row{grid-template-columns:minmax(0,1fr) 54px auto;gap:8px;padding:11px 10px;min-height:46px}
+  .term-nombre{font-size:13px}
+  .term-val{font-size:12px;min-width:0}
+  .term-detalle{padding:10px 8px 12px}
+  .dg{height:150px}
+  .quien{padding:10px 12px;margin-bottom:12px}
+  .quien-corr{display:none}
+  .btn-cambiar{padding:10px 14px;font-size:13px;min-height:40px}
+  .sec{padding:12px;margin-bottom:10px}
+  .tarea-card{padding:10px}
+  .btn-add{padding:14px;font-size:14px}
+  .total-bar{padding:10px 14px;margin-bottom:10px}
+  .total-bar-val{font-size:22px}
+  /* guardar siempre a la mano */
+  #btnGuardar{position:sticky;bottom:10px;z-index:20;box-shadow:0 6px 18px rgba(0,0,0,.28);padding:17px}
+  .exito-box{padding:28px 16px}
+  .exito-ico{font-size:46px}
+  .toast-msg{white-space:normal;max-width:90vw;text-align:center;bottom:84px}
+}
 .ped-cerrar{display:block;margin:12px auto 0;background:none;border:none;color:#6B6B6A;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline}
 /* ── Time Picker 12h ── */
 </style>
@@ -674,7 +704,7 @@ function compactoUnd(n) {
 
 // Meta diaria por persona (línea punteada del gráfico) y alto máximo de barra (el gráfico mide 210px)
 var META_DIA_GRAFICO = 10000;
-var ALTO_BARRAS_DIA = 180;
+var ALTO_BARRAS_DIA = (window.innerWidth <= 700) ? 120 : 180;
 
 function buildTermDiario(o) {
   var hoy = fechaGT();
