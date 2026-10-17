@@ -398,6 +398,14 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-urg{font-style:normal;font-size:9.5px;font-weight:800;color:#B83232;background:#FEE2E2;border-radius:6px;padding:1px 6px;margin-right:3px}
 .ped-tipo-h.urg{background:#FEE2E2;border-color:#B83232}
 .ped-tipo-h.urg .ped-tipo-n{color:#B83232}
+.ped-stk{font-size:11px;font-weight:700;border-radius:6px;padding:2px 8px;margin-top:4px;display:inline-block;max-width:100%}
+.ped-stk.ok{background:#DCFCE7;color:#166534}
+.ped-stk.par{background:#FEF3C7;color:#92400E}
+.ped-stk.cero{background:#F0EDE8;color:#6B6B6A}
+.ped-bod-stk{font-weight:800;border-radius:6px;padding:1px 8px}
+.ped-bod-stk.ok{background:#DCFCE7;color:#166534}
+.ped-bod-stk.par{background:#FEF3C7;color:#92400E}
+.ped-bod-stk.cero{background:#F0EDE8;color:#6B6B6A}
 .ped-cerrar{display:block;margin:12px auto 0;background:none;border:none;color:#6B6B6A;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline}
 /* ── Time Picker 12h ── */
 </style>
@@ -1400,7 +1408,7 @@ async function pedCargarStock(sols) {
   var skInv = {}, skB7 = {};
   sols.forEach(function(x) {
     (x.solicitud_lineas || []).forEach(function(l) {
-      [l.sku_base, l.sku_contratapa].forEach(function(k) { if (k) skInv[k] = 1; });
+      [l.sku, l.sku_base, l.sku_contratapa].forEach(function(k) { if (k) skInv[k] = 1; });
       [l.sku_liner, l.sku_banda].forEach(function(k) { if (k) skB7[k] = 1; });
     });
   });
@@ -1436,6 +1444,21 @@ function pedChipTap(id) {
 }
 
 // Resumen de una línea para el chip cerrado en celular: ¿alcanzan los componentes?
+// ESPEJO de stkPTHtml (tapas.html): stock del producto terminado (SKU principal) frente a lo que falta entregar
+function pedStkPTTexto(stock, falta) {
+  if (stock === null || stock === undefined) return null;
+  if (stock <= 0) return { cls: 'cero', txt: '📦 Stock PT 0 · producir todo' };
+  if (falta > 0 && stock >= falta) return { cls: 'ok', txt: '📦 Stock PT ' + pedNum(stock) + ' · cubre el saldo' };
+  if (falta > 0) return { cls: 'par', txt: '📦 Stock PT ' + pedNum(stock) + ' · producir ' + pedNum(falta - stock) };
+  return { cls: 'ok', txt: '📦 Stock PT ' + pedNum(stock) };
+}
+function pedStkPTHtml(sku, falta) {
+  if (!sku) return '';
+  var it = (PED.stockInv || {})[sku];
+  var t = pedStkPTTexto(it ? it.ex : null, falta);
+  return t ? '<div class="ped-stk ' + t.cls + '" title="Existencia actual del producto terminado en inventario (Bodega 2)">' + t.txt + '</div>' : '';
+}
+
 function pedCompResumenHtml(x) {
   var k = pedCompStockHtml(x);
   var mal = (k.match(/class="ped-k mal"/g) || []).length;
@@ -1552,6 +1575,7 @@ function renderPedidos() {
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
       + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
       + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
+      + pedStkPTHtml(x.sku, x.saldo)
       + '<div class="ped-resum">' + (proc ? '<span class="ped-res-b proc">▶ ' + pedNum(x.enProc) + ' en proceso</span>' : '') + pedCompResumenHtml(x) + '</div>'
       + '<div class="ped-more">'
       +   '<div class="ped-chip-s">' + (proc ? '▶ ' + pedNum(x.enProc) + ' en proceso' : 'de ' + pedNum(x.cant) + (x.entregado ? ' · ent. ' + pedNum(x.entregado) : '')) + '</div>'
@@ -1689,7 +1713,8 @@ function pedFilasBodega(x) {
   var filas = [];
   (x.s.solicitud_lineas || []).forEach(function(l) {
     var cant = l.cantidad || 0;
-    if (l.sku) filas.push({ rol: 'Tapa', sku: l.sku, desc: l.descripcion || '', cant: cant, stock: null, salido: null });
+    var itPT = l.sku ? (PED.stockInv || {})[l.sku] : null;
+    if (l.sku) filas.push({ rol: 'Tapa', sku: l.sku, desc: l.descripcion || (itPT ? itPT.desc : ''), cant: cant, stock: itPT ? itPT.ex : null, salido: null });
     [['Base', l.sku_base, false], ['Contratapa', l.sku_contratapa, false], ['Liner', l.sku_liner, true], ['Banda', l.sku_banda, true]].forEach(function(c) {
       if (!c[1]) return;
       var it = (c[2] ? PED.stockB7 : PED.stockInv)[c[1]];
@@ -1706,7 +1731,8 @@ function pedBloqueBodegaHtml(x) {
   var rows = filas.map(function(f) {
     if (f.rol === 'Tapa') {
       return '<div class="ped-bod-r tapa"><div class="ped-bod-t"><i>Tapa</i><b>' + escHtml(f.sku) + '</b><span>' + escHtml(f.desc) + '</span></div>'
-        + '<div class="ped-bod-n"><span>Pedido <b>' + pedNum(f.cant) + '</b> und</span></div></div>';
+        + '<div class="ped-bod-n"><span>Pedido <b>' + pedNum(f.cant) + '</b> und</span>'
+        + (function() { var t = pedStkPTTexto(f.stock, f.cant || 0); return t ? '<span class="ped-bod-stk ' + t.cls + '">' + t.txt + '</span>' : ''; })() + '</div></div>';
     }
     var pedir = Math.max(0, f.cant - (f.salido || 0));
     var falta = f.stock !== null && pedir > f.stock ? pedir - f.stock : 0;

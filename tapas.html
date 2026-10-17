@@ -424,6 +424,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .bod-n .pedir b{color:#92400E}
 .bod-n .listo{color:#166534;font-weight:800}
 .bod-n .falta{color:var(--red);font-weight:800}
+.bod-stk{font-weight:800;border-radius:6px;padding:1px 8px}
+.bod-stk.ok{background:#DCFCE7;color:#166534}
+.bod-stk.par{background:#FEF3C7;color:#92400E}
+.bod-stk.cero{background:#F0EDE8;color:#6B6B6A}
+.cp-stk{font-size:11px;font-weight:700;border-radius:6px;padding:2px 8px;margin-top:4px;display:inline-block;max-width:100%}
+.cp-stk.ok{background:#DCFCE7;color:#166534}
+.cp-stk.par{background:#FEF3C7;color:#92400E}
+.cp-stk.cero{background:#F0EDE8;color:#6B6B6A}
+
 .cp-resum,.cp-acc{display:none}
 .cp-res-b{font-size:10px;font-weight:800;border-radius:10px;padding:1px 8px}
 .cp-res-b.ok{background:#DCFCE7;color:#166534}
@@ -1628,7 +1637,8 @@ function buildBloqueBodegaFicha(s, filas) {
   var rows = filas.map(function(f) {
     if (f.rol === 'Tapa') {
       return '<div class="bod-r tapa"><div class="bod-t"><i>Tapa</i><b>' + escHtml(f.sku) + '</b><span>' + escHtml(f.desc || '') + '</span></div>'
-        + '<div class="bod-n"><span>Pedido <b>' + (f.cant || 0).toLocaleString() + '</b> und</span></div></div>';
+        + '<div class="bod-n"><span>Pedido <b>' + (f.cant || 0).toLocaleString() + '</b> und</span>'
+        + (function() { var t = stkPTTexto(f.stock, f.cant || 0); return t ? '<span class="bod-stk ' + t.cls + '">' + t.txt + '</span>' : ''; })() + '</div></div>';
     }
     var pedir = Math.max(0, f.cant - (f.salido || 0));
     var falta = f.stock !== null && pedir > f.stock ? pedir - f.stock : 0;
@@ -3751,6 +3761,22 @@ function componentesResumenHtml(s) {
   return k ? '<span class="cp-res-b ok">✓ componentes ok</span>' : '';
 }
 
+// Stock del PRODUCTO TERMINADO (SKU principal, inventario B2) frente a lo que falta entregar: a veces ya hay existencia y no
+// hace falta producir todo. Informativo — el mismo stock puede estar apartado para otra ficha. ESPEJO: pedStkPTHtml (registro-tapas.html).
+function stkPTTexto(stock, falta) {
+  if (stock === null || stock === undefined) return null;
+  if (stock <= 0) return { cls: 'cero', txt: '📦 Stock PT 0 · producir todo' };
+  if (falta > 0 && stock >= falta) return { cls: 'ok', txt: '📦 Stock PT ' + stock.toLocaleString() + ' · cubre el saldo' };
+  if (falta > 0) return { cls: 'par', txt: '📦 Stock PT ' + stock.toLocaleString() + ' · producir ' + (falta - stock).toLocaleString() };
+  return { cls: 'ok', txt: '📦 Stock PT ' + stock.toLocaleString() };
+}
+function stkPTHtml(sku, falta) {
+  if (!sku) return '';
+  var it = invB2DeTapas(sku);
+  var t = stkPTTexto(it ? (it.existencia || 0) : null, falta);
+  return t ? '<div class="cp-stk ' + t.cls + '" title="Existencia actual del producto terminado en inventario (Bodega 2)">' + t.txt + '</div>' : '';
+}
+
 function buildChipCompacto(x, conCliente) {
   var enProc = x.abiertos.length > 0;
   var idq = escHtml(String(x.id));
@@ -3758,6 +3784,7 @@ function buildChipCompacto(x, conCliente) {
     + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
     + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
+    + stkPTHtml(x.sku, x.saldo)
     + '<div class="cp-resum">' + (enProc ? '<span class="cp-res-b proc">▶ ' + x.enProc.toLocaleString() + ' en proceso</span>' : '') + componentesResumenHtml(x.s) + '</div>'
     + '<div class="cp-more">'
     +   '<div class="cp-chip-s">' + (enProc ? '▶ ' + x.enProc.toLocaleString() + ' en proceso' : 'de ' + x.cant.toLocaleString() + (x.ent ? ' · ent. ' + x.ent.toLocaleString() : '')) + '</div>'
