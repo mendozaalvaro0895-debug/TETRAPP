@@ -372,9 +372,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-pc{border:1.5px solid #2563EB;background:#EFF6FF;border-radius:10px;padding:6px 9px;cursor:pointer}
 .cp-pc-t{display:flex;justify-content:space-between;gap:6px;font-size:11px;font-weight:800;color:#1E3A8A}
 .cp-pc-t b{font-family:var(--mono)}
-.cp-pc-t{align-items:center}
-.cp-pc-q{flex-shrink:0;background:#FEE2E2;border:none;color:#B83232;border-radius:6px;padding:3px 8px;font-size:10.5px;font-weight:800;cursor:pointer;font-family:inherit}
-.cp-pc-q:hover{background:#FECACA}
 .plz-lote{display:flex;align-items:center;gap:8px;border:1.5px solid #2563EB;background:#EFF6FF;border-radius:8px;padding:6px 10px;margin-bottom:6px;font-size:12px}
 .plz-lote span{flex:1;color:#1E3A8A;font-weight:700}
 .plz-lote button{background:#FEE2E2;border:none;color:#B83232;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer}
@@ -1762,6 +1759,7 @@ async function mostrarDetalle(id) {
   bodegaFilasFicha[s.id] = filasBod;
   const cuerpo = `
       ${buildBloqueBodegaFicha(s, filasBod)}
+      ${lotesAbiertosPlazoHtml(s)}
       ${bloqueTiempo}
 
       ${bloqueFugas}
@@ -2651,6 +2649,7 @@ async function quitarLoteTapas(loteId) {
   await cargarLotesTapas();
   renderFichasTapas();
   if (PLZ.id) pintarPlazoFicha();
+  if (selId) mostrarDetalle(selId);
   if (fichaModalId) mostrarDetalle(fichaModalId);
   showToast('Lote quitado');
 }
@@ -3758,8 +3757,7 @@ function renderFichasCompactasTapas() {
   var htmlProc = proc.length ? '<div class="cp-proc">' + proc.map(function(p) {
     var pct = Math.min(100, Math.round(p.l.hecho / p.l.cantidad * 100));
     return '<div class="cp-pc" onclick="abrirFichaTapas(\'' + escHtml(String(p.x.id)) + '\')">'
-      + '<div class="cp-pc-t"><span>' + escHtml(p.x.cliente) + ' · ' + escHtml(p.x.codigo) + limiteCompactoHtml(p.x.s) + '</span><b>' + p.l.cantidad.toLocaleString() + '</b>'
-      +   '<button class="cp-pc-q" title="Quitar este lote de &quot;en proceso&quot;" onclick="event.stopPropagation();quitarLoteTapas(\'' + escHtml(String(p.l.id)) + '\')">✕ Quitar</button></div>'
+      + '<div class="cp-pc-t"><span>' + escHtml(p.x.cliente) + ' · ' + escHtml(p.x.codigo) + limiteCompactoHtml(p.x.s) + '</span><b>' + p.l.cantidad.toLocaleString() + '</b></div>'
       + '<div class="cp-pc-d">' + escHtml(p.x.desc) + '</div>'
       + (p.l.tareas.length ? '<div class="cp-pc-p">' + tareasResumenCompacto(p.l.tareas) + '</div>' : '')
       + '<div class="cp-bar"><i style="width:' + pct + '%"></i></div></div>';
