@@ -1205,17 +1205,11 @@ var PED_TIPO_SIN = 'Sin clasificar';
 // de un tipo / cliente / "En proceso" / "Completados" oculta o muestra sus chips; el encabezado con totales queda visible.
 var pedColapsados = {};
 try { pedColapsados = JSON.parse(localStorage.getItem('tapas_fichas_colapsados') || '{}') || {}; } catch(e) {}
-var pedClavesVista = [];
 function pedCol(k) { return pedColapsados[k] ? ' col' : ''; }
 function pedGuardarColapsados() { try { localStorage.setItem('tapas_fichas_colapsados', JSON.stringify(pedColapsados)); } catch(e) {} }
 function toggleBloquePed(kEnc) {
   var k = decodeURIComponent(kEnc);
   if (pedColapsados[k]) delete pedColapsados[k]; else pedColapsados[k] = 1;
-  pedGuardarColapsados();
-  renderPedidos();
-}
-function colapsarTodoPed(colapsar) {
-  pedClavesVista.forEach(function(k) { if (colapsar) pedColapsados[k] = 1; else delete pedColapsados[k]; });
   pedGuardarColapsados();
   renderPedidos();
 }
@@ -1435,8 +1429,6 @@ function renderPedidos() {
       + pedCompStockHtml(x)
       + '</div>';
   };
-  pedClavesVista = (proc.length ? ['proc'] : []).concat(['comp']).concat(pedAgrupar === 'tipo'
-    ? vivas.map(function(x) { return 'tipo:' + tipoDeSkuTapa(x.sku, x.desc); }) : clis.map(function(c) { return 'cli:' + c; }));
   var htmlGrid;
   if (pedAgrupar === 'tipo') {
     var porTipo = {}, tipos = [];
@@ -1474,9 +1466,7 @@ function renderPedidos() {
       : '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
   }
   var modoBtns = '<span class="ped-modo"><button class="' + (pedAgrupar === 'tipo' ? 'act' : '') + '" onclick="setPedAgrupar(\'tipo\')">Por tipo</button>'
-    + '<button class="' + (pedAgrupar === 'cliente' ? 'act' : '') + '" onclick="setPedAgrupar(\'cliente\')">Por cliente</button></span>'
-    + '<span class="ped-modo" style="margin-left:6px"><button onclick="colapsarTodoPed(true)" title="Ocultar los chips de todos los bloques">Colapsar todo</button>'
-    + '<button onclick="colapsarTodoPed(false)" title="Mostrar todos los bloques">Expandir todo</button></span>';
+    + '<button class="' + (pedAgrupar === 'cliente' ? 'act' : '') + '" onclick="setPedAgrupar(\'cliente\')">Por cliente</button></span>';
 
   // 3) Completados: ingresos PT con su requi, agrupados por requi + ficha
   var grupos = {}, orden = [];

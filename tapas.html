@@ -3530,17 +3530,11 @@ var FICHAS_VISTA_COMPACTA = true;
 // registro-tapas.html: ESPEJO). Claves: 'tipo:<nombre>', 'cli:<nombre>', 'proc'.
 var fichasColapsados = {};
 try { fichasColapsados = JSON.parse(localStorage.getItem('tapas_fichas_colapsados') || '{}') || {}; } catch(e) {}
-var fichasClavesVista = [];
 function cpCol(k) { return fichasColapsados[k] ? ' col' : ''; }
 function cpGuardarColapsados() { try { localStorage.setItem('tapas_fichas_colapsados', JSON.stringify(fichasColapsados)); } catch(e) {} }
 function toggleBloqueFichas(kEnc) {
   var k = decodeURIComponent(kEnc);
   if (fichasColapsados[k]) delete fichasColapsados[k]; else fichasColapsados[k] = 1;
-  cpGuardarColapsados();
-  renderFichasTapas();
-}
-function colapsarTodoFichas(colapsar) {
-  fichasClavesVista.forEach(function(k) { if (colapsar) fichasColapsados[k] = 1; else delete fichasColapsados[k]; });
   cpGuardarColapsados();
   renderFichasTapas();
 }
@@ -3655,8 +3649,6 @@ function renderFichasCompactasTapas() {
   });
   clis.sort(function(a, b) { return a.localeCompare(b); });
 
-  fichasClavesVista = (proc.length ? ['proc'] : []).concat(fichasAgrupar === 'tipo'
-    ? vivas.map(function(x) { return 'tipo:' + tipoDeFicha(x.s); }) : clis.map(function(c) { return 'cli:' + c; }));
   var cuerpo;
   if (fichasAgrupar === 'tipo') {
     // Por TIPO de tapa: cuánto se debe de cada una (saldo por entregar), el tipo con más pendiente primero
@@ -3701,8 +3693,6 @@ function renderFichasCompactasTapas() {
     +   '<span class="fich-count">' + vivas.length + ' pedido' + (vivas.length !== 1 ? 's' : '') + ' con saldo · ' + clis.length + ' cliente' + (clis.length !== 1 ? 's' : '') + '</span>'
     +   '<span class="cp-modo" style="margin-left:auto"><button class="' + (fichasAgrupar === 'tipo' ? 'act' : '') + '" onclick="setFichasAgrupar(\'tipo\')">Por tipo</button>'
     +   '<button class="' + (fichasAgrupar === 'cliente' ? 'act' : '') + '" onclick="setFichasAgrupar(\'cliente\')">Por cliente</button></span>'
-    +   '<span class="cp-modo"><button onclick="colapsarTodoFichas(true)" title="Ocultar los chips de todos los bloques">Colapsar todo</button>'
-    +   '<button onclick="colapsarTodoFichas(false)" title="Mostrar todos los bloques">Expandir todo</button></span>'
     +   '<button class="btn btn-t btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button></div>'
     + '<div class="fich-body">'
     + (proc.length ? '<div class="cp-sec clic' + cpCol('proc') + '"' + cpClic('proc') + '><span class="cp-chev">▾</span>🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc.replace('class="cp-proc"', 'class="cp-proc' + cpCol('proc') + '"') : '')
