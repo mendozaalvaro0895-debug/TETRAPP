@@ -1321,14 +1321,7 @@ function toggleBloquePed(kEnc) {
 function pedClic(k) { return ' onclick="toggleBloquePed(\'' + escHtml(encodeURIComponent(k)) + '\')"'; }
 var pedAgrupar = 'cliente'; // 'cliente' (default en el perfil de Tapas) | 'tipo' | 'prioridad'
 try { var _ag = localStorage.getItem('tapas_fichas_agrupar'); pedAgrupar = (_ag === 'tipo' || _ag === 'prioridad') ? _ag : 'cliente'; } catch(e) {}
-// Vista "Por prioridad": ordenar por 'fecha' (límite más cercana primero) o por 'urgente' (urgentes primero, luego por fecha)
-var pedOrdenPrio = 'fecha';
-try { pedOrdenPrio = localStorage.getItem('tapas_fichas_orden_prio') === 'urgente' ? 'urgente' : 'fecha'; } catch(e) {}
-function setPedOrdenPrio(o) {
-  pedOrdenPrio = o;
-  try { localStorage.setItem('tapas_fichas_orden_prio', o); } catch(e) {}
-  renderPedidos();
-}
+
 
 function detectarTipoTapa(desc) {
   var t = acNorm(desc);
@@ -1592,7 +1585,7 @@ function renderPedidos() {
       ? '<div class="ped-resumen">' + resumen + '</div>' + secciones
       : '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
   } else if (pedAgrupar === 'prioridad') {
-    // Por PRIORIDAD: una sola lista, o ordenada por fecha límite, o con los URGENTES primero (y dentro de cada grupo por fecha)
+    // Por PRIORIDAD: primero los URGENTES y luego los demás, cada grupo ordenado por fecha límite
     var porFecha = function(a, b) { return (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at)); };
     var bloque = function(titulo, items, cls) {
       return '<div class="ped-tipo' + pedCol('prio:' + titulo) + '"><div class="ped-tipo-h' + (cls || '') + '"' + pedClic('prio:' + titulo) + '><span class="ped-chev">▾</span><span class="ped-tipo-n">' + titulo + '</span>'
@@ -1600,13 +1593,11 @@ function renderPedidos() {
         + '<div class="ped-tipo-c">' + items.map(function(x) { return chip(x, true); }).join('') + '</div></div>';
     };
     if (!vivas.length) htmlGrid = '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
-    else if (pedOrdenPrio === 'urgente') {
+    else {
       var urg = vivas.filter(function(x) { return x.urgente; }).sort(porFecha);
       var resto = vivas.filter(function(x) { return !x.urgente; }).sort(porFecha);
       htmlGrid = (urg.length ? bloque('🔴 Urgentes', urg, ' urg') : '<div class="ped-vacio">No hay pedidos urgentes.</div>')
-        + (resto.length ? bloque('Demás pedidos', resto, '') : '');
-    } else {
-      htmlGrid = bloque('📅 Por fecha límite', vivas.slice().sort(porFecha), '');
+        + (resto.length ? bloque('Demás pedidos · por fecha límite', resto, '') : '');
     }
   } else {
     var cols = clis.map(function(c) {
@@ -1622,9 +1613,7 @@ function renderPedidos() {
   }
   var modoBtns = '<span class="ped-modo"><button class="' + (pedAgrupar === 'tipo' ? 'act' : '') + '" onclick="setPedAgrupar(\'tipo\')">Por tipo</button>'
     + '<button class="' + (pedAgrupar === 'cliente' ? 'act' : '') + '" onclick="setPedAgrupar(\'cliente\')">Por cliente</button>'
-    + '<button class="' + (pedAgrupar === 'prioridad' ? 'act' : '') + '" onclick="setPedAgrupar(\'prioridad\')">Por prioridad</button></span>'
-    + (pedAgrupar === 'prioridad' ? '<span class="ped-modo"><button class="' + (pedOrdenPrio === 'fecha' ? 'act' : '') + '" onclick="setPedOrdenPrio(\'fecha\')">📅 Por fecha</button>'
-      + '<button class="' + (pedOrdenPrio === 'urgente' ? 'act' : '') + '" onclick="setPedOrdenPrio(\'urgente\')">🔴 Urgentes primero</button></span>' : '');
+    + '<button class="' + (pedAgrupar === 'prioridad' ? 'act' : '') + '" onclick="setPedAgrupar(\'prioridad\')">Por prioridad</button></span>';
 
   // 3) Completados: ingresos PT con su requi, agrupados por requi + ficha
   var grupos = {}, orden = [];

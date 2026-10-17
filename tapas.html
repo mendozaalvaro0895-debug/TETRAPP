@@ -3639,14 +3639,7 @@ function toggleBloqueFichas(kEnc) {
 function cpClic(k) { return ' onclick="toggleBloqueFichas(\'' + escHtml(encodeURIComponent(k)) + '\')"'; }
 var fichasAgrupar = 'tipo'; // 'tipo' (default) | 'cliente' | 'prioridad'
 try { var _ag = localStorage.getItem('tapas_fichas_agrupar'); fichasAgrupar = (_ag === 'cliente' || _ag === 'prioridad') ? _ag : 'tipo'; } catch(e) {}
-// Vista "Por prioridad": ordenar por 'fecha' (límite más cercana primero) o por 'urgente' (urgentes primero, luego por fecha)
-var fichasOrdenPrio = 'fecha';
-try { fichasOrdenPrio = localStorage.getItem('tapas_fichas_orden_prio') === 'urgente' ? 'urgente' : 'fecha'; } catch(e) {}
-function setFichasOrdenPrio(o) {
-  fichasOrdenPrio = o;
-  try { localStorage.setItem('tapas_fichas_orden_prio', o); } catch(e) {}
-  renderFichasTapas();
-}
+
 function setFichasAgrupar(m) {
   fichasAgrupar = m;
   try { localStorage.setItem('tapas_fichas_agrupar', m); } catch(e) {}
@@ -3808,7 +3801,7 @@ function renderFichasCompactasTapas() {
       ? '<div class="cp-sec">Por entregar según el tipo de tapa <i>clic en un total para ir a su grupo</i></div><div class="cp-resumen">' + resumen + '</div>' + secciones
       : '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>';
   } else if (fichasAgrupar === 'prioridad') {
-    // Por PRIORIDAD: una sola lista, o ordenada por fecha límite, o con los URGENTES primero (y dentro de cada grupo por fecha)
+    // Por PRIORIDAD: primero los URGENTES y luego los demás, cada grupo ordenado por fecha límite
     var porFecha = function(a, b) { return (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt)); };
     var bloque = function(titulo, items, cls) {
       return '<div class="cp-tipo' + cpCol('prio:' + titulo) + '"><div class="cp-tipo-h' + (cls || '') + '"' + cpClic('prio:' + titulo) + '><span class="cp-chev">▾</span><span class="cp-tipo-n">' + titulo + '</span>'
@@ -3817,13 +3810,11 @@ function renderFichasCompactasTapas() {
     };
     var esUrg = function(x) { return x.s.prio === 'urgente'; };
     if (!vivas.length) cuerpo = '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>';
-    else if (fichasOrdenPrio === 'urgente') {
+    else {
       var urg = vivas.filter(esUrg).sort(porFecha);
       var resto = vivas.filter(function(x) { return !esUrg(x); }).sort(porFecha);
       cuerpo = (urg.length ? bloque('🔴 Urgentes', urg, ' urg') : '<div class="empty" style="padding:16px;text-align:center;color:var(--gray)">No hay pedidos urgentes</div>')
-        + (resto.length ? bloque('Demás pedidos', resto, '') : '');
-    } else {
-      cuerpo = bloque('📅 Por fecha límite', vivas.slice().sort(porFecha), '');
+        + (resto.length ? bloque('Demás pedidos · por fecha límite', resto, '') : '');
     }
   } else {
     var cols = clis.map(function(c) {
@@ -3844,8 +3835,6 @@ function renderFichasCompactasTapas() {
     +   '<span class="cp-modo" style="margin-left:auto"><button class="' + (fichasAgrupar === 'tipo' ? 'act' : '') + '" onclick="setFichasAgrupar(\'tipo\')">Por tipo</button>'
     +   '<button class="' + (fichasAgrupar === 'cliente' ? 'act' : '') + '" onclick="setFichasAgrupar(\'cliente\')">Por cliente</button>'
     +   '<button class="' + (fichasAgrupar === 'prioridad' ? 'act' : '') + '" onclick="setFichasAgrupar(\'prioridad\')">Por prioridad</button></span>'
-    +   (fichasAgrupar === 'prioridad' ? '<span class="cp-modo"><button class="' + (fichasOrdenPrio === 'fecha' ? 'act' : '') + '" onclick="setFichasOrdenPrio(\'fecha\')">📅 Por fecha</button>'
-    +   '<button class="' + (fichasOrdenPrio === 'urgente' ? 'act' : '') + '" onclick="setFichasOrdenPrio(\'urgente\')">🔴 Urgentes primero</button></span>' : '')
     +   '<button class="btn btn-t btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button></div>'
     + '<div class="fich-body">'
     + (proc.length ? '<div class="cp-sec clic' + cpCol('proc') + '"' + cpClic('proc') + '><span class="cp-chev">▾</span>🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc.replace('class="cp-proc"', 'class="cp-proc' + cpCol('proc') + '"') : '')
