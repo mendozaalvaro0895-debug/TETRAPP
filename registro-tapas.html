@@ -1304,17 +1304,20 @@ var PED_TIPO_SIN = 'Sin clasificar';
 // de un tipo / cliente / "En proceso" / "Completados" oculta o muestra sus chips; el encabezado con totales queda visible.
 var pedColapsados = {};
 try { pedColapsados = JSON.parse(localStorage.getItem('tapas_fichas_colapsados') || '{}') || {}; } catch(e) {}
-function pedCol(k) { return pedColapsados[k] ? ' col' : ''; }
+// Los CLIENTES arrancan COLAPSADOS (solo el encabezado con pedidos y saldo) hasta que se abren a mano; 0 = abierto a propósito.
+function pedEstaCol(k) { return k.indexOf('cli:') === 0 ? pedColapsados[k] !== 0 : !!pedColapsados[k]; }
+function pedCol(k) { return pedEstaCol(k) ? ' col' : ''; }
 function pedGuardarColapsados() { try { localStorage.setItem('tapas_fichas_colapsados', JSON.stringify(pedColapsados)); } catch(e) {} }
 function toggleBloquePed(kEnc) {
   var k = decodeURIComponent(kEnc);
-  if (pedColapsados[k]) delete pedColapsados[k]; else pedColapsados[k] = 1;
+  if (k.indexOf('cli:') === 0) pedColapsados[k] = pedEstaCol(k) ? 0 : 1;
+  else if (pedColapsados[k]) delete pedColapsados[k]; else pedColapsados[k] = 1;
   pedGuardarColapsados();
   renderPedidos();
 }
 function pedClic(k) { return ' onclick="toggleBloquePed(\'' + escHtml(encodeURIComponent(k)) + '\')"'; }
-var pedAgrupar = 'tipo'; // 'tipo' (default) | 'cliente'
-try { pedAgrupar = localStorage.getItem('tapas_fichas_agrupar') === 'cliente' ? 'cliente' : 'tipo'; } catch(e) {}
+var pedAgrupar = 'cliente'; // 'cliente' (default en el perfil de Tapas) | 'tipo'
+try { pedAgrupar = localStorage.getItem('tapas_fichas_agrupar') === 'tipo' ? 'tipo' : 'cliente'; } catch(e) {}
 
 function detectarTipoTapa(desc) {
   var t = acNorm(desc);
