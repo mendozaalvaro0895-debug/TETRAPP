@@ -390,7 +390,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-chip.proc .cp-chip-t b{color:#1E3A8A}
 .cp-lim{font-family:var(--mono);font-size:9.5px;font-weight:600;color:var(--gray);margin-left:5px;white-space:nowrap}
 .cp-lim.esp{color:#1E3A8A;font-weight:800}
-.cp-k{display:flex;gap:4px;align-items:baseline;font-size:9.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cp-k{display:flex;flex-wrap:wrap;gap:0 4px;align-items:baseline;font-size:9.5px;margin-top:3px;line-height:1.3}
+.cp-kd{color:var(--ink);font-weight:500}
 .cp-k i{font-style:normal;font-weight:800;text-transform:uppercase;letter-spacing:.2px;color:var(--gray)}
 .cp-k b{font-family:var(--mono);color:var(--ink)}
 .cp-k em{font-style:normal;font-weight:800}
@@ -3562,6 +3563,7 @@ function componentesStockHtml(s) {
     else if (f.stock >= porSacar) { estado = 'ok'; txt = '✓ alcanza'; }
     else { estado = 'mal'; txt = '✗ insuficiente: faltan ' + (porSacar - f.stock).toLocaleString(); }
     return '<div class="cp-k ' + estado + '" title="' + escHtml(f.desc || '') + ' · por sacar de bodega: ' + porSacar.toLocaleString() + '"><i>' + f.rol + '</i> <b>' + escHtml(f.sku) + '</b>'
+      + (f.desc ? ' <span class="cp-kd">' + escHtml(f.desc) + '</span>' : '')
       + (f.stock === null ? '' : ' · ' + f.stock.toLocaleString() + ' und') + ' · <em>' + txt + '</em></div>';
   }).join('');
 }
