@@ -243,9 +243,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ent-act button{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;color:var(--teal)}
 .ent-act button.ent-del{color:var(--gray-l);font-size:14px}
 .ent-mas{display:block;margin:10px auto 4px}
-.ing-lin{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.7fr) 84px 30px;gap:6px;margin-bottom:6px;align-items:start}
+.ing-lin{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1fr) minmax(0,1.7fr) 84px 30px;gap:6px;margin-bottom:6px;align-items:start}
+.ing-zone{border:2px dashed var(--teal);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:center;background:var(--teal-xl);outline:none;margin-bottom:12px;transition:border-color .15s}
+.ing-zone:focus{border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.15)}
+.ing-zone-l{font-size:13px;font-weight:800;color:var(--teal)}
+.ing-zone-s{font-size:10px;color:var(--gray);margin-top:2px}
+.ing-zone-s span{cursor:pointer;text-decoration:underline;color:#6366f1}
+.ing-zone img{display:none;max-width:100%;max-height:100px;border-radius:6px;margin-top:6px;object-fit:contain;cursor:zoom-in}
 .ing-x{background:none;border:1px solid var(--border);border-radius:6px;color:var(--gray-l);font-size:13px;cursor:pointer;padding:5px 0;line-height:1}
-@media(max-width:700px){.ing-lin{grid-template-columns:minmax(0,1fr) 84px 30px}.ing-lin>:first-child{grid-column:1/-1}}
+@media(max-width:700px){.ing-lin{grid-template-columns:minmax(0,1fr) 30px}.ing-lin>:nth-child(-n+3){grid-column:1/-1}}
 
 .sku-code{font-family:var(--mono);font-weight:700;color:var(--teal);font-size:11px;margin-bottom:2px}
 .sku-desc{color:var(--ink);font-size:11px}
@@ -1172,12 +1178,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 <!-- MODAL ENTREGADO (requi de ingreso PT) -->
 <div class="overlay" id="overlayIngPT">
-  <div class="modal" style="max-width:780px">
+  <div class="modal" style="max-width:860px">
     <div class="mh">
       <div class="mh-title" id="ingTitulo">📦 Registrar entregado</div>
       <button class="m-close" onclick="cerrarIngPT()">✕</button>
     </div>
     <div class="mb">
+      <div id="ingImgZone" class="ing-zone" tabindex="0" onclick="this.focus()" onpaste="ingPegarImagen(event)">
+        <div id="ingImgLbl" class="ing-zone-l">📋 Clic aquí y pega la imagen · Ctrl+V  ·  (doble clic en la imagen = ampliar)</div>
+        <div class="ing-zone-s">ó <span onclick="event.stopPropagation();ingElegirArchivo()">selecciona un archivo o toma una foto</span> de la requi de ingreso PT</div>
+        <img id="ingImgPrev" ondblclick="event.stopPropagation();ingAmpliarImagen(this.src)" title="Doble clic para ampliar">
+      </div>
       <div class="fr">
         <div class="fg">
           <div class="fl">No. de requi de ingreso PT *</div>
@@ -5536,7 +5547,24 @@ function buildEntGrupoHtml(g, gi, mp) {
 // ── Formulario ────────────────────────────────────────────────
 function ingNuevaLinea(d) {
   d = d || {};
-  return { sol: d.sol || '', solTxt: '', sku: d.sku || '', desc: d.desc || '', skuTxt: '', cant: d.cant || '' };
+  return { cli: d.cli || '', sol: d.sol || '', solTxt: '', sku: d.sku || '', desc: d.desc || '', skuTxt: '', cant: d.cant || '' };
+}
+
+// Clientes de las fichas de Tapas, los de más uso primero (el mismo orden del formulario de solicitud)
+function ingClientes() {
+  var uso = {};
+  solicitudes.forEach(function(x) { if (x.cliente) uso[x.cliente] = (uso[x.cliente] || 0) + 1; });
+  return Object.keys(uso).sort(function(a, b) { return (uso[b] || 0) - (uso[a] || 0) || a.localeCompare(b); });
+}
+
+function ingCliChange(i, v) {
+  ingSincronizarCant();
+  var l = ingLineas[i];
+  if (!l) return;
+  l.cli = v;
+  var s = l.sol ? solicitudes.find(function(x) { return x.id === l.sol; }) : null;
+  if (s && v && s.cliente !== v) l.sol = ''; // el pedido elegido era de otro cliente
+  renderIngLineas();
 }
 
 function abrirIngPT(rowId) {
@@ -5551,8 +5579,10 @@ function abrirIngPT(rowId) {
   ingLineas = g ? g.rows.map(function(m) {
     var solOk = m.solicitud_id && solicitudes.some(function(x) { return x.id === m.solicitud_id; }); // pedido borrado: se limpia el vínculo
     var it = invB2DeTapas(m.sku_original);
-    return ingNuevaLinea({ sol: solOk ? m.solicitud_id : '', sku: m.sku_original || '', desc: it ? (it.descripcion || '') : '', cant: m.cantidad || '' });
+    var sOk = solOk ? solicitudes.find(function(x) { return x.id === m.solicitud_id; }) : null;
+    return ingNuevaLinea({ cli: sOk ? (sOk.cliente || '') : '', sol: solOk ? m.solicitud_id : '', sku: m.sku_original || '', desc: it ? (it.descripcion || '') : '', cant: m.cantidad || '' });
   }) : [ingNuevaLinea()];
+  ingImgReset();
   document.getElementById('overlayIngPT').classList.add('open');
   renderIngLineas();
   rq.focus();
@@ -5595,7 +5625,11 @@ function renderIngLineas(focusId) {
     var s = l.sol ? solicitudes.find(function(x) { return x.id === l.sol; }) : null;
     var solVal = s ? ingTextoPedido(s) : l.solTxt;
     var skuVal = l.sku ? textoCampoSku(l.sku, l.desc) : l.skuTxt;
+    var cliOpts = ingClientes();
+    if (l.cli && cliOpts.indexOf(l.cli) < 0) cliOpts.push(l.cli);
     return '<div class="ing-lin">'
+      + '<select class="fi" id="ing-cli-' + i + '" onchange="ingCliChange(' + i + ',this.value)" style="width:100%;box-sizing:border-box"><option value="">— Cliente —</option>'
+      +   cliOpts.map(function(c) { return '<option value="' + escHtml(c) + '"' + (c === l.cli ? ' selected' : '') + '>' + escHtml(c) + '</option>'; }).join('') + '</select>'
       + '<div class="lin-in-wrap"><textarea class="fi lin-ta" rows="1" id="ing-sol-' + i + '" placeholder="🔗 Pedido (opcional)" autocomplete="off"'
       +   ' oninput="ingSolInput(' + i + ',this,true)" onfocus="ingSolInput(' + i + ',this,false)" onkeydown="if(event.key===\'Enter\')event.preventDefault()" onblur="setTimeout(cerrarFormDrop,200)">'
       +   escHtml(solVal) + '</textarea></div>'
@@ -5652,6 +5686,7 @@ function ingSolInput(i, el, escribiendo) {
   var ent = mapasEntregados().ent;
   var cand = solicitudes.filter(function(s) {
     if (!fichaViva(s) && !(s.estado === 'lista' && toks.length)) return false;
+    if (l.cli && s.cliente !== l.cli) return false;
     if (!toks.length) return true;
     var t = normBusqueda((s.id_display || '') + ' ' + (s.cliente || '') + ' ' + s.lineas.map(function(x) { return (x.sku || '') + ' ' + (x.desc || ''); }).join(' '));
     return toks.every(function(k) { return t.indexOf(k) !== -1; });
@@ -5673,7 +5708,7 @@ function ingSolSelect(i, solId) {
   var l = ingLineas[i];
   var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!l || !s) return;
-  l.sol = s.id; l.solTxt = '';
+  l.sol = s.id; l.solTxt = ''; l.cli = s.cliente || l.cli;
   // Ficha de un solo producto: se completa el SKU solo (si hay varios, se elige a mano)
   if (!l.sku && s.lineas.length === 1 && s.lineas[0].sku) {
     var it = invB2DeTapas(s.lineas[0].sku);
@@ -5701,6 +5736,139 @@ function ingSkuSelect(i, sku) {
   l.sku = it.sku; l.desc = it.descripcion || ''; l.skuTxt = '';
   cerrarFormDrop();
   renderIngLineas();
+}
+
+// ── Pegar / elegir la imagen de la requi y leerla con IA (mismo endpoint y flujo que Serigrafía: api/parse-doc.js, solo master) ──
+var ING_LBL_INI = '📋 Clic aquí y pega la imagen · Ctrl+V  ·  (doble clic en la imagen = ampliar)';
+
+function ingImgReset() {
+  var lbl = document.getElementById('ingImgLbl');
+  if (lbl) { lbl.textContent = ING_LBL_INI; lbl.style.color = ''; }
+  var prev = document.getElementById('ingImgPrev');
+  if (prev) { prev.removeAttribute('src'); prev.style.display = 'none'; }
+}
+
+function ingPegarImagen(ev) {
+  var items = (ev.clipboardData || {}).items || [];
+  for (var k = 0; k < items.length; k++) {
+    if (items[k].type.indexOf('image') >= 0) {
+      ev.preventDefault();
+      ingProcesarImagen(items[k].getAsFile());
+      return;
+    }
+  }
+}
+// Ctrl+V con la ventana abierta funciona aunque no se haya hecho clic en la zona
+document.addEventListener('paste', function(ev) {
+  var ov = document.getElementById('overlayIngPT');
+  if (!ov || !ov.classList.contains('open') || ev.defaultPrevented) return;
+  ingPegarImagen(ev);
+});
+
+function ingElegirArchivo() {
+  var inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  inp.style.display = 'none';
+  document.body.appendChild(inp);
+  inp.addEventListener('change', function() {
+    var file = inp.files && inp.files[0];
+    document.body.removeChild(inp);
+    if (file) ingProcesarImagen(file);
+  });
+  inp.click();
+}
+
+function ingProcesarImagen(blob) {
+  if (!blob) return;
+  var lbl = document.getElementById('ingImgLbl');
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var prev = document.getElementById('ingImgPrev');
+    if (prev) { prev.src = e.target.result; prev.style.display = 'block'; }
+    if (lbl) { lbl.style.color = 'var(--teal)'; lbl.textContent = '⏳ Analizando con IA…'; }
+    var img = new Image();
+    img.onload = function() { ingEnviarParseDoc(img); };
+    img.onerror = function() { if (lbl) { lbl.style.color = '#B83232'; lbl.textContent = '❌ No pude abrir esa imagen'; } };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(blob);
+}
+
+function ingEnviarParseDoc(imgEl) {
+  // Escalar por el lado largo a 1568px (óptimo para Claude Vision), JPEG de alta calidad para no perder dígitos
+  var MAX = 1568, w = imgEl.width, h = imgEl.height;
+  var sc = Math.min(1, MAX / Math.max(w, h));
+  w = Math.round(w * sc); h = Math.round(h * sc);
+  var cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  var cx = cv.getContext('2d');
+  cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high';
+  cx.drawImage(imgEl, 0, 0, w, h);
+  var b64 = cv.toDataURL('image/jpeg', 0.95).split(',')[1];
+  fetch('/api/parse-doc', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': HEADERS.Authorization },
+    body: JSON.stringify({ image_base64: b64, mime_type: 'image/jpeg', tipo: 'ingreso' })
+  })
+  .then(function(r) { return r.json().catch(function() { return { error: 'Respuesta inválida del servidor (' + r.status + ')' }; }); })
+  .then(function(result) {
+    if (result.error) throw new Error(result.error);
+    ingAplicarResultado(result);
+  })
+  .catch(function(err) {
+    var lbl = document.getElementById('ingImgLbl');
+    if (lbl) { lbl.style.color = '#B83232'; lbl.textContent = '❌ ' + String(err.message || err).slice(0, 120); }
+  });
+}
+
+// Rellena requi, fecha, nota y productos con lo leído. Cada código se valida contra el inventario (B2); si la tapa tiene UN solo
+// pedido vivo con ese SKU, se vincula sola (cliente + pedido) — queda visible y editable en la línea.
+function ingAplicarResultado(result) {
+  var rEl = document.getElementById('ingRequi'), fEl = document.getElementById('ingFecha'), nEl = document.getElementById('ingNota');
+  if (rEl && result.requi) { rEl.value = String(result.requi).trim(); rEl.style.borderColor = ''; }
+  if (fEl && result.fecha) fEl.value = result.fecha;
+  if (nEl && result.descripcion && !nEl.value.trim()) nEl.value = result.descripcion;
+  var prods = result.productos || [];
+  var noEnc = [], vinc = [];
+  if (prods.length) {
+    ingLineas = prods.map(function(pr) {
+      var it = pr.sku ? invB2DeTapas(String(pr.sku)) : null;
+      var l = ingNuevaLinea({ sku: it ? it.sku : '', desc: it ? (it.descripcion || '') : '', cant: pr.cant || '' });
+      if (!it) {
+        l.skuTxt = pr.sku ? (pr.sku + (pr.desc ? ' — ' + pr.desc : '')) : (pr.desc || '');
+        if (pr.sku) noEnc.push(String(pr.sku));
+      } else {
+        var vivas = solicitudes.filter(function(s) { return fichaViva(s) && s.lineas.some(function(x) { return x.sku === it.sku; }); });
+        if (vivas.length === 1) { l.sol = vivas[0].id; l.cli = vivas[0].cliente || ''; vinc.push(vivas[0].id_display || String(vivas[0].id).slice(0, 8)); }
+      }
+      return l;
+    });
+  }
+  renderIngLineas();
+  var warns = (result.warnings || []).slice();
+  if (noEnc.length) warns.push('⚠️ Códigos que NO existen en inventario — revisa los dígitos: ' + noEnc.join(', '));
+  var ok = !warns.length;
+  var txt = (ok ? '✅ ' : '⚠️ ') + (result.requi || 'Sin requi') + (result.fecha ? ' · ' + result.fecha : '') + ' · ' + prods.length + ' producto' + (prods.length !== 1 ? 's' : '') + ' leído' + (prods.length !== 1 ? 's' : '')
+    + (vinc.length ? ' · 🔗 vinculado a ' + vinc.join(', ') + ' (revisa)' : '');
+  if (!ok) txt += '  ' + warns.join(' · ');
+  var lbl = document.getElementById('ingImgLbl');
+  if (lbl) { lbl.style.color = ok ? '#059669' : '#b45309'; lbl.textContent = txt; }
+}
+
+function ingAmpliarImagen(src) {
+  if (!src) return;
+  var ov = document.getElementById('imgLightbox');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'imgLightbox';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:20px;box-sizing:border-box';
+    ov.onclick = function() { ov.style.display = 'none'; };
+    ov.innerHTML = '<img id="imgLightboxImg" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,.6)">'
+      + '<div style="position:absolute;top:16px;right:22px;color:#fff;font-size:30px;font-weight:300;cursor:pointer">✕</div>';
+    document.body.appendChild(ov);
+  }
+  document.getElementById('imgLightboxImg').src = src;
+  ov.style.display = 'flex';
 }
 
 // ── Guardar / editar / eliminar ───────────────────────────────
