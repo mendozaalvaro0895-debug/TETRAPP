@@ -2540,6 +2540,18 @@ function switchRecetTab(tab) {
   renderRecetario();
 }
 
+// ¿Este SKU ya tiene algo capturado aunque la receta no esté guardada?
+function recetaTieneDatos(sku) {
+  var r = RECETAS_MAP[sku];
+  if (r && (r.area || r.es_directo || r.foto_url || (PARTES_MAP[r.id] || []).length)) return true;
+  var esp = ESPECS_MAP[sku];
+  if (!esp) return false;
+  return Object.keys(esp).some(function(c) {
+    var v = esp[c] && esp[c].valor;
+    return v != null && String(v).trim() !== '' && String(v).trim() !== '[]';
+  });
+}
+
 function renderRecetario() {
   var q = RECET_FILTRO.toLowerCase();
   var lista = RECET_SKUS.filter(function(s) {
@@ -2547,6 +2559,11 @@ function renderRecetario() {
   });
   var pendientes = lista.filter(function(s) { var r = RECETAS_MAP[s.sku_fact]; return !r || !r.guardado; });
   var guardados  = lista.filter(function(s) { var r = RECETAS_MAP[s.sku_fact]; return r && r.guardado; });
+  // Pendientes que ya traen datos (partes, área, foto o especificaciones) van primero;
+  // dentro de cada grupo se conserva el orden por SKU (Array.sort es estable).
+  var conDatos = {};
+  pendientes.forEach(function(s) { conDatos[s.sku_fact] = recetaTieneDatos(s.sku_fact); });
+  pendientes.sort(function(a, b) { return (conDatos[b.sku_fact] ? 1 : 0) - (conDatos[a.sku_fact] ? 1 : 0); });
 
   var tp = document.getElementById('recetTabPend');
   var tg = document.getElementById('recetTabGuard');
