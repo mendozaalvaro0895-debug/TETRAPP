@@ -405,6 +405,66 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-chip-p span{display:block;font-size:11px;font-weight:600;color:var(--ink);line-height:1.25}
 .cp-chip-s{font-size:9.5px;font-family:var(--mono);color:var(--ink)}
 .cp-chip.proc .cp-chip-s{color:#1E3A8A;font-weight:700}
+.bod-r{padding:7px 12px;border-top:1px solid var(--border)}
+.bod-r:first-child{border-top:none}
+.bod-r.tapa{background:var(--teal-xl)}
+.bod-t{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.bod-t i{font-style:normal;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--teal);min-width:66px}
+.bod-t b{font-family:var(--mono);font-size:15px;color:var(--ink)}
+.bod-t span{font-size:12px;color:var(--ink)}
+.bod-n{display:flex;gap:12px;flex-wrap:wrap;margin:2px 0 0 74px;font-size:11px;color:var(--gray)}
+.bod-n b{font-family:var(--mono);color:var(--ink)}
+.bod-n .pedir{color:#92400E;font-weight:800}
+.bod-n .pedir b{color:#92400E}
+.bod-n .listo{color:#166534;font-weight:800}
+.bod-n .falta{color:var(--red);font-weight:800}
+.cp-resum,.cp-acc{display:none}
+.cp-res-b{font-size:10px;font-weight:800;border-radius:10px;padding:1px 8px}
+.cp-res-b.ok{background:#DCFCE7;color:#166534}
+.cp-res-b.mal{background:#FEE2E2;color:#B83232}
+.cp-res-b.proc{background:#DBEAFE;color:#1E3A8A}
+/* ── VISTA CELULAR (≤700px): el chip muestra solo lo esencial y el resto aparece al tocarlo ── */
+@media(max-width:700px){
+  .fich-hdr{flex-wrap:wrap;gap:6px 8px;padding:8px 10px}
+  .fich-title{font-size:14px}
+  .fich-body{padding:8px}
+  .cp-modo button{padding:7px 12px;font-size:12px}
+  .cp-proc{grid-template-columns:minmax(0,1fr)}
+  .cp-grid{grid-template-columns:minmax(0,1fr) !important}
+  .cp-tipo-c{grid-template-columns:minmax(0,1fr);padding:6px}
+  .cp-chip,.cp-pc,.cp-col,.cp-tipo{min-width:0;max-width:100%}
+  .fich-wrap{max-width:100%}
+  .cp-tipo-h{flex-wrap:wrap;gap:2px 8px;padding:8px 10px}
+  .cp-tipo-n{font-size:13px}
+  .cp-resumen{gap:5px}
+  .cp-res{padding:5px 9px}
+  .cp-chip{padding:8px 10px;border-radius:10px}
+  .cp-chip-t{font-size:13px}
+  .cp-chip-t b{font-size:16px}
+  .cp-chip-p b{font-size:14px}
+  .cp-chip-p span{font-size:12px}
+  .cp-chip:not(.open) .cp-chip-p span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cp-chip:not(.open) .cp-more{display:none}
+  .cp-chip:not(.open) .cp-resum{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+  .cp-chip.open .cp-acc{display:block;margin-top:8px}
+  .cp-acc button{width:100%;min-height:40px;border:none;border-radius:8px;background:var(--teal);color:#fff;font-size:13px;font-weight:700;cursor:pointer}
+  .cp-k{font-size:10.5px}
+  .cp-chip-s{font-size:11px}
+  .cp-col-h,.cp-tipo-h{min-height:40px}
+  /* ventanas: hojas a todo el ancho desde abajo */
+  #modalFichaTapas,#modalPlazoTapas{align-items:flex-end}
+  #modalFichaTapas .modal,#modalPlazoTapas .modal{width:100% !important;max-width:100% !important;max-height:94vh;border-radius:16px 16px 0 0}
+  #modalFichaTapas .mh,#modalPlazoTapas .mh{flex-wrap:wrap;gap:8px;padding:12px 14px}
+  #modalFichaTapas .mb,#modalPlazoTapas .mb{padding:12px 14px}
+  #fichaAcc{flex-wrap:wrap;gap:6px}
+  #fichaAcc .btn{min-height:38px;font-size:12px}
+  .plz-nums{grid-template-columns:repeat(2,1fr)}
+  .bod-n{margin-left:0}
+  .bod-t i{min-width:0}
+  .dc-lineas{display:none}
+  .plz-ch{padding:8px 13px;font-size:13px}
+  #plzCuerpo .btn,#fichaCuerpo .btn{min-height:42px}
+}
 .fich-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .fich-chip{font-family:var(--mono);font-size:10.5px;font-weight:700;background:var(--teal-xl);color:var(--teal);border-radius:5px;padding:2px 8px}
 .fich-chip i{font-style:normal;font-family:var(--font);font-weight:600;font-size:9.5px;letter-spacing:.3px;text-transform:uppercase;color:var(--gray);margin-right:3px}
@@ -1558,25 +1618,25 @@ function filasBodegaFicha(s, movs) {
 
 function buildBloqueBodegaFicha(s, filas) {
   if (!filas.length) return '';
-  var trs = filas.map(function(f) {
-    var esTapa = f.rol === 'Tapa';
-    var pedir = esTapa ? null : Math.max(0, f.cant - (f.salido || 0));
-    var falta = !esTapa && f.stock !== null && pedir > f.stock ? pedir - f.stock : 0;
-    return '<tr' + (esTapa ? ' style="background:var(--teal-xl)"' : '') + '>'
-      + '<td><span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--teal)">' + f.rol + '</span></td>'
-      + '<td style="font-family:var(--mono);font-weight:800;font-size:13px">' + escHtml(f.sku) + '</td>'
-      + '<td style="font-size:11px">' + escHtml(f.desc || '—') + '</td>'
-      + '<td style="text-align:right;font-family:var(--mono)">' + f.cant.toLocaleString() + '</td>'
-      + '<td style="text-align:right;font-family:var(--mono);color:var(--gray)">' + (esTapa ? '—' : (f.salido || 0).toLocaleString()) + '</td>'
-      + '<td style="text-align:right;font-family:var(--mono);font-weight:800;color:' + (esTapa ? 'var(--gray)' : (pedir > 0 ? 'var(--amber)' : 'var(--green)')) + '">' + (esTapa ? '—' : pedir.toLocaleString()) + '</td>'
-      + '<td style="text-align:right;font-family:var(--mono);color:' + (falta > 0 ? 'var(--red)' : 'var(--gray)') + '">' + (f.stock === null ? '—' : f.stock.toLocaleString()) + (f.b7 ? ' <span style="font-size:9px">B7</span>' : '') + (falta > 0 ? '<div style="font-size:9px;font-weight:800">FALTAN ' + falta.toLocaleString() + '</div>' : '') + '</td>'
-      + '</tr>';
+  var comp = filas.filter(function(f) { return f.rol !== 'Tapa'; });
+  var rows = filas.map(function(f) {
+    if (f.rol === 'Tapa') {
+      return '<div class="bod-r tapa"><div class="bod-t"><i>Tapa</i><b>' + escHtml(f.sku) + '</b><span>' + escHtml(f.desc || '') + '</span></div>'
+        + '<div class="bod-n"><span>Pedido <b>' + (f.cant || 0).toLocaleString() + '</b> und</span></div></div>';
+    }
+    var pedir = Math.max(0, f.cant - (f.salido || 0));
+    var falta = f.stock !== null && pedir > f.stock ? pedir - f.stock : 0;
+    return '<div class="bod-r"><div class="bod-t"><i>' + f.rol + '</i><b>' + escHtml(f.sku) + '</b><span>' + escHtml(f.desc || 'sin descripción en inventario') + '</span></div>'
+      + '<div class="bod-n"><span>Necesita <b>' + f.cant.toLocaleString() + '</b></span><span>Ya salió <b>' + (f.salido || 0).toLocaleString() + '</b></span>'
+      + (pedir > 0 ? '<span class="pedir">Por pedir <b>' + pedir.toLocaleString() + '</b></span>' : '<span class="listo">Ya retirado</span>')
+      + '<span' + (falta > 0 ? ' class="falta"' : '') + '>Stock ' + (f.b7 ? 'B7 ' : '') + '<b>' + (f.stock === null ? '—' : f.stock.toLocaleString()) + '</b>' + (falta > 0 ? ' · FALTAN ' + falta.toLocaleString() : '') + '</span></div></div>';
   }).join('');
   return '<div class="dc" style="border-color:var(--teal);border-width:2px">'
     + '<div class="dc-h" style="background:var(--teal-xl);color:var(--teal);display:flex;align-items:center;justify-content:space-between;gap:8px">'
     +   '<span>📦 SKUs para pedir a Bodega</span>'
-    +   '<button class="btn btn-t btn-xs" style="text-transform:none;letter-spacing:0" onclick="copiarPedidoBodega(\'' + escHtml(s.id) + '\')">📋 Copiar pedido</button></div>'
-    + '<div class="dc-b" style="padding:6px 10px"><table class="dt"><thead><tr><th></th><th>SKU</th><th>Descripción</th><th style="text-align:right">Necesita</th><th style="text-align:right">Ya salió</th><th style="text-align:right">Por pedir</th><th style="text-align:right">Stock</th></tr></thead><tbody>' + trs + '</tbody></table></div></div>';
+    +   (comp.length ? '<button class="btn btn-t btn-xs" style="text-transform:none;letter-spacing:0" onclick="copiarPedidoBodega(\'' + escHtml(s.id) + '\')">📋 Copiar pedido</button>' : '') + '</div>'
+    + '<div class="dc-b" style="padding:0;overflow:visible">' + rows
+    + (comp.length ? '' : '<div class="bod-r" style="font-size:11px;color:var(--gray-l);font-style:italic">Esta ficha no tiene Base, Contratapa, Liner ni Banda registrados.</div>') + '</div></div>';
 }
 
 // Texto listo para pegar en el mensaje a Bodega: solo lo que aún falta sacar
@@ -1700,7 +1760,7 @@ async function mostrarDetalle(id) {
 
       ${bloqueFugas}
       ${bloqueIngresos}
-      <div class="dc">
+      <div class="dc dc-lineas">
         <div class="dc-h">Líneas del pedido</div>
         <div class="dc-b">
           <table class="dt">
@@ -3572,14 +3632,38 @@ function componentesStockHtml(s) {
   }).join('');
 }
 
+// Celular (≤700px): tocar un chip lo ABRE/CIERRA en el mismo lugar (muestra descripción completa, componentes y el
+// botón "Ver detalle"); en pantalla grande tocar un chip abre directo el detalle de la ficha, como siempre.
+var cpAbiertos = {};
+function esVistaMovil() { return !!(window.matchMedia && window.matchMedia('(max-width:700px)').matches); }
+function cpChipTap(id) {
+  if (!esVistaMovil()) { abrirFichaTapas(id); return; }
+  if (cpAbiertos[id]) delete cpAbiertos[id]; else cpAbiertos[id] = 1;
+  var el = document.querySelector('[data-cpid="' + id + '"]');
+  if (el) el.classList.toggle('open', !!cpAbiertos[id]);
+}
+
+// Resumen de una línea para el chip cerrado en celular: ¿alcanzan los componentes?
+function componentesResumenHtml(s) {
+  var k = componentesStockHtml(s);
+  var mal = (k.match(/class="cp-k mal"/g) || []).length;
+  if (mal) return '<span class="cp-res-b mal">✗ ' + mal + ' componente' + (mal > 1 ? 's' : '') + ' sin stock</span>';
+  return k ? '<span class="cp-res-b ok">✓ componentes ok</span>' : '';
+}
+
 function buildChipCompacto(x, conCliente) {
   var enProc = x.abiertos.length > 0;
-  return '<div class="cp-chip' + (enProc ? ' proc' : '') + '" onclick="abrirFichaTapas(\'' + escHtml(String(x.id)) + '\')">'
+  var idq = escHtml(String(x.id));
+  return '<div class="cp-chip' + (enProc ? ' proc' : '') + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
     + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
     + '<div class="cp-chip-t"><span>' + escHtml(x.codigo) + limiteCompactoHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
-    + '<div class="cp-chip-s">' + (enProc ? '▶ ' + x.enProc.toLocaleString() + ' en proceso' : 'de ' + x.cant.toLocaleString() + (x.ent ? ' · ent. ' + x.ent.toLocaleString() : '')) + '</div>'
-    + (function() { var k = componentesStockHtml(x.s); return k ? '<div class="cp-comps">' + k + '</div>' : ''; })()
+    + '<div class="cp-resum">' + (enProc ? '<span class="cp-res-b proc">▶ ' + x.enProc.toLocaleString() + ' en proceso</span>' : '') + componentesResumenHtml(x.s) + '</div>'
+    + '<div class="cp-more">'
+    +   '<div class="cp-chip-s">' + (enProc ? '▶ ' + x.enProc.toLocaleString() + ' en proceso' : 'de ' + x.cant.toLocaleString() + (x.ent ? ' · ent. ' + x.ent.toLocaleString() : '')) + '</div>'
+    +   (function() { var k = componentesStockHtml(x.s); return k ? '<div class="cp-comps">' + k + '</div>' : ''; })()
+    + '</div>'
+    + '<div class="cp-acc"><button onclick="event.stopPropagation();abrirFichaTapas(\'' + idq + '\')">Ver detalle de la ficha</button></div>'
     + '</div>';
 }
 

@@ -316,6 +316,55 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-tipo-s b{font-family:'DM Mono',monospace;color:#0C0C0B;font-size:13px}
 .ped-tipo-c{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px;padding:8px;border:1px solid #E0DED8;border-top:none;border-radius:0 0 8px 8px;background:#F7F6F2}
 .ped-chip-c{font-size:10px;font-weight:800;color:#0C0C0B;text-transform:uppercase;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ped-resum,.ped-acc{display:none}
+.ped-res-b{font-size:10px;font-weight:800;border-radius:10px;padding:1px 8px}
+.ped-res-b.ok{background:#DCFCE7;color:#166534}
+.ped-res-b.mal{background:#FEE2E2;color:#B83232}
+.ped-res-b.proc{background:#DBEAFE;color:#1E3A8A}
+/* ── VISTA CELULAR (≤700px): el chip muestra solo lo esencial y el resto aparece al tocarlo ── */
+@media(max-width:700px){
+  .wrap.wide{padding:10px 8px 50px}
+  .tabsr{padding:6px;gap:4px}
+  .tabb{padding:8px 12px;font-size:12px}
+  .ped-h1{font-size:17px}
+  .ped-ref{padding:7px 12px;font-size:12px}
+  .ped-sec-t{flex-wrap:wrap;gap:4px 8px}
+  .ped-modo button{padding:7px 12px;font-size:12px}
+  .ped-proc{grid-template-columns:minmax(0,1fr)}
+  .ped-grid{grid-template-columns:minmax(0,1fr) !important}
+  .ped-tipo-c{grid-template-columns:minmax(0,1fr);padding:6px}
+  .ped-chip,.ped-pc,.ped-col,.ped-tipo{min-width:0;max-width:100%}
+  .ped-tipo-h{flex-wrap:wrap;gap:2px 8px;padding:8px 10px;min-height:40px}
+  .ped-col-h{min-height:40px}
+  .ped-tipo-n{font-size:13px}
+  .ped-resumen{gap:5px}
+  .ped-res{padding:5px 9px}
+  .ped-chip{padding:8px 10px;border-radius:10px}
+  .ped-chip-t{font-size:13px}
+  .ped-chip-t b{font-size:16px}
+  .ped-chip-p b{font-size:14px}
+  .ped-chip-p span{font-size:12px}
+  .ped-chip:not(.open) .ped-chip-p span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ped-chip:not(.open) .ped-more{display:none}
+  .ped-chip:not(.open) .ped-resum{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+  .ped-chip.open .ped-acc{display:block;margin-top:8px}
+  .ped-acc button{width:100%;min-height:44px;border:none;border-radius:8px;background:#2563EB;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
+  .ped-k{font-size:10.5px}
+  .ped-chip-s{font-size:11px}
+  /* popup del pedido: hoja desde abajo, a todo el ancho */
+  .ped-ov{align-items:flex-end;padding:0}
+  .ped-box{max-width:100%;border-radius:16px 16px 0 0;max-height:92vh;padding:14px 14px 18px}
+  .ped-box h3{font-size:16px}
+  .ped-nums{grid-template-columns:repeat(2,1fr)}
+  .ped-bod-n{margin-left:0}
+  .ped-bod-t i{min-width:0}
+  .ped-bod-h button{padding:7px 12px;font-size:12px}
+  .ped-ch{padding:10px 15px;font-size:13px}
+  .ped-add-btn{padding:15px;font-size:15px}
+  .ped-lote button{padding:8px 12px}
+  .ped-cerrar{padding:10px;font-size:13px}
+  .ped-comp-r{padding:8px 10px}
+}
 .ped-cerrar{display:block;margin:12px auto 0;background:none;border:none;color:#6B6B6A;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline}
 /* ── Time Picker 12h ── */
 </style>
@@ -1338,6 +1387,25 @@ async function pedCargarStock(sols) {
 
 // ESPEJO de componentesStockHtml() de tapas.html: "BASE 10258 · 51,500 und · ✓ alcanza" / "✗ insuficiente: faltan N" /
 // "✓ ya retirada" — stock actual vs. lo que aún falta SACAR de bodega para la ficha (cantidad − salidas ya vinculadas, por SKU).
+// Celular (≤700px): tocar un chip lo ABRE/CIERRA en el mismo lugar (descripción completa, componentes y el botón para abrir
+// el pedido); en pantalla grande tocar un chip abre directo el popup del pedido, como siempre. ESPEJO de cpChipTap (tapas.html).
+var pedAbiertos = {};
+function esVistaMovil() { return !!(window.matchMedia && window.matchMedia('(max-width:700px)').matches); }
+function pedChipTap(id) {
+  if (!esVistaMovil()) { abrirPedido(id); return; }
+  if (pedAbiertos[id]) delete pedAbiertos[id]; else pedAbiertos[id] = 1;
+  var el = document.querySelector('[data-pedid="' + id + '"]');
+  if (el) el.classList.toggle('open', !!pedAbiertos[id]);
+}
+
+// Resumen de una línea para el chip cerrado en celular: ¿alcanzan los componentes?
+function pedCompResumenHtml(x) {
+  var k = pedCompStockHtml(x);
+  var mal = (k.match(/class="ped-k mal"/g) || []).length;
+  if (mal) return '<span class="ped-res-b mal">✗ ' + mal + ' componente' + (mal > 1 ? 's' : '') + ' sin stock</span>';
+  return k ? '<span class="ped-res-b ok">✓ componentes ok</span>' : '';
+}
+
 function pedCompStockHtml(x) {
   var salido = {};
   (PED.salidas || []).forEach(function(m) { if (m.solicitud_id === x.id && m.sku_original) salido[m.sku_original] = (salido[m.sku_original] || 0) + (m.cantidad || 0); });
@@ -1442,12 +1510,17 @@ function renderPedidos() {
   var ordenChips = function(a, b) { return (b.abiertos.length > 0) - (a.abiertos.length > 0) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at)); };
   var chip = function(x, conCliente) {
     var proc = x.abiertos.length > 0;
-    return '<div class="ped-chip' + (proc ? ' proc' : '') + '" onclick="abrirPedido(\'' + escHtml(String(x.id)) + '\')">'
+    var idq = escHtml(String(x.id));
+    return '<div class="ped-chip' + (proc ? ' proc' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
       + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + pedLimiteHtml(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
       + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
-      + '<div class="ped-chip-s">' + (proc ? '▶ ' + pedNum(x.enProc) + ' en proceso' : 'de ' + pedNum(x.cant) + (x.entregado ? ' · ent. ' + pedNum(x.entregado) : '')) + '</div>'
-      + (function() { var k = pedCompStockHtml(x); return k ? '<div class="ped-comps">' + k + '</div>' : ''; })()
+      + '<div class="ped-resum">' + (proc ? '<span class="ped-res-b proc">▶ ' + pedNum(x.enProc) + ' en proceso</span>' : '') + pedCompResumenHtml(x) + '</div>'
+      + '<div class="ped-more">'
+      +   '<div class="ped-chip-s">' + (proc ? '▶ ' + pedNum(x.enProc) + ' en proceso' : 'de ' + pedNum(x.cant) + (x.entregado ? ' · ent. ' + pedNum(x.entregado) : '')) + '</div>'
+      +   (function() { var k = pedCompStockHtml(x); return k ? '<div class="ped-comps">' + k + '</div>' : ''; })()
+      + '</div>'
+      + '<div class="ped-acc"><button onclick="event.stopPropagation();abrirPedido(\'' + idq + '\')">Abrir pedido · marcar en proceso</button></div>'
       + '</div>';
   };
   var htmlGrid;
