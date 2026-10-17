@@ -257,9 +257,24 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 @media(max-width:700px){.ped-comp-r{grid-template-columns:70px 1fr auto}.ped-comp-r .cl,.ped-comp-r .fi,.ped-comp-r .pr{display:none}}
 .ped-ov{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(12,12,11,.72);z-index:9000;align-items:center;justify-content:center;padding:14px}
 .ped-ov.open{display:flex}
-.ped-box{background:#fff;border-radius:14px;max-width:460px;width:100%;padding:16px 18px;max-height:92vh;overflow:auto}
+.ped-box{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:16px 18px;max-height:92vh;overflow:auto}
 .ped-box h3{font-family:'Playfair Display',serif;font-size:18px;color:#1A6B5B;margin-bottom:2px}
 .ped-box .pd{font-size:12px;color:#3A3A38;margin:6px 0 10px;line-height:1.4}
+.ped-bod{border:2px solid #1A6B5B;border-radius:10px;margin:2px 0 12px;overflow:hidden}
+.ped-bod-h{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#EBF7F4;padding:6px 10px;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#1A6B5B}
+.ped-bod-h button{background:#1A6B5B;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0;font-family:'DM Sans',sans-serif}
+.ped-bod-r{padding:6px 10px;border-top:1px solid #E0DED8}
+.ped-bod-r.tapa{background:#F6FBF9}
+.ped-bod-t{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.ped-bod-t i{font-style:normal;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#1A6B5B;min-width:62px}
+.ped-bod-t b{font-family:'DM Mono',monospace;font-size:14px;color:#0C0C0B}
+.ped-bod-t span{font-size:11px;color:#3A3A38}
+.ped-bod-n{display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 0 68px;font-size:10.5px;color:#6B6B6A}
+.ped-bod-n b{font-family:'DM Mono',monospace;color:#0C0C0B}
+.ped-bod-n .pedir{color:#92400E;font-weight:800}
+.ped-bod-n .pedir b{color:#92400E}
+.ped-bod-n .listo{color:#166534;font-weight:800}
+.ped-bod-n .falta{color:#B83232;font-weight:800}
 .ped-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
 .ped-nums div{background:#F7F6F2;border-radius:8px;padding:6px;text-align:center}
 .ped-nums b{display:block;font-family:'DM Mono',monospace;font-size:14px;color:#0C0C0B}
@@ -1533,6 +1548,62 @@ function pedTareasResumen(tareas) {
   return ult.join(' | ') + (tareas.length > 2 ? ' (+' + (tareas.length - 2) + ')' : '');
 }
 
+// SKUs para pedir a Bodega de un pedido — ESPEJO del bloque "SKUs para pedir a Bodega" del detalle de la ficha en tapas.html:
+// la tapa (referencia) + Base/Contratapa/Liner/Banda de cada línea con Necesita (1 por tapa) · Ya salió (salidas de bodega
+// vinculadas a la ficha, por SKU) · Por pedir · Stock actual (B2, o Bodega 7 para Liner/Banda; FALTAN N si no alcanza).
+function pedFilasBodega(x) {
+  var salido = {};
+  (PED.salidas || []).forEach(function(m) { if (m.solicitud_id === x.id && m.sku_original) salido[m.sku_original] = (salido[m.sku_original] || 0) + (m.cantidad || 0); });
+  var filas = [];
+  (x.s.solicitud_lineas || []).forEach(function(l) {
+    var cant = l.cantidad || 0;
+    if (l.sku) filas.push({ rol: 'Tapa', sku: l.sku, desc: l.descripcion || '', cant: cant, stock: null, salido: null });
+    [['Base', l.sku_base, false], ['Contratapa', l.sku_contratapa, false], ['Liner', l.sku_liner, true], ['Banda', l.sku_banda, true]].forEach(function(c) {
+      if (!c[1]) return;
+      var it = (c[2] ? PED.stockB7 : PED.stockInv)[c[1]];
+      filas.push({ rol: c[0], sku: c[1], desc: it ? it.desc : '', cant: cant, stock: it ? it.ex : null, salido: salido[c[1]] || 0, b7: c[2] });
+    });
+  });
+  return filas;
+}
+
+function pedBloqueBodegaHtml(x) {
+  var filas = pedFilasBodega(x);
+  if (!filas.length) return '';
+  var comp = filas.filter(function(f) { return f.rol !== 'Tapa'; });
+  var rows = filas.map(function(f) {
+    if (f.rol === 'Tapa') {
+      return '<div class="ped-bod-r tapa"><div class="ped-bod-t"><i>Tapa</i><b>' + escHtml(f.sku) + '</b><span>' + escHtml(f.desc) + '</span></div>'
+        + '<div class="ped-bod-n"><span>Pedido <b>' + pedNum(f.cant) + '</b> und</span></div></div>';
+    }
+    var pedir = Math.max(0, f.cant - (f.salido || 0));
+    var falta = f.stock !== null && pedir > f.stock ? pedir - f.stock : 0;
+    return '<div class="ped-bod-r"><div class="ped-bod-t"><i>' + f.rol + '</i><b>' + escHtml(f.sku) + '</b><span>' + escHtml(f.desc || 'sin descripción en inventario') + '</span></div>'
+      + '<div class="ped-bod-n"><span>Necesita <b>' + pedNum(f.cant) + '</b></span><span>Ya salió <b>' + pedNum(f.salido || 0) + '</b></span>'
+      + (pedir > 0 ? '<span class="pedir">Por pedir <b>' + pedNum(pedir) + '</b></span>' : '<span class="listo">Ya retirado</span>')
+      + '<span' + (falta > 0 ? ' class="falta"' : '') + '>Stock ' + (f.b7 ? 'B7 ' : '') + '<b>' + (f.stock === null ? '—' : pedNum(f.stock)) + '</b>' + (falta > 0 ? ' · FALTAN ' + pedNum(falta) : '') + '</span></div></div>';
+  }).join('');
+  return '<div class="ped-bod"><div class="ped-bod-h"><span>📦 SKUs para pedir a Bodega</span>'
+    + (comp.length ? '<button onclick="copiarPedidoBodegaPed(\'' + escHtml(String(x.id)) + '\')">📋 Copiar pedido</button>' : '') + '</div>'
+    + (comp.length ? rows : rows + '<div class="ped-bod-r" style="font-size:11px;color:#9A9A98;font-style:italic">Esta ficha no tiene Base, Contratapa, Liner ni Banda registrados.</div>') + '</div>';
+}
+
+// Texto listo para pegar en el mensaje a Bodega: solo lo que aún falta sacar
+function copiarPedidoBodegaPed(id) {
+  var x = PED.modelo.find(function(m) { return String(m.id) === String(id); });
+  if (!x) return;
+  var filas = pedFilasBodega(x);
+  var pend = filas.filter(function(f) { return f.rol !== 'Tapa'; }).map(function(f) { return { f: f, pedir: Math.max(0, f.cant - (f.salido || 0)) }; })
+    .filter(function(q) { return q.pedir > 0; });
+  if (!pend.length) { showToast('Este pedido no tiene nada pendiente de pedir a Bodega', '#92400E'); return; }
+  var tapa = filas.find(function(f) { return f.rol === 'Tapa'; });
+  var txt = 'Pedido a Bodega · ' + x.codigo + ' · ' + x.cliente + (tapa ? '\nTapa: ' + tapa.sku + ' — ' + tapa.desc : '') + '\n'
+    + pend.map(function(q) { return '• ' + q.f.rol + ' ' + q.f.sku + ' — ' + (q.f.desc || '') + ' — ' + pedNum(q.pedir) + ' und'; }).join('\n');
+  var listo = function() { showToast('📋 Pedido copiado: pégalo en el mensaje a Bodega'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(listo, function() { prompt('Copia el pedido:', txt); });
+  else prompt('Copia el pedido:', txt);
+}
+
 function pedChips(lista, sel, tipo) {
   var marcados = Array.isArray(sel) ? sel : [sel];
   return '<div class="ped-chs">' + lista.map(function(o) {
@@ -1606,6 +1677,7 @@ function pintarPedido() {
   document.getElementById('pedBox').innerHTML =
     '<h3>' + escHtml(x.codigo) + ' · ' + escHtml(x.cliente) + pedLimiteHtml(x) + '</h3>'
     + '<div class="pd"><b>' + escHtml(x.sku) + '</b> ' + escHtml(x.desc) + '</div>'
+    + pedBloqueBodegaHtml(x)
     + '<div class="ped-nums"><div><b>' + pedNum(x.cant) + '</b><span>Pedido</span></div><div><b>' + pedNum(x.entregado) + '</b><span>Entregado</span></div>'
     + '<div><b>' + pedNum(x.enProc) + '</b><span>En proceso</span></div><div><b>' + pedNum(x.libre) + '</b><span>Sin iniciar</span></div></div>'
     + (lotes ? '<div class="ped-sec-t" style="margin-top:0">Lotes en proceso</div>' + lotes : '')
