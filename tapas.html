@@ -2078,11 +2078,17 @@ function tipoDeFicha(s) {
   return tipoDeSkuTapa(l0.sku, (l0.desc || '') + ' ' + (s.desc || ''));
 }
 
+// Tipos QUITADOS del desplegable (se guardan en este navegador): no se borra ninguna ficha, solo dejan de ofrecerse
+var tiposOcultos = [];
+try { tiposOcultos = JSON.parse(localStorage.getItem('tapas_tipos_ocultos') || '[]') || []; } catch(e) {}
+function guardarTiposOcultos() { try { localStorage.setItem('tapas_tipos_ocultos', JSON.stringify(tiposOcultos)); } catch(e) {} }
+
 function listaTiposTapas(extra) {
   var set = {};
   TIPOS_BASE_TAPAS.forEach(function(t) { set[t] = true; });
   Object.keys(tipoSpecTapas).forEach(function(k) { set[tipoSpecTapas[k]] = true; });
   solicitudes.forEach(function(x) { set[tipoDeFicha(x)] = true; });
+  tiposOcultos.forEach(function(t) { delete set[t]; });
   if (extra) set[extra] = true;
   delete set[TIPO_SIN_CLASIFICAR];
   return Object.keys(set).filter(Boolean).sort(function(a, b) { return a.localeCompare(b); });
@@ -2110,14 +2116,74 @@ async function guardarTipoTapa(sku, tipo) {
   } catch(e) { console.warn('guardarTipoTapa:', e); }
 }
 
+// ── Quitar tipos del desplegable ──
+// Ventana con la lista de tipos y su uso. "Quitar": si algún SKU lo tenía guardado en el Recetario ("Familia") se borra
+// ese dato (esos SKU quedan sin tipo y se vuelve a sugerir por palabras clave) y el tipo deja de aparecer en el desplegable.
+function abrirQuitarTipos() {
+  var ov = document.getElementById('ovQuitarTipos');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'ovQuitarTipos';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(12,12,11,.6);z-index:10100;display:flex;align-items:center;justify-content:center;padding:14px';
+    ov.setAttribute('onclick', 'if(event.target===this)cerrarQuitarTipos()');
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+  pintarQuitarTipos();
+}
+function cerrarQuitarTipos() {
+  var ov = document.getElementById('ovQuitarTipos');
+  if (ov) ov.style.display = 'none';
+}
+function pintarQuitarTipos(aviso) {
+  var ov = document.getElementById('ovQuitarTipos');
+  if (!ov) return;
+  var tipos = listaTiposTapas();
+  var filas = tipos.map(function(t, i) {
+    var enRec = Object.keys(tipoSpecTapas).filter(function(k) { return tipoSpecTapas[k] === t; }).length;
+    var enFic = solicitudes.filter(function(x) { return tipoDeFicha(x) === t; }).length;
+    var uso = (enRec ? enRec + ' SKU en el Recetario' : '') + (enRec && enFic ? ' · ' : '') + (enFic ? enFic + ' ficha' + (enFic !== 1 ? 's' : '') : '');
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border)">'
+      + '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">' + escHtml(t) + '</div>'
+      + '<div style="font-size:11px;color:var(--gray)">' + (uso || 'sin uso') + '</div></div>'
+      + '<button class="btn btn-sm" style="background:#FEE2E2;color:#B83232;border:none;font-weight:700" onclick="quitarTipoTapa(' + i + ')">✕ Quitar</button></div>';
+  }).join('');
+  window._tiposQuitar = tipos;
+  ov.innerHTML = '<div style="background:var(--card);border-radius:14px;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.4)">'
+    + '<div style="font-weight:800;font-size:15px;color:var(--teal);margin-bottom:2px">Quitar un tipo de tapa</div>'
+    + '<div style="font-size:11px;color:var(--gray);margin-bottom:8px">Deja de ofrecerse en el desplegable. Las fichas no se borran; los SKU que lo tenían guardado en el Recetario quedan sin tipo (se vuelve a sugerir por la descripción).</div>'
+    + (aviso ? '<div style="font-size:12px;color:#166534;background:#DCFCE7;border-radius:8px;padding:6px 10px;margin-bottom:6px">' + escHtml(aviso) + '</div>' : '')
+    + (filas || '<div style="padding:14px;text-align:center;color:var(--gray);font-size:12px">No hay tipos para quitar</div>')
+    + '<div style="text-align:right;margin-top:12px"><button class="btn btn-g btn-sm" onclick="cerrarQuitarTipos()">Cerrar</button></div></div>';
+}
+async function quitarTipoTapa(i) {
+  var t = (window._tiposQuitar || [])[i];
+  if (!t) return;
+  var enRec = Object.keys(tipoSpecTapas).filter(function(k) { return tipoSpecTapas[k] === t; });
+  if (!confirm('¿Quitar el tipo "' + t + '" del desplegable?' + (enRec.length ? '\n\n' + enRec.length + ' SKU lo tienen guardado en el Recetario: quedarán sin tipo.' : ''))) return;
+  if (enRec.length) {
+    var r = await db.from('sku_especificaciones').delete().eq('area', 'tapas').eq('campo', 'Familia').eq('valor', t).select('sku');
+    if (r.error || !(r.data || []).length) { pintarQuitarTipos(); alert('No se pudo borrar el tipo del Recetario' + (r.error ? ': ' + r.error.message : ' (sin permiso: solo master)')); return; }
+    enRec.forEach(function(k) { delete tipoSpecTapas[k]; });
+  }
+  if (tiposOcultos.indexOf(t) < 0) tiposOcultos.push(t);
+  guardarTiposOcultos();
+  var l = lineas[0];
+  if (l && l.tipo === t) { l.tipo = ''; l.tipoOrigen = ''; }
+  renderLineas();
+  pintarQuitarTipos('Tipo "' + t + '" quitado');
+}
+
 function setTipoLinea(v) {
   var l = lineas[0];
   if (!l) return;
+  if (v === '__quitar__') { renderLineas(); abrirQuitarTipos(); return; }
   if (v === '__otro__') {
     var n = prompt('Nombre del nuevo tipo de tapa (ej. Press top 38/400, Rosca lisa…):');
     n = String(n || '').trim();
     if (!n) { renderLineas(); return; }
     l.tipo = n;
+    if (tiposOcultos.indexOf(n) >= 0) { tiposOcultos = tiposOcultos.filter(function(t) { return t !== n; }); guardarTiposOcultos(); }
   } else l.tipo = v;
   l.tipoOrigen = 'manual';
   renderLineas();
@@ -2314,7 +2380,7 @@ function renderLineas(focusId) {
         var opts = listaTiposTapas(l.tipo).map(function(t) { return '<option value="' + escHtml(t) + '"' + (t === l.tipo ? ' selected' : '') + '>' + escHtml(t) + '</option>'; }).join('');
         var nota = l.tipoOrigen === 'guardado' ? 'guardado en el Recetario' : (l.tipoOrigen === 'sugerido' ? 'sugerido por la descripción: confírmalo o cámbialo' : (l.tipoOrigen === 'manual' ? 'se guardará en el Recetario para este SKU' : 'elige el tipo para ordenar las fichas'));
         return '<div class="lin-comp"><span class="lin-comp-lbl">Tipo</span>'
-          + '<select class="fs" style="font-size:12px;padding:5px 8px" onchange="setTipoLinea(this.value)"><option value=""' + (l.tipo ? '' : ' selected') + '>' + TIPO_SIN_CLASIFICAR + '</option>' + opts + '<option value="__otro__">＋ Otro tipo…</option></select>'
+          + '<select class="fs" style="font-size:12px;padding:5px 8px" onchange="setTipoLinea(this.value)"><option value=""' + (l.tipo ? '' : ' selected') + '>' + TIPO_SIN_CLASIFICAR + '</option>' + opts + '<option value="__otro__">＋ Otro tipo…</option><option value="__quitar__">－ Quitar un tipo…</option></select>'
           + '<span class="lin-stk">' + nota + '</span></div>';
       })()
     + (l.autoDe ? '<div class="lin-auto">↺ Rellenado con la ficha <b>' + escHtml(l.autoDe) + '</b> (misma tapa y mismo cliente): revisa y cambia lo que haga falta</div>' : '')
