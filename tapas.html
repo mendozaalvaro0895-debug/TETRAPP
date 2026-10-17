@@ -243,7 +243,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ent-act button{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;color:var(--teal)}
 .ent-act button.ent-del{color:var(--gray-l);font-size:14px}
 .ent-mas{display:block;margin:10px auto 4px}
-.ing-lin{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1fr) minmax(0,1.7fr) 84px 30px;gap:6px;margin-bottom:6px;align-items:start}
+.ing-lin{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.7fr) 84px 30px;gap:6px;margin-bottom:6px;align-items:start}
 .ing-zone{border:2px dashed var(--teal);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:center;background:var(--teal-xl);outline:none;margin-bottom:12px;transition:border-color .15s}
 .ing-zone:focus{border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.15)}
 .ing-zone-l{font-size:13px;font-weight:800;color:var(--teal)}
@@ -251,7 +251,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ing-zone-s span{cursor:pointer;text-decoration:underline;color:#6366f1}
 .ing-zone img{display:none;max-width:100%;max-height:100px;border-radius:6px;margin-top:6px;object-fit:contain;cursor:zoom-in}
 .ing-x{background:none;border:1px solid var(--border);border-radius:6px;color:var(--gray-l);font-size:13px;cursor:pointer;padding:5px 0;line-height:1}
-@media(max-width:700px){.ing-lin{grid-template-columns:minmax(0,1fr) 30px}.ing-lin>:nth-child(-n+3){grid-column:1/-1}}
+@media(max-width:700px){.ing-lin{grid-template-columns:minmax(0,1fr) 84px 30px}.ing-lin>:first-child{grid-column:1/-1}.ing-hdr{grid-template-columns:1fr !important}}
 
 .sku-code{font-family:var(--mono);font-weight:700;color:var(--teal);font-size:11px;margin-bottom:2px}
 .sku-desc{color:var(--ink);font-size:11px}
@@ -1189,7 +1189,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="ing-zone-s">ó <span onclick="event.stopPropagation();ingElegirArchivo()">selecciona un archivo o toma una foto</span> de la requi de ingreso PT</div>
         <img id="ingImgPrev" ondblclick="event.stopPropagation();ingAmpliarImagen(this.src)" title="Doble clic para ampliar">
       </div>
-      <div class="fr">
+      <div class="fr ing-hdr" style="grid-template-columns:1fr 1fr 1.2fr">
         <div class="fg">
           <div class="fl">No. de requi de ingreso PT *</div>
           <input class="fi" id="ingRequi" placeholder="Ej: PTI21056" autocomplete="off">
@@ -1197,6 +1197,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="fg">
           <div class="fl">Fecha del ingreso</div>
           <input class="fi" id="ingFecha" type="date">
+        </div>
+        <div class="fg">
+          <div class="fl">Cliente <span style="font-weight:500;color:var(--gray-l)">(filtra los pedidos)</span></div>
+          <select class="fi" id="ingCli" onchange="ingCliChange(this.value)"></select>
         </div>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -5547,7 +5551,7 @@ function buildEntGrupoHtml(g, gi, mp) {
 // ── Formulario ────────────────────────────────────────────────
 function ingNuevaLinea(d) {
   d = d || {};
-  return { cli: d.cli || '', sol: d.sol || '', solTxt: '', sku: d.sku || '', desc: d.desc || '', skuTxt: '', cant: d.cant || '' };
+  return { sol: d.sol || '', solTxt: '', sku: d.sku || '', desc: d.desc || '', skuTxt: '', cant: d.cant || '' };
 }
 
 // Clientes de las fichas de Tapas, los de más uso primero (el mismo orden del formulario de solicitud)
@@ -5557,13 +5561,24 @@ function ingClientes() {
   return Object.keys(uso).sort(function(a, b) { return (uso[b] || 0) - (uso[a] || 0) || a.localeCompare(b); });
 }
 
-function ingCliChange(i, v) {
+// Cliente de la requi (uno solo, junto al No. de requi y la fecha): filtra los pedidos que se pueden vincular
+var ingCli = '';
+function ingPintarCliente() {
+  var sel = document.getElementById('ingCli');
+  if (!sel) return;
+  var lista = ingClientes();
+  if (ingCli && lista.indexOf(ingCli) < 0) lista.push(ingCli);
+  sel.innerHTML = '<option value="">— Todos —</option>' + lista.map(function(c) {
+    return '<option value="' + escHtml(c) + '"' + (c === ingCli ? ' selected' : '') + '>' + escHtml(c) + '</option>';
+  }).join('');
+}
+function ingCliChange(v) {
   ingSincronizarCant();
-  var l = ingLineas[i];
-  if (!l) return;
-  l.cli = v;
-  var s = l.sol ? solicitudes.find(function(x) { return x.id === l.sol; }) : null;
-  if (s && v && s.cliente !== v) l.sol = ''; // el pedido elegido era de otro cliente
+  ingCli = v;
+  ingLineas.forEach(function(l) {
+    var s = l.sol ? solicitudes.find(function(x) { return x.id === l.sol; }) : null;
+    if (s && v && s.cliente !== v) l.sol = ''; // el pedido elegido era de otro cliente
+  });
   renderIngLineas();
 }
 
@@ -5579,9 +5594,15 @@ function abrirIngPT(rowId) {
   ingLineas = g ? g.rows.map(function(m) {
     var solOk = m.solicitud_id && solicitudes.some(function(x) { return x.id === m.solicitud_id; }); // pedido borrado: se limpia el vínculo
     var it = invB2DeTapas(m.sku_original);
-    var sOk = solOk ? solicitudes.find(function(x) { return x.id === m.solicitud_id; }) : null;
-    return ingNuevaLinea({ cli: sOk ? (sOk.cliente || '') : '', sol: solOk ? m.solicitud_id : '', sku: m.sku_original || '', desc: it ? (it.descripcion || '') : '', cant: m.cantidad || '' });
+    return ingNuevaLinea({ sol: solOk ? m.solicitud_id : '', sku: m.sku_original || '', desc: it ? (it.descripcion || '') : '', cant: m.cantidad || '' });
   }) : [ingNuevaLinea()];
+  ingCli = '';
+  if (g) {
+    var clis = {};
+    ingLineas.forEach(function(l) { var sx = l.sol ? solicitudes.find(function(x) { return x.id === l.sol; }) : null; if (sx && sx.cliente) clis[sx.cliente] = 1; });
+    var ck = Object.keys(clis);
+    if (ck.length === 1) ingCli = ck[0]; // todos los pedidos de la requi son del mismo cliente
+  }
   ingImgReset();
   document.getElementById('overlayIngPT').classList.add('open');
   renderIngLineas();
@@ -5625,11 +5646,7 @@ function renderIngLineas(focusId) {
     var s = l.sol ? solicitudes.find(function(x) { return x.id === l.sol; }) : null;
     var solVal = s ? ingTextoPedido(s) : l.solTxt;
     var skuVal = l.sku ? textoCampoSku(l.sku, l.desc) : l.skuTxt;
-    var cliOpts = ingClientes();
-    if (l.cli && cliOpts.indexOf(l.cli) < 0) cliOpts.push(l.cli);
     return '<div class="ing-lin">'
-      + '<select class="fi" id="ing-cli-' + i + '" onchange="ingCliChange(' + i + ',this.value)" style="width:100%;box-sizing:border-box"><option value="">— Cliente —</option>'
-      +   cliOpts.map(function(c) { return '<option value="' + escHtml(c) + '"' + (c === l.cli ? ' selected' : '') + '>' + escHtml(c) + '</option>'; }).join('') + '</select>'
       + '<div class="lin-in-wrap"><textarea class="fi lin-ta" rows="1" id="ing-sol-' + i + '" placeholder="🔗 Pedido (opcional)" autocomplete="off"'
       +   ' oninput="ingSolInput(' + i + ',this,true)" onfocus="ingSolInput(' + i + ',this,false)" onkeydown="if(event.key===\'Enter\')event.preventDefault()" onblur="setTimeout(cerrarFormDrop,200)">'
       +   escHtml(solVal) + '</textarea></div>'
@@ -5640,6 +5657,7 @@ function renderIngLineas(focusId) {
       + '<button class="ing-x" title="Quitar" onclick="ingQuitarLinea(' + i + ')">✕</button>'
       + '</div>';
   }).join('');
+  ingPintarCliente();
   ingAjustarCampos();
   if (focusId) {
     var el = document.getElementById(focusId);
@@ -5686,7 +5704,7 @@ function ingSolInput(i, el, escribiendo) {
   var ent = mapasEntregados().ent;
   var cand = solicitudes.filter(function(s) {
     if (!fichaViva(s) && !(s.estado === 'lista' && toks.length)) return false;
-    if (l.cli && s.cliente !== l.cli) return false;
+    if (ingCli && s.cliente !== ingCli) return false;
     if (!toks.length) return true;
     var t = normBusqueda((s.id_display || '') + ' ' + (s.cliente || '') + ' ' + s.lineas.map(function(x) { return (x.sku || '') + ' ' + (x.desc || ''); }).join(' '));
     return toks.every(function(k) { return t.indexOf(k) !== -1; });
@@ -5708,7 +5726,8 @@ function ingSolSelect(i, solId) {
   var l = ingLineas[i];
   var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!l || !s) return;
-  l.sol = s.id; l.solTxt = ''; l.cli = s.cliente || l.cli;
+  l.sol = s.id; l.solTxt = '';
+  if (!ingCli && s.cliente) ingCli = s.cliente;
   // Ficha de un solo producto: se completa el SKU solo (si hay varios, se elige a mano)
   if (!l.sku && s.lineas.length === 1 && s.lineas[0].sku) {
     var it = invB2DeTapas(s.lineas[0].sku);
@@ -5839,11 +5858,14 @@ function ingAplicarResultado(result) {
         if (pr.sku) noEnc.push(String(pr.sku));
       } else {
         var vivas = solicitudes.filter(function(s) { return fichaViva(s) && s.lineas.some(function(x) { return x.sku === it.sku; }); });
-        if (vivas.length === 1) { l.sol = vivas[0].id; l.cli = vivas[0].cliente || ''; vinc.push(vivas[0].id_display || String(vivas[0].id).slice(0, 8)); }
+        if (vivas.length === 1) { l.sol = vivas[0].id; vinc.push(vivas[0].id_display || String(vivas[0].id).slice(0, 8)); }
       }
       return l;
     });
   }
+  var cliVinc = {};
+  ingLineas.forEach(function(l) { var sx = l.sol ? solicitudes.find(function(x) { return x.id === l.sol; }) : null; if (sx && sx.cliente) cliVinc[sx.cliente] = 1; });
+  if (Object.keys(cliVinc).length === 1) ingCli = Object.keys(cliVinc)[0];
   renderIngLineas();
   var warns = (result.warnings || []).slice();
   if (noEnc.length) warns.push('⚠️ Códigos que NO existen en inventario — revisa los dígitos: ' + noEnc.join(', '));
