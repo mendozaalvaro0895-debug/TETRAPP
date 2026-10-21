@@ -430,6 +430,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .bod-n .pedir b{color:#92400E}
 .bod-n .listo{color:#166534;font-weight:800}
 .bod-n .falta{color:var(--red);font-weight:800}
+@media(max-width:700px){.rec-conf-grid{grid-template-columns:1fr !important}}
 .bod-stk{font-weight:800;border-radius:6px;padding:1px 8px}
 .bod-stk.ok{background:#DCFCE7;color:#166534}
 .bod-stk.par{background:#FEF3C7;color:#92400E}
@@ -2794,7 +2795,9 @@ async function guardarPlazoFicha() {
 // 'accesorio' (el rol va en `nota`); procesos → 'proceso' (nombres de PROCESOS_FIJOS del Recetario).
 // Solo se ofrece si el producto es un SKU real y NO tiene partes en su receta; la receta nace
 // guardado=false (queda en "Pendientes" del Recetario para que alguien la revise). Si ya hay una
-// receta con partes NUNCA se sobrescribe: a lo mucho se avisa que la ficha difiere.
+// receta con partes NUNCA se sobrescribe sola: si la ficha es DISTINTA se muestran ambas versiones lado a lado
+// (abrirConflictoReceta) y quien guarda elige cuál queda; elegir la de la ficha reemplaza las partes y devuelve
+// la receta a "Pendientes" para revisión.
 var ROL_ACCESORIO_RECETA = { contratapa: 'Contratapa', liner: 'Liner', banda: 'Banda' };
 
 function construirPartesReceta(linea, l) {
@@ -2824,15 +2827,21 @@ async function ofrecerRecetaDeFicha(sku, desc, partes) {
     var recetaId = rr.data ? rr.data.id : null;
     var existentes = [];
     if (recetaId) {
-      var rp = await db.from('sku_receta_partes').select('tipo,codigo').eq('receta_id', recetaId);
+      var rp = await db.from('sku_receta_partes').select('id,orden,tipo,codigo,nota').eq('receta_id', recetaId).order('orden', { ascending: true });
       if (rp.error) return;
       existentes = rp.data || [];
     }
     if (existentes.length) {
-      var tengo = {};
-      existentes.forEach(function(e) { tengo[clavePartesReceta(e.tipo, e.codigo)] = true; });
-      var difiere = partes.some(function(p) { return !tengo[clavePartesReceta(p.tipo, p.codigo)]; });
-      if (difiere) showToast('📖 ' + sku + ' ya tiene receta en el Recetario y esta ficha difiere: no se tocó', '#92400e');
+      // Se compara solo lo que una ficha sabe describir: Base, accesorios y procesos (en ambos sentidos)
+      var comparables = existentes.filter(function(e) { return REC_TIPOS_FICHA.indexOf(e.tipo) >= 0; });
+      var kRec = {}, kFic = {};
+      comparables.forEach(function(e) { kRec[clavePartesReceta(e.tipo, e.codigo)] = true; });
+      partes.forEach(function(p) { kFic[clavePartesReceta(p.tipo, p.codigo)] = true; });
+      var distinta = partes.some(function(p) { return !kRec[clavePartesReceta(p.tipo, p.codigo)]; })
+                  || comparables.some(function(e) { return !kFic[clavePartesReceta(e.tipo, e.codigo)]; });
+      if (!distinta) return;
+      if (!comparables.length) { showToast('📖 ' + sku + ' ya tiene una receta en el Recetario con otro tipo de partes: no se tocó', '#92400e'); return; }
+      abrirConflictoReceta(sku, desc, recetaId, existentes, comparables, partes);
       return;
     }
     var resumen = partes.map(function(p) { return '• ' + (p.tipo === 'proceso' ? 'Proceso' : (p.nota || 'Base')) + ': ' + p.codigo; }).join('\n');
@@ -2854,6 +2863,82 @@ async function ofrecerRecetaDeFicha(sku, desc, partes) {
   } catch(e) {
     console.warn('ofrecerRecetaDeFicha:', e);
     showToast('No se pudo enviar la receta al Recetario: ' + (e.message || e), '#92400e');
+  }
+}
+
+// ── Receta existente vs. receta de esta ficha: se muestran ambas y se elige ──
+var REC_TIPOS_FICHA = ['base', 'accesorio', 'proceso'];
+var RECETA_CONF = null;
+
+function recParteLbl(p) {
+  return p.tipo === 'proceso' ? 'Proceso' : (p.tipo === 'base' ? 'Base' : (p.nota || 'Accesorio'));
+}
+
+function abrirConflictoReceta(sku, desc, recetaId, existentes, comparables, partes) {
+  RECETA_CONF = { sku: sku, desc: desc, recetaId: recetaId, existentes: existentes, comparables: comparables, partes: partes };
+  var kRec = {}, kFic = {};
+  comparables.forEach(function(e) { kRec[clavePartesReceta(e.tipo, e.codigo)] = true; });
+  partes.forEach(function(p) { kFic[clavePartesReceta(p.tipo, p.codigo)] = true; });
+  // Una columna: cada parte con su marca si solo existe de ese lado
+  function columna(lista, otroSet, marca) {
+    return lista.map(function(p) {
+      var solo = !otroSet[clavePartesReceta(p.tipo, p.codigo)];
+      return '<div style="padding:5px 8px;border-radius:6px;margin-bottom:4px;font-size:12px;' + (solo ? 'background:#FEF3C7;border:1px solid #F59E0B' : 'background:var(--bg2);border:1px solid var(--border)') + '">'
+        + '<b style="font-size:10px;text-transform:uppercase;color:var(--teal)">' + escHtml(recParteLbl(p)) + '</b> ' + escHtml(p.codigo)
+        + (solo ? ' <span style="font-size:10px;font-weight:800;color:#92400E">· ' + marca + '</span>' : '') + '</div>';
+    }).join('') || '<div style="font-size:12px;color:var(--gray)">— sin partes —</div>';
+  }
+  var ov = document.getElementById('ovConflictoReceta');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'ovConflictoReceta';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(12,12,11,.65);z-index:10100;display:flex;align-items:center;justify-content:center;padding:14px';
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:var(--card);border-radius:14px;max-width:720px;width:100%;max-height:90vh;overflow-y:auto;padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.4)">'
+    + '<div style="font-weight:800;font-size:15px;color:var(--teal)">📖 La receta de ' + escHtml(sku) + ' ya existe y esta ficha es distinta</div>'
+    + '<div style="font-size:11px;color:var(--gray);margin:2px 0 10px">' + escHtml(desc || '') + ' — elige cuál es la correcta. En amarillo, lo que solo está en esa versión.</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" class="rec-conf-grid">'
+    +   '<div><div style="font-size:11px;font-weight:800;margin-bottom:6px">📚 La del Recetario (actual)</div>' + columna(comparables, kFic, 'solo en el Recetario') + '</div>'
+    +   '<div><div style="font-size:11px;font-weight:800;margin-bottom:6px">📝 La de esta ficha</div>' + columna(partes, kRec, 'solo en la ficha') + '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'
+    +   '<button class="btn btn-g" style="flex:1;min-width:210px" onclick="recetaConflictoElegir(\'recetario\')">Quedarme con la del Recetario<br><span style="font-size:10px;font-weight:500">no cambia nada</span></button>'
+    +   '<button class="btn btn-t" style="flex:1;min-width:210px" onclick="recetaConflictoElegir(\'ficha\')">Usar la de esta ficha<br><span style="font-size:10px;font-weight:500">reemplaza la del Recetario y queda en "Pendientes"</span></button>'
+    + '</div></div>';
+  ov.style.display = 'flex';
+}
+
+function cerrarConflictoReceta() {
+  var ov = document.getElementById('ovConflictoReceta');
+  if (ov) ov.style.display = 'none';
+}
+
+async function recetaConflictoElegir(opcion) {
+  var c = RECETA_CONF;
+  cerrarConflictoReceta();
+  RECETA_CONF = null;
+  if (!c) return;
+  if (opcion !== 'ficha') { showToast('📖 Se mantuvo la receta del Recetario para ' + c.sku); return; }
+  try {
+    // Primero se inserta la versión nueva; solo si salió bien se borra la anterior (nunca queda la receta vacía)
+    var maxOrden = c.existentes.reduce(function(m, e) { return Math.max(m, e.orden || 0); }, 0);
+    var filas = c.partes.map(function(p, i) { return { receta_id: c.recetaId, orden: maxOrden + i + 1, tipo: p.tipo, codigo: p.codigo, nota: p.nota }; });
+    var ip = await db.from('sku_receta_partes').insert(filas);
+    if (ip.error) throw ip.error;
+    var ids = c.comparables.map(function(e) { return e.id; });
+    if (ids.length) {
+      var del = await db.from('sku_receta_partes').delete().in('id', ids).select('id');
+      if (del.error || (del.data || []).length < ids.length) {
+        showToast('⚠️ Se agregó la versión de la ficha pero no se pudo borrar la anterior' + (del.error ? ': ' + del.error.message : ' (sin permiso)') + '. Revisa el Recetario: puede haber partes duplicadas.', '#B83232');
+        return;
+      }
+    }
+    await db.from('sku_recetas').update({ guardado: false }).eq('id', c.recetaId); // vuelve a "Pendientes" para revisión
+    showToast('📖 Receta de ' + c.sku + ' reemplazada por la de la ficha (pendiente de revisión)');
+  } catch(e) {
+    console.warn('recetaConflictoElegir:', e);
+    showToast('No se pudo actualizar la receta: ' + (e.message || e), '#92400e');
   }
 }
 
