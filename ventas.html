@@ -528,6 +528,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="kpi-s" id="kpiCli1Sub">—</div>
       </div>
     </div>
+    <!-- barómetro de baja de consumo — visible solo al comparar con mes anterior -->
+    <div id="cliBarometro" style="display:none;margin-bottom:12px;border:1px solid var(--border);border-radius:8px;overflow:hidden"></div>
     <div class="tbl-wrap">
       <div class="tbl-head">
         <div><div class="tbl-head-t">Ventas por cliente</div><div class="tbl-head-s" id="cliSub">—</div></div>
@@ -1423,7 +1425,8 @@ function renderClientes() {
   });
 
   var ant = mesSel === 'todo' ? null : mesAnterior(mesSel);
-  var qAntMap = ant ? agrupar(filasDelPeriodo(ant), function (v) { return v.cliente || '—'; }) : null;
+  var filasAntRaw = ant ? filasDelPeriodo(ant) : null;
+  var qAntMap = filasAntRaw ? agrupar(filasAntRaw, function (v) { return v.cliente || '—'; }) : null;
 
   document.getElementById('kpiCliN').textContent = noms.length;
   var top3 = 0;
@@ -1443,6 +1446,101 @@ function renderClientes() {
   noms.forEach(function (n, i) { html += buildCliRow(i + 1, i + 1, n, porCli[n], total, qAntMap); });
   document.getElementById('cliBody').innerHTML = html ||
     '<tr class="empty-row"><td colspan="7">Sin clientes en este periodo</td></tr>';
+
+  renderBarometroClientes(filas, filasAntRaw);
+}
+
+function renderBarometroClientes(filasAct, filasAnt) {
+  var el = document.getElementById('cliBarometro');
+  if (!el) return;
+  if (!filasAnt || filasAnt.length === 0) { el.style.display = 'none'; return; }
+
+  // Agrupar por cliente+SKU para ambos meses
+  var prodsAct = {}, prodsAnt = {};
+  filasAct.forEach(function(v) {
+    var cli = v.cliente || '—', sku = (v.sku || '—').trim();
+    if (!prodsAct[cli]) prodsAct[cli] = {};
+    if (!prodsAct[cli][sku]) prodsAct[cli][sku] = { q: 0, desc: v.descripcion || sku };
+    prodsAct[cli][sku].q += v.total_quetzales;
+  });
+  filasAnt.forEach(function(v) {
+    var cli = v.cliente || '—', sku = (v.sku || '—').trim();
+    if (!prodsAnt[cli]) prodsAnt[cli] = {};
+    if (!prodsAnt[cli][sku]) prodsAnt[cli][sku] = { q: 0, desc: v.descripcion || sku };
+    prodsAnt[cli][sku].q += v.total_quetzales;
+  });
+
+  // Totales por cliente
+  var totAct = {}, totAnt = {};
+  Object.keys(prodsAct).forEach(function(c) { totAct[c] = 0; Object.keys(prodsAct[c]).forEach(function(s) { totAct[c] += prodsAct[c][s].q; }); });
+  Object.keys(prodsAnt).forEach(function(c) { totAnt[c] = 0; Object.keys(prodsAnt[c]).forEach(function(s) { totAnt[c] += prodsAnt[c][s].q; }); });
+
+  // Clientes que bajaron vs mes anterior
+  var bajaron = [];
+  Object.keys(prodsAnt).forEach(function(cli) {
+    var qA = totAnt[cli] || 0, qN = totAct[cli] || 0;
+    if (qA > 0 && qN < qA) {
+      var pct = (qN - qA) / qA * 100;
+      // Productos que bajaron en este cliente
+      var skusDiffs = [];
+      var allSkus = {};
+      Object.keys(prodsAnt[cli]).forEach(function(s) { allSkus[s] = true; });
+      if (prodsAct[cli]) Object.keys(prodsAct[cli]).forEach(function(s) { allSkus[s] = true; });
+      Object.keys(allSkus).forEach(function(sku) {
+        var qSA = (prodsAnt[cli] && prodsAnt[cli][sku]) ? prodsAnt[cli][sku].q : 0;
+        var qSN = (prodsAct[cli] && prodsAct[cli][sku]) ? prodsAct[cli][sku].q : 0;
+        if (qSN < qSA) {
+          var desc = (prodsAnt[cli] && prodsAnt[cli][sku]) ? prodsAnt[cli][sku].desc :
+                     ((prodsAct[cli] && prodsAct[cli][sku]) ? prodsAct[cli][sku].desc : sku);
+          skusDiffs.push({ sku: sku, desc: desc, qAnt: qSA, qAct: qSN, diff: qSN - qSA });
+        }
+      });
+      skusDiffs.sort(function(a, b) { return a.diff - b.diff; }); // mayor caída primero
+      bajaron.push({ cli: cli, qAnt: qA, qAct: qN, pct: pct, diff: qN - qA, skusDiffs: skusDiffs.slice(0, 4) });
+    }
+  });
+
+  if (bajaron.length === 0) { el.style.display = 'none'; return; }
+  bajaron.sort(function(a, b) { return a.diff - b.diff; }); // mayor caída absoluta primero
+
+  var html = '<div style="padding:8px 14px 7px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:#fef2f2">' +
+    '<span style="font-size:11px;font-weight:800;color:#dc2626;letter-spacing:.3px;text-transform:uppercase">▼ Baja de consumo</span>' +
+    '<span style="font-size:11px;color:#b91c1c">' + bajaron.length + ' cliente' + (bajaron.length !== 1 ? 's' : '') + ' compraron menos que el mes anterior</span>' +
+    '</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:12px 14px">';
+
+  bajaron.forEach(function(item) {
+    var pctStr = fmtPct(item.pct); // negative already
+    var prodsHtml = item.skusDiffs.map(function(p) {
+      var pctSku = p.qAnt > 0 ? (p.diff / p.qAnt * 100) : -100;
+      var descCorta = p.desc.length > 36 ? p.desc.substring(0, 36) + '…' : p.desc;
+      return '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:4px 0;border-top:1px solid var(--border)">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:10px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(p.desc) + '">' + escHtml(descCorta) + '</div>' +
+          '<div style="font-size:9px;color:var(--gray);font-family:monospace;margin-top:1px">' + escHtml(p.sku) + '</div>' +
+        '</div>' +
+        '<div style="text-align:right;flex-shrink:0">' +
+          '<div style="font-size:11px;font-weight:700;color:#dc2626;font-family:monospace">' + fmtPct(pctSku) + '</div>' +
+          '<div style="font-size:9px;color:#94a3b8;font-family:monospace">−' + fmtQ(Math.abs(p.diff)) + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    html += '<div style="flex:1;min-width:200px;max-width:320px;border:1px solid #fca5a5;border-top:3px solid #dc2626;border-radius:6px;padding:10px 12px;background:#fff">' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:3px">' +
+        '<div style="font-size:12px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(item.cli) + '">' + escHtml(nombreCorto(item.cli)) + '</div>' +
+        '<div style="font-size:17px;font-weight:800;color:#dc2626;font-family:monospace;flex-shrink:0">' + pctStr + '</div>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--gray);font-family:monospace;margin-bottom:8px">' +
+        fmtQ(item.qAnt) + ' → ' + fmtQ(item.qAct) + '<span style="color:#dc2626"> −' + fmtQ(Math.abs(item.diff)) + '</span>' +
+      '</div>' +
+      prodsHtml +
+    '</div>';
+  });
+
+  html += '</div>';
+  el.innerHTML = html;
+  el.style.display = '';
 }
 
 // ════════════════════════════════════════════════════════════════
