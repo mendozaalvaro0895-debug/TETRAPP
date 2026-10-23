@@ -482,6 +482,14 @@ view-personal: grid unificado de TODA la tabla personal (área tapas + serig jun
   quiere traer de vuelta la columna más adelante — solo falta restaurar el `<th>`/`<col
   class="c-habil">`/`<td class="td-multi">` en `buildPersonalTable()`/`buildPersonalRow()` y
   subir `P_TABLE_COLS` de 12 a 13.
+  ROL CON LÍNEA EN SERIGRAFÍA (oct/2026, `rolPersona`/`rolCeldaHtml`, columna "Rol / Proceso"): en el grupo Serigrafía el rol va
+  acompañado de un chip con su LÍNEA de color (L1 verde · L2 morado · L3 ámbar · L4 cian), como en la hoja de asistencia
+  ("L2 - FLAMEO"). El rol sale de `mtx_rol` (posición normal del tablero de serigrafia.html: manda sobre `proceso_hab`, igual que
+  `posKeyDefault` allá; `SERIG_MTX_A_ROL` es el espejo de `MATRIZ_TO_PROCESO`) y la línea de `mtx_linea`. Solo Flameador,
+  Impresión y Receptor van por línea; Supervisor, Apoyo y Empaque son generales (sin chip). Flameador/Impresión/Receptor SIN línea
+  asignada muestran "L?" punteado (se asigna en el tablero de Serigrafía; Gestión NO edita `mtx_rol`/`mtx_linea`); una persona
+  de Serigrafía sin ningún rol muestra "Sin rol" en ámbar (antes decía "Operador"); un Prestado con rol de matriz sale
+  "Prestado · Flameador". También aplica a las filas VACANTE (se ve qué línea/rol hay que cubrir). Las demás áreas no cambian.
   El/la supervisor(a) de cada grupo se ordena SIEMPRE primero dentro de su área
   (`ordenSupervisorPrimero()`, orden estable — el resto conserva activo desc/nombre asc) y se
   distingue con "★ " antes del nombre + fondo tenue + nombre en negrita (`tr.p-row.supervisor`).

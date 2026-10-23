@@ -213,6 +213,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .p-table tr.p-row.vacante td:first-child{font-weight:800;font-style:italic;color:var(--amber)}
 .p-table tr.p-row.vacante .p-row-avatar{background:transparent;color:var(--amber);border:1.5px dashed var(--amber)}
 .vac-antes{display:block;margin:2px 0 0 36px;font-size:10px;font-weight:500;font-style:normal;color:var(--gray);opacity:.6}
+.rol-linea{display:inline-block;min-width:24px;text-align:center;font-family:var(--mono);font-size:10px;font-weight:800;line-height:16px;padding:0 6px;border-radius:5px;margin-right:7px;color:#fff;vertical-align:middle}
+.rol-linea.rl1{background:#1A6B5B}
+.rol-linea.rl2{background:#5A2D9E}
+.rol-linea.rl3{background:#B87200}
+.rol-linea.rl4{background:#0E7490}
+.rol-linea.rl0{background:transparent;color:var(--gray);border:1px dashed var(--gray-l)}
+.rol-falta{color:var(--amber);font-weight:700}
 .vac-cerrar{margin-left:8px;font-size:10px;font-style:normal;font-weight:700;color:var(--gray);cursor:pointer;padding:1px 6px;border-radius:10px;border:1px solid var(--border);background:var(--card)}
 .vac-cerrar:hover{color:var(--red);border-color:var(--red)}
 .p-table tr.p-row.supervisor{background:#4338CA0D}
@@ -2242,7 +2249,37 @@ var TURNO_PRODUCCION_LBL = { alex: 'Turno Alex', gabino: 'Turno Gabino' };
 // chica y translúcida "Antes: nombre · baja fecha" bajo VACANTE (`.vac-antes`), para saber
 // quién se fue sin que compita con la plaza. Clic = cubrirla con alguien nuevo (precarga
 // área/rol/proceso/turno); ✕ = cerrar la vacante sin cubrirla.
-function buildFilaVacante(p, rolTxt, turnoTxt) {
+// ROL que se muestra en la tabla. En Serigrafía el rol va acompañado de su LÍNEA (L1–L4), como en la hoja
+// de asistencia ("L2 - FLAMEO"): el rol sale de `mtx_rol` (posición normal del tablero de serigrafia.html, que
+// manda sobre `proceso_hab`) y la línea de `mtx_linea`. Supervisor, Apoyo y Empaque son roles generales y NO
+// van por línea; Flameador/Impresión/Receptor sí, y si les falta la línea se marca "L?" para completarla en
+// el tablero de Serigrafía. Un/a Serigrafía sin rol alguno sale "Sin rol" (antes decía "Operador").
+var SERIG_MTX_A_ROL = { flameador: 'Flameador', imprime: 'Impresión', recibe: 'Receptor', supervisor: 'Supervisor', auxiliar: 'Apoyo', empaque: 'Empaque' };
+var SERIG_ROLES_POR_LINEA = { 'Flameador': 1, 'Impresión': 1, 'Receptor': 1 };
+function rolPersona(p) {
+  if (p.rol === 'supervisor') return { txt: 'Supervisor', linea: null };
+  if (p.area !== 'serig') return { txt: p.proceso_hab || 'Operador', linea: null };
+  var proc = String(p.proceso_hab || '').trim();
+  var base = (p.mtx_rol && SERIG_MTX_A_ROL[p.mtx_rol]) || proc;
+  var prestado = proc === 'Prestado';
+  if (!base) return { txt: 'Sin rol', linea: null, falta: true };
+  var linea = parseInt(p.mtx_linea, 10);
+  linea = (SERIG_ROLES_POR_LINEA[base] && linea >= 1 && linea <= 4) ? linea : null;
+  return {
+    txt: (prestado && base !== 'Prestado') ? 'Prestado · ' + base : base,
+    linea: linea,
+    sinLinea: !!SERIG_ROLES_POR_LINEA[base] && !linea
+  };
+}
+function rolCeldaHtml(p) {
+  var r = rolPersona(p);
+  var chip = r.linea
+    ? '<span class="rol-linea rl' + r.linea + '" title="Línea ' + r.linea + '">L' + r.linea + '</span>'
+    : (r.sinLinea ? '<span class="rol-linea rl0" title="Sin línea asignada — se asigna en el tablero de Serigrafía">L?</span>' : '');
+  return chip + (r.falta ? '<span class="rol-falta">Sin rol</span>' : escHtml(r.txt));
+}
+
+function buildFilaVacante(p, rolHtml, turnoTxt) {
   var guion = '<span class="falta-none">—</span>';
   var antes = 'Antes: ' + (p.nombre || 'sin nombre') + (p.fecha_baja ? ' · baja ' + p.fecha_baja : '');
   return '<tr class="p-row vacante" onclick="cubrirVacante(\'' + p.id + '\')" title="Clic para cubrir esta plaza con una persona nueva">' +
@@ -2250,7 +2287,7 @@ function buildFilaVacante(p, rolTxt, turnoTxt) {
       '<span class="vac-cerrar" onclick="event.stopPropagation();cerrarVacante(\'' + p.id + '\')" title="Cerrar la vacante (la plaza ya no se necesita)">✕ cerrar</span>' +
       '<span class="vac-antes">' + escHtml(antes) + '</span></td>' +
     '<td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td>' +
-    '<td>' + escHtml(rolTxt) + '</td>' +
+    '<td>' + rolHtml + '</td>' +
     '<td>' + escHtml(turnoTxt) + '</td>' +
     '<td><span class="pill pill-vacante">Vacante</span></td>' +
     '<td>' + guion + '</td><td>' + guion + '</td><td>' + guion + '</td>' +
@@ -2259,11 +2296,11 @@ function buildFilaVacante(p, rolTxt, turnoTxt) {
 
 function buildPersonalRow(p, anonVac) {
   var iniciales = escHtml(p.iniciales || (p.nombre ? p.nombre.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase() : '?'));
-  var rolTxt = p.rol === 'supervisor' ? 'Supervisor' : (p.proceso_hab || 'Operador');
+  var rolHtml = rolCeldaHtml(p);
   var turnoTxt = p.area === 'produccion'
     ? (TURNO_PRODUCCION_LBL[p.turno_produccion] || '—')
     : (p.area === 'tapas' || p.area === 'serig') ? 'Matutino' : '—';
-  if (esPlazaVacante(p, anonVac)) return buildFilaVacante(p, rolTxt, turnoTxt);
+  if (esPlazaVacante(p, anonVac)) return buildFilaVacante(p, rolHtml, turnoTxt);
   var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-activo' : 'pill-inactivo') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>' +
     (p.plaza_vacante && !p.activo ? ' <span class="pill pill-vacante" title="Esta baja dejó la plaza como vacante">plaza vacante</span>' : '');
   var lockerChip = p.locker
@@ -2289,7 +2326,7 @@ function buildPersonalRow(p, anonVac) {
     '<td>' + (p.telefono ? escHtml(p.telefono) : '—') + '</td>' +
     '<td>' + (p.fecha_inicio ? escHtml(p.fecha_inicio) : '—') + '</td>' +
     '<td>' + (p.talla_uniforme ? escHtml(p.talla_uniforme) : '—') + '</td>' +
-    '<td>' + escHtml(rolTxt) + '</td>' +
+    '<td>' + rolHtml + '</td>' +
     '<td>' + escHtml(turnoTxt) + '</td>' +
     '<td>' + estadoBadge + '</td>' +
     '<td>' + lockerChip + '</td>' +
