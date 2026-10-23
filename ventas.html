@@ -528,17 +528,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="kpi-s" id="kpiCli1Sub">—</div>
       </div>
     </div>
-    <!-- barómetro de baja de consumo — visible solo al comparar con mes anterior -->
-    <div id="cliBarometro" style="display:none;margin-bottom:12px;border:1px solid var(--border);border-radius:8px;overflow:hidden"></div>
     <div class="tbl-wrap">
       <div class="tbl-head">
         <div><div class="tbl-head-t">Ventas por cliente</div><div class="tbl-head-s" id="cliSub">—</div></div>
+        <div id="cliAntLeyenda" style="display:none;font-size:10px;color:var(--gray);align-self:flex-end;padding-bottom:2px">Valor gris = mes anterior</div>
       </div>
       <div class="tbl-scroll">
         <table class="tbl">
           <thead><tr>
             <th>#</th><th>Cliente</th>
-            <th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th><th class="num">Facturas</th><th class="num">Δ vs mes ant.</th>
+            <th class="num">Quetzales</th><th class="num">% periodo</th><th class="num">Unidades</th><th class="num">Facturas</th><th style="width:22px"></th>
           </tr></thead>
           <tbody id="cliBody"><tr class="empty-row"><td colspan="7">Cargando…</td></tr></tbody>
         </table>
@@ -890,7 +889,8 @@ function renderChart() {
 }
 
 var PROD_CLIENTES_MAP = {}; // { sku: { clientes: {cli: {q,u}}, desc: str } }
-var CLI_PRODS_MAP = {};    // { cliente: { sku: { q, u, desc } } }
+var CLI_PRODS_MAP = {};     // { cliente: { sku: { q, u, desc } } } — mes actual
+var CLI_PRODS_MAP_ANT = {}; // idem mes anterior
 
 // Algunos SKUs de facturación son el SKU base + un dígito sufijo (ej. 10025 → 100251/100252…).
 // Dado un SKU, devuelve el "base" quitando el último carácter si termina en dígito.
@@ -1367,40 +1367,87 @@ function toggleCliDetalle(rowId) {
 
 function buildCliDetalleHtml(nombre, totalCli) {
   var prods = CLI_PRODS_MAP[nombre];
+  var prodsAnt = CLI_PRODS_MAP_ANT[nombre] || {};
   if (!prods || !Object.keys(prods).length)
     return '<div style="font-size:11px;color:#94a3b8;padding:4px 0">Sin detalle en este periodo</div>';
-  var skus = Object.keys(prods).sort(function(a,b){ return prods[b].q - prods[a].q; }).slice(0, 5);
+  var hasAnt = Object.keys(prodsAnt).length > 0;
+  // Unión de SKUs de ambos meses, ordenados por Q actual desc
+  var skusAct = Object.keys(prods).sort(function(a,b){ return prods[b].q - prods[a].q; });
+  var skusExtra = Object.keys(prodsAnt).filter(function(s){ return !prods[s]; }).sort(function(a,b){ return prodsAnt[b].q - prodsAnt[a].q; });
+  var skus = skusAct.concat(skusExtra).slice(0, 8);
   return skus.map(function(sku, i) {
-    var d = prods[sku];
-    var pct = totalCli > 0 ? d.q / totalCli * 100 : 0;
-    return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #f1f5f9">' +
+    var d = prods[sku] || null;
+    var dA = prodsAnt[sku] || null;
+    var q = d ? d.q : 0;
+    var u = d ? d.u : 0;
+    var desc = (d || dA).desc;
+    var pct = totalCli > 0 ? q / totalCli * 100 : 0;
+    var deltaQ = (dA && dA.q > 0) ? (q - dA.q) / dA.q * 100 : null;
+    var dcolor = deltaQ !== null ? (deltaQ >= 0 ? '#10b981' : '#ef4444') : null;
+    var darrow = deltaQ !== null ? (deltaQ >= 0 ? '▲' : '▼') : '';
+    var qColor = d ? 'var(--ven)' : '#94a3b8';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9">' +
       '<div style="font-size:10px;color:#94a3b8;width:14px;text-align:right;flex-shrink:0">' + (i+1) + '</div>' +
       '<div style="flex:1;min-width:0">' +
         '<div style="font-family:var(--mono);font-size:9px;color:#94a3b8;line-height:1.1">' + escHtml(sku) + '</div>' +
-        '<div style="font-size:11px;color:#1e293b;font-weight:500;word-break:break-word">' + escHtml(d.desc) + '</div>' +
+        '<div style="font-size:11px;color:#1e293b;font-weight:500;word-break:break-word">' + escHtml(desc) + (d ? '' : ' <span style="font-size:9px;color:#94a3b8">(solo mes ant.)</span>') + '</div>' +
       '</div>' +
-      '<div style="font-size:11px;font-weight:600;color:var(--ven);white-space:nowrap">' + fmtQ(d.q) + '</div>' +
-      '<div style="font-size:10px;color:#64748b;width:56px;text-align:right;white-space:nowrap">' + fmtU(d.u) + ' und</div>' +
-      '<div style="font-size:11px;font-weight:700;color:var(--ven);width:38px;text-align:right">' + fmtPct(pct) + '</div>' +
+      '<div style="text-align:right;flex-shrink:0">' +
+        '<div style="font-size:11px;font-weight:600;color:' + qColor + ';white-space:nowrap">' + fmtQ(q) + '</div>' +
+        (dA ? '<div style="font-size:9px;color:#94a3b8;font-family:var(--mono);white-space:nowrap">' + fmtQ(dA.q) + (deltaQ !== null ? ' <span style="color:' + dcolor + '">' + darrow + fmtPct(Math.abs(deltaQ)) + '</span>' : '') + '</div>' : '') +
+      '</div>' +
+      '<div style="text-align:right;flex-shrink:0;min-width:52px">' +
+        '<div style="font-size:10px;color:#64748b;white-space:nowrap">' + fmtU(u) + ' und</div>' +
+        (dA ? '<div style="font-size:9px;color:#94a3b8;white-space:nowrap">' + fmtU(dA.u) + '</div>' : '') +
+      '</div>' +
+      '<div style="font-size:11px;font-weight:700;color:var(--ven);width:36px;text-align:right;flex-shrink:0">' + (pct > 0 ? fmtPct(pct) : '—') + '</div>' +
     '</div>';
   }).join('');
 }
 
-function buildCliRow(rowId, idx, nombre, dat, total, qAntMap) {
+function buildCliRow(rowId, idx, nombre, dat, total, qAntMap, totalAnt) {
   var pct = total > 0 ? dat.q / total * 100 : 0;
-  var delta = qAntMap === null ? null : (qAntMap[nombre] ? qAntMap[nombre].q : 0);
+  var antDat = qAntMap && qAntMap[nombre] ? qAntMap[nombre] : null;
+  var antQ = antDat ? antDat.q : null;
+  var antU = antDat ? antDat.u : null;
+  var antF = antDat ? Object.keys(antDat.facturas).length : null;
+  var antPct = (antDat && totalAnt > 0) ? antDat.q / totalAnt * 100 : null;
+
+  function antSub(content) {
+    return qAntMap !== null && content !== null
+      ? '<div style="font-size:9px;color:#94a3b8;margin-top:1px;font-family:var(--mono)">' + content + '</div>'
+      : '';
+  }
+
+  var qSubHtml = '';
+  if (qAntMap !== null && antQ !== null) {
+    if (antQ === 0) {
+      qSubHtml = antSub('—');
+    } else {
+      var dpct = (dat.q - antQ) / antQ * 100;
+      var dcolor2 = dpct >= 0 ? '#10b981' : '#ef4444';
+      var darrow2 = dpct >= 0 ? '▲' : '▼';
+      qSubHtml = '<div style="font-size:9px;margin-top:1px;font-family:var(--mono)">' +
+        '<span style="color:#94a3b8">' + fmtQ(antQ) + '</span>' +
+        ' <span style="color:' + dcolor2 + '">' + darrow2 + fmtPct(Math.abs(dpct)) + '</span>' +
+        '</div>';
+    }
+  } else if (qAntMap !== null) {
+    qSubHtml = antSub('nuevo');
+  }
+
   return '<tr id="cliRow-' + rowId + '" data-nombre="' + escHtml(nombre) + '" data-q="' + dat.q + '" onclick="toggleCliDetalle(' + rowId + ')" style="cursor:pointer"' +
     ' onmouseenter="this.style.background=\'#eff6ff\';this.firstElementChild.style.borderLeftColor=\'var(--ven)\'"' +
     ' onmouseleave="this.style.background=\'\';this.firstElementChild.style.borderLeftColor=\'transparent\'">' +
     '<td class="pct-cell" style="border-left:3px solid transparent;transition:border-color .15s">' + idx + '</td>' +
     '<td class="desc-cell" title="' + escHtml(nombre) + '">' + escHtml(nombreCorto(nombre)) +
     '<div class="mini-bar"><i style="width:' + Math.min(100, Math.round(pct)) + '%"></i></div></td>' +
-    '<td class="num">' + fmtQ(dat.q) + '</td>' +
-    '<td class="num pct-cell">' + fmtPct(pct) + '</td>' +
-    '<td class="num">' + fmtU(dat.u) + '</td>' +
-    '<td class="num">' + Object.keys(dat.facturas).length + '</td>' +
-    '<td class="num">' + (qAntMap === null ? '<span class="pct-cell">—</span>' : deltaHtml(dat.q, delta)) +
-      ' <span id="cliArr-' + rowId + '" style="font-size:10px;color:#cbd5e1;margin-left:4px">▾</span></td>' +
+    '<td class="num">' + fmtQ(dat.q) + qSubHtml + '</td>' +
+    '<td class="num pct-cell">' + fmtPct(pct) + antSub(antPct !== null ? fmtPct(antPct) : null) + '</td>' +
+    '<td class="num">' + fmtU(dat.u) + antSub(antU !== null ? fmtU(antU) : null) + '</td>' +
+    '<td class="num">' + Object.keys(dat.facturas).length + antSub(antF !== null ? antF + '' : null) + '</td>' +
+    '<td class="num" style="width:22px;padding-right:8px">' +
+      '<span id="cliArr-' + rowId + '" style="font-size:10px;color:#cbd5e1">▾</span></td>' +
     '</tr>' +
     '<tr id="cliDet-' + rowId + '" style="display:none">' +
       '<td colspan="7" style="padding:8px 12px 12px 28px;background:#f8fafc;border-bottom:1px solid var(--border)"></td>' +
@@ -1413,11 +1460,10 @@ function renderClientes() {
   var porCli = agrupar(filas, function (v) { return v.cliente || '—'; });
   var noms = Object.keys(porCli).sort(function (a, b) { return porCli[b].q - porCli[a].q; });
 
-  // Construir mapa cliente → productos para el detalle expandible
+  // Construir mapa cliente → productos (mes actual y anterior) para el detalle expandible
   CLI_PRODS_MAP = {};
   filas.forEach(function(v) {
-    var cli = v.cliente || '—';
-    var sku = (v.sku || '—').trim();
+    var cli = v.cliente || '—', sku = (v.sku || '—').trim();
     if (!CLI_PRODS_MAP[cli]) CLI_PRODS_MAP[cli] = {};
     if (!CLI_PRODS_MAP[cli][sku]) CLI_PRODS_MAP[cli][sku] = { q: 0, u: 0, desc: v.descripcion || sku };
     CLI_PRODS_MAP[cli][sku].q += v.total_quetzales;
@@ -1427,6 +1473,19 @@ function renderClientes() {
   var ant = mesSel === 'todo' ? null : mesAnterior(mesSel);
   var filasAntRaw = ant ? filasDelPeriodo(ant) : null;
   var qAntMap = filasAntRaw ? agrupar(filasAntRaw, function (v) { return v.cliente || '—'; }) : null;
+  var totalAnt = filasAntRaw ? totalQ(filasAntRaw) : 0;
+
+  CLI_PRODS_MAP_ANT = {};
+  if (filasAntRaw) filasAntRaw.forEach(function(v) {
+    var cli = v.cliente || '—', sku = (v.sku || '—').trim();
+    if (!CLI_PRODS_MAP_ANT[cli]) CLI_PRODS_MAP_ANT[cli] = {};
+    if (!CLI_PRODS_MAP_ANT[cli][sku]) CLI_PRODS_MAP_ANT[cli][sku] = { q: 0, u: 0, desc: v.descripcion || sku };
+    CLI_PRODS_MAP_ANT[cli][sku].q += v.total_quetzales;
+    CLI_PRODS_MAP_ANT[cli][sku].u += v.total_unidades;
+  });
+
+  var leyenda = document.getElementById('cliAntLeyenda');
+  if (leyenda) leyenda.style.display = ant ? '' : 'none';
 
   document.getElementById('kpiCliN').textContent = noms.length;
   var top3 = 0;
@@ -1443,104 +1502,9 @@ function renderClientes() {
   document.getElementById('cliSub').textContent = mesLabel(mesSel) + ' · ' + noms.length + ' clientes';
 
   var html = '';
-  noms.forEach(function (n, i) { html += buildCliRow(i + 1, i + 1, n, porCli[n], total, qAntMap); });
+  noms.forEach(function (n, i) { html += buildCliRow(i + 1, i + 1, n, porCli[n], total, qAntMap, totalAnt); });
   document.getElementById('cliBody').innerHTML = html ||
     '<tr class="empty-row"><td colspan="7">Sin clientes en este periodo</td></tr>';
-
-  renderBarometroClientes(filas, filasAntRaw);
-}
-
-function renderBarometroClientes(filasAct, filasAnt) {
-  var el = document.getElementById('cliBarometro');
-  if (!el) return;
-  if (!filasAnt || filasAnt.length === 0) { el.style.display = 'none'; return; }
-
-  // Agrupar por cliente+SKU para ambos meses
-  var prodsAct = {}, prodsAnt = {};
-  filasAct.forEach(function(v) {
-    var cli = v.cliente || '—', sku = (v.sku || '—').trim();
-    if (!prodsAct[cli]) prodsAct[cli] = {};
-    if (!prodsAct[cli][sku]) prodsAct[cli][sku] = { q: 0, desc: v.descripcion || sku };
-    prodsAct[cli][sku].q += v.total_quetzales;
-  });
-  filasAnt.forEach(function(v) {
-    var cli = v.cliente || '—', sku = (v.sku || '—').trim();
-    if (!prodsAnt[cli]) prodsAnt[cli] = {};
-    if (!prodsAnt[cli][sku]) prodsAnt[cli][sku] = { q: 0, desc: v.descripcion || sku };
-    prodsAnt[cli][sku].q += v.total_quetzales;
-  });
-
-  // Totales por cliente
-  var totAct = {}, totAnt = {};
-  Object.keys(prodsAct).forEach(function(c) { totAct[c] = 0; Object.keys(prodsAct[c]).forEach(function(s) { totAct[c] += prodsAct[c][s].q; }); });
-  Object.keys(prodsAnt).forEach(function(c) { totAnt[c] = 0; Object.keys(prodsAnt[c]).forEach(function(s) { totAnt[c] += prodsAnt[c][s].q; }); });
-
-  // Clientes que bajaron vs mes anterior
-  var bajaron = [];
-  Object.keys(prodsAnt).forEach(function(cli) {
-    var qA = totAnt[cli] || 0, qN = totAct[cli] || 0;
-    if (qA > 0 && qN < qA) {
-      var pct = (qN - qA) / qA * 100;
-      // Productos que bajaron en este cliente
-      var skusDiffs = [];
-      var allSkus = {};
-      Object.keys(prodsAnt[cli]).forEach(function(s) { allSkus[s] = true; });
-      if (prodsAct[cli]) Object.keys(prodsAct[cli]).forEach(function(s) { allSkus[s] = true; });
-      Object.keys(allSkus).forEach(function(sku) {
-        var qSA = (prodsAnt[cli] && prodsAnt[cli][sku]) ? prodsAnt[cli][sku].q : 0;
-        var qSN = (prodsAct[cli] && prodsAct[cli][sku]) ? prodsAct[cli][sku].q : 0;
-        if (qSN < qSA) {
-          var desc = (prodsAnt[cli] && prodsAnt[cli][sku]) ? prodsAnt[cli][sku].desc :
-                     ((prodsAct[cli] && prodsAct[cli][sku]) ? prodsAct[cli][sku].desc : sku);
-          skusDiffs.push({ sku: sku, desc: desc, qAnt: qSA, qAct: qSN, diff: qSN - qSA });
-        }
-      });
-      skusDiffs.sort(function(a, b) { return a.diff - b.diff; }); // mayor caída primero
-      bajaron.push({ cli: cli, qAnt: qA, qAct: qN, pct: pct, diff: qN - qA, skusDiffs: skusDiffs.slice(0, 4) });
-    }
-  });
-
-  if (bajaron.length === 0) { el.style.display = 'none'; return; }
-  bajaron.sort(function(a, b) { return a.diff - b.diff; }); // mayor caída absoluta primero
-
-  var html = '<div style="padding:8px 14px 7px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:#fef2f2">' +
-    '<span style="font-size:11px;font-weight:800;color:#dc2626;letter-spacing:.3px;text-transform:uppercase">▼ Baja de consumo</span>' +
-    '<span style="font-size:11px;color:#b91c1c">' + bajaron.length + ' cliente' + (bajaron.length !== 1 ? 's' : '') + ' compraron menos que el mes anterior</span>' +
-    '</div>' +
-    '<div style="display:flex;flex-wrap:wrap;gap:10px;padding:12px 14px">';
-
-  bajaron.forEach(function(item) {
-    var pctStr = fmtPct(item.pct); // negative already
-    var prodsHtml = item.skusDiffs.map(function(p) {
-      var pctSku = p.qAnt > 0 ? (p.diff / p.qAnt * 100) : -100;
-      var descCorta = p.desc.length > 36 ? p.desc.substring(0, 36) + '…' : p.desc;
-      return '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:4px 0;border-top:1px solid var(--border)">' +
-        '<div style="flex:1;min-width:0">' +
-          '<div style="font-size:10px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(p.desc) + '">' + escHtml(descCorta) + '</div>' +
-          '<div style="font-size:9px;color:var(--gray);font-family:monospace;margin-top:1px">' + escHtml(p.sku) + '</div>' +
-        '</div>' +
-        '<div style="text-align:right;flex-shrink:0">' +
-          '<div style="font-size:11px;font-weight:700;color:#dc2626;font-family:monospace">' + fmtPct(pctSku) + '</div>' +
-          '<div style="font-size:9px;color:#94a3b8;font-family:monospace">−' + fmtQ(Math.abs(p.diff)) + '</div>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-
-    html += '<div style="flex:1;min-width:200px;max-width:320px;border:1px solid #fca5a5;border-top:3px solid #dc2626;border-radius:6px;padding:10px 12px;background:#fff">' +
-      '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:3px">' +
-        '<div style="font-size:12px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(item.cli) + '">' + escHtml(nombreCorto(item.cli)) + '</div>' +
-        '<div style="font-size:17px;font-weight:800;color:#dc2626;font-family:monospace;flex-shrink:0">' + pctStr + '</div>' +
-      '</div>' +
-      '<div style="font-size:10px;color:var(--gray);font-family:monospace;margin-bottom:8px">' +
-        fmtQ(item.qAnt) + ' → ' + fmtQ(item.qAct) + '<span style="color:#dc2626"> −' + fmtQ(Math.abs(item.diff)) + '</span>' +
-      '</div>' +
-      prodsHtml +
-    '</div>';
-  });
-
-  html += '</div>';
-  el.innerHTML = html;
-  el.style.display = '';
 }
 
 // ════════════════════════════════════════════════════════════════
