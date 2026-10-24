@@ -1960,16 +1960,25 @@ async function confirmarBorrar(id) {
   const s = solicitudes.find(x => x.id === id);
   if (s?.dbId) {
     try {
-      await db.from('solicitud_lineas').delete().eq('solicitud_id', s.dbId);
-      await db.from('solicitudes').delete().eq('id', s.dbId);
+      const rl = await db.from('solicitud_lineas').delete().eq('solicitud_id', s.dbId);
+      if (rl.error) throw rl.error;
+      const rs = await db.from('solicitudes').delete().eq('id', s.dbId).select('id');
+      if (rs.error) throw rs.error;
+      if (!(rs.data || []).length) throw new Error('sin permiso para eliminar (solo master)');
       solicitudes = solicitudes.filter(x => x.id !== id);
+      lotesTapas = lotesTapas.filter(l => l.solicitud_id !== id); // sus lotes caen con la ficha
+      // Se repinta TODO lo que muestra fichas, sin recargar la página: lista, KPIs, Fichas de Trabajo, alertas y entregados
       renderListas();
+      refreshKPIs();
+      renderInicioPedidosTapas();
       document.getElementById('detTapas').innerHTML = '<div class="det-empty"><div class="det-empty-ico">🗑️</div><div class="det-empty-txt">Solicitud eliminada</div></div>';
       showToast('🗑 Solicitud eliminada');
       selId = null;
       cerrarFichaTapas();
     } catch(e) {
-      showToast('❌ Error al eliminar', '#B83232');
+      console.error('confirmarBorrar:', e);
+      showToast('❌ No se pudo eliminar: ' + (e.message || e), '#B83232');
+      cargarSolicitudes(); // vuelve a mostrar el estado real (por si las líneas ya se habían borrado)
     }
   }
 }
