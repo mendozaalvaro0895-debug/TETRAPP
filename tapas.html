@@ -2004,6 +2004,46 @@ var COMP_FORM = [
 // se copian sus componentes (Base/Contratapa/Liner/Banda) y procesos de la ficha MÁS RECIENTE de ese mismo
 // cliente + SKU. Todo queda editable; solo corre en solicitudes nuevas y nunca pisa lo que el usuario ya
 // tocó (si cambia el cliente o el producto, se descarta lo autorrellenado y se vuelve a buscar).
+//
+// RESPALDO: si ese cliente nunca había pedido ese SKU (o la ficha se eliminó), se usa la RECETA guardada en el
+// Recetario para ese SKU (sku_recetas area 'tapas': Base, Contratapa/Liner/Banda y procesos) — así cada receta que
+// quedó guardada sigue sirviendo de molde para los pedidos nuevos. La ficha del mismo cliente tiene prioridad
+// porque es más específica (logos, tamaños); la receta es general del SKU.
+var recetasTapas = {}; // sku → [{tipo, codigo, nota, orden}]
+async function cargarRecetasTapas() {
+  try {
+    var r = await db.from('sku_recetas').select('sku_fact,sku_receta_partes(tipo,codigo,nota,orden)').eq('area', 'tapas').limit(3000);
+    if (r.error) return;
+    var out = {};
+    (r.data || []).forEach(function(x) {
+      var partes = (x.sku_receta_partes || []).slice().sort(function(a, b) { return (a.orden || 0) - (b.orden || 0); });
+      if (x.sku_fact && partes.length) out[String(x.sku_fact)] = partes;
+    });
+    recetasTapas = out;
+  } catch(e) { /* sin Recetario: solo se autorrellena desde fichas */ }
+}
+
+// Receta del SKU convertida al formato del formulario: { comp:{base,contratapa,liner,banda}, procs:['armado',…] } o null
+function recetaComoFuente(sku) {
+  var partes = recetasTapas[String(sku)];
+  if (!partes || !partes.length) return null;
+  var comp = {}, procs = [];
+  function codSku(c) { return String(c || '').split(' - ')[0].trim(); }
+  partes.forEach(function(p) {
+    if (p.tipo === 'base') comp.base = codSku(p.codigo);
+    else if (p.tipo === 'accesorio') {
+      var rol = normBusqueda(p.nota || '');
+      if (rol === 'contratapa' || rol === 'liner' || rol === 'banda') comp[rol] = codSku(p.codigo);
+    } else if (p.tipo === 'proceso') {
+      var nom = normBusqueda(codSku(p.codigo));
+      var pr = ALL_PROCS_TAPAS.find(function(x) { return normBusqueda(x.lbl) === nom; });
+      if (pr && procs.indexOf(pr.val) < 0) procs.push(pr.val);
+    }
+  });
+  if (!Object.keys(comp).length && !procs.length) return null;
+  return { comp: comp, procs: procs, etiqueta: 'Recetario', origen: 'receta' };
+}
+
 function fichaPreviaDe(cliente, sku) {
   var cand = solicitudes.filter(function(x) {
     return x.cliente === cliente && x.lineas.some(function(l) { return l.sku === sku; });
@@ -2017,15 +2057,19 @@ function autorrellenarDesdeFichas(cambioCliente) {
   var l = lineas[0];
   if (!l) return;
   if (l.autoDe) { // descartar lo que se había autorrellenado antes (otro cliente u otro producto)
-    l.comp = {}; l.procs = []; l.procsAuto = []; l.sugVistas = {}; l.tocados = {}; l.autoDe = '';
+    l.comp = {}; l.procs = []; l.procsAuto = []; l.sugVistas = {}; l.tocados = {}; l.autoDe = ''; l.autoOrigen = '';
   }
   var cliente = document.getElementById('fCli').value;
-  if (!cliente || !l.sku) { if (cambioCliente) renderLineas(); return; }
+  if (!l.sku) { if (cambioCliente) renderLineas(); return; }
   var tocado = Object.keys(l.tocados || {}).length > 0 || COMP_FORM.some(function(c) { return compDe(l, c.k).sku; });
   if (tocado) { if (cambioCliente) renderLineas(); return; } // el usuario ya empezó a llenar: no se pisa
-  var prev = fichaPreviaDe(cliente, l.sku);
-  if (!prev) { if (cambioCliente) renderLineas(); return; }
-  var comp = { base: prev.l.skuBase, contratapa: prev.l.skuContratapa, liner: prev.l.skuLiner, banda: prev.l.skuBanda };
+  var prev = cliente ? fichaPreviaDe(cliente, l.sku) : null;
+  var fuente = null;
+  if (prev) fuente = { comp: { base: prev.l.skuBase, contratapa: prev.l.skuContratapa, liner: prev.l.skuLiner, banda: prev.l.skuBanda },
+                       procs: prev.l.procs || [], etiqueta: prev.s.id_display || String(prev.s.id).slice(0, 8), origen: 'ficha' };
+  else fuente = recetaComoFuente(l.sku);
+  if (!fuente) { if (cambioCliente) renderLineas(); return; }
+  var comp = fuente.comp;
   var algo = false;
   COMP_FORM.forEach(function(c) {
     var sku = String(comp[c.k] || '').trim();
@@ -2035,7 +2079,7 @@ function autorrellenarDesdeFichas(cambioCliente) {
     l.comp[c.k] = { sku: sku, desc: item.descripcion || '', ex: item.existencia || 0 };
     algo = true;
   });
-  var procs = (prev.l.procs || []).slice();
+  var procs = (fuente.procs || []).slice();
   if (procs.length) {
     l.procs = procs;
     procs.forEach(function(p) { l.tocados[p] = true; }); // lo copiado no lo mueve un componente
@@ -2044,7 +2088,7 @@ function autorrellenarDesdeFichas(cambioCliente) {
   if (l.comp.base || l.comp.contratapa) l.sugVistas.armado = true;
   if (l.comp.liner) l.sugVistas.liner = true;
   if (l.comp.banda) l.sugVistas.banda = true;
-  if (algo) l.autoDe = prev.s.id_display || String(prev.s.id).slice(0, 8);
+  if (algo) { l.autoDe = fuente.etiqueta; l.autoOrigen = fuente.origen; }
   if (cambioCliente) { renderLineas(); calcular(); }
 }
 
@@ -2260,6 +2304,7 @@ function setPlazoForm(t) {
 
 function abrirForm() {
   editandoFichaId = null;
+  cargarRecetasTapas(); // refresca en segundo plano las recetas del Recetario (autorrelleno)
   document.getElementById('mTitle').textContent = 'Nueva solicitud · Tapas';
   document.getElementById('btnSave').textContent = 'Guardar';
   cargarInsumosB7(); // refresca el stock de B7 en segundo plano
@@ -2424,7 +2469,9 @@ function renderLineas(focusId) {
           + '<select class="fs" style="font-size:12px;padding:5px 8px" onchange="setTipoLinea(this.value)"><option value=""' + (l.tipo ? '' : ' selected') + '>' + TIPO_SIN_CLASIFICAR + '</option>' + opts + '<option value="__otro__">＋ Otro tipo…</option><option value="__quitar__">－ Quitar un tipo…</option></select>'
           + '<span class="lin-stk">' + nota + '</span></div>';
       })()
-    + (l.autoDe ? '<div class="lin-auto">↺ Rellenado con la ficha <b>' + escHtml(l.autoDe) + '</b> (misma tapa y mismo cliente): revisa y cambia lo que haga falta</div>' : '')
+    + (l.autoDe ? (l.autoOrigen === 'receta'
+        ? '<div class="lin-auto">↺ Rellenado con la <b>receta guardada en el Recetario</b> para este SKU (este cliente aún no lo había pedido): revisa y cambia lo que haga falta</div>'
+        : '<div class="lin-auto">↺ Rellenado con la ficha <b>' + escHtml(l.autoDe) + '</b> (misma tapa y mismo cliente): revisa y cambia lo que haga falta</div>') : '')
     + '<div class="lin-comp-title">Componentes <span>(opcionales)</span></div>'
     + COMP_FORM.map(function(c) { return buildCompRow(l, c); }).join('')
     + '<div class="lin-comp-title">Procesos <span>(los componentes sugieren Armado/Liner/Banda; todos se pueden marcar o quitar)</span></div>'
@@ -2896,6 +2943,7 @@ async function ofrecerRecetaDeFicha(sku, desc, partes) {
     var ip = await db.from('sku_receta_partes').insert(filas);
     if (ip.error) throw ip.error;
     showToast('📖 Receta de ' + sku + ' enviada al Recetario (pendiente de revisión)');
+    cargarRecetasTapas();
   } catch(e) {
     console.warn('ofrecerRecetaDeFicha:', e);
     showToast('No se pudo enviar la receta al Recetario: ' + (e.message || e), '#92400e');
@@ -2972,6 +3020,7 @@ async function recetaConflictoElegir(opcion) {
     }
     await db.from('sku_recetas').update({ guardado: false }).eq('id', c.recetaId); // vuelve a "Pendientes" para revisión
     showToast('📖 Receta de ' + c.sku + ' reemplazada por la de la ficha (pendiente de revisión)');
+    cargarRecetasTapas();
   } catch(e) {
     console.warn('recetaConflictoElegir:', e);
     showToast('No se pudo actualizar la receta: ' + (e.message || e), '#92400e');
@@ -5233,6 +5282,7 @@ async function init() {
   await cargarPersonal();
   await cargarFeriados();
   await cargarTiposTapa();
+  await cargarRecetasTapas();
   await cargarSolicitudes();
   await cargarMovimientos(); // alimenta el bloque "Entregados" del Inicio
   await cargarRechazos();
