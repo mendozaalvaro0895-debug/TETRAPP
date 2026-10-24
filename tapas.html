@@ -1975,6 +1975,10 @@ async function confirmarBorrar(id) {
       showToast('🗑 Solicitud eliminada');
       selId = null;
       cerrarFichaTapas();
+      // La RECETA no depende de la ficha: queda en el Recetario aunque se elimine. Si ese SKU aún no tiene receta con partes
+      // (o la ficha era distinta de la guardada) se ofrece guardarla/compararla ahora, para no perder lo que enseñó.
+      var l0 = s.lineas && s.lineas[0];
+      if (l0 && l0.sku) ofrecerRecetaDeFicha(l0.sku, l0.desc, partesRecetaDeFicha(s));
     } catch(e) {
       console.error('confirmarBorrar:', e);
       showToast('❌ No se pudo eliminar: ' + (e.message || e), '#B83232');
@@ -2822,6 +2826,27 @@ function construirPartesReceta(linea, l) {
   });
   ALL_PROCS_TAPAS.forEach(function(p) {
     if ((linea.procesos || []).indexOf(p.val) >= 0) partes.push({ tipo: 'proceso', codigo: p.lbl, nota: null });
+  });
+  return partes;
+}
+
+// Receta de una ficha YA GUARDADA (sin formulario abierto): se usa al eliminarla para no perder lo que enseñó.
+// Mismo formato que construirPartesReceta: "SKU - descripción" tomada del catálogo (B2; Liner/Banda de Bodega 7).
+function partesRecetaDeFicha(s) {
+  var l0 = (s && s.lineas && s.lineas[0]) || null;
+  if (!l0) return [];
+  var partes = [];
+  function cod(sku, b7) {
+    var it = b7 ? insumosB7Cache.find(function(i) { return i.sku === sku; }) : invB2DeTapas(sku);
+    var d = it ? (it.descripcion || '') : '';
+    return sku + (d ? ' - ' + d : '');
+  }
+  if (l0.skuBase) partes.push({ tipo: 'base', codigo: cod(l0.skuBase, false), nota: null });
+  [['contratapa', l0.skuContratapa, false], ['liner', l0.skuLiner, true], ['banda', l0.skuBanda, true]].forEach(function(c) {
+    if (c[1]) partes.push({ tipo: 'accesorio', codigo: cod(c[1], c[2]), nota: ROL_ACCESORIO_RECETA[c[0]] });
+  });
+  ALL_PROCS_TAPAS.forEach(function(p) {
+    if ((l0.procs || []).indexOf(p.val) >= 0) partes.push({ tipo: 'proceso', codigo: p.lbl, nota: null });
   });
   return partes;
 }
