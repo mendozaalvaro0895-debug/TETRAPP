@@ -378,6 +378,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-pc{border:1.5px solid #2563EB;background:#EFF6FF;border-radius:10px;padding:6px 9px;cursor:pointer}
 .cp-pc-t{display:flex;justify-content:space-between;gap:6px;font-size:11px;font-weight:800;color:#1E3A8A}
 .cp-pc-t b{font-family:var(--mono)}
+.cp-nota{margin-top:6px;padding:5px 8px;background:#FEF9C3;border:1px solid #FDE047;border-left-width:4px;border-radius:7px;font-size:11.5px;line-height:1.35;color:#713F12;white-space:pre-line;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.cp-nota b{font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;color:#A16207;margin-right:4px}
+.cp-chip.open .cp-nota{-webkit-line-clamp:unset;display:block}
+.cp-nota.full{-webkit-line-clamp:unset;display:block}
 .cp-urg{font-style:normal;font-size:9.5px;font-weight:800;color:#B83232;background:#FEE2E2;border-radius:6px;padding:1px 6px;margin-right:3px}
 .cp-tipo-h.urg{background:#FEE2E2;border-color:#B83232}
 .cp-tipo-h.urg .cp-tipo-n{color:#B83232}
@@ -1789,6 +1793,7 @@ async function mostrarDetalle(id) {
   const filasBod = filasBodegaFicha(s, movsFicha);
   bodegaFilasFicha[s.id] = filasBod;
   const cuerpo = `
+      ${s.notas ? `<div class="dc" style="border-color:#FDE047;border-width:2px"><div class="dc-h" style="background:#FEF9C3;color:#A16207">📝 Notas</div><div class="dc-b" style="white-space:pre-line;background:#FFFDF0">${escHtml(s.notas)}</div></div>` : ''}
       ${buildBloqueBodegaFicha(s, filasBod)}
       ${lotesAbiertosPlazoHtml(s)}
       ${bloqueTiempo}
@@ -1816,8 +1821,7 @@ async function mostrarDetalle(id) {
       </div>
 
       ${bloqueProgreso}
-
-      ${s.notas ? `<div class="dc"><div class="dc-h">Notas</div><div class="dc-b">${escHtml(s.notas)}</div></div>` : ''}`;
+`;
 
   if (enModal) {
     document.getElementById('fichaTitulo').innerHTML = titulo;
@@ -3967,6 +3971,13 @@ function stkPTHtml(sku, falta) {
   return t ? stkPTBarra(t) : '';
 }
 
+// NOTAS de la ficha (ahí se anotan las entregas y los parciales): se muestran SIEMPRE en el chip, hasta 3 líneas
+// (la ventana de la ficha las trae completas). Texto escapado; los saltos de línea se respetan.
+function notaChipHtml(notas, full) {
+  var t = String(notas || '').trim();
+  return t ? '<div class="cp-nota' + (full ? ' full' : '') + '" title="' + escHtml(t) + '"><b>📝 Notas</b>' + escHtml(t) + '</div>' : '';
+}
+
 function buildChipCompacto(x, conCliente) {
   var enProc = x.abiertos.length > 0;
   var idq = escHtml(String(x.id));
@@ -3975,6 +3986,7 @@ function buildChipCompacto(x, conCliente) {
     + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
     + stkPTHtml(x.sku, x.saldo)
+    + notaChipHtml(x.s.notas)
     + '<div class="cp-resum">' + (enProc ? '<span class="cp-res-b proc">▶ ' + x.enProc.toLocaleString() + ' en proceso</span>' : '') + componentesResumenHtml(x.s) + '</div>'
     + '<div class="cp-more">'
     +   '<div class="cp-chip-s">' + (enProc ? '▶ ' + x.enProc.toLocaleString() + ' en proceso' : 'de ' + x.cant.toLocaleString() + (x.ent ? ' · ent. ' + x.ent.toLocaleString() : '')) + '</div>'
@@ -4047,6 +4059,7 @@ function renderFichasCompactasTapas() {
       + '<div class="cp-pc-t"><span>' + escHtml(p.x.cliente) + ' · ' + escHtml(p.x.codigo) + limiteCompactoHtml(p.x.s) + '</span><b>' + p.l.cantidad.toLocaleString() + '</b></div>'
       + '<div class="cp-pc-d">' + escHtml(p.x.desc) + '</div>'
       + (p.l.tareas.length ? '<div class="cp-pc-p">' + tareasResumenCompacto(p.l.tareas) + '</div>' : '')
+      + notaChipHtml(p.x.s.notas)
       + '<div class="cp-bar"><i style="width:' + pct + '%"></i></div></div>';
   }).join('') + '</div>' : '';
 

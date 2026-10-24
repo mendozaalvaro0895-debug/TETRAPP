@@ -395,6 +395,10 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
   .exito-ico{font-size:46px}
   .toast-msg{white-space:normal;max-width:90vw;text-align:center;bottom:84px}
 }
+.ped-nota{margin-top:6px;padding:5px 8px;background:#FEF9C3;border:1px solid #FDE047;border-left-width:4px;border-radius:7px;font-size:11.5px;line-height:1.35;color:#713F12;white-space:pre-line;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ped-nota b{font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;color:#A16207;margin-right:4px}
+.ped-chip.open .ped-nota{-webkit-line-clamp:unset;display:block}
+.ped-nota.full{-webkit-line-clamp:unset;display:block}
 .ped-urg{font-style:normal;font-size:9.5px;font-weight:800;color:#B83232;background:#FEE2E2;border-radius:6px;padding:1px 6px;margin-right:3px}
 .ped-tipo-h.urg{background:#FEE2E2;border-color:#B83232}
 .ped-tipo-h.urg .ped-tipo-n{color:#B83232}
@@ -1370,7 +1374,7 @@ function pedAutoRefresco(activo) {
 async function cargarPedidos(silencioso) {
   try {
     // Con componentes (sku_base…) y plazo_tipo; si alguna columna aún no existe (SQL #29 / #37 sin correr) se reintenta sin ella
-    var cBase = 'id,codigo,cliente_nombre,estado,created_at,fecha_limite,prioridad';
+    var cBase = 'id,codigo,cliente_nombre,estado,created_at,fecha_limite,prioridad,notas';
     var lin = 'sku,descripcion,cantidad,procesos', linC = lin + ',sku_base,sku_contratapa,sku_liner,sku_banda';
     var intentos = [cBase + ',plazo_tipo,solicitud_lineas(' + linC + ')', cBase + ',solicitud_lineas(' + linC + ')',
                     cBase + ',plazo_tipo,solicitud_lineas(' + lin + ')', cBase + ',solicitud_lineas(' + lin + ')'];
@@ -1464,6 +1468,12 @@ function pedStkPTHtml(sku, falta) {
   var it = (PED.stockInv || {})[sku];
   var t = pedStkPTTexto(it ? it.ex : null, falta);
   return t ? pedStkPTBarra(t) : '';
+}
+
+// ESPEJO de notaChipHtml (tapas.html): las NOTAS de la ficha (entregas y parciales) siempre visibles en el chip
+function pedNotaHtml(notas, full) {
+  var t = String(notas || '').trim();
+  return t ? '<div class="ped-nota' + (full ? ' full' : '') + '" title="' + escHtml(t) + '"><b>📝 Notas</b>' + escHtml(t) + '</div>' : '';
 }
 
 function pedCompResumenHtml(x) {
@@ -1564,6 +1574,7 @@ function renderPedidos() {
       + '<div class="ped-pc-t"><span>' + escHtml(p.x.cliente) + ' · ' + escHtml(p.x.codigo) + pedLimiteHtml(p.x) + '</span><b>' + pedNum(p.l.cantidad) + '</b></div>'
       + '<div class="ped-pc-d">' + escHtml((p.x.sku ? p.x.sku + ' — ' : '') + p.x.desc) + '</div>'
       + (p.l.tareas.length ? '<div class="ped-pc-p">' + pedTareasResumen(p.l.tareas) + '</div>' : '')
+      + pedNotaHtml(p.x.s.notas)
       + '<div class="ped-bar"><i style="width:' + pct + '%"></i></div></div>';
   }).join('') + '</div>' : '<div class="ped-vacio">Nada marcado en proceso. Toca un pedido de abajo para marcarlo.</div>';
 
@@ -1583,6 +1594,7 @@ function renderPedidos() {
       + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
       + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
       + pedStkPTHtml(x.sku, x.saldo)
+      + pedNotaHtml(x.s.notas)
       + '<div class="ped-resum">' + (proc ? '<span class="ped-res-b proc">▶ ' + pedNum(x.enProc) + ' en proceso</span>' : '') + pedCompResumenHtml(x) + '</div>'
       + '<div class="ped-more">'
       +   '<div class="ped-chip-s">' + (proc ? '▶ ' + pedNum(x.enProc) + ' en proceso' : 'de ' + pedNum(x.cant) + (x.entregado ? ' · ent. ' + pedNum(x.entregado) : '')) + '</div>'
@@ -1842,6 +1854,7 @@ function pintarPedido() {
   document.getElementById('pedBox').innerHTML =
     '<h3>' + escHtml(x.codigo) + ' · ' + escHtml(x.cliente) + pedLimiteHtml(x) + '</h3>'
     + '<div class="pd"><b>' + escHtml(x.sku) + '</b> ' + escHtml(x.desc) + '</div>'
+    + pedNotaHtml(x.s.notas, true)
     + pedBloqueBodegaHtml(x)
     + '<div class="ped-nums"><div><b>' + pedNum(x.cant) + '</b><span>Pedido</span></div><div><b>' + pedNum(x.entregado) + '</b><span>Entregado</span></div>'
     + '<div><b>' + pedNum(x.enProc) + '</b><span>En proceso</span></div><div><b>' + pedNum(x.libre) + '</b><span>Sin iniciar</span></div></div>'
