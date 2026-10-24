@@ -1245,7 +1245,8 @@ let perdidaSolicitudActual = null;
 const ALL_PROCS_TAPAS = [
   {val:'armado', lbl:'Armado'}, {val:'banda', lbl:'Banda'},
   {val:'liner', lbl:'Liner'}, {val:'flameado', lbl:'Flameado'},
-  {val:'impresion', lbl:'Impresión'}, {val:'encajado', lbl:'Encajado'}
+  {val:'impresion', lbl:'Impresión'}, {val:'encajado', lbl:'Encajado'},
+  {val:'ensamble', lbl:'Ensamble', soloPushPull: true} // proceso EXCLUSIVO de la familia Push Pull (oct/2026)
 ];
 
 // ── Metas de producción por proceso (und/hora) ───────────────
@@ -2263,6 +2264,17 @@ async function quitarTipoTapa(i) {
   pintarQuitarTipos('Tipo "' + t + '" quitado');
 }
 
+// Familia PUSH PULL: el proceso "Ensamble" solo existe para ella (el chip solo se ofrece con ese tipo de tapa)
+function esFamiliaPushPull(tipo) {
+  return /push\s*-?\s*pull/.test(normBusqueda(tipo || ''));
+}
+// Si la tapa deja de ser Push Pull, el proceso Ensamble se descarta (no aplica a otras familias)
+function aplicarFamiliaProcs(l) {
+  if (!l || esFamiliaPushPull(l.tipo)) return;
+  l.procs = (l.procs || []).filter(function(p) { return p !== 'ensamble'; });
+  if (l.tocados) delete l.tocados.ensamble;
+}
+
 function setTipoLinea(v) {
   var l = lineas[0];
   if (!l) return;
@@ -2275,6 +2287,7 @@ function setTipoLinea(v) {
     if (tiposOcultos.indexOf(n) >= 0) { tiposOcultos = tiposOcultos.filter(function(t) { return t !== n; }); guardarTiposOcultos(); }
   } else l.tipo = v;
   l.tipoOrigen = 'manual';
+  aplicarFamiliaProcs(l);
   renderLineas();
 }
 
@@ -2480,9 +2493,9 @@ function renderLineas(focusId) {
     + COMP_FORM.map(function(c) { return buildCompRow(l, c); }).join('')
     + '<div class="lin-comp-title">Procesos <span>(los componentes sugieren Armado/Liner/Banda; todos se pueden marcar o quitar)</span></div>'
     + '<div style="display:flex;gap:5px;flex-wrap:wrap">'
-    + ALL_PROCS_TAPAS.map(function(p) {
+    + ALL_PROCS_TAPAS.filter(function(p) { return !p.soloPushPull || esFamiliaPushPull(l.tipo) || l.procs.indexOf(p.val) >= 0; }).map(function(p) {
         var sel = l.procs.indexOf(p.val) >= 0;
-        return '<div class="op-chip' + (sel ? ' sel-proc' : '') + '" onclick="toggleLineaProc(\'' + p.val + '\')">' + p.lbl + '</div>';
+        return '<div class="op-chip' + (sel ? ' sel-proc' : '') + '" onclick="toggleLineaProc(\'' + p.val + '\')"' + (p.soloPushPull ? ' title="Proceso exclusivo de la familia Push Pull"' : '') + '>' + p.lbl + (p.soloPushPull ? ' <small style="opacity:.7">(Push Pull)</small>' : '') + '</div>';
       }).join('')
     + '</div>'
     + '</div>';
@@ -2627,6 +2640,7 @@ function formSkuSelect(kind, sku) {
     l.tipo = tipoDeSkuTapa(l.sku, l.desc);
     l.tipoOrigen = tipoSpecTapas[l.sku] ? 'guardado' : (l.tipo === TIPO_SIN_CLASIFICAR ? '' : 'sugerido');
     autorrellenarDesdeFichas(false);
+    aplicarFamiliaProcs(l);
   } else {
     l.comp[kind] = { sku: item.sku, desc: item.descripcion || '', ex: item.existencia || 0 };
   }
@@ -4040,7 +4054,7 @@ function limiteCompactoHtml(s) {
 
 function tareasResumenCompacto(tareas) {
   var corto = function(n) { var w = String(n || '').trim().split(/\s+/); return w.length > 1 ? w[0] + ' ' + w[1].charAt(0).toUpperCase() + '.' : (w[0] || '—'); };
-  var lbl = { armado: 'Armado', banda: 'Banda', liner: 'Liner', flameado: 'Flameado', impresion: 'Impresión', encajado: 'Encajado' };
+  var lbl = { armado: 'Armado', banda: 'Banda', liner: 'Liner', flameado: 'Flameado', impresion: 'Impresión', encajado: 'Encajado', ensamble: 'Ensamble' };
   var ult = tareas.slice(-2).map(function(t) { return escHtml(lbl[t.proceso] || t.proceso) + ' · ' + escHtml(corto(t.operario_nombre)); });
   return ult.join(' | ') + (tareas.length > 2 ? ' (+' + (tareas.length - 2) + ')' : '');
 }

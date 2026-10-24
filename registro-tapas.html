@@ -521,7 +521,7 @@ var opActual = null;
 var tareaCount = 0;
 var supervisorActual = { nombre: '', codigo: '' };
 
-var PROCS_LIST = ['Armado','Banda','Liner','Impresión','Encajado','Flameado','Revisado (cavidad, deformidad o mancha)','Limpiar pestaña','Apoyo Serigrafía','Apoyo Producción','Otra tarea'];
+var PROCS_LIST = ['Armado','Banda','Liner','Impresión','Encajado','Ensamble','Flameado','Revisado (cavidad, deformidad o mancha)','Limpiar pestaña','Apoyo Serigrafía','Apoyo Producción','Otra tarea'];
 
 // Metas de productividad (unidades por hora), atadas a cada tarea
 var CAPACIDADES = {
@@ -1693,8 +1693,8 @@ function renderPedidos() {
 }
 
 // ── Popup de un pedido: números + lotes en proceso (con quién hace qué) + marcar/iniciar ──
-var PED_PROC_LBL = { armado: 'Armado', banda: 'Banda', liner: 'Liner', flameado: 'Flameado', impresion: 'Impresión', encajado: 'Encajado' };
-var PED_PROC_ORDEN = ['armado', 'banda', 'liner', 'flameado', 'impresion', 'encajado'];
+var PED_PROC_LBL = { armado: 'Armado', banda: 'Banda', liner: 'Liner', flameado: 'Flameado', impresion: 'Impresión', encajado: 'Encajado', ensamble: 'Ensamble' };
+var PED_PROC_ORDEN = ['armado', 'banda', 'liner', 'flameado', 'impresion', 'encajado', 'ensamble'];
 
 // Procesos de la ficha (los que se marcaron al crearla); si no trae ninguno, se ofrecen todos
 function pedProcsDe(lins) {
@@ -1702,7 +1702,8 @@ function pedProcsDe(lins) {
   (lins || []).forEach(function(l) { (l.procesos || []).forEach(function(p) { set[p] = true; }); });
   var out = PED_PROC_ORDEN.filter(function(p) { return set[p]; });
   Object.keys(set).forEach(function(p) { if (out.indexOf(p) < 0) out.push(p); });
-  return out.length ? out : PED_PROC_ORDEN.slice();
+  // Sin procesos en la ficha se ofrecen todos MENOS Ensamble (exclusivo de la familia Push Pull: solo si la ficha lo trae)
+  return out.length ? out : PED_PROC_ORDEN.filter(function(p) { return p !== 'ensamble'; });
 }
 
 function pedProcLbl(p) { return PED_PROC_LBL[p] || p; }
