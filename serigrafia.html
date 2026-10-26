@@ -2613,8 +2613,8 @@ function boardBuildCard(item) {
       '</div>'
     : '<div style="margin-top:4px"><span style="font-size:12px;font-weight:700">' + cantLabel + '</span></div>' +
       requiRow;
-  var perC     = periodoDe(item.createdAt);
-  var esNueva  = perC.key === periodoActualKey();
+  var perC     = periodoEfectivoDe(item);   // mes en que está la ficha (respeta traslados)
+  var esNueva  = perC.key >= periodoActualKey();
   var badgeAgo = perC.key === '0000-00' ? ''
     : '<span class="badge-ago' + (esNueva ? '' : ' badge-ago-old') + '" title="Período ' + perC.largo + '">' + perC.corto + '</span>';
   var esLista = item.estado === 'lista';
@@ -2703,13 +2703,14 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     (salidaRequisSin.length ? '<span style="color:var(--teal-dark);font-weight:700">📤 Salida: ' + escHtml(salidaRequisSin[0]) + (salidaRequisSin.length > 1 ? ' +' + (salidaRequisSin.length - 1) : '') + '</span>' : '') +
     (fechaEntregado ? '<span style="color:#15803d;font-weight:700">✅ Entregado: ' + fmtFechaCorta(fechaEntregado) + '</span>' : '') +
     '</div>';
-  var perC3     = periodoDe(item.createdAt);
-  var esNueva3  = perC3.key === periodoActualKey();
+  var perIng3   = periodoDe(item.createdAt);     // mes en que ingresó
+  var perC3     = periodoEfectivoDe(item);       // mes en que está (respeta traslados)
+  var esNueva3  = perC3.key >= periodoActualKey();
   var badgeAgo3 = perC3.key === '0000-00' ? ''
     : '<span class="badge-ago' + (esNueva3 ? '' : ' badge-ago-old') + '" title="Período ' + perC3.largo + '">' + perC3.corto + '</span>';
-  var trasladado3 = !item.restaurada && item.periodoEfectivo && item.periodoEfectivo !== perC3.key;
+  var trasladado3 = !item.restaurada && item.periodoEfectivo && item.periodoEfectivo !== perIng3.key;
   var badgeTraslado3 = trasladado3
-    ? '<span class="badge-traslado" title="Ingresó en ' + perC3.largo + '; trasladado a ' + periodoPorKey(item.periodoEfectivo).largo + '">↩ de ' + perC3.corto + '</span>'
+    ? '<span class="badge-traslado" title="Ingresó en ' + perIng3.largo + '; trasladado a ' + periodoPorKey(item.periodoEfectivo).largo + '">↩ de ' + perIng3.corto + '</span>'
     : '';
   return '<div class="board-card' + (esNueva3 ? ' nueva-orden' : '') + '" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
