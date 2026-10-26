@@ -2709,7 +2709,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     : '<span class="badge-ago' + (esNueva3 ? '' : ' badge-ago-old') + '" title="Período ' + perC3.largo + '">' + perC3.corto + '</span>';
   var trasladado3 = !item.restaurada && item.periodoEfectivo && item.periodoEfectivo !== perC3.key;
   var badgeTraslado3 = trasladado3
-    ? '<span class="badge-traslado" title="Pendiente de ' + perC3.largo + ', trasladado al mes actual">↩ de ' + perC3.corto + '</span>'
+    ? '<span class="badge-traslado" title="Ingresó en ' + perC3.largo + '; trasladado a ' + periodoPorKey(item.periodoEfectivo).largo + '">↩ de ' + perC3.corto + '</span>'
     : '';
   return '<div class="board-card' + (esNueva3 ? ' nueva-orden' : '') + '" draggable="true"' +
     ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
@@ -7422,15 +7422,18 @@ function sumarMesKey(key, n) {
   var d = new Date(y, m, 1);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 }
-function poblarMesPedido() {
+function poblarMesPedido(mesExtra) {
   var sel = document.getElementById('fMesPedido');
   if (!sel) return;
   var hoyKey = periodoActualKey();
   var opts = [hoyKey, sumarMesKey(hoyKey, 1), sumarMesKey(hoyKey, 2)];
-  sel.innerHTML = opts.map(function(k, i) {
-    return '<option value="' + k + '">' + periodoPorKey(k).largo + (i === 0 ? ' (actual)' : '') + '</option>';
+  // Al editar: incluir el mes en que está hoy la ficha aunque sea anterior (ej. septiembre)
+  if (mesExtra && /^\d{4}-\d{2}$/.test(mesExtra) && opts.indexOf(mesExtra) < 0) opts.push(mesExtra);
+  opts.sort();
+  sel.innerHTML = opts.map(function(k) {
+    return '<option value="' + k + '">' + periodoPorKey(k).largo + (k === hoyKey ? ' (actual)' : '') + '</option>';
   }).join('');
-  sel.value = hoyKey;
+  sel.value = mesExtra && opts.indexOf(mesExtra) >= 0 ? mesExtra : hoyKey;
 }
 
 // Número de OC: obligatorio en pedidos NUEVOS de DAROSA (columna solicitudes.numero_oc)
@@ -7479,7 +7482,8 @@ function abrirFormEditar(solId) {
   document.getElementById('fNumeroOC').value = s.numero_oc || '';
   document.getElementById('fNumeroOC').style.borderColor = '';
   actualizarCampoOC();
-  document.getElementById('fMesRow').style.display = 'none';   // el mes solo se elige al crear
+  poblarMesPedido(mesSol(s));   // mes en que está hoy la ficha; cambiarlo la traslada
+  document.getElementById('fMesRow').style.display = '';
   document.getElementById('fArea').value = s.area_sol || 'Ventas';
   document.getElementById('fFecha').value = s.fecha_lim || '';
   document.getElementById('fPrioSelect').value = s.prio || 'normal';
@@ -8498,6 +8502,9 @@ async function guardarEdicion(lineasValidas, cliente) {
       notas: notasFinal
     };
     if (esClienteConOC(cliente)) datosEdit.numero_oc = valorOC() || null;
+    // Mes del pedido: distinto del mes de ingreso original = traslado (periodo_efectivo); igual = sin traslado (null)
+    var mesEd = (document.getElementById('fMesPedido') || {}).value || '';
+    if (mesEd) datosEdit.periodo_efectivo = (mesEd !== periodoDe(s.created_at).key) ? mesEd : null;
     var r = await db.from('solicitudes').update(datosEdit).eq('id', s.dbId);
     if (r.error) throw errorOC(r.error);
     var rd = await db.from('solicitud_lineas').delete().eq('solicitud_id', s.dbId);
