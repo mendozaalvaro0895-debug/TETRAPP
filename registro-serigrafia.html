@@ -298,6 +298,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
         <button type="button" class="btn-foto" onclick="abrirCamara()">📷 Cámara</button>
         <button type="button" class="btn-foto" onclick="abrirGaleria()">🖼 Galería</button>
       </div>
+      <div style="font-size:11px;color:#6B6B6A;text-align:center;margin:-2px 0 8px">💡 En computadora: copia una captura de pantalla y pégala aquí con <b>Ctrl+V</b></div>
       <input type="file" id="fFotoCam" accept="image/*" capture="environment" style="display:none" onchange="previsualizarFoto(this)">
       <input type="file" id="fFotoGal" accept="image/*" style="display:none" onchange="previsualizarFoto(this)">
       <div id="fotoPreview" style="display:none">
@@ -1284,12 +1285,32 @@ function abrirGaleria() { document.getElementById('fFotoGal').click(); }
 function previsualizarFoto(input) {
   var file = input.files[0];
   if (!file) return;
-  comprimirImagen(file, function(blob) {
-    fotoBlob = blob;
-    document.getElementById('fotoImg').src = URL.createObjectURL(blob);
-    document.getElementById('fotoPreview').style.display = 'block';
-  });
+  comprimirImagen(file, usarFotoBlob);
 }
+
+function usarFotoBlob(blob) {
+  fotoBlob = blob;
+  document.getElementById('fotoImg').src = URL.createObjectURL(blob);
+  document.getElementById('fotoPreview').style.display = 'block';
+}
+
+// Pegar una captura de pantalla (Ctrl+V / copiar imagen) como foto del contador.
+// Solo actúa si el paso de la foto está a la vista; el texto pegado en campos normales no se toca.
+document.addEventListener('paste', function(e) {
+  var btns = document.querySelector('.foto-btns');
+  if (!btns || btns.offsetParent === null) return;
+  var items = (e.clipboardData && e.clipboardData.items) || [];
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].kind === 'file' && items[i].type.indexOf('image/') === 0) {
+      var file = items[i].getAsFile();
+      if (!file) continue;
+      e.preventDefault();
+      comprimirImagen(file, usarFotoBlob);
+      showToast('📋 Captura pegada como foto');
+      return;
+    }
+  }
+});
 
 function comprimirImagen(file, cb) {
   var reader = new FileReader();
