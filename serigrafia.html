@@ -6876,13 +6876,15 @@ function fechaEst(turnos) {
 async function generarCodigo(area) {
   var prefix = area === 'serig' ? 'S' : 'T';
   try {
-    var r = await db.from('solicitudes').select('codigo').eq('area', area).order('created_at', {ascending:false}).limit(1);
+    // El siguiente código = el MAYOR número existente + 1. (Antes se tomaba el de la ficha más reciente
+    // por created_at, pero una ficha con fecha de un mes futuro rompía ese orden y repetía el código.)
+    var r = await db.from('solicitudes').select('codigo').eq('area', area).order('created_at', {ascending:false}).limit(1000);
     if (r.error) throw r.error;
     var lastNum = 0;
-    if (r.data && r.data.length > 0 && r.data[0].codigo) {
-      var match = r.data[0].codigo.match(/\d+$/);
-      if (match) lastNum = parseInt(match[0]);
-    }
+    (r.data || []).forEach(function(row) {
+      var match = (row.codigo || '').match(/\d+$/);
+      if (match) lastNum = Math.max(lastNum, parseInt(match[0], 10));
+    });
     return prefix + '-' + String(lastNum + 1).padStart(3, '0');
   } catch(e) {
     return prefix + '-001';
@@ -8473,6 +8475,12 @@ async function guardarNuevo(lineasValidas, cliente) {
     var mesElegido = (document.getElementById('fMesPedido') || {}).value || '';
     if (mesElegido && mesElegido > periodoActualKey()) datosNuevo.created_at = mesElegido + '-01T12:00:00-06:00';
     var r = await db.from('solicitudes').insert(datosNuevo).select().single();
+    // Código repetido (otra pestaña/persona creó una ficha a la vez): pedir el siguiente y reintentar
+    for (var intento = 0; intento < 3 && r.error && r.error.code === '23505' && /codigo/i.test(r.error.message || ''); intento++) {
+      codigo = await generarCodigo('serig');
+      datosNuevo.codigo = codigo;
+      r = await db.from('solicitudes').insert(datosNuevo).select().single();
+    }
     if (r.error) throw errorOC(r.error);
     nuevaId = r.data.id;
     var payload = buildLineasPayload(lineasValidas, nuevaId);
