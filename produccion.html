@@ -347,6 +347,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rce-prod-title{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--gray);margin-bottom:6px}
 .rce-mat-hdr{display:grid;grid-template-columns:1fr 90px 60px 28px;gap:5px;padding:0 0 4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-l);border-bottom:1px solid var(--bg2)}
 .rce-mat-row{display:grid;grid-template-columns:1fr 90px 60px 28px;gap:5px;align-items:center;margin-top:5px}
+.rce-col-btns{display:flex;gap:8px;flex-wrap:wrap}
+.rce-col-btns .rce-add-row{flex:1;min-width:150px}
+.rce-pegar{margin-top:8px;padding:10px 12px;border:1.5px solid var(--prod-l);border-radius:8px;background:var(--prod-xl)}
+.rce-pegar-ayuda{font-size:11px;color:var(--gray);line-height:1.5;margin-bottom:6px}
+.rce-pegar-ayuda code{font-family:var(--mono);background:#fff;padding:0 4px;border-radius:3px}
+.rce-pegar textarea{width:100%;font-family:var(--mono);font-size:12px;padding:8px;border:1.5px solid var(--border);border-radius:7px;resize:vertical}
+.rce-pegar-foot{display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap}
 .rce-add-row{background:none;border:1.5px dashed var(--border);border-radius:6px;font-size:11px;font-weight:600;color:var(--gray);cursor:pointer;padding:5px 12px;width:100%;margin-top:6px;transition:border-color .15s,color .15s;font-family:var(--font)}
 .rce-add-row:hover{border-color:var(--prod);color:var(--prod)}
 .rce-cap{background:var(--prod-xl);border:1px solid var(--prod-l);border-radius:8px;padding:10px 14px;margin:10px 0}
@@ -2914,9 +2921,16 @@ function buildRcEspecsProd(sku, sid, esMaster) {
     '</div>' +
     '<div class="rce-prod-section">' +
       '<div class="rce-prod-title">Colorante</div>' +
-      '<div class="rce-mat-hdr"><span>Colorante</span><span>Cantidad (g)</span><span>%</span><span></span></div>' +
+      '<div class="rce-mat-hdr"><span>Colorante</span><span>g por kg</span><span>%</span><span></span></div>' +
       '<div id="rce-col-' + sid + '">' + buildMatRows(colData, sid, 'col', esMaster) + '</div>' +
-      (esMaster ? '<button class="rce-add-row" onclick="addMatRow(\'' + sid + '\',\'col\')">+ Agregar colorante</button>' : '') +
+      (esMaster ? '<div class="rce-col-btns"><button class="rce-add-row" onclick="addMatRow(\'' + sid + '\',\'col\')">+ Agregar colorante</button>' +
+        '<button class="rce-add-row" onclick="rcPegarToggle(\'' + sid + '\')">📋 Pegar receta (Excel)</button></div>' +
+        '<div class="rce-pegar" id="rce-pegar-' + sid + '" style="display:none">' +
+          '<div class="rce-pegar-ayuda">Pega las líneas de ESTE color tal como salen del Excel: <b>SKU del colorante</b> y <b>gramos por kilo</b> separados por espacio o tab (ej. <code>6029&nbsp;&nbsp;22</code>). Se ignoran el encabezado <code>HOJA:</code>, los asteriscos y las líneas en blanco.</div>' +
+          '<textarea id="rce-pegar-txt-' + sid + '" rows="6" placeholder="HOJA: BARRILITO&#10;* 6029&#9;22&#10;* 6506&#9;14"></textarea>' +
+          '<div class="rce-pegar-foot"><button class="rc-save-btn" onclick="rcPegarAplicar(\'' + sid + '\')">Cargar en la receta</button>' +
+          '<span class="rc-foto-status" id="rce-pegar-st-' + sid + '"></span></div>' +
+        '</div>' : '') +
     '</div>' +
     '<div class="rce-row"><span class="rce-lbl">Molde</span>' +
       '<div class="rc-wrap"><input class="rce-in" id="rce-molde-' + sid + '" value="' + esc(moldeVal) + '" placeholder="Nombre del molde…" autocomplete="off"' +
@@ -2991,6 +3005,60 @@ function delMatRow(sid, tipo, idx) {
     var btn = r.querySelector('.rc-del');
     if (btn) btn.setAttribute('onclick', 'delMatRow(\'' + sid + '\',\'' + tipo + '\',' + i + ')');
   });
+}
+
+/* ── Pegar receta de colorantes desde Excel ──
+   Cada línea: SKU del colorante + gramos por kilo de resina. Carga las filas en pantalla;
+   NO guarda: se revisa y se pulsa "Guardar especificaciones". */
+function parsePegadoColorante(texto) {
+  var items = [], ignoradas = [];
+  String(texto || '').split(/\r?\n/).forEach(function (linea) {
+    var t = linea.replace(/^[\s*\-•·>]+/, '').trim();
+    if (!t || /^hoja\s*:/i.test(t)) return;
+    var m = t.match(/^(\d[\dA-Za-z\-]*)\s+(\d+(?:[.,]\d+)?)\s*(?:g|gr|gramos)?\s*$/i);
+    if (!m) { ignoradas.push(t); return; }
+    items.push({ sku: m[1], gkg: parseFloat(m[2].replace(',', '.')) });
+  });
+  return { items: items, ignoradas: ignoradas };
+}
+
+function rcPegarToggle(sid) {
+  var p = document.getElementById('rce-pegar-' + sid);
+  if (!p) return;
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  var t = document.getElementById('rce-pegar-txt-' + sid);
+  if (t && p.style.display === 'block') t.focus();
+}
+
+function rcPegarAplicar(sid) {
+  var st = document.getElementById('rce-pegar-st-' + sid);
+  var txt = (document.getElementById('rce-pegar-txt-' + sid) || {}).value || '';
+  var r = parsePegadoColorante(txt);
+  if (!r.items.length) {
+    if (st) st.textContent = '⚠️ No encontré líneas "SKU  gramos" en el texto pegado.';
+    return;
+  }
+  var actuales = getMatRows(sid, 'col');
+  if (actuales.length && !confirm('Este envase ya tiene ' + actuales.length + ' colorante(s) en pantalla. ¿Reemplazarlos por los ' + r.items.length + ' pegados?')) return;
+  var noEncontrados = [], vistos = {}, repetidos = [];
+  var filas = r.items.map(function (it) {
+    var inv = INV_MAT.filter(function (x) { return String(x.sku).trim() === it.sku; })[0];
+    if (!inv) noEncontrados.push(it.sku);
+    if (vistos[it.sku]) repetidos.push(it.sku);
+    vistos[it.sku] = true;
+    return {
+      nombre: inv ? (it.sku + ' — ' + (inv.descripcion || '')) : it.sku,
+      cantidad: String(it.gkg),
+      pct: String(Math.round(it.gkg * 10) / 100)   // g por kg → % del peso de resina
+    };
+  });
+  document.getElementById('rce-col-' + sid).innerHTML = buildMatRows(filas, sid, 'col', true);
+  var av = [];
+  if (noEncontrados.length) av.push('sin descripción (no están en Bodega 7): ' + noEncontrados.join(', '));
+  if (repetidos.length) av.push('SKU repetido: ' + repetidos.join(', '));
+  if (r.ignoradas.length) av.push('líneas ignoradas: ' + r.ignoradas.length);
+  if (st) st.textContent = '✓ ' + filas.length + ' colorante(s) cargados — revisa y pulsa "Guardar especificaciones".' + (av.length ? ' ⚠️ ' + av.join(' · ') : '');
+  var area = document.getElementById('rce-pegar-txt-' + sid); if (area) area.value = '';
 }
 
 function getMatRows(sid, tipo) {
