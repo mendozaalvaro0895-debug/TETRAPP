@@ -2460,18 +2460,8 @@ function prodPestanaActiva() {
   return null;
 }
 
-// Refresco completo (incluye Recetario) — solo se dispara en un punto de quiebre
-// natural (volver a la pestaña/ventana), nunca a mitad de tecleo.
-function prodRefrescarVistaActiva() {
-  var v = prodPestanaActiva();
-  if (v === 'inicio') switchInicioVista(INICIO_VISTA);
-  if (v === 'ingreso') cargarUltimos();
-  if (v === 'recetario' && RECETARIO_CARGADO) cargarRecetario();
-}
-window.addEventListener('focus', prodRefrescarVistaActiva);
-document.addEventListener('visibilitychange', function () {
-  if (document.visibilityState === 'visible') prodRefrescarVistaActiva();
-});
+// ⚠️ NO refrescar al volver a la pestaña/ventana (focus/visibilitychange): quien copia de un Excel
+// y regresa perdía lo que estaba llenando (Recetario, Ingreso manual, textarea de pegado).
 
 // Refresco en vivo por Realtime — solo Inicio/Ingreso (pantallas de solo lectura).
 // Recetario queda fuera a propósito: reconstruye las tarjetas con innerHTML y

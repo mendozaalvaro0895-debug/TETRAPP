@@ -734,7 +734,8 @@ Notas críticas:
 22. `sql/realtime_produccion_v1.sql` — agrega `produccion_diaria` a la publicación
     `supabase_realtime` (mismo patrón que `sql/realtime_serig.sql`). Sin correr esto, Inicio e
     Ingreso de produccion.html siguen funcionando pero sin refresco en vivo entre usuarios/equipos
-    — solo se actualizan al volver a la pestaña/ventana.
+    (hay que recargar). ⚠️ produccion.html NO refresca al volver a la pestaña/ventana (se quitó
+    oct/2026: quien copia de un Excel y regresa perdía lo que llenaba); Recetario nunca se refresca solo.
 23. `sql/moldes_v1.sql` — tabla nueva `moldes` (catálogo de moldes de Producción: nombre,
     cavidades, ciclo_seg) + RLS + 88 moldes importados de "MOLDES Y CICLOS - SEP 2026.xlsx".
     Alimenta el autocompletado de Molde/Cavidades en el Recetario (produccion.html). Sin correr
