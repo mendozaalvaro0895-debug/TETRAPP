@@ -1014,6 +1014,12 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
           </select>
         </div>
       </div>
+      <div class="fr" id="fMesRow">
+        <div class="fg">
+          <div class="fl">Mes del pedido</div>
+          <select class="fs" id="fMesPedido"></select>
+        </div>
+      </div>
       <div class="fr" id="fOcRow" style="display:none">
         <div class="fg">
           <div class="fl">Número de OC *</div>
@@ -1661,7 +1667,7 @@ async function cargarCapacidadMes(mes) {
 
 // null = todavía cargando (dispara la carga) o sin datos calculables
 function capPctCliente(cli, mes) {
-  if (!/^\d{4}-\d{2}$/.test(mes || '') || mes === '0000-00') return null;
+  if (!/^\d{4}-\d{2}$/.test(mes || '') || mes === '0000-00' || mes > periodoActualKey()) return null;
   var c = capMesCache[mes];
   var vencido = c && mes === periodoActualKey() && (Date.now() - c.t) > CAP_TTL_MS;
   if (!c || vencido) { cargarCapacidadMes(mes); if (!c) return null; }
@@ -1706,7 +1712,7 @@ async function verificarCierresPeriodo(itemsSin) {
   var grupos = {};
   itemsSin.forEach(function(item) {
     var per = periodoEfectivoDe(item);
-    if (per.key === perHoy || per.key === '0000-00') return; // solo períodos vencidos
+    if (per.key >= perHoy || per.key === '0000-00') return; // solo períodos ya vencidos (nunca el actual ni uno futuro)
     var cli = item.cliente || '(Sin cliente)';
     var gk  = cli + '§' + per.key;
     if (periodoCierresCache[gk]) return; // ya cerrado
@@ -3165,7 +3171,7 @@ function boardBuildSinBlock(items) {
         var capInfo   = capPctCliente(cli, per.key);
         var capVal    = capInfo ? capInfo.pct : 0;
         var pctClr    = capVal >= 100 ? '#bbf7d0' : capVal > 0 ? '#fde68a' : 'rgba(255,255,255,.45)';
-        var capTxt    = capInfo ? capInfo.pct + '% cap' : (/^\d{4}-\d{2}$/.test(per.key) && per.key !== '0000-00' ? '…' : '—');
+        var capTxt    = capInfo ? capInfo.pct + '% cap' : (per.key <= perHoy && /^\d{4}-\d{2}$/.test(per.key) && per.key !== '0000-00' ? '…' : '—');
         var capTitle  = capInfo
           ? 'Capacidad de ' + (capInfo.lineas.length > 1 ? 'Líneas 3 y 4 (promedio)' : 'Línea ' + capInfo.lineas[0]) + ': ' +
             capInfo.tiros.toLocaleString() + ' tiros de ' + capInfo.cap.toLocaleString() +
@@ -7409,6 +7415,24 @@ async function restaurarSolicitud(id) {
 
 var editandoSolicitudId = null;
 
+// Mes del pedido: un pedido nuevo puede quedar en el mes actual (default) o en el siguiente
+// ("como si se hubiera ingresado en noviembre"): se guarda con created_at = día 1 de ese mes.
+function sumarMesKey(key, n) {
+  var y = parseInt(key.slice(0, 4), 10), m = parseInt(key.slice(5, 7), 10) - 1 + n;
+  var d = new Date(y, m, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function poblarMesPedido() {
+  var sel = document.getElementById('fMesPedido');
+  if (!sel) return;
+  var hoyKey = periodoActualKey();
+  var opts = [hoyKey, sumarMesKey(hoyKey, 1), sumarMesKey(hoyKey, 2)];
+  sel.innerHTML = opts.map(function(k, i) {
+    return '<option value="' + k + '">' + periodoPorKey(k).largo + (i === 0 ? ' (actual)' : '') + '</option>';
+  }).join('');
+  sel.value = hoyKey;
+}
+
 // Número de OC: obligatorio en pedidos NUEVOS de DAROSA (columna solicitudes.numero_oc)
 function esClienteConOC(cli) { return /darosa/i.test(cli || ''); }
 function actualizarCampoOC() {
@@ -7427,6 +7451,8 @@ function abrirForm() {
   document.getElementById('fNumeroOC').value = '';
   document.getElementById('fNumeroOC').style.borderColor = '';
   actualizarCampoOC();
+  poblarMesPedido();
+  document.getElementById('fMesRow').style.display = '';
   document.getElementById('mTitle').textContent = 'Nueva solicitud · Serigrafía';
   document.getElementById('btnSave').textContent = 'Guardar';
   var d = new Date(); d.setDate(d.getDate() + 3);
@@ -7453,6 +7479,7 @@ function abrirFormEditar(solId) {
   document.getElementById('fNumeroOC').value = s.numero_oc || '';
   document.getElementById('fNumeroOC').style.borderColor = '';
   actualizarCampoOC();
+  document.getElementById('fMesRow').style.display = 'none';   // el mes solo se elige al crear
   document.getElementById('fArea').value = s.area_sol || 'Ventas';
   document.getElementById('fFecha').value = s.fecha_lim || '';
   document.getElementById('fPrioSelect').value = s.prio || 'normal';
@@ -8437,6 +8464,9 @@ async function guardarNuevo(lineasValidas, cliente) {
       estado: 'nueva', progreso_pct: 0, notas: notasFinal
     };
     if (esClienteConOC(cliente) && valorOC()) datosNuevo.numero_oc = valorOC();
+    // Mes futuro elegido: la ficha queda como ingresada el día 1 de ese mes (12:00 hora de Guatemala)
+    var mesElegido = (document.getElementById('fMesPedido') || {}).value || '';
+    if (mesElegido && mesElegido > periodoActualKey()) datosNuevo.created_at = mesElegido + '-01T12:00:00-06:00';
     var r = await db.from('solicitudes').insert(datosNuevo).select().single();
     if (r.error) throw errorOC(r.error);
     nuevaId = r.data.id;
