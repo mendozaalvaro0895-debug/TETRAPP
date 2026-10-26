@@ -205,8 +205,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .drop-zone-img-ico{font-size:22px}
 .drop-zone-img-txt{font-size:13px;font-weight:700;color:#1D4ED8}
 .drop-zone-img-sub{font-size:11px;color:#6B6B6A;margin-top:2px}
-.man-row{display:grid;grid-template-columns:1fr 90px 140px 90px 34px;gap:8px;margin-bottom:8px;align-items:center}
-.man-lbls{display:grid;grid-template-columns:1fr 90px 140px 90px 34px;gap:8px;margin-bottom:6px}
+.man-row{display:grid;grid-template-columns:1fr 175px 140px 90px 34px;gap:8px;margin-bottom:8px;align-items:center}
+.man-lbls{display:grid;grid-template-columns:1fr 175px 140px 90px 34px;gap:8px;margin-bottom:6px}
 .man-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray)}
 .man-in{padding:7px 9px;border:1.5px solid var(--border);border-radius:7px;font-family:var(--font);font-size:13px;width:100%;background:var(--card);color:var(--ink)}
 .man-in:focus{outline:none;border-color:var(--prod)}
@@ -679,7 +679,94 @@ function familiaExcluida(descFamilia) {
   return FAMILIAS_EXCLUIDAS.indexOf(String(descFamilia || '').trim().toUpperCase()) !== -1;
 }
 
-var MAQUINAS = [1,2,3,4,5,6,7,8,9,10,11,12];
+/* ── Catálogo de máquinas (tabla `maquinas`, sql/maquinas_v1.sql) ──
+   produccion_diaria.maquina guarda el `id`. Si la tabla aún no existe se usa esta copia
+   mínima [id, nombre, corto, tipo, estacion, foto, orden, activa] para no frenar el Ingreso. */
+var MAQ_FALLBACK = [
+  [1,'SOPLADORA #1','#1','sopladora','ÚNICA',null,1,true],[2,'SOPLADORA #2','#2','sopladora','ÚNICA',null,2,true],
+  [3,'SOPLADORA #3','#3','sopladora','ÚNICA',null,3,true],[4,'SOPLADORA #4','#4','sopladora','ÚNICA',null,4,true],
+  [5,'SOPLADORA #5','#5','sopladora','ÚNICA',null,5,true],
+  [61,'SOPLADORA #6E1','#6E1','sopladora','DOBLE','maq6',6,true],[62,'SOPLADORA #6E2','#6E2','sopladora','DOBLE','maq6',7,true],
+  [7,'INY-SOPLADORA #7','#7','iny_sopladora','4 ESTACIONES',null,8,true],
+  [81,'SOPLADORA #8E1','#8E1','sopladora','DOBLE','maq8',9,true],[82,'SOPLADORA #8E2','#8E2','sopladora','DOBLE','maq8',10,true],
+  [91,'SOPLADORA #9E1','#9E1','sopladora','DOBLE','maq9',11,true],[92,'SOPLADORA #9E2','#9E2','sopladora','DOBLE','maq9',12,true],
+  [10,'INY-SOPLADORA #10','#10','iny_sopladora','5 ESTACIONES',null,13,true],
+  [21,'INYECTORA 220','IY220','inyectora',null,null,14,true],[22,'INYECTORA 200 (Vieja)','IY200V','inyectora',null,null,15,true],
+  [23,'INYECTORA 200 (Nueva)','IY200N','inyectora',null,null,16,true],[24,'INYECTORA 150','IY150','inyectora',null,null,17,true],
+  [25,'INYECTORA 120 (Vieja)','IY120V','inyectora',null,null,18,true],[26,'INYECTORA 120 (Nueva)','IY120N','inyectora',null,null,19,true],
+  [27,'INYECTORA 90','IY90','inyectora',null,null,20,true],
+  [6,'SOPLADORA #6 (histórico)','#6','historico','DOBLE','maq6',91,false],[8,'SOPLADORA #8 (histórico)','#8','historico','DOBLE','maq8',92,false],
+  [9,'SOPLADORA #9 (histórico)','#9','historico','DOBLE','maq9',93,false],
+  [11,'MÁQUINA #11 (sin definir)','#11','sin_definir',null,null,98,false],[12,'MÁQUINA #12 (sin definir)','#12','sin_definir',null,null,99,false]
+];
+var MAQ_MAP = {};     // id -> fila de `maquinas` (incluye inactivas, para mostrar historial)
+var MAQUINAS = [];    // ids ACTIVOS en orden de display (desplegables y fichas)
+
+function aplicarMaquinas(rows) {
+  MAQ_MAP = {};
+  rows.forEach(function (r) { MAQ_MAP[r.id] = r; });
+  MAQUINAS = rows.filter(function (r) { return r.activa; })
+    .sort(function (a, b) { return a.orden - b.orden; })
+    .map(function (r) { return r.id; });
+}
+aplicarMaquinas(MAQ_FALLBACK.map(function (a) {
+  return { id: a[0], nombre: a[1], corto: a[2], tipo: a[3], estacion: a[4], foto: a[5], orden: a[6], activa: a[7] };
+}));
+
+async function cargarMaquinas() {
+  var r = await db.from('maquinas').select('id,nombre,corto,tipo,marca,modelo,centro,estacion,referencia,foto,orden,activa');
+  if (r.error || !r.data || !r.data.length) {
+    console.warn('[Máquinas] usando lista de respaldo (¿falta correr sql/maquinas_v1.sql?):', r.error);
+    return;
+  }
+  aplicarMaquinas(r.data);
+}
+
+function maqNombre(id) { var m = MAQ_MAP[id]; return m ? m.nombre : 'Máq ' + id; }
+// maquina_default de un SKU solo vale si esa máquina sigue activa (si era #6/#8/#9 sin estación, hay que elegir E1/E2)
+function maqDefaultValido(id) { return MAQUINAS.indexOf(id) !== -1 ? id : 0; }
+function maqCorto(id)  { var m = MAQ_MAP[id]; return m ? m.corto : String(id); }
+function maqOrden(id)  { var m = MAQ_MAP[id]; return m ? m.orden : 1000 + id; }
+function maqExcluida(id) { var m = MAQ_MAP[id]; return !!(m && m.tipo === 'sin_definir'); }
+function maqDoble(m) { return !!(m && m.estacion === 'DOBLE'); }
+function maqTipoCorto(id) {
+  var m = MAQ_MAP[id]; if (!m) return '';
+  if (m.tipo === 'iny_sopladora') return 'I.Sopla';
+  if (m.tipo === 'inyectora') return 'Inyec.';
+  if (m.tipo === 'sin_definir') return '';
+  return maqDoble(m) ? 'S.Doble' : 'S.Simple';
+}
+function maqTipoTxt(id) {
+  var m = MAQ_MAP[id]; if (!m) return '';
+  if (m.tipo === 'iny_sopladora') return 'Inyecto Sopladora';
+  if (m.tipo === 'inyectora') return 'Inyectora';
+  if (m.tipo === 'sin_definir') return 'Sin tipo asignado';
+  return maqDoble(m) ? 'Sopladora Doble' : 'Sopladora simple';
+}
+// Marca · modelo · centro · estaciones · referencia (lo que haya cargado en `maquinas`)
+function maqDetalle(id) {
+  var m = MAQ_MAP[id]; if (!m) return '';
+  var base = [m.marca, m.modelo].filter(Boolean).join(' ');
+  var estac = (m.tipo === 'iny_sopladora' && m.estacion) ? m.estacion : '';
+  return [base, m.centro ? 'Centro ' + m.centro : '', estac, m.referencia].filter(Boolean).join(' · ');
+}
+function maqFoto(id) { var m = MAQ_MAP[id]; return 'img/maquinas/' + ((m && m.foto) || ('maq' + id)) + '.png'; }
+// Opciones de <select>: solo las activas, más la actual si es una histórica (para no cambiarla sin querer)
+function maqOptions(seleccion, sinTexto) {
+  var ids = MAQUINAS.slice();
+  if (seleccion && ids.indexOf(seleccion) === -1) ids.push(seleccion);
+  var opts = '<option value="0">' + (sinTexto || '— Sin asignar —') + '</option>';
+  ids.forEach(function (m) {
+    opts += '<option value="' + m + '"' + (m === seleccion ? ' selected' : '') + '>' + esc(maqNombre(m)) + '</option>';
+  });
+  return opts;
+}
+// Fichas: máquinas activas + las inactivas que tengan producción en el período
+function maqIdsFichas(porMaquina) {
+  var extra = Object.keys(porMaquina).map(Number).filter(function (id) { return MAQUINAS.indexOf(id) === -1; })
+    .sort(function (a, b) { return maqOrden(a) - maqOrden(b); });
+  return MAQUINAS.concat(extra);
+}
 var PERSONAL_PROD = []; // personal.area='produccion' activos — para asignar operario por fila
 
 function buildOperarioOptions(actual) {
@@ -690,12 +777,6 @@ function buildOperarioOptions(actual) {
   });
   return opts;
 }
-var MAQ_TIPO = {1:'S.Simple',2:'S.Simple',3:'S.Simple',4:'S.Simple',5:'S.Simple',
-  6:'S.Doble',7:'I.Sopla',8:'S.Doble',9:'S.Doble',10:'I.Sopla'};
-var MAQ_TIPO_FULL = {1:'Sopladora simple',2:'Sopladora simple',3:'Sopladora simple',
-  4:'Sopladora simple',5:'Sopladora simple',6:'Sopladora Doble',
-  7:'Inyecto Sopladora',8:'Sopladora Doble',9:'Sopladora Doble',
-  10:'Inyecto Sopladora'};
 var DIAS_C = ['LUN','MAR','MIÉ','JUE','VIE','SÁB'];
 var DIAS_CORTO = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']; // getDay(): 0=domingo
 var MESES_ABR = {ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,OCT:10,NOV:11,DIC:12};
@@ -884,7 +965,7 @@ async function renderInicio() {
     }
   });
 
-  grid.innerHTML = MAQUINAS.map(function (m) { return buildMaquinaCardHtml(m, porMaquina[m]); }).join('');
+  grid.innerHTML = maqIdsFichas(porMaquina).map(function (m) { return buildMaquinaCardHtml(m, porMaquina[m]); }).join('');
 
   var totalDia = Object.keys(porMaquina).reduce(function (a, m) { return a + porMaquina[m].total; }, 0);
   document.getElementById('inicioResumenTxt').textContent =
@@ -892,7 +973,7 @@ async function renderInicio() {
 }
 
 function buildMaquinaImgHtml(m) {
-  return '<img class="maq-card-img" src="img/maquinas/maq' + m + '.png" alt=""' +
+  return '<img class="maq-card-img" src="' + maqFoto(m) + '" alt=""' +
     ' onerror="this.style.display=\'none\'">';
 }
 
@@ -983,7 +1064,8 @@ function buildMaqDetalleHtml(m, historial, meta, opts) {
 }
 
 function buildMaquinaCardHtml(m, datos) {
-  var tipo = MAQ_TIPO_FULL[m];
+  var tipo = maqTipoTxt(m);
+  var detalle = maqDetalle(m);
   var historial = (datos && datos.historial) || [];
 
   if (!datos || !datos.total) {
@@ -994,8 +1076,8 @@ function buildMaquinaCardHtml(m, datos) {
       : '';
     return '<div class="maq-card vacia">' +
       buildMaquinaImgHtml(m) +
-      '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span></div>' +
-      '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
+      '<div class="maq-card-hdr"><span class="maq-card-num">' + esc(maqNombre(m)) + '</span></div>' +
+      '<div class="maq-card-tipo">' + esc(tipo || 'Sin tipo asignado') + (detalle ? ' · ' + esc(detalle) : '') + '</div>' +
       '<div class="maq-card-und" style="margin-top:16px">Sin actividad</div>' +
       '<div class="maq-card-und-lbl">este día</div>' +
       detalleVacio +
@@ -1025,8 +1107,8 @@ function buildMaquinaCardHtml(m, datos) {
 
   return '<div class="maq-card activa">' +
     buildMaquinaImgHtml(m) +
-    '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span>' + efPill + '</div>' +
-    '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
+    '<div class="maq-card-hdr"><span class="maq-card-num">' + esc(maqNombre(m)) + '</span>' + efPill + '</div>' +
+    '<div class="maq-card-tipo">' + esc(tipo || 'Sin tipo asignado') + (detalle ? ' · ' + esc(detalle) : '') + '</div>' +
     (otros === 0
       ? '<div class="maq-card-sku">' + esc(principal.sku) + '</div>' +
         '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>'
@@ -1065,7 +1147,7 @@ function agruparMaquinaPeriodo(rows) {
 
 function renderSemFichasGrid() {
   var porMaquina = agruparMaquinaPeriodo(PROD_SEM);
-  document.getElementById('semFichasGrid').innerHTML = MAQUINAS.map(function (m) {
+  document.getElementById('semFichasGrid').innerHTML = maqIdsFichas(porMaquina).map(function (m) {
     return buildMaquinaCardPeriodoHtml(m, porMaquina[m],
       { sufijo: 's', labelPeriodo: 'esta semana', toggleLabel: 'Ver detalle de la semana', mensajeVacio: 'Sin producción registrada esta semana.' });
   }).join('');
@@ -1073,7 +1155,7 @@ function renderSemFichasGrid() {
 
 function renderMesFichasGrid() {
   var porMaquina = agruparMaquinaPeriodo(PROD_MES);
-  document.getElementById('mesFichasGrid').innerHTML = MAQUINAS.map(function (m) {
+  document.getElementById('mesFichasGrid').innerHTML = maqIdsFichas(porMaquina).map(function (m) {
     return buildMaquinaCardPeriodoHtml(m, porMaquina[m],
       { sufijo: 'me', labelPeriodo: 'este mes', toggleLabel: 'Ver detalle del mes', mensajeVacio: 'Sin producción registrada este mes.' });
   }).join('');
@@ -1140,14 +1222,15 @@ function buildMaqDetallePeriodoHtml(m, historial, opts) {
 }
 
 function buildMaquinaCardPeriodoHtml(m, datos, opts) {
-  var tipo = MAQ_TIPO_FULL[m];
+  var tipo = maqTipoTxt(m);
+  var detalle = maqDetalle(m);
   var historial = (datos && datos.historial) || [];
 
   if (!datos || !datos.total) {
     return '<div class="maq-card vacia">' +
       buildMaquinaImgHtml(m) +
-      '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span></div>' +
-      '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
+      '<div class="maq-card-hdr"><span class="maq-card-num">' + esc(maqNombre(m)) + '</span></div>' +
+      '<div class="maq-card-tipo">' + esc(tipo || 'Sin tipo asignado') + (detalle ? ' · ' + esc(detalle) : '') + '</div>' +
       '<div class="maq-card-und" style="margin-top:16px">Sin actividad</div>' +
       '<div class="maq-card-und-lbl">' + esc(opts.labelPeriodo) + '</div>' +
       '</div>';
@@ -1176,8 +1259,8 @@ function buildMaquinaCardPeriodoHtml(m, datos, opts) {
 
   return '<div class="maq-card activa">' +
     buildMaquinaImgHtml(m) +
-    '<div class="maq-card-hdr"><span class="maq-card-num">Máq ' + m + '</span>' + efPill + '</div>' +
-    '<div class="maq-card-tipo">' + (tipo ? esc(tipo) : 'Sin tipo asignado') + '</div>' +
+    '<div class="maq-card-hdr"><span class="maq-card-num">' + esc(maqNombre(m)) + '</span>' + efPill + '</div>' +
+    '<div class="maq-card-tipo">' + esc(tipo || 'Sin tipo asignado') + (detalle ? ' · ' + esc(detalle) : '') + '</div>' +
     (otros === 0
       ? '<div class="maq-card-sku">' + esc(principal.sku) + '</div>' +
         '<div class="maq-card-desc" title="' + esc(principal.descripcion) + '">' + esc(principal.descripcion) + '</div>'
@@ -1490,7 +1573,7 @@ function abrirPreview(filas, meta, nombre) {
       sku: f.sku,
       descripcion: (inv && inv.descripcion) || f.descripcion,
       cantidad: f.cantidad,
-      maquina: (inv && inv.maquina_default) || 0,
+      maquina: maqDefaultValido(inv && inv.maquina_default),
       operador: '',
       enCatalogo: !!inv
     };
@@ -1518,15 +1601,12 @@ function repintarPreview() {
 
 function buildPrevRow(r, i) {
   var cls = r.maquina ? 'prev-maq' : 'prev-maq sin';
-  var opts = '<option value="0">—</option>';
-  MAQUINAS.forEach(function (m) {
-    opts += '<option value="' + m + '"' + (r.maquina === m ? ' selected' : '') + '>' + m + '</option>';
-  });
+  var opts = maqOptions(r.maquina, '—');
   var alerta = r.enCatalogo ? '' : ' <span class="src-tag src-none" title="Este SKU no está en inventario">nuevo</span>';
   return '<tr>' +
     '<td style="font-family:var(--mono);font-weight:700">' + esc(r.sku) + alerta + '</td>' +
     '<td style="font-size:11.5px">' + esc((r.descripcion || '').slice(0, 52)) + '</td>' +
-    '<td style="text-align:center"><select class="' + cls + '" onchange="setPrevMaq(' + i + ',this.value)">' + opts + '</select></td>' +
+    '<td style="text-align:center"><select class="' + cls + '" style="width:auto;min-width:150px;text-align:left" onchange="setPrevMaq(' + i + ',this.value)">' + opts + '</select></td>' +
     '<td style="text-align:center"><select class="prev-maq" onchange="setPrevOperario(' + i + ',this.value)">' + buildOperarioOptions(r.operador) + '</select></td>' +
     '<td style="text-align:right;font-family:var(--mono)">' + fmtU(r.cantidad) + '</td>' +
     '</tr>';
@@ -1596,7 +1676,7 @@ function autoMaquinas() {
   leerPrevMeta();
   var n = 0;
   prevRows.forEach(function (r) {
-    if (!r.maquina && INV[r.sku] && INV[r.sku].maquina_default) {
+    if (!r.maquina && INV[r.sku] && maqDefaultValido(INV[r.sku].maquina_default)) {
       r.maquina = INV[r.sku].maquina_default; n++;
     }
   });
@@ -1707,8 +1787,7 @@ function addManRow() {
   var div = document.createElement('div');
   div.className = 'man-row';
   div.id = 'manRow' + id;
-  var opts = '<option value="0">—</option>';
-  MAQUINAS.forEach(function (m) { opts += '<option value="' + m + '">' + m + '</option>'; });
+  var opts = maqOptions(0, '—');
   div.innerHTML =
     '<div class="sku-wrap">' +
     '<input class="man-in" id="manSku' + id + '" placeholder="Código o nombre…" autocomplete="off" ' +
@@ -1751,7 +1830,7 @@ function acElegir(id, sku) {
   document.getElementById('manSku' + id).value = sku;
   acCerrar(id);
   var inv = INV[sku];
-  if (inv && inv.maquina_default) document.getElementById('manMaq' + id).value = inv.maquina_default;
+  if (inv && maqDefaultValido(inv.maquina_default)) document.getElementById('manMaq' + id).value = inv.maquina_default;
   var c = document.getElementById('manCant' + id);
   if (c) c.focus();
 }
@@ -1841,8 +1920,8 @@ async function cargarUltimos() {
 }
 
 function buildUltRow(t) {
-  var maqs = Object.keys(t.maq).map(Number).sort(function (a, b) { return a - b; });
-  var pills = maqs.map(function (m) { return '<span class="maq-pill">' + m + '</span>'; }).join(' ');
+  var maqs = Object.keys(t.maq).map(Number).sort(function (a, b) { return maqOrden(a) - maqOrden(b); });
+  var pills = maqs.map(function (m) { return '<span class="maq-pill" title="' + esc(maqNombre(m)) + '">' + esc(maqCorto(m)) + '</span>'; }).join(' ');
   var sinTxt = t.sin ? '<span class="maq-pill sin">' + t.sin + '</span>' : '<span style="color:var(--gray-l)">—</span>';
   return '<tr>' +
     '<td style="font-family:var(--mono)">' + fechaLarga(t.fecha) + '</td>' +
@@ -1881,18 +1960,13 @@ async function abrirModalMaq(fecha, turno) {
 }
 
 function renderModalMaq() {
-  var baseOpts = '<option value="0">— Sin asignar</option>';
-  for (var m = 1; m <= 10; m++) {
-    baseOpts += '<option value="' + m + '">' + m + ' · ' + (MAQ_TIPO[m] || '') + '</option>';
-  }
   var html = '<table class="tbl" style="width:100%"><thead><tr>' +
-    '<th>Código</th><th>Producto</th><th class="num">Cantidad</th><th class="ctr" style="min-width:160px">Máquina</th>' +
+    '<th>Código</th><th>Producto</th><th class="num">Cantidad</th><th class="ctr" style="min-width:200px">Máquina</th>' +
     '<th class="ctr" style="min-width:160px">Operario</th>' +
     '</tr></thead><tbody>';
   maqRows.forEach(function (row, i) {
     var desc = row.descripcion || (INV[row.sku] && INV[row.sku].descripcion) || '—';
-    var opts = baseOpts.replace('value="' + (row.maquina || 0) + '"',
-      'value="' + (row.maquina || 0) + '" selected');
+    var opts = maqOptions(row.maquina || 0);
     html += '<tr>' +
       '<td style="font-family:var(--mono);font-weight:700">' + esc(row.sku) + '</td>' +
       '<td style="font-size:11px;white-space:normal;max-width:220px;text-align:left">' + esc(desc) + '</td>' +
@@ -2017,7 +2091,7 @@ function agruparProduccion(prodRows) {
   var grupos = {};
   prodRows.forEach(function (p) {
     var mq = p.maquina || 0;
-    if (mq < 1 || mq > 10) return; // solo envases máq 1-10
+    if (mq < 1 || maqExcluida(mq)) return; // sin máquina, o #11/#12 (sin definir: siguen fuera del reporte)
     var k = mq + '|' + p.sku;
     if (!grupos[k]) {
       grupos[k] = {
@@ -2032,7 +2106,7 @@ function agruparProduccion(prodRows) {
   });
   return Object.keys(grupos).map(function (k) { return grupos[k]; })
     .sort(function (a, b) {
-      var ma = a.maquina || 99, mb = b.maquina || 99;
+      var ma = a.maquina ? maqOrden(a.maquina) : 9999, mb = b.maquina ? maqOrden(b.maquina) : 9999;
       if (ma !== mb) return ma - mb;
       return b.total - a.total;
     });
@@ -2127,8 +2201,8 @@ function buildSemRow(g, ini, meta, turnos, ef, pr, pot, rowClasses) {
   var metaTxt = meta > 0 ? fmtU(meta) : 'definir';
   var metaCls = meta > 0 ? 'meta-edit' : 'meta-edit vacia';
   var maqTxt = g.maquina
-    ? '<span class="maq-pill" title="' + esc(MAQ_TIPO_FULL[g.maquina] || 'Máq ' + g.maquina) + '">' +
-      g.maquina + '<span class="maq-tipo-lbl">' + (MAQ_TIPO[g.maquina] || '') + '</span></span>'
+    ? '<span class="maq-pill" title="' + esc(maqNombre(g.maquina) + (maqDetalle(g.maquina) ? ' · ' + maqDetalle(g.maquina) : '')) + '">' +
+      esc(maqCorto(g.maquina)) + '<span class="maq-tipo-lbl">' + esc(maqTipoCorto(g.maquina)) + '</span></span>'
     : '<span class="maq-pill sin" title="Sin máquina asignada">?</span>';
   var clsAttr = (rowClasses && rowClasses.length) ? ' class="' + rowClasses.join(' ') + '"' : '';
 
@@ -2320,12 +2394,12 @@ function buildResumenMesHtml(mesLabel) {
   if (maquinasEf.length > 1) {
     var mejor = maquinasEf[0], peor = maquinasEf[maquinasEf.length - 1];
     secMaq = buildResumenSeccion('2) Máquinas del mes',
-      'La máquina <b>' + esc(mejor.maquina) + '</b> fue la más eficiente (' + (mejor.ef * 100).toFixed(0) + '%, ' +
-      fmtU(mejor.prod) + ' und). La máquina <b>' + esc(peor.maquina) + '</b> cerró más baja (' + (peor.ef * 100).toFixed(0) +
+      'La máquina <b>' + esc(maqNombre(mejor.maquina)) + '</b> fue la más eficiente (' + (mejor.ef * 100).toFixed(0) + '%, ' +
+      fmtU(mejor.prod) + ' und). La máquina <b>' + esc(maqNombre(peor.maquina)) + '</b> cerró más baja (' + (peor.ef * 100).toFixed(0) +
       '%, ' + fmtU(peor.prod) + ' und) — vale la pena revisar paros o asignación de moldes en esa línea.');
   } else if (maquinasEf.length === 1) {
     secMaq = buildResumenSeccion('2) Máquinas del mes',
-      'Solo la máquina <b>' + esc(maquinasEf[0].maquina) + '</b> tiene datos suficientes para calcular eficiencia este mes (' +
+      'Solo la máquina <b>' + esc(maqNombre(maquinasEf[0].maquina)) + '</b> tiene datos suficientes para calcular eficiencia este mes (' +
       (maquinasEf[0].ef * 100).toFixed(0) + '%).');
   }
 
@@ -2360,6 +2434,7 @@ async function init() {
       (/meta_12hrs|maquina_default|precio_ponderado_manual|column/i.test(m)
         ? '\n\nFalta correr sql/produccion_v1.sql en Supabase → SQL Editor.' : ''), 'err');
   }
+  try { await cargarMaquinas(); } catch (e) { console.warn('No se pudo cargar el catálogo de máquinas:', e); }
   try { await cargarPersonalProd(); } catch (e) { console.warn('No se pudo cargar personal de Producción:', e); }
   try { await cargarPrecios(); } catch (e) { console.warn(e); }
   await cargarUltimos();

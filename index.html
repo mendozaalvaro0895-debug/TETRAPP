@@ -1535,7 +1535,9 @@ var CI_ACCIONES = [
   { v: 'reconciliar',     l: '🔍 Ya está en el sistema (no hacer nada)' },
   { v: 'ignorar',         l: '❌ Ignorar esta línea' }
 ];
-var MAQUINAS_CI = [1,2,3,4,5,6,7,8,9,10,11,12];
+// Catálogo de máquinas = tabla `maquinas` (sql/maquinas_v1.sql, mismos ids que produccion_diaria.maquina).
+// Si la tabla aún no existe cae a los números de siempre.
+var MAQUINAS_CI = [1,2,3,4,5,6,7,8,9,10,11,12].map(function(n) { return { id: n, nombre: '#' + n }; });
 var PERSONAL_PROD_CI = [];
 async function ciCargarPersonalProd() {
   var r = await db.from('personal').select('codigo,nombre').eq('area', 'produccion').eq('activo', true).order('nombre');
@@ -1550,6 +1552,8 @@ function ciAbrir() {
   document.getElementById('ciStatusSubir').textContent = '';
   document.getElementById('ciStatusPie').textContent = '';
   document.getElementById('ciPasoSubir').style.display = '';
+  var rm = await db.from('maquinas').select('id,nombre').eq('activa', true).order('orden');
+  if (!rm.error && rm.data && rm.data.length) MAQUINAS_CI = rm.data;
   document.getElementById('ciPasoRevision').style.display = 'none';
   document.getElementById('ciBtnProcesar').style.display = '';
   document.getElementById('ciBtnGuardar').style.display = 'none';
@@ -1915,7 +1919,7 @@ function ciRenderUnDoc(d, di) {
 
 function ciExtraProduccion(d, di, li, l) {
   var maqOpts = '<option value="">Máquina</option>' + MAQUINAS_CI.map(function(m) {
-    return '<option value="' + m + '"' + (String(l.maquina) === String(m) ? ' selected' : '') + '>#' + m + '</option>';
+    return '<option value="' + m.id + '"' + (String(l.maquina) === String(m.id) ? ' selected' : '') + '>' + escHtml(m.nombre) + '</option>';
   }).join('');
   var opOpts = '<option value="">Operario</option>' + PERSONAL_PROD_CI.map(function(p) {
     return '<option value="' + escHtml(p.codigo) + '"' + (l.operador === p.codigo ? ' selected' : '') + '>' + escHtml(p.nombre) + '</option>';
@@ -1926,7 +1930,7 @@ function ciExtraProduccion(d, di, li, l) {
       '<option value="dia"' + (l.turno === 'dia' ? ' selected' : '') + '>☀️ Día</option>' +
       '<option value="noche"' + (l.turno === 'noche' ? ' selected' : '') + '>🌙 Noche</option>' +
     '</select>' +
-    '<select onchange="ciSetCampo(' + di + ',' + li + ',\'maquina\',this.value)" style="width:78px">' + maqOpts + '</select>' +
+    '<select onchange="ciSetCampo(' + di + ',' + li + ',\'maquina\',this.value)" style="width:150px">' + maqOpts + '</select>' +
     '<select onchange="ciSetCampo(' + di + ',' + li + ',\'operador\',this.value)" style="width:118px">' + opOpts + '</select>' +
   '</div>';
 }

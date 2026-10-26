@@ -2634,8 +2634,14 @@ async function cargarResumenProduccion(personalId) {
       var m = x.maquina || 0;
       porMaquina[m] = (porMaquina[m] || 0) + (x.cantidad || 0);
     });
-    var maquinasTxt = Object.keys(porMaquina).sort(function(a, b) { return a - b; }).map(function(m) {
-      return 'Máquina ' + m + ': ' + Math.round(porMaquina[m]).toLocaleString('es-GT') + ' und';
+    // Nombres desde la tabla `maquinas` (sql/maquinas_v1.sql); sin ella se muestra "Máquina N" como antes
+    var maqNombres = {}, maqOrden = {};
+    var rmq = await db.from('maquinas').select('id,nombre,orden');
+    if (!rmq.error) (rmq.data || []).forEach(function(q) { maqNombres[q.id] = q.nombre; maqOrden[q.id] = q.orden; });
+    var maquinasTxt = Object.keys(porMaquina).sort(function(a, b) {
+      return (maqOrden[a] != null ? maqOrden[a] : 1000 + Number(a)) - (maqOrden[b] != null ? maqOrden[b] : 1000 + Number(b));
+    }).map(function(m) {
+      return (maqNombres[m] || (m === '0' ? 'Sin máquina' : 'Máquina ' + m)) + ': ' + Math.round(porMaquina[m]).toLocaleString('es-GT') + ' und';
     }).join(' · ');
     cont.innerHTML = '<div style="background:var(--gest-l);border-radius:10px;padding:12px 14px;margin-bottom:14px">' +
       '<div style="font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--gest-m)">Producción registrada</div>' +
