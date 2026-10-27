@@ -406,6 +406,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-chip{border:1.5px solid var(--border);border-radius:8px;padding:4px 7px;cursor:pointer;background:var(--card);line-height:1.3;transition:border-color .12s}
 .cp-chip:hover{border-color:var(--teal)}
 .cp-chip.proc{border-color:#2563EB;background:#EFF6FF}
+/* Ficha CUBIERTA por stock (el stock PT alcanza el saldo): se ve como "completada" — verde y semitransparente, al final de su grupo, para no atenderla ni sobrestockear */
+.cp-chip.cubierta{background:#F0FDF4;border-color:#86EFAC;opacity:.55;transition:opacity .15s}
+.cp-chip.cubierta:hover,.cp-chip.cubierta.open{opacity:1}
+.cp-chip.cubierta.proc{border-color:#86EFAC;background:#F0FDF4}
+.cp-chip.cubierta::before{content:'✓ COMPLETADA · el stock cubre el saldo';display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#15803D;margin-bottom:2px}
+
 .cp-chip-t{display:flex;justify-content:space-between;gap:4px;font-size:11px;font-weight:800;align-items:baseline}
 .cp-chip-t b{font-family:var(--mono);font-size:12px;color:var(--teal)}
 .cp-chip.proc .cp-chip-t b{color:#1E3A8A}
@@ -4068,7 +4074,7 @@ function notaChipHtml(notas, full) {
 function buildChipCompacto(x, conCliente) {
   var enProc = x.abiertos.length > 0;
   var idq = escHtml(String(x.id));
-  return '<div class="cp-chip' + (enProc ? ' proc' : '') + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
+  return '<div class="cp-chip' + (enProc ? ' proc' : '') + (x.cubierta ? ' cubierta' : '') + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
     + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
     + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
@@ -4083,8 +4089,10 @@ function buildChipCompacto(x, conCliente) {
     + '</div>';
 }
 
+// Orden de los chips: 1) las CUBIERTAS por stock al final (no hay que fabricar nada) · 2) las que MÁS falta fabricar primero ·
+// 3) fecha límite más cercana · 4) antigüedad
 function ordenChipsCompactos(a, b) {
-  return (b.abiertos.length > 0) - (a.abiertos.length > 0) || (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt));
+  return (a.cubierta ? 1 : 0) - (b.cubierta ? 1 : 0) || (b.producir - a.producir) || (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt));
 }
 
 function modeloFichasCompactas() {
@@ -4114,6 +4122,13 @@ function modeloFichasCompactas() {
              sku: l0.sku || '', descSola: (s.lineas.length > 1 ? (l0.desc || '') + ' (+' + (s.lineas.length - 1) + ')' : (l0.desc || s.desc || '')),
              desc: (l0.sku ? l0.sku + ' · ' : '') + (s.lineas.length > 1 ? (l0.desc || '') + ' (+' + (s.lineas.length - 1) + ')' : (l0.desc || s.desc || '')),
              viva: fichaViva(s) };
+  }).map(function(x) {
+    // Stock del PRODUCTO TERMINADO (SKU principal, B2) frente al saldo: cuánto falta FABRICAR y si el stock ya lo cubre todo
+    var it = x.sku ? invB2DeTapas(x.sku) : null;
+    x.stockPT = it ? (it.existencia || 0) : null;
+    x.producir = x.stockPT === null ? x.saldo : Math.max(0, x.saldo - x.stockPT);
+    x.cubierta = x.stockPT !== null && x.saldo > 0 && x.stockPT >= x.saldo;
+    return x;
   });
 }
 
@@ -4185,7 +4200,7 @@ function renderFichasCompactasTapas() {
       : '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>';
   } else if (fichasAgrupar === 'prioridad') {
     // Por PRIORIDAD: primero los URGENTES y luego los demás, cada grupo ordenado por fecha límite
-    var porFecha = function(a, b) { return (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt)); };
+    var porFecha = ordenChipsCompactos; // dentro de cada bloque: las que más falta fabricar primero y las cubiertas por stock al final
     var bloque = function(titulo, items, cls) {
       return '<div class="cp-tipo' + cpCol('prio:' + titulo) + '"><div class="cp-tipo-h' + (cls || '') + '"' + cpClic('prio:' + titulo) + '><span class="cp-chev">▾</span><span class="cp-tipo-n">' + titulo + '</span>'
         + '<span class="cp-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + items.reduce(function(a, x) { return a + x.saldo; }, 0).toLocaleString() + '</b> und</span></div>'
@@ -4197,7 +4212,7 @@ function renderFichasCompactasTapas() {
       var urg = vivas.filter(esUrg).sort(porFecha);
       var resto = vivas.filter(function(x) { return !esUrg(x); }).sort(porFecha);
       cuerpo = (urg.length ? bloque('🔴 Urgentes', urg, ' urg') : '<div class="empty" style="padding:16px;text-align:center;color:var(--gray)">No hay pedidos urgentes</div>')
-        + (resto.length ? bloque('Demás pedidos · por fecha límite', resto, '') : '');
+        + (resto.length ? bloque('Demás pedidos', resto, '') : '');
     }
   } else {
     var filas = clis.map(function(c) {

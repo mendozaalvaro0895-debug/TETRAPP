@@ -229,6 +229,12 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-chip{border:1.5px solid #D8D6D0;border-radius:8px;padding:4px 7px;cursor:pointer;background:#FDFDFC;line-height:1.3;-webkit-tap-highlight-color:transparent}
 .ped-chip:hover{border-color:#1A6B5B}
 .ped-chip.proc{border-color:#2563EB;background:#EFF6FF}
+/* Ficha CUBIERTA por stock (el stock PT alcanza el saldo): se ve como "completada" — verde y semitransparente, al final de su grupo, para no atenderla ni sobrestockear */
+.ped-chip.cubierta{background:#F0FDF4;border-color:#86EFAC;opacity:.55;transition:opacity .15s}
+.ped-chip.cubierta:hover,.ped-chip.cubierta.open{opacity:1}
+.ped-chip.cubierta.proc{border-color:#86EFAC;background:#F0FDF4}
+.ped-chip.cubierta::before{content:'✓ COMPLETADA · el stock cubre el saldo';display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#15803D;margin-bottom:2px}
+
 .ped-chip-t{display:flex;justify-content:space-between;gap:4px;font-size:11px;font-weight:800}
 .ped-chip-t b{font-family:'DM Mono',monospace;color:#1A6B5B}
 .ped-lim{font-family:'DM Mono',monospace;font-size:9.5px;font-weight:600;color:#6B6B6A;margin-left:5px;white-space:nowrap}
@@ -1481,6 +1487,13 @@ function pedNotaHtml(notas, full) {
   return t ? '<div class="ped-nota' + (full ? ' full' : '') + '" title="' + escHtml(t) + '"><b>📝 Notas</b>' + escHtml(t) + '</div>' : '';
 }
 
+// ESPEJO del modelo de tapas.html: cuánto falta FABRICAR (saldo − stock PT del SKU principal) y si el stock ya lo cubre todo
+function pedProducirInfo(x) {
+  var it = x.sku ? (PED.stockInv || {})[x.sku] : null;
+  var st = it ? it.ex : null;
+  return { stock: st, producir: st === null ? x.saldo : Math.max(0, x.saldo - st), cubierta: st !== null && x.saldo > 0 && st >= x.saldo };
+}
+
 function pedCompResumenHtml(x) {
   var k = pedCompStockHtml(x);
   var mal = (k.match(/class="ped-k mal"/g) || []).length;
@@ -1590,11 +1603,15 @@ function renderPedidos() {
     porCli[x.cliente].push(x);
   });
   clis.sort(function(a, b) { return a.localeCompare(b); });
-  var ordenChips = function(a, b) { return (b.abiertos.length > 0) - (a.abiertos.length > 0) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at)); };
+  // Orden de los chips: 1) las CUBIERTAS por stock al final · 2) las que MÁS falta fabricar primero · 3) fecha límite · 4) antigüedad
+  var ordenChips = function(a, b) {
+    var pa = pedProducirInfo(a), pb = pedProducirInfo(b);
+    return (pa.cubierta ? 1 : 0) - (pb.cubierta ? 1 : 0) || (pb.producir - pa.producir) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at));
+  };
   var chip = function(x, conCliente) {
     var proc = x.abiertos.length > 0;
     var idq = escHtml(String(x.id));
-    return '<div class="ped-chip' + (proc ? ' proc' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
+    return '<div class="ped-chip' + (proc ? ' proc' : '') + (pedProducirInfo(x).cubierta ? ' cubierta' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
       + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
       + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
@@ -1634,7 +1651,7 @@ function renderPedidos() {
       : '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
   } else if (pedAgrupar === 'prioridad') {
     // Por PRIORIDAD: primero los URGENTES y luego los demás, cada grupo ordenado por fecha límite
-    var porFecha = function(a, b) { return (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at)); };
+    var porFecha = ordenChips; // dentro de cada bloque: las que más falta fabricar primero y las cubiertas por stock al final
     var bloque = function(titulo, items, cls) {
       return '<div class="ped-tipo' + pedCol('prio:' + titulo) + '"><div class="ped-tipo-h' + (cls || '') + '"' + pedClic('prio:' + titulo) + '><span class="ped-chev">▾</span><span class="ped-tipo-n">' + titulo + '</span>'
         + '<span class="ped-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + pedNum(items.reduce(function(a, x) { return a + x.saldo; }, 0)) + '</b> und</span></div>'
@@ -1645,7 +1662,7 @@ function renderPedidos() {
       var urg = vivas.filter(function(x) { return x.urgente; }).sort(porFecha);
       var resto = vivas.filter(function(x) { return !x.urgente; }).sort(porFecha);
       htmlGrid = (urg.length ? bloque('🔴 Urgentes', urg, ' urg') : '<div class="ped-vacio">No hay pedidos urgentes.</div>')
-        + (resto.length ? bloque('Demás pedidos · por fecha límite', resto, '') : '');
+        + (resto.length ? bloque('Demás pedidos', resto, '') : '');
     }
   } else {
     var filas = clis.map(function(c) {
