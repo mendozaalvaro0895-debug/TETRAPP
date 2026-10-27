@@ -121,6 +121,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .stats-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
 .stat-chip{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--gray)}
 .stat-chip strong{display:block;font-family:var(--mono);font-size:20px;color:var(--ink);font-weight:700;line-height:1.2}
+.stat-chip.clic{cursor:pointer;user-select:none}
+.stat-chip.clic:hover{border-color:#34D399}
+.stat-chip.clic.active{background:var(--green-l);border-color:#34D399;box-shadow:0 0 0 2px #34D39944}
+.tag-nuevo{background:var(--green-l);color:#065F46;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:6px;white-space:nowrap;vertical-align:middle}
 
 .bod-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
 .bod-tab{padding:6px 16px;border-radius:8px;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--gray);transition:all .15s}
@@ -275,6 +279,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="stat-chip"><strong id="statActivos">—</strong>Activos</div>
       <div class="stat-chip"><strong id="statCeroStock">—</strong>Stock en cero</div>
       <div class="stat-chip" id="chipBajoMin" style="display:none;border-color:#FDE68A;background:#FFFBEB"><strong id="statBajoMin" style="color:#B87200">—</strong>Bajo mínimo</div>
+      <div class="stat-chip clic" id="chipNuevos" style="display:none" onclick="toggleSoloNuevos()" title="Códigos agregados en las últimas importaciones, del más reciente al más antiguo"><strong id="statNuevos" style="color:#065F46">0</strong>🆕 Nuevos recientes</div>
     </div>
 
     <div class="bod-tabs">
@@ -616,6 +621,59 @@ var POR_PAG = 50;
 var sortCol = 'sku';
 var sortDir = 1;
 
+/* ── SKU nuevos de las últimas importaciones ──────────────────────
+   Al confirmar una importación se guardan los códigos nuevos (con bodega y fecha) en el
+   localStorage de este equipo; el chip "Nuevos recientes" los filtra, el más reciente primero. */
+var NUEVOS_KEY = 'tetra_nuevos_hist';
+var NUEVOS_MAX = 300;
+var soloNuevos = false;
+var nuevosOrdenManual = false;
+
+function nuevosHist() {
+  try { var h = JSON.parse(localStorage.getItem(NUEVOS_KEY) || '[]'); return Array.isArray(h) ? h : []; } catch(e) { return []; }
+}
+function nuevosRegistrar(bodegaKey, lista) {
+  if (!lista || !lista.length) return;
+  try {
+    var ts = new Date().toISOString();
+    var nuevosH = lista.map(function(p) { return { sku: p.sku, b: bodegaKey, ts: ts }; });
+    var h = nuevosH.concat(nuevosHist()).slice(0, NUEVOS_MAX);
+    localStorage.setItem(NUEVOS_KEY, JSON.stringify(h));
+  } catch(e) {}
+}
+function nuevosClave(item) {
+  return (bodegaFiltro === 'B7' ? 'B7' : (item.bodega || 'B2')) + '|' + item.sku;
+}
+function nuevosMapa() {
+  var m = {};
+  nuevosHist().forEach(function(e) { var k = e.b + '|' + e.sku; if (!m[k]) m[k] = e.ts; });
+  return m;
+}
+function nuevoTs(item, mapa) { return (mapa || nuevosMapa())[nuevosClave(item)] || null; }
+function toggleSoloNuevos() {
+  soloNuevos = !soloNuevos;
+  nuevosOrdenManual = false;
+  pag = 0;
+  var chip = document.getElementById('chipNuevos');
+  if (chip) chip.classList.toggle('active', soloNuevos);
+  aplicarFiltro();
+}
+function fmtFechaNuevo(ts) {
+  return new Date(ts).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' });
+}
+function actualizarChipNuevos() {
+  var chip = document.getElementById('chipNuevos');
+  if (!chip) return;
+  var mapa = nuevosMapa();
+  var fuente = bodegaFiltro === 'B7' ? todosLosInsumosB7 : todosLosItems;
+  var n = fuente.filter(function(i) {
+    if (bodegaFiltro === 'B2' && (i.bodega || 'B2') !== 'B2') return false;
+    return !!mapa[nuevosClave(i)];
+  }).length;
+  document.getElementById('statNuevos').textContent = n;
+  chip.style.display = (n > 0 || soloNuevos) ? 'block' : 'none';
+}
+
 async function cargarTodo() {
   document.getElementById('tblBody').innerHTML = '<tr class="empty-row"><td colspan="6">Cargando…</td></tr>';
   try {
@@ -669,6 +727,7 @@ function actualizarStats() {
     document.getElementById('statCeroStock').textContent = activos.filter(function(i) { return (i.existencia || 0) === 0; }).length;
     if (chip) { document.getElementById('statBajoMin').textContent = bajoMin; chip.style.display = 'none'; }
   }
+  actualizarChipNuevos();
 }
 
 function filtrarTabla(q) {
@@ -679,9 +738,11 @@ function filtrarTabla(q) {
 function aplicarFiltro(q) {
   var query = (q || document.getElementById('searchInput').value || '').toLowerCase().trim();
   var fuente = bodegaFiltro === 'B7' ? todosLosInsumosB7 : todosLosItems;
+  var mapaNuevos = soloNuevos ? nuevosMapa() : null;
   filtrados = fuente.filter(function(i) {
     if (!mostrarInactivos && !i.activo) return false;
     if (bodegaFiltro === 'B2' && (i.bodega || 'B2') !== 'B2') return false;
+    if (soloNuevos && !mapaNuevos[nuevosClave(i)]) return false;
     if (!query) return true;
     return (i.sku || '').toLowerCase().includes(query) ||
            (i.descripcion || '').toLowerCase().includes(query);
@@ -704,6 +765,7 @@ function ordenar(col) {
     sortDir = col === 'existencia' ? -1 : 1;
   }
   pag = 0;
+  nuevosOrdenManual = true;
   actualizarIconosSort();
   renderTabla();
 }
@@ -724,6 +786,16 @@ function actualizarIconosSort() {
 }
 
 function sortFiltrados() {
+  if (soloNuevos && !nuevosOrdenManual) {
+    // más reciente primero; dentro de una misma carga, por SKU
+    var mapa = nuevosMapa();
+    filtrados.sort(function(a, b) {
+      var ta = mapa[nuevosClave(a)] || '', tb = mapa[nuevosClave(b)] || '';
+      if (ta !== tb) return ta < tb ? 1 : -1;
+      return String(a.sku).localeCompare(String(b.sku), undefined, { numeric: true });
+    });
+    return;
+  }
   filtrados.sort(function(a, b) {
     var va, vb;
     if (sortCol === 'existencia') {
@@ -757,8 +829,9 @@ function renderTabla() {
   var fin    = Math.min(inicio + POR_PAG, filtrados.length);
   var pagina = filtrados.slice(inicio, fin);
 
+  var mapaTag = nuevosMapa();
   tbody.innerHTML = pagina.map(function(item) {
-    return buildFila(item);
+    return buildFila(item, mapaTag[nuevosClave(item)]);
   }).join('');
 
   var paginacion = document.getElementById('pagination');
@@ -772,7 +845,7 @@ function renderTabla() {
   }
 }
 
-function buildFila(item) {
+function buildFila(item, tsNuevo) {
   var badge = item.activo
     ? '<span class="badge badge-active">● Activo</span>'
     : '<span class="badge badge-inactive">● Inactivo</span>';
@@ -795,7 +868,8 @@ function buildFila(item) {
   var areaVentasTd = buildAreaVentasTd(item);
 
   return '<tr class="' + rowClass + '">' +
-    '<td class="sku-cell">' + escHtml(item.sku) + '</td>' +
+    '<td class="sku-cell">' + escHtml(item.sku) +
+      (tsNuevo ? '<span class="tag-nuevo" title="Agregado en la importación del ' + escHtml(fmtFechaNuevo(tsNuevo)) + '">NUEVO · ' + escHtml(fmtFechaNuevo(tsNuevo)) + '</span>' : '') + '</td>' +
     '<td class="desc-cell">' + escHtml(item.descripcion || '—') + '</td>' +
     '<td class="exist-cell">' +
       '<span id="ev-' + escHtml(item.sku) + '" ondblclick="editarExist(\'' + skuEsc + '\')" title="Doble clic para editar">' + exist + '</span>' +
@@ -1340,6 +1414,7 @@ async function confirmarImportB7() {
     var msg = total + ' insumos procesados';
     if (nuevos.length) msg += ' · ' + nuevos.length + ' nuevos';
     if (errores) msg += ' · ' + errores + ' errores';
+    nuevosRegistrar('B7', nuevos);
     toast(msg, errores ? 'err' : 'ok');
     if (!errores) {
       registrarImportDiario();
@@ -1416,6 +1491,7 @@ async function confirmarImport() {
     if (nuevos.length) msg += ' · ' + nuevos.length + ' nuevos agregados';
     if (descActualizadas) msg += ' · ' + descActualizadas + ' descripciones actualizadas';
     if (errores) msg += ' · ' + errores + ' errores';
+    nuevosRegistrar(bodeganKey, nuevos);
     toast(msg, errores ? 'err' : 'ok');
     if (!errores) {
       registrarImportDiario();
