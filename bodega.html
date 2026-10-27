@@ -629,17 +629,44 @@ var NUEVOS_MAX = 300;
 var soloNuevos = false;
 var nuevosOrdenManual = false;
 
-function nuevosHist() {
+var NUEVOS_DB_CLAVE = 'bodega_nuevos_hist';   // fila de `configuracion` (visible desde cualquier equipo)
+var nuevosMem = null;
+
+function nuevosHistLocal() {
   try { var h = JSON.parse(localStorage.getItem(NUEVOS_KEY) || '[]'); return Array.isArray(h) ? h : []; } catch(e) { return []; }
+}
+function nuevosHist() { return nuevosMem || nuevosHistLocal(); }
+// une listas sin repetir bodega+sku (gana la fecha más reciente), la más reciente primero
+function nuevosUnir(listas) {
+  var mejor = {};
+  listas.forEach(function(lista) {
+    (lista || []).forEach(function(e) {
+      if (!e || !e.sku || !e.ts) return;
+      var k = e.b + '|' + e.sku;
+      if (!mejor[k] || e.ts > mejor[k].ts) mejor[k] = e;
+    });
+  });
+  return Object.keys(mejor).map(function(k) { return mejor[k]; })
+    .sort(function(a, b) { return a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0; })
+    .slice(0, NUEVOS_MAX);
+}
+async function nuevosCargarDB() {
+  var deDB = [];
+  try {
+    var r = await db.from('configuracion').select('valor').eq('clave', NUEVOS_DB_CLAVE).maybeSingle();
+    if (r && r.data && Array.isArray(r.data.valor)) deDB = r.data.valor;
+  } catch(e) {}
+  nuevosMem = nuevosUnir([deDB, nuevosMem, nuevosHistLocal()]);
 }
 function nuevosRegistrar(bodegaKey, lista) {
   if (!lista || !lista.length) return;
-  try {
-    var ts = new Date().toISOString();
-    var nuevosH = lista.map(function(p) { return { sku: p.sku, b: bodegaKey, ts: ts }; });
-    var h = nuevosH.concat(nuevosHist()).slice(0, NUEVOS_MAX);
-    localStorage.setItem(NUEVOS_KEY, JSON.stringify(h));
-  } catch(e) {}
+  var ts = new Date().toISOString();
+  var nuevosH = lista.map(function(p) { return { sku: p.sku, b: bodegaKey, ts: ts }; });
+  nuevosMem = nuevosUnir([nuevosH, nuevosHist()]);
+  try { localStorage.setItem(NUEVOS_KEY, JSON.stringify(nuevosMem)); } catch(e) {}
+  // Supabase: lo ven todos los equipos. Solo master puede escribir; si falla queda la copia local.
+  db.from('configuracion').upsert({ clave: NUEVOS_DB_CLAVE, valor: nuevosMem, updated_at: ts })
+    .then(function(r) { if (r && r.error) console.warn('bodega_nuevos_hist:', r.error.message); });
 }
 function nuevosClave(item) {
   return (bodegaFiltro === 'B7' ? 'B7' : (item.bodega || 'B2')) + '|' + item.sku;
@@ -652,7 +679,7 @@ function nuevosMapa() {
 function nuevoTs(item, mapa) { return (mapa || nuevosMapa())[nuevosClave(item)] || null; }
 function toggleSoloNuevos() {
   if (!soloNuevos && document.getElementById('statNuevos').textContent === '0') {
-    toast('Todavía no hay SKU nuevos registrados en este equipo. Se llena con la próxima importación que traiga productos nuevos.', 'ok');
+    toast('Todavía no hay SKU nuevos registrados. Se llena con la próxima importación que traiga productos nuevos.', 'ok');
     return;
   }
   soloNuevos = !soloNuevos;
@@ -708,6 +735,7 @@ async function cargarTodo() {
       desdeB7 += BATCH;
     }
     todosLosInsumosB7 = todosB7;
+    await nuevosCargarDB();
     actualizarStats();
     aplicarFiltro();
   } catch(e) {
