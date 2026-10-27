@@ -210,6 +210,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .drv-ro{color:var(--gray);background:transparent}
 .drv-aviso{color:#FBBF24}
 .drv-nueva{color:#7ECEC0;font-weight:700}
+.drv-area{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;padding:3px 10px;border-radius:4px;border:1px solid currentColor;background:color-mix(in srgb,currentColor 14%,transparent);white-space:nowrap;vertical-align:middle}
+.drv-fila-nom{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 @media(max-width:560px){.drv-form{grid-template-columns:1fr}}
 .ci-recon-ok{color:#4ADE80;font-weight:700;font-size:11.5px}
 .ci-recon-warn{color:#FBBF24;font-weight:700;font-size:11.5px}
@@ -531,15 +533,10 @@ setInterval(cargarKPIs, 30000);
 // escHtml() lo provee shared/auth.js de forma global.
 
 // ══ GUÍA DE ALIMENTACIÓN DIARIA ═════════════════════════════
-// Reglas (oct/2026): inventario AM desde el primer ingreso del día, PM desde las 3:33 pm;
-// requis de Tapas/Serigrafía, ventas y asistencia: al menos las del día hábil anterior.
+// Reglas (oct/2026): inventario AM desde el primer ingreso del día (ya NO se exige el PM);
+// requis de Tapas/Serigrafía, ventas, asistencia y validación de productividad de Tapas (comandas por
+// aprobar): al día hasta el día hábil anterior.
 // Domingos y feriados (dias_feriados) no se exige nada. El bloqueo de fichas aplica solo a master.
-var GUIA_MIN_PM = 15 * 60 + 33;
-
-function gtMinutos() {
-  var d = new Date(Date.now() - 6 * 60 * 60 * 1000);
-  return d.getUTCHours() * 60 + d.getUTCMinutes();
-}
 function guiaSumarDias(fecha, n) {
   var d = new Date(fecha + 'T12:00:00Z');
   d.setUTCDate(d.getUTCDate() + n);
@@ -579,8 +576,8 @@ function guiaInvLocal() {
   try { return (JSON.parse(localStorage.getItem('tetra_inv_' + fechaHoyLocal()) || '{"count":0}').count) || 0; } catch (e) { return 0; }
 }
 
-function guiaTarea(id, label, req, done, detalle, ir) {
-  return { id: id, label: label, req: req, done: done, det: detalle, ir: ir };
+function guiaTarea(id, label, req, done, detalle, ir, btn) {
+  return { id: id, label: label, req: req, done: done, det: detalle, ir: ir, btn: btn || '' };
 }
 
 async function guiaConstruir() {
@@ -598,26 +595,21 @@ async function guiaConstruir() {
     guiaSafe(db.from('movimientos_materiales').select('observaciones,created_at').eq('area', 'serig').gte('created_at', desde).limit(1000)),
     guiaSafe(db.from('entregas_serig').select('fecha').order('fecha', { ascending: false }).limit(1)),
     guiaSafe(db.from('ventas').select('fecha').order('fecha', { ascending: false }).limit(1)),
-    guiaSafe(db.from('asistencia_diaria').select('area').eq('fecha', ayer).in('area', ['tapas', 'serig']).limit(500))
+    guiaSafe(db.from('asistencia_diaria').select('area').eq('fecha', ayer).in('area', ['tapas', 'serig']).limit(500)),
+    guiaSafe(db.from('comandas').select('fecha').eq('estado_aprobacion', 'pendiente').order('fecha', { ascending: true }).limit(1000))
   ]);
-  var tareasHoy = res[0], movTapas = res[1], movSerig = res[2], entSerig = res[3], ventas = res[4], asist = res[5];
+  var tareasHoy = res[0], movTapas = res[1], movSerig = res[2], entSerig = res[3], ventas = res[4], asist = res[5], comPend = res[6];
 
   var t = [];
-  // Inventario: si la tabla nueva aún no existe se cae al localStorage de este equipo
-  var invAM, invPM;
+  // Inventario AM (un registro PM posterior también lo da por cumplido). Si la tabla nueva aún no existe se cae al localStorage de este equipo
+  var invAM;
   if (tareasHoy) {
-    var hayPM = tareasHoy.some(function (x) { return x.tarea === 'inventario_pm'; });
-    invPM = hayPM;
-    invAM = hayPM || tareasHoy.some(function (x) { return x.tarea === 'inventario_am'; });
+    invAM = tareasHoy.some(function (x) { return x.tarea === 'inventario_am' || x.tarea === 'inventario_pm'; });
   } else {
-    var c = guiaInvLocal();
-    invAM = c >= 1; invPM = c >= 2;
+    invAM = guiaInvLocal() >= 1;
   }
-  var reqPM = hoyHabil && gtMinutos() >= GUIA_MIN_PM;
   t.push(guiaTarea('inv_am', 'Inventario AM', hoyHabil, invAM,
     invAM ? 'Registrado hoy' : 'Pendiente desde el primer ingreso del día', 'bodega.html#existencias'));
-  t.push(guiaTarea('inv_pm', 'Inventario PM', reqPM, invPM,
-    invPM ? 'Registrado hoy' : (reqPM ? 'Pendiente — se exige desde las 3:33 pm' : 'Se exige desde las 3:33 pm'), 'bodega.html#existencias'));
 
   function porFecha(id, label, maxFecha, ir) {
     var done = maxFecha === null ? null : maxFecha >= ayer;
@@ -641,6 +633,19 @@ async function guiaConstruir() {
   asistArea('asist_tapas', 'Asistencia Tapas', 'tapas', 'tapas.html');
   asistArea('asist_serig', 'Asistencia Serigrafía', 'serig', 'serigrafia.html');
 
+  // Validación de productividad de Tapas = aprobar los ingresos (comandas) que registran la supervisora y el personal.
+  // Cumplida cuando no queda ninguna por aprobar con fecha hasta el día hábil anterior; las de hoy pueden esperar.
+  var vDone = null, vDet = 'No se pudo verificar';
+  if (comPend !== null) {
+    var vieja = comPend.filter(function (c) { return c.fecha <= ayer; });
+    var deHoy = comPend.length - vieja.length;
+    vDone = vieja.length === 0;
+    vDet = vDone
+      ? 'Al día' + (deHoy ? ' · ' + deHoy + (deHoy === 1 ? ' comanda de hoy' : ' comandas de hoy') + ' por aprobar' : ' · sin comandas por aprobar')
+      : vieja.length + (vieja.length === 1 ? ' comanda por aprobar' : ' comandas por aprobar') + ' · la más antigua: ' + indFechaCorta(vieja[0].fecha);
+  }
+  t.push(guiaTarea('valid_tapas', 'Validación de productividad en Tapas', hoyHabil, vDone, vDet, 'comandas.html?modo=pendientes', 'Aprobar →'));
+
   var omitida = (tareasHoy || []).some(function (x) { return x.tarea === 'omitir_guia'; });
   return { tareas: t, hoyHabil: hoyHabil, omitida: omitida, hoy: hoy, ayer: ayer };
 }
@@ -653,7 +658,7 @@ function guiaClase(t) {
 function guiaFilaHtml(t) {
   var go = '';
   if (t.ir === '#central') go = '<button class="guia-go" onclick="ciAbrir()">Cargar →</button>';
-  else go = '<a class="guia-go" href="' + t.ir + '">Ir →</a>';
+  else go = '<a class="guia-go" href="' + t.ir + '">' + (t.btn || 'Ir →') + '</a>';
   return '<div class="guia-row ' + guiaClase(t) + '"><span class="guia-led"></span>' +
     '<div class="guia-txt"><div class="guia-lbl">' + t.label + '</div><div class="guia-det">' + t.det + '</div></div>' + go + '</div>';
 }
@@ -967,6 +972,15 @@ var DRV_ESTADO_APP = { presente: 'presente', permiso: 'presente', ausente: 'ause
 var DRV_ORIGEN_FALTA = { tapas: 'asistencia_tapas', serig: 'asistencia_serig' };
 var DRV_AREAS_NOMBRE = { produccion: 'Producción', serig: 'Serigrafía', tapas: 'Tapas', bodega: 'Bodega', mantenimiento: 'Mantenimiento',
   torno: 'Torno', moldes: 'Moldes', molino: 'Molino', oficina: 'Oficina', limpieza: 'Limpieza' };
+// Acento de cada área sobre fondo oscuro (mismos tonos de las fichas del inicio; las áreas sin ficha llevan uno propio)
+var DRV_ACENTO_AREA = { serig: '#A78BFA', tapas: '#7ECEC0', produccion: '#E0A93B', bodega: '#22D3EE', molino: '#FB923C', oficina: '#60A5FA',
+  moldes: '#F472B6', mantenimiento: '#F87171', torno: '#A3E635', limpieza: '#2DD4BF' };
+// Etiqueta GRANDE del área (y turno en Producción) que acompaña a cada nombre en la revisión del Drive
+function drvAreaChip(area, turno) {
+  var txt = DRV_AREAS_NOMBRE[area] || area || '—';
+  if (area === 'produccion' && turno) txt += ' · Turno ' + String(turno).charAt(0).toUpperCase() + String(turno).slice(1);
+  return '<span class="drv-area" style="color:' + (DRV_ACENTO_AREA[area] || '#9CA3AF') + '">' + escHtml(txt) + '</span>';
+}
 
 function drvNorm(s) {
   return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
@@ -1239,7 +1253,7 @@ function drvOpcionesPersonal(area) {
 
 function drvFilaBaja(b, i) {
   return '<tr><td><input type="checkbox" class="drv-baja" data-i="' + i + '" checked></td>' +
-    '<td><b>' + escHtml(b.nombre) + '</b><div class="ci-doc-meta">' + escHtml(b.codigo) + ' · ' + escHtml(DRV_AREAS_NOMBRE[b.area] || b.area) + '</div></td>' +
+    '<td><div class="drv-fila-nom">' + drvAreaChip(b.area) + '<b>' + escHtml(b.nombre) + '</b></div><div class="ci-doc-meta">' + escHtml(b.codigo) + '</div></td>' +
     '<td style="font-family:var(--mono)">' + escHtml(indFechaCorta(b.desde)) + '</td></tr>';
 }
 // Persona NUEVA = nadie parecido en TETRAPP → se recomienda el alta (botón destacado).
@@ -1248,14 +1262,14 @@ function drvEsNueva(s) { return s.motivo !== 'ambiguo'; }
 function drvFilaSinCruzar(s, i) {
   var nueva = drvEsNueva(s);
   var nota = nueva
-    ? '<span class="drv-nueva">🆕 Persona nueva en la hoja — se recomienda darla de alta</span>'
+    ? '<span class="drv-nueva">🆕 Persona nueva en la hoja — se recomienda darla de alta en <span style="color:' + (DRV_ACENTO_AREA[s.area] || '#9CA3AF') + '">' + escHtml(DRV_AREAS_NOMBRE[s.area] || s.area) + '</span></span>'
     : '<span class="drv-aviso">⚠️ Parecida a: ' + escHtml(s.candidatos.join(' / ')) + ' — si es la misma persona, usa Vincular</span>';
   var alta = nueva
     ? '<button class="ci-btn" style="padding:6px 14px;font-size:12px" onclick="drvAltaAbrir(' + i + ')" title="Crear la ficha en TETRAPP con los datos de la hoja">➕ Dar de alta</button> '
     : '<button class="guia-go" onclick="drvAltaAbrir(' + i + ')" title="Solo si de verdad es otra persona">➕ Dar de alta</button>';
   var vinc = '<select id="drvSel' + i + '" style="max-width:240px">' + drvOpcionesPersonal(s.area) + '</select> ' +
     '<button class="guia-go" onclick="drvVincular(' + i + ')">Vincular</button>';
-  return '<tr><td><b>' + escHtml(s.nombre) + '</b><div class="ci-doc-meta">' + escHtml(DRV_AREAS_NOMBRE[s.area] || s.area) + ' · ' + nota + '</div></td>' +
+  return '<tr><td><div class="drv-fila-nom">' + drvAreaChip(s.area, s.turnoProd) + '<b>' + escHtml(s.nombre) + '</b></div><div class="ci-doc-meta">' + nota + '</div></td>' +
     '<td>' + (nueva ? alta + vinc : vinc + ' ' + alta) + '</td></tr>';
 }
 function drvLista(titulo, items, fmt) {
@@ -1279,8 +1293,8 @@ async function drvAbrirRevision() {
       '<div class="ci-doc-meta">Su asistencia no se sincroniza hasta que existan en TETRAPP. Las marcadas 🆕 parecen personas nuevas: <b>dalas de alta</b> aquí mismo. Si ya existen con otro nombre, usa <b>Vincular</b>.</div></div></div>' +
       '<table class="ci-tbl"><tbody>' + r.sinCruzar.map(drvFilaSinCruzar).join('') + '</tbody></table></div>';
   }
-  h += drvLista('Activos en la hoja pero dados de baja en TETRAPP', r.reactivar, function (x) { return escHtml(x.nombre) + ' · ' + escHtml(x.codigo); });
-  h += drvLista('Activos en TETRAPP que no aparecen en la hoja del mes', r.faltanEnHoja, function (x) { return escHtml(x.nombre) + ' · ' + escHtml(x.codigo) + ' · ' + escHtml(DRV_AREAS_NOMBRE[x.area] || x.area); });
+  h += drvLista('Activos en la hoja pero dados de baja en TETRAPP', r.reactivar, function (x) { return drvAreaChip(x.area) + ' ' + escHtml(x.nombre) + ' · ' + escHtml(x.codigo); });
+  h += drvLista('Activos en TETRAPP que no aparecen en la hoja del mes', r.faltanEnHoja, function (x) { return drvAreaChip(x.area) + ' ' + escHtml(x.nombre) + ' · ' + escHtml(x.codigo); });
   h += drvLista('Estados de la hoja que no reconozco (se ignoran)', r.desconocidos, function (x) { return escHtml(x); });
   if (!h) h = '<div class="ci-status">Todo al día — nada por revisar.</div>';
   document.getElementById('driveBody').innerHTML = h;
@@ -1380,8 +1394,7 @@ async function drvAltaAbrir(i) {
   document.getElementById('altaCodigo').value = drvCodigoLibre(s.area, personal);
   document.getElementById('altaIniciales').removeAttribute('data-manual');
   document.getElementById('altaIniciales').value = drvIniciales(nombre);
-  document.getElementById('altaArea').textContent = (DRV_AREAS_NOMBRE[s.area] || s.area) +
-    (s.area === 'produccion' && s.turnoProd ? ' · Turno ' + s.turnoProd.charAt(0).toUpperCase() + s.turnoProd.slice(1) : '');
+  document.getElementById('altaArea').innerHTML = drvAreaChip(s.area, s.turnoProd);
   document.getElementById('altaInicio').value = s.ingreso || drvIngresoDeNombre(s.nombre) || '';
   document.getElementById('altaRol').value = 'operador';
   document.getElementById('altaProceso').value = '';
@@ -1542,6 +1555,8 @@ var PERSONAL_PROD_CI = [];
 async function ciCargarPersonalProd() {
   var r = await db.from('personal').select('codigo,nombre').eq('area', 'produccion').eq('activo', true).order('nombre');
   PERSONAL_PROD_CI = r.data || [];
+  var rm = await db.from('maquinas').select('id,nombre').eq('activa', true).order('orden');
+  if (!rm.error && rm.data && rm.data.length) MAQUINAS_CI = rm.data;
 }
 
 function ciAbrir() {
@@ -1552,8 +1567,6 @@ function ciAbrir() {
   document.getElementById('ciStatusSubir').textContent = '';
   document.getElementById('ciStatusPie').textContent = '';
   document.getElementById('ciPasoSubir').style.display = '';
-  var rm = await db.from('maquinas').select('id,nombre').eq('activa', true).order('orden');
-  if (!rm.error && rm.data && rm.data.length) MAQUINAS_CI = rm.data;
   document.getElementById('ciPasoRevision').style.display = 'none';
   document.getElementById('ciBtnProcesar').style.display = '';
   document.getElementById('ciBtnGuardar').style.display = 'none';
