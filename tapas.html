@@ -387,6 +387,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-nota b{font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;color:#A16207;margin-right:4px}
 .cp-chip.open .cp-nota{-webkit-line-clamp:unset;display:block}
 .cp-nota.full{-webkit-line-clamp:unset;display:block}
+.cp-cod{margin-top:3px;font-size:10px;color:#475569}
+.cp-cod b{font-family:var(--mono);color:#0F172A}
 .cp-urg{font-style:normal;font-size:9.5px;font-weight:800;color:#B83232;background:#FEE2E2;border-radius:6px;padding:1px 6px;margin-right:3px}
 .cp-tipo-h.urg{background:#FEE2E2;border-color:#B83232}
 .cp-tipo-h.urg .cp-tipo-n{color:#B83232}
@@ -1806,6 +1808,7 @@ async function mostrarDetalle(id) {
   const filasBod = filasBodegaFicha(s, movsFicha);
   bodegaFilasFicha[s.id] = filasBod;
   const cuerpo = `
+      ${(s.lineas[0] && s.lineas[0].codigoCliente) ? `<div class="dc"><div class="dc-b" style="font-size:12px">🏷 Código del cliente: <b style="font-family:var(--mono)">${escHtml(s.lineas[0].codigoCliente)}</b></div></div>` : ''}
       ${s.notas ? `<div class="dc" style="border-color:#FDE047;border-width:2px"><div class="dc-h" style="background:#FEF9C3;color:#A16207">📝 Notas</div><div class="dc-b" style="white-space:pre-line;background:#FFFDF0">${escHtml(s.notas)}</div></div>` : ''}
       ${buildBloqueBodegaFicha(s, filasBod)}
       ${lotesAbiertosPlazoHtml(s)}
@@ -4173,6 +4176,12 @@ function notaChipHtml(notas, full) {
   return t ? '<div class="cp-nota' + (full ? ' full' : '') + '" title="' + escHtml(t) + '"><b>📝 Notas</b>' + escHtml(t) + '</div>' : '';
 }
 
+// Código del cliente de la ficha (el de su OC), para cruzarla rápido con la orden de compra
+function codClienteChipHtml(s) {
+  var c = s && s.lineas && s.lineas[0] ? s.lineas[0].codigoCliente : '';
+  return c ? '<div class="cp-cod" title="Código con que el cliente identifica este producto en su OC">🏷 Cód. cliente <b>' + escHtml(c) + '</b></div>' : '';
+}
+
 function buildChipCompacto(x, conCliente) {
   var enProc = x.abiertos.length > 0;
   var idq = escHtml(String(x.id));
@@ -4180,6 +4189,7 @@ function buildChipCompacto(x, conCliente) {
     + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
     + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
+    + codClienteChipHtml(x.s)
     + stkPTHtml(x.sku, x.saldo)
     + notaChipHtml(x.s.notas)
     + '<div class="cp-resum">' + (enProc ? '<span class="cp-res-b proc">▶ ' + x.enProc.toLocaleString() + ' en proceso</span>' : '') + componentesResumenHtml(x.s) + '</div>'

@@ -2,7 +2,7 @@
 -- Código del cliente ↔ nuestro SKU (oct/2026)
 -- Cada cliente identifica sus productos con SU PROPIO código en sus OC. Al escribirlo en la
 -- solicitud de Tapas se busca aquí y se elige solo nuestro SKU; si es nuevo, queda vinculado
--- al guardar. Además la línea de la ficha guarda el código (solo se ve al editar la ficha; no se muestra en las fichas de pedido).
+-- al guardar. Además la línea de la ficha guarda el código (se muestra en las fichas solo en la vista de master).
 -- Correr en Supabase Dashboard → SQL Editor (no borra ni cambia nada existente).
 -- ════════════════════════════════════════════════════════════════
 
@@ -47,7 +47,7 @@ revoke all on public.sku_codigo_cliente from anon;
 grant select, insert, update, delete on public.sku_codigo_cliente to authenticated;
 grant usage, select on sequence public.sku_codigo_cliente_id_seq to authenticated;
 
--- El código también se guarda en la línea de cada ficha (solo se ve al editar; no se muestra en las fichas)
+-- El código también se guarda en la línea de cada ficha (se muestra en las fichas solo en la vista de master)
 alter table public.solicitud_lineas add column if not exists codigo_cliente text;
 
 -- Verificar
