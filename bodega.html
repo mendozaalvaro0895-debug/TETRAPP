@@ -651,6 +651,10 @@ function nuevosMapa() {
 }
 function nuevoTs(item, mapa) { return (mapa || nuevosMapa())[nuevosClave(item)] || null; }
 function toggleSoloNuevos() {
+  if (!soloNuevos && document.getElementById('statNuevos').textContent === '0') {
+    toast('Todavía no hay SKU nuevos registrados en este equipo. Se llena con la próxima importación que traiga productos nuevos.', 'ok');
+    return;
+  }
   soloNuevos = !soloNuevos;
   nuevosOrdenManual = false;
   pag = 0;
@@ -670,8 +674,7 @@ function actualizarChipNuevos() {
     if (bodegaFiltro === 'B2' && (i.bodega || 'B2') !== 'B2') return false;
     return !!mapa[nuevosClave(i)];
   }).length;
-  document.getElementById('statNuevos').textContent = n;
-  chip.style.display = 'block';
+  document.getElementById('statNuevos').textContent = n;  chip.style.display = 'block';
   chip.style.opacity = n > 0 ? '1' : '.55';
 }
 
@@ -819,7 +822,8 @@ function renderTabla() {
   var tbody = document.getElementById('tblBody');
   var cols = bodegaFiltro === 'B7' ? 6 : 5;
   if (filtrados.length === 0) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="' + cols + '">Sin resultados</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="' + cols + '">' +
+      (soloNuevos ? 'Sin SKU nuevos en esta vista · toca "Nuevos recientes" otra vez para volver al listado completo' : 'Sin resultados') + '</td></tr>';
     document.getElementById('pagination').style.display = 'none';
     return;
   }
