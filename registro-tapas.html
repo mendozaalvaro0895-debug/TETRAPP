@@ -1491,7 +1491,12 @@ function pedNotaHtml(notas, full) {
 function pedProducirInfo(x) {
   var it = x.sku ? (PED.stockInv || {})[x.sku] : null;
   var st = it ? it.ex : null;
-  return { stock: st, producir: st === null ? x.saldo : Math.max(0, x.saldo - st), cubierta: st !== null && x.saldo > 0 && st >= x.saldo };
+  // matOk: ¿hay stock suficiente de BASE y CONTRATAPA para fabricar? (el Liner no cuenta). ESPEJO de baseContratapaOk (tapas.html)
+  var matOk = pedFilasBodega(x).filter(function(f) { return f.rol === 'Base' || f.rol === 'Contratapa'; }).every(function(f) {
+    var porSacar = Math.max(0, f.cant - (f.salido || 0));
+    return f.stock === null || porSacar === 0 || f.stock >= porSacar;
+  });
+  return { stock: st, producir: st === null ? x.saldo : Math.max(0, x.saldo - st), cubierta: st !== null && x.saldo > 0 && st >= x.saldo, matOk: matOk };
 }
 
 function pedCompResumenHtml(x) {
@@ -1603,10 +1608,11 @@ function renderPedidos() {
     porCli[x.cliente].push(x);
   });
   clis.sort(function(a, b) { return a.localeCompare(b); });
-  // Orden de los chips: 1) las CUBIERTAS por stock al final · 2) las que MÁS falta fabricar primero · 3) fecha límite · 4) antigüedad
+  // Orden de los chips: 1) las CUBIERTAS por stock al final · 2) las que ya tienen Base y Contratapa suficientes (el Liner no cuenta)
+  // antes que las que no · 3) las que MÁS falta fabricar primero · 4) fecha límite · 5) antigüedad
   var ordenChips = function(a, b) {
     var pa = pedProducirInfo(a), pb = pedProducirInfo(b);
-    return (pa.cubierta ? 1 : 0) - (pb.cubierta ? 1 : 0) || (pb.producir - pa.producir) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at));
+    return (pa.cubierta ? 1 : 0) - (pb.cubierta ? 1 : 0) || ((pb.matOk ? 1 : 0) - (pa.matOk ? 1 : 0)) || (pb.producir - pa.producir) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at));
   };
   var chip = function(x, conCliente) {
     var proc = x.abiertos.length > 0;

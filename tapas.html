@@ -4089,10 +4089,11 @@ function buildChipCompacto(x, conCliente) {
     + '</div>';
 }
 
-// Orden de los chips: 1) las CUBIERTAS por stock al final (no hay que fabricar nada) · 2) las que MÁS falta fabricar primero ·
-// 3) fecha límite más cercana · 4) antigüedad
+// Orden de los chips: 1) las CUBIERTAS por stock al final (no hay que fabricar nada) · 2) las que YA tienen Base y Contratapa
+// suficientes (se pueden fabricar hoy; el Liner no cuenta) antes que las que no · 3) las que MÁS falta fabricar primero ·
+// 4) fecha límite más cercana · 5) antigüedad
 function ordenChipsCompactos(a, b) {
-  return (a.cubierta ? 1 : 0) - (b.cubierta ? 1 : 0) || (b.producir - a.producir) || (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt));
+  return (a.cubierta ? 1 : 0) - (b.cubierta ? 1 : 0) || ((b.matOk ? 1 : 0) - (a.matOk ? 1 : 0)) || (b.producir - a.producir) || (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt));
 }
 
 function modeloFichasCompactas() {
@@ -4128,7 +4129,19 @@ function modeloFichasCompactas() {
     x.stockPT = it ? (it.existencia || 0) : null;
     x.producir = x.stockPT === null ? x.saldo : Math.max(0, x.saldo - x.stockPT);
     x.cubierta = x.stockPT !== null && x.saldo > 0 && x.stockPT >= x.saldo;
+    x.matOk = baseContratapaOk(x.s);
     return x;
+  });
+}
+
+// ¿Hay stock suficiente de BASE y CONTRATAPA (B2) para fabricar lo que falta de esta ficha? (el Liner NO cuenta: el proveedor
+// actual lo resuelve el mismo día). Mismo cálculo que componentesStockHtml: stock vs. lo que aún falta SACAR de bodega para la ficha.
+// Sin Base/Contratapa registradas, o sin dato de stock, no penaliza.
+function baseContratapaOk(s) {
+  var movs = salidaMovs.filter(function(m) { return m.solicitud_id === s.id && m.area !== 'serig'; });
+  return filasBodegaFicha(s, movs).filter(function(f) { return f.rol === 'Base' || f.rol === 'Contratapa'; }).every(function(f) {
+    var porSacar = Math.max(0, f.cant - (f.salido || 0));
+    return f.stock === null || porSacar === 0 || f.stock >= porSacar;
   });
 }
 
