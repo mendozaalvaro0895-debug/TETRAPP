@@ -1720,8 +1720,9 @@ async function confirmarImport() {
     }
 
     var nuevosMap = {};
+    var esHistorico = fMax < (new Date().getFullYear() + '-01-01'); // años anteriores: solo alimenta tendencias, no productos "nuevos"
     rows.forEach(function (r) {
-      if (familiaExcluida(r.descripcion_familia)) return;
+      if (esHistorico || familiaExcluida(r.descripcion_familia)) return;
       if (r.sku && !skusAntes[r.sku] && !nuevosMap[r.sku]) nuevosMap[r.sku] = r.descripcion || '';
     });
     var nuevos = Object.keys(nuevosMap).sort().map(function (s) { return {sku: s, desc: nuevosMap[s]}; });
@@ -1986,8 +1987,12 @@ function esCandidatoEnvase(row) {
 
 function construirRecetSkus() {
   var skuMap = {};
+  // Solo SKUs facturados en los últimos 12 meses: la base guarda historial de años anteriores (para tendencias/ML) y los
+  // productos descontinuados no deben aparecer como "Pendientes" del Recetario.
+  var corte = new Date(); corte.setFullYear(corte.getFullYear() - 1);
+  var corteISO = corte.getFullYear() + '-' + ('0' + (corte.getMonth() + 1)).slice(-2) + '-' + ('0' + corte.getDate()).slice(-2);
   VENTAS.forEach(function(v) {
-    if (!v.sku) return;
+    if (!v.sku || String(v.fecha || '') < corteISO) return;
     if (!skuMap[v.sku] || (!skuMap[v.sku] && v.descripcion)) skuMap[v.sku] = v.descripcion || '';
   });
   INV_REC.forEach(function(i) {
