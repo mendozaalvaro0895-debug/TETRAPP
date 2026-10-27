@@ -367,6 +367,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-chip-c{font-size:10px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cp-chev{display:inline-block;width:12px;font-size:10px;color:var(--teal);transition:transform .12s}
 .cp-tipo.col .cp-chev,.cp-col.col .cp-chev,.cp-sec.col .cp-chev{transform:rotate(-90deg)}
+/* Por cliente = cada cliente es una FILA desplegable y sus fichas se reparten en 2/3/4 columnas (1 en celular) */
+.cp-tipo-c.cp-cli-c{grid-template-columns:minmax(0,1fr)}
+@media(min-width:701px){.cp-tipo-c.cp-cli-c{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1000px){.cp-tipo-c.cp-cli-c{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:1400px){.cp-tipo-c.cp-cli-c{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .cp-tipo.col .cp-tipo-c{display:none}
 .cp-tipo.col .cp-tipo-h{border-radius:8px}
 .cp-col.col .cp-chips{display:none}
@@ -4195,15 +4200,17 @@ function renderFichasCompactasTapas() {
         + (resto.length ? bloque('Demás pedidos · por fecha límite', resto, '') : '');
     }
   } else {
-    var cols = clis.map(function(c) {
+    var filas = clis.map(function(c) {
       var items = porCli[c].slice().sort(ordenChipsCompactos);
       var saldoTot = items.reduce(function(a, x) { return a + x.saldo; }, 0);
-      return '<div class="cp-col' + cpCol('cli:' + c) + '"><div class="cp-col-h"' + cpClic('cli:' + c) + '><div class="cp-col-n"><span class="cp-chev">▾</span>' + escHtml(c) + '</div>'
-        + '<div class="cp-col-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo ' + saldoTot.toLocaleString() + '</div></div>'
-        + '<div class="cp-chips">' + items.map(function(x) { return buildChipCompacto(x, false); }).join('') + '</div></div>';
+      var urg = items.filter(function(x) { return x.s.prio === 'urgente'; }).length;
+      return '<div class="cp-tipo' + cpCol('cli:' + c) + '"><div class="cp-tipo-h"' + cpClic('cli:' + c) + '><span class="cp-chev">▾</span><span class="cp-tipo-n">' + escHtml(c) + '</span>'
+        + '<span class="cp-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo <b>' + saldoTot.toLocaleString() + '</b> und'
+        + (urg ? ' · <span style="color:#B83232;font-weight:800">🔴 ' + urg + ' urgente' + (urg !== 1 ? 's' : '') + '</span>' : '') + '</span></div>'
+        + '<div class="cp-tipo-c cp-cli-c">' + items.map(function(x) { return buildChipCompacto(x, false); }).join('') + '</div></div>';
     }).join('');
-    cuerpo = '<div class="cp-sec">Todos los pedidos por cliente <i>clic para ver el detalle de la ficha</i></div>'
-      + (clis.length ? '<div class="cp-grid" style="grid-template-columns:repeat(' + clis.length + ',minmax(170px,300px))">' + cols + '</div>'
+    cuerpo = '<div class="cp-sec">Todos los pedidos por cliente <i>clic en un cliente para abrir o cerrar sus fichas</i></div>'
+      + (clis.length ? filas
                      : '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>');
   }
 

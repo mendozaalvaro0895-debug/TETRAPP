@@ -201,6 +201,11 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-aviso{background:#FFF3D6;color:#7A4800;border:1px solid #E8C468;border-radius:8px;padding:7px 10px;font-size:11px;margin:6px 0}
 .ped-chev{display:inline-block;width:12px;font-size:10px;color:#1A6B5B;transition:transform .12s}
 .ped-tipo.col .ped-chev,.ped-col.col .ped-chev,.ped-sec-t.col .ped-chev{transform:rotate(-90deg)}
+/* Por cliente = cada cliente es una FILA desplegable y sus fichas se reparten en 2/3/4 columnas (1 en celular) */
+.ped-tipo-c.ped-cli-c{grid-template-columns:minmax(0,1fr)}
+@media(min-width:701px){.ped-tipo-c.ped-cli-c{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1000px){.ped-tipo-c.ped-cli-c{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:1400px){.ped-tipo-c.ped-cli-c{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .ped-tipo.col .ped-tipo-c{display:none}
 .ped-tipo.col .ped-tipo-h{border-radius:8px}
 .ped-col.col .ped-chips{display:none}
@@ -1643,16 +1648,16 @@ function renderPedidos() {
         + (resto.length ? bloque('Demás pedidos · por fecha límite', resto, '') : '');
     }
   } else {
-    var cols = clis.map(function(c) {
+    var filas = clis.map(function(c) {
       var items = porCli[c].slice().sort(ordenChips);
       var saldoTot = items.reduce(function(a, x) { return a + x.saldo; }, 0);
-      return '<div class="ped-col' + pedCol('cli:' + c) + '"><div class="ped-col-h"' + pedClic('cli:' + c) + '><div class="ped-col-n"><span class="ped-chev">▾</span>' + escHtml(c) + '</div>'
-        + '<div class="ped-col-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo ' + pedNum(saldoTot) + '</div></div>'
-        + '<div class="ped-chips">' + items.map(function(x) { return chip(x, false); }).join('') + '</div></div>';
+      var urg = items.filter(function(x) { return x.urgente; }).length;
+      return '<div class="ped-tipo' + pedCol('cli:' + c) + '"><div class="ped-tipo-h"' + pedClic('cli:' + c) + '><span class="ped-chev">▾</span><span class="ped-tipo-n">' + escHtml(c) + '</span>'
+        + '<span class="ped-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo <b>' + pedNum(saldoTot) + '</b> und'
+        + (urg ? ' · <span style="color:#B83232;font-weight:800">🔴 ' + urg + ' urgente' + (urg !== 1 ? 's' : '') + '</span>' : '') + '</span></div>'
+        + '<div class="ped-tipo-c ped-cli-c">' + items.map(function(x) { return chip(x, false); }).join('') + '</div></div>';
     }).join('');
-    htmlGrid = clis.length
-      ? '<div class="ped-grid" style="grid-template-columns:repeat(' + clis.length + ',minmax(170px,300px))">' + cols + '</div>'
-      : '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
+    htmlGrid = clis.length ? filas : '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
   }
   var modoBtns = '<span class="ped-modo"><button class="' + (pedAgrupar === 'tipo' ? 'act' : '') + '" onclick="setPedAgrupar(\'tipo\')">Por tipo</button>'
     + '<button class="' + (pedAgrupar === 'cliente' ? 'act' : '') + '" onclick="setPedAgrupar(\'cliente\')">Por cliente</button>'
