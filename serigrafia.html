@@ -2549,6 +2549,40 @@ function buildBaseStockRow(item) {
   '</div>';
 }
 
+// Stock del PRODUCTO (el envase ya impreso, SKU de la ficha) en Bodega 2 frente al saldo por entregar:
+// sirve para no fabricar de más si ya hay existencia. Informativo: no reparte el stock entre fichas del mismo SKU.
+function stockPTEstado(item, saldo) {
+  if (!item.sku || item.estado === 'lista' || !(saldo > 0)) return null;
+  var inv = invB2De(item.sku);
+  if (!inv) return null;
+  var stock = inv.existencia || 0;
+  var e = { stock: stock, saldo: saldo, desc: inv.descripcion || '' };
+  if (stock >= saldo)  { e.clr = '#15803d'; e.bg = '#dcfce7'; e.txt = '✓ cubre el saldo'; }
+  else if (stock > 0)  { e.clr = '#92400e'; e.bg = '#fef9c3'; e.txt = 'producir ' + (saldo - stock).toLocaleString(); }
+  else                 { e.clr = '#991b1b'; e.bg = '#fee2e2'; e.txt = 'producir todo ' + saldo.toLocaleString(); }
+  return e;
+}
+
+// Fila (fichas dentro de una línea)
+function buildStockPTRow(item, saldo) {
+  var e = stockPTEstado(item, saldo);
+  if (!e) return '';
+  return '<div style="margin-top:3px;padding:3px 8px;background:' + e.bg + ';border-left:3px solid ' + e.clr + ';border-radius:6px;font-size:10px;line-height:1.3;display:flex;justify-content:space-between;align-items:center;gap:6px"' +
+    ' title="' + escHtml('Stock del producto en Bodega 2 · saldo por entregar: ' + saldo.toLocaleString() + (e.desc ? ' · ' + e.desc : '')) + '">' +
+    '<span style="color:var(--ink)"><span style="font-weight:700;color:' + e.clr + '">📦 Stock PT</span> · <b>' + e.stock.toLocaleString() + '</b> und</span>' +
+    '<span style="font-weight:800;color:' + e.clr + ';white-space:nowrap">' + e.txt + '</span>' +
+  '</div>';
+}
+
+// Chip (fichas en "Sin asignar")
+function buildStockPTChip(item, saldo) {
+  var e = stockPTEstado(item, saldo);
+  if (!e) return '';
+  return '<div style="margin-top:2px"><span title="' + escHtml('Stock del producto en Bodega 2 · saldo por entregar: ' + saldo.toLocaleString() + (e.desc ? ' · ' + e.desc : '')) + '" style="display:inline-flex;align-items:center;gap:5px;background:' + e.bg + ';color:' + e.clr + ';border:1px solid ' + e.clr + '55;border-radius:10px;padding:1px 8px;font-size:9px;font-weight:800;white-space:nowrap">' +
+    '📦 Stock PT ' + e.stock.toLocaleString() + ' und · ' + e.txt +
+  '</span></div>';
+}
+
 // Chip compacto (fichas en "Sin asignar")
 function buildBaseStockChip(item) {
   var e = baseStockEstado(item);
@@ -2632,6 +2666,7 @@ function boardBuildCard(item) {
     '<div style="font-size:11px;line-height:1.35;margin-bottom:2px;word-break:break-word">' + descTxt + '</div>' +
     cantAndProg +
     buildBaseStockRow(item) +
+    buildStockPTRow(item, Math.max(0, (item.cant || 0) - entregado)) +
     fechasRow +
     (item.linea_id ? buildComentarioRow(item) : '') +
     '</div>';
@@ -2731,6 +2766,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     '<div style="margin-top:2px;font-size:10px;color:' + descClr + ';font-weight:' + descWt + ';line-height:1.35">' + escHtml(desc) + '</div>' +
     fechasRow +
     buildBaseStockChip(item) +
+    buildStockPTChip(item, Math.max(0, total - entregado)) +
     notasRow +
     requiRow +
   '</div>';
