@@ -387,6 +387,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-nota b{font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;color:#A16207;margin-right:4px}
 .cp-chip.open .cp-nota{-webkit-line-clamp:unset;display:block}
 .cp-nota.full{-webkit-line-clamp:unset;display:block}
+.cp-cod{margin-top:3px;font-size:10px;color:#475569}
+.cp-cod b{font-family:var(--mono);color:#0F172A}
 .cp-urg{font-style:normal;font-size:9.5px;font-weight:800;color:#B83232;background:#FEE2E2;border-radius:6px;padding:1px 6px;margin-right:3px}
 .cp-tipo-h.urg{background:#FEE2E2;border-color:#B83232}
 .cp-tipo-h.urg .cp-tipo-n{color:#B83232}
@@ -946,7 +948,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="fr">
         <div class="fg">
           <div class="fl">Cliente</div>
-          <select class="fs" id="fCli" onchange="autorrellenarDesdeFichas(true)">
+          <select class="fs" id="fCli" onchange="clienteCambiadoForm()">
             <option value="">— Selecciona cliente —</option>
           </select>
         </div>
@@ -1376,7 +1378,8 @@ async function cargarSolicitudes() {
           skuBase: l.sku_base || '',
           skuContratapa: l.sku_contratapa || '',
           skuLiner: l.sku_liner || '',
-          skuBanda: l.sku_banda || ''
+          skuBanda: l.sku_banda || '',
+          codigoCliente: l.codigo_cliente || ''
         })),
         cant: lineasData.reduce((sum, l) => sum + (l.cantidad || 0), 0),
         ingreso: s.created_at ? new Date(new Date(s.created_at).getTime() - 6 * 3600 * 1000).toISOString().slice(0, 10) : '',
@@ -1805,6 +1808,7 @@ async function mostrarDetalle(id) {
   const filasBod = filasBodegaFicha(s, movsFicha);
   bodegaFilasFicha[s.id] = filasBod;
   const cuerpo = `
+      ${(s.lineas[0] && s.lineas[0].codigoCliente) ? `<div class="dc"><div class="dc-b" style="font-size:12px">🏷 Código del cliente: <b style="font-family:var(--mono)">${escHtml(s.lineas[0].codigoCliente)}</b></div></div>` : ''}
       ${s.notas ? `<div class="dc" style="border-color:#FDE047;border-width:2px"><div class="dc-h" style="background:#FEF9C3;color:#A16207">📝 Notas</div><div class="dc-b" style="white-space:pre-line;background:#FFFDF0">${escHtml(s.notas)}</div></div>` : ''}
       ${buildBloqueBodegaFicha(s, filasBod)}
       ${lotesAbiertosPlazoHtml(s)}
@@ -2127,7 +2131,85 @@ function autorrellenarDesdeFichas(cambioCliente) {
 }
 
 function nuevaLineaForm() {
-  return { sku: '', desc: '', cant: 0, procs: [], procsAuto: [], sugVistas: {}, tocados: {}, existencia: undefined, comp: {} };
+  return { sku: '', desc: '', cant: 0, procs: [], procsAuto: [], sugVistas: {}, tocados: {}, existencia: undefined, comp: {}, codCli: '', codNota: '' };
+}
+
+// ── CÓDIGO DEL CLIENTE ↔ NUESTRO SKU ─────────────────────────────────────────
+// Cada cliente identifica sus productos con SU PROPIO código en sus OC. Al escribirlo en la solicitud (junto al cliente) se
+// busca el vínculo guardado (sku_codigo_cliente) y se elige solo nuestro SKU (y con él los componentes/procesos autorrellenados);
+// si es nuevo, al guardar la solicitud queda vinculado para las próximas OC. También se guarda en la línea (codigo_cliente)
+// para verlo en la ficha. sql/sku_codigo_cliente_v1.sql
+var codigosCliente = {};   // 'cliente|CODNORM' → { sku, codigo }
+var codigosPorSku = {};    // 'cliente|sku' → código (el más reciente)
+var codigosClienteOk = true;
+function codNorm(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function claveCodCli(cli, cod) { return normBusqueda(cli || '') + '|' + codNorm(cod); }
+
+async function cargarCodigosCliente() {
+  try {
+    var r = await db.from('sku_codigo_cliente').select('cliente,codigo_cliente,sku,actualizado_en').eq('area', 'tapas').order('actualizado_en', { ascending: true }).limit(5000);
+    if (r.error) { codigosClienteOk = false; return; }
+    codigosClienteOk = true;
+    var a = {}, b = {};
+    (r.data || []).forEach(function(x) {
+      a[claveCodCli(x.cliente, x.codigo_cliente)] = { sku: x.sku, codigo: x.codigo_cliente };
+      b[normBusqueda(x.cliente) + '|' + x.sku] = x.codigo_cliente; // el último gana
+    });
+    codigosCliente = a; codigosPorSku = b;
+  } catch(e) { codigosClienteOk = false; }
+}
+
+// Busca el vínculo del código escrito (o, si no hay código, el que ya tiene guardado ese cliente para el SKU elegido)
+function aplicarCodigoCliente(renderizar) {
+  var l = lineas[0];
+  if (!l) return;
+  var cliente = (document.getElementById('fCli') || {}).value || '';
+  var cod = String(l.codCli || '').trim();
+  l.codNota = '';
+  if (cod) {
+    if (!cliente) l.codNota = 'elige primero el cliente para buscar el vínculo';
+    else {
+      var m = codigosCliente[claveCodCli(cliente, cod)];
+      if (m) {
+        var it = invB2DeTapas(m.sku);
+        if (!it) l.codNota = '⚠️ vinculado al SKU ' + m.sku + ', que ya no está en el inventario';
+        else if (!l.sku) { l.codNota = '🔗 vinculado: ' + cod + ' = SKU ' + it.sku; formSkuSelect('prod', it.sku); }
+        else if (l.sku === it.sku) l.codNota = '🔗 vinculado: ' + cod + ' = SKU ' + it.sku;
+        else l.codNota = '⚠️ ' + cod + ' estaba vinculado al SKU ' + it.sku + ' (elegiste ' + l.sku + '): al guardar se te preguntará cuál queda';
+      } else l.codNota = codigosClienteOk ? 'código nuevo: elige el producto y el vínculo se guarda con la solicitud' : '⚠️ falta correr sql/sku_codigo_cliente_v1.sql (el vínculo no se guardará)';
+    }
+  } else if (cliente && l.sku && codigosPorSku[normBusqueda(cliente) + '|' + l.sku]) {
+    l.codCli = codigosPorSku[normBusqueda(cliente) + '|' + l.sku];
+    l.codNota = 'código guardado de este cliente para este SKU';
+  }
+  if (renderizar) renderLineas();
+}
+
+function clienteCambiadoForm() {
+  autorrellenarDesdeFichas(true);
+  aplicarCodigoCliente(true);
+}
+
+// Después de guardar la solicitud: el código del cliente queda vinculado a nuestro SKU (si cambia de SKU, se pregunta)
+async function guardarVinculoCodigo(cliente, codigo, sku, desc) {
+  try {
+    codigo = String(codigo || '').trim();
+    if (!cliente || !codigo || !sku) return;
+    var previo = codigosCliente[claveCodCli(cliente, codigo)];
+    if (previo && previo.sku === sku) return;
+    if (previo && !confirm('El código "' + codigo + '" de ' + cliente + ' estaba vinculado al SKU ' + previo.sku + '.\n\n¿Cambiarlo para que apunte al SKU ' + sku + '?')) return;
+    var quien = (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
+    var r = await db.from('sku_codigo_cliente').upsert({
+      cliente: cliente, codigo_cliente: codigo, codigo_norm: codNorm(codigo), sku: sku, descripcion: desc || null, area: 'tapas', actualizado_por: quien
+    }, { onConflict: 'cliente,codigo_norm,area' }).select('id');
+    if (r.error || !(r.data || []).length) throw r.error || new Error('sin permiso');
+    showToast('🔗 Código ' + codigo + ' de ' + cliente + ' vinculado al SKU ' + sku);
+    cargarCodigosCliente();
+  } catch(e) {
+    console.warn('guardarVinculoCodigo:', e);
+    showToast(/relation|does not exist|schema cache|sku_codigo_cliente/i.test(String((e && e.message) || e))
+      ? '⚠️ Falta correr sql/sku_codigo_cliente_v1.sql en Supabase: el código se guardó en la ficha pero no quedó vinculado' : '⚠️ No se pudo guardar el vínculo del código: ' + ((e && e.message) || e), '#92400e');
+  }
 }
 
 // Procesos de la ficha: los componentes elegidos SUGIEREN procesos y los marcan solos
@@ -2351,6 +2433,7 @@ function setPlazoForm(t) {
 function abrirForm() {
   editandoFichaId = null;
   cargarRecetasTapas(); // refresca en segundo plano las recetas del Recetario (autorrelleno)
+  cargarCodigosCliente(); // y los códigos de cliente vinculados
   document.getElementById('mTitle').textContent = 'Nueva solicitud · Tapas';
   document.getElementById('btnSave').textContent = 'Guardar';
   cargarInsumosB7(); // refresca el stock de B7 en segundo plano
@@ -2385,6 +2468,7 @@ async function editarFichaTapas(id) {
   l.existencia = it ? (it.existencia || 0) : (l0.existencia || 0);
   l.tipo = tipoDeSkuTapa(l.sku, l.desc);
   l.tipoOrigen = tipoSpecTapas[l.sku] ? 'guardado' : (l.tipo === TIPO_SIN_CLASIFICAR ? '' : 'sugerido');
+  l.codCli = l0.codigoCliente || '';
   l.procs = (l0.procs || []).slice();
   l.procs.forEach(function(p) { l.tocados[p] = true; }); // lo ya guardado no lo mueve un componente
   var comp = { base: l0.skuBase, contratapa: l0.skuContratapa, liner: l0.skuLiner, banda: l0.skuBanda };
@@ -2427,6 +2511,8 @@ async function guardarEdicionFicha(l, cliente, fLimite) {
     procesos: l.procs || []
   };
   COMP_FORM.forEach(function(c) { linea[c.campo] = compDe(l, c.k).sku.trim() || null; }); // vaciar un componente lo quita
+  var codNuevo = String(l.codCli || '').trim();
+  if (codNuevo !== String(s.lineas[0].codigoCliente || '')) linea.codigo_cliente = codNuevo || null; // solo si cambió
   try {
     var cambio = {
       cliente_nombre: cliente, fecha_limite: fLimite || null,
@@ -2437,6 +2523,11 @@ async function guardarEdicionFicha(l, cliente, fLimite) {
     var r = await db.from('solicitudes').update(cambio).eq('id', s.dbId).select('id');
     if (r.error || !(r.data || []).length) throw r.error || new Error('sin permiso para editar (solo master)');
     var rl = await db.from('solicitud_lineas').update(linea).eq('id', s.lineas[0].id).select('id');
+    if (rl.error && 'codigo_cliente' in linea && /codigo_cliente/i.test(String(rl.error.message))) { // columna aún sin crear
+      delete linea.codigo_cliente;
+      rl = await db.from('solicitud_lineas').update(linea).eq('id', s.lineas[0].id).select('id');
+      showToast('⚠️ Falta correr sql/sku_codigo_cliente_v1.sql: se guardó sin el código del cliente', '#92400e');
+    }
     if (rl.error || !(rl.data || []).length) throw rl.error || new Error('no se pudo actualizar la línea');
     var partesReceta = construirPartesReceta(linea, l);
     await guardarTipoTapa(linea.sku, l.tipo);
@@ -2444,6 +2535,7 @@ async function guardarEdicionFicha(l, cliente, fLimite) {
     await cargarSolicitudes();
     if (fichaModalId === s.id || selId === s.id) mostrarDetalle(s.id);
     showToast('✅ ' + (s.id_display || '') + ' actualizada');
+    guardarVinculoCodigo(cliente, codNuevo, linea.sku, linea.descripcion);
     ofrecerRecetaDeFicha(linea.sku, linea.descripcion, partesReceta, cliente);
   } catch(e) {
     console.error('Error editando:', e);
@@ -2501,6 +2593,10 @@ function renderLineas(focusId) {
   sincronizarProcs(l);
   var exColor = l.existencia === undefined ? 'var(--gray-l)' : (l.existencia >= (l.cant || 0) ? 'var(--green)' : 'var(--amber)');
   cont.innerHTML = '<div style="padding:8px 10px">'
+    + '<div class="lin-comp" style="margin:0 0 8px"><span class="lin-comp-lbl" title="Código con el que el cliente identifica este producto en su OC">Cód. cliente</span>'
+    +   '<input class="fi" id="lin-cod-cli" type="text" autocomplete="off" placeholder="Código del producto en la OC del cliente (opcional)" value="' + escHtml(l.codCli || '') + '"'
+    +   ' onchange="lineas[0].codCli=this.value;aplicarCodigoCliente(true)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}" style="min-width:0">'
+    +   '<span class="lin-stk" style="white-space:normal;grid-column:1/-1;margin-left:86px">' + escHtml(l.codNota || 'con el código del cliente se elige solo nuestro SKU; si es nuevo, queda vinculado al guardar') + '</span></div>'
     + '<div class="lin-prod">'
     +   '<div class="lin-in-wrap"><textarea class="fi lin-ta" rows="1" id="lin-in-prod" placeholder="🔍 SKU, nombre o producto nuevo…" autocomplete="off"'
     +     ' oninput="formSkuInput(\'prod\',this,true)" onfocus="formSkuInput(\'prod\',this,false)" onkeydown="if(event.key===\'Enter\')event.preventDefault()" onblur="setTimeout(cerrarFormDrop,200)">'
@@ -2672,6 +2768,7 @@ function formSkuSelect(kind, sku) {
     l.tipoOrigen = tipoSpecTapas[l.sku] ? 'guardado' : (l.tipo === TIPO_SIN_CLASIFICAR ? '' : 'sugerido');
     autorrellenarDesdeFichas(false);
     aplicarFamiliaProcs(l);
+    aplicarCodigoCliente(false);
   } else {
     l.comp[kind] = { sku: item.sku, desc: item.descripcion || '', ex: item.existencia || 0 };
   }
@@ -2740,6 +2837,8 @@ async function guardar() {
     procesos: l.procs || [], operadores_ids: []
   };
   COMP_FORM.forEach(function(c) { var s = compDe(l, c.k).sku.trim(); if (s) linea[c.campo] = s; });
+  var codCli = String(l.codCli || '').trim();
+  if (codCli) linea.codigo_cliente = codCli; // solo se manda si se escribió: sin el SQL, el caso normal no cambia
 
   let solId = null;
   try {
@@ -2751,7 +2850,12 @@ async function guardar() {
     if (r.error) throw r.error;
     solId = r.data.id;
 
-    const rl = await db.from('solicitud_lineas').insert(Object.assign({ solicitud_id: solId }, linea));
+    let rl = await db.from('solicitud_lineas').insert(Object.assign({ solicitud_id: solId }, linea));
+    if (rl.error && codCli && /codigo_cliente/i.test(String(rl.error.message))) { // la columna aún no existe: se guarda sin el código
+      delete linea.codigo_cliente;
+      rl = await db.from('solicitud_lineas').insert(Object.assign({ solicitud_id: solId }, linea));
+      showToast('⚠️ Falta correr sql/sku_codigo_cliente_v1.sql: la ficha se guardó sin el código del cliente', '#92400e');
+    }
     if (rl.error) {
       await db.from('solicitudes').delete().eq('id', solId); // no dejar una ficha sin línea
       solId = null;
@@ -2763,6 +2867,7 @@ async function guardar() {
     cerrarForm();
     await cargarSolicitudes();
     showToast('✅ ' + codigo + ' guardada');
+    guardarVinculoCodigo(cliente, codCli, linea.sku, linea.descripcion);
     ofrecerRecetaDeFicha(linea.sku, linea.descripcion, partesReceta, cliente); // no bloquea ni rompe el guardado
   } catch(e) {
     console.error('Error guardando:', e);
@@ -4071,6 +4176,12 @@ function notaChipHtml(notas, full) {
   return t ? '<div class="cp-nota' + (full ? ' full' : '') + '" title="' + escHtml(t) + '"><b>📝 Notas</b>' + escHtml(t) + '</div>' : '';
 }
 
+// Código del cliente de la ficha (el de su OC), para cruzarla rápido con la orden de compra
+function codClienteChipHtml(s) {
+  var c = s && s.lineas && s.lineas[0] ? s.lineas[0].codigoCliente : '';
+  return c ? '<div class="cp-cod" title="Código con que el cliente identifica este producto en su OC">🏷 Cód. cliente <b>' + escHtml(c) + '</b></div>' : '';
+}
+
 function buildChipCompacto(x, conCliente) {
   var enProc = x.abiertos.length > 0;
   var idq = escHtml(String(x.id));
@@ -4078,6 +4189,7 @@ function buildChipCompacto(x, conCliente) {
     + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
     + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
+    + codClienteChipHtml(x.s)
     + stkPTHtml(x.sku, x.saldo)
     + notaChipHtml(x.s.notas)
     + '<div class="cp-resum">' + (enProc ? '<span class="cp-res-b proc">▶ ' + x.enProc.toLocaleString() + ' en proceso</span>' : '') + componentesResumenHtml(x.s) + '</div>'
@@ -5413,6 +5525,7 @@ async function init() {
   await cargarFeriados();
   await cargarTiposTapa();
   await cargarRecetasTapas();
+  await cargarCodigosCliente();
   await cargarSolicitudes();
   await cargarMovimientos(); // alimenta el bloque "Entregados" del Inicio
   await cargarRechazos();
