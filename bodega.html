@@ -279,7 +279,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div class="stat-chip"><strong id="statActivos">—</strong>Activos</div>
       <div class="stat-chip"><strong id="statCeroStock">—</strong>Stock en cero</div>
       <div class="stat-chip" id="chipBajoMin" style="display:none;border-color:#FDE68A;background:#FFFBEB"><strong id="statBajoMin" style="color:#B87200">—</strong>Bajo mínimo</div>
-      <div class="stat-chip clic" id="chipNuevos" style="display:none" onclick="toggleSoloNuevos()" title="Códigos agregados en las últimas importaciones, del más reciente al más antiguo"><strong id="statNuevos" style="color:#065F46">0</strong>🆕 Nuevos recientes</div>
+      <div class="stat-chip clic" id="chipNuevos" onclick="toggleSoloNuevos()" title="Códigos agregados en las últimas importaciones, del más reciente al más antiguo"><strong id="statNuevos" style="color:#065F46">0</strong>🆕 Nuevos recientes</div>
     </div>
 
     <div class="bod-tabs">
@@ -671,7 +671,8 @@ function actualizarChipNuevos() {
     return !!mapa[nuevosClave(i)];
   }).length;
   document.getElementById('statNuevos').textContent = n;
-  chip.style.display = (n > 0 || soloNuevos) ? 'block' : 'none';
+  chip.style.display = 'block';
+  chip.style.opacity = n > 0 ? '1' : '.55';
 }
 
 async function cargarTodo() {
