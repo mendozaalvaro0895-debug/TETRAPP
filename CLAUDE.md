@@ -246,15 +246,17 @@ view-productividad  Mensual (prodMes) sobre comandas+comanda_tareas, solo tareas
   und ÷ horas_efectivas devuelve siempre la meta (100% artificial). Por eso la vista por
   proceso muestra volumen y meta, no und/hora real: la comanda no reparte el turno por proceso.
   metaDeProceso(nombre) normaliza tildes ('Impresión' → clave 'impresion' = 1500, no default).
-  GRÁFICO "👥 Productividad por operario — todos en un gráfico" (oct/2026, `pgoRender`, contenedor
-  `prodGrafOperarios`, arriba de todo; solo tapas.html/master): UNA LÍNEA POR PERSONA (supervisión incluida)
-  con las unidades de tareas Terminadas de comandas APROBADAS (mismo criterio del termómetro). Botón
-  "📅 Por mes" (últimos 6 o 12 meses terminando en el mes de #prodMes) / "📈 Por día" (días del mes de
-  #prodMes, domingos sombreados, línea punteada de meta `META_DIA_GRAFICO`=10,000). Un mes/día sin comanda de
-  esa persona NO se dibuja (la línea se corta; no cuenta como 0). Leyenda con un chip por persona
-  (clic = ocultar/mostrar; "Todos" / "Top 5"), color estable por nombre, total y promedio de lo visible.
-  `pgoCargar` pagina las comandas de a 1000 (12 meses pasan del límite de PostgREST) y se cachea por rango
-  (🔄 Actualizar lo invalida); se redibuja al cambiar el ancho de la ventana. Sin SQL nuevo.
+  GRÁFICO "🏁 La competencia — acumulado día a día de todos los operarios" (oct/2026, `pgoRender`,
+  contenedor `prodGrafOperarios`, arriba de todo; solo tapas.html/master; reemplazó a un primer gráfico de
+  líneas por mes/por día que Alvaro descartó): una LÍNEA POR PERSONA (supervisión incluida) con sus unidades
+  ACUMULADAS desde el día 1 del mes de #prodMes (flechas ‹ › cambian ese mismo selector, así la tabla de abajo
+  queda en el mismo mes) — se ve quién va adelante y quién lo alcanza. Solo tareas Terminadas de comandas
+  APROBADAS (criterio del termómetro). Línea punteada verde = ritmo de la meta (`META_DIA_GRAFICO` por día
+  laborable, sin domingos ni `feriadosSet`); punto grande = dónde va cada quien, puntos chicos = días en que
+  produjo (el tooltip trae el día, lo del día y el acumulado). Panel derecho "🏁 Posiciones al día X":
+  medallas 🥇🥈🥉, total, diferencia contra el líder y lo del último día; clic en una fila oculta/muestra su línea
+  ("Todos" / "Top 5"). En pantalla angosta el panel baja bajo el gráfico. `pgoCargar` pagina de a 1000 y
+  cachea por mes (🔄 Actualizar lo invalida); se redibuja al cambiar el ancho. Sin SQL nuevo.
   Arriba de la tabla, "📦 Producción mensual — Ingreso PT" (renderProdMensualTapas,
   instancia 'productividad', contenedor `prodMensualTapas`): barras diarias sobre
   movimientos_materiales (tipo='entrada_pt') — equivalente de renderProdMensual en

@@ -629,14 +629,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 /* Producción mensual (Productividad · Requis de Ingreso PT) */
 .prod-mens-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
-.pgo-leyenda{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 14px 10px}
-.pgo-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--card);border-radius:14px;padding:2px 9px 2px 6px;font-size:11px;cursor:pointer;font-family:var(--sans);color:var(--ink)}
-.pgo-chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
-.pgo-chip b{font-weight:700;color:var(--gray)}
-.pgo-chip.off{opacity:.4;text-decoration:line-through}
-.pgo-acc{margin-left:auto;display:inline-flex;gap:4px}
+.pgo-body{display:flex;gap:14px;align-items:flex-start;padding:10px 14px 4px}
+.pgo-chart{flex:1;min-width:0;overflow-x:auto}
+.pgo-rank{width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:3px}
+.pgo-rank-h{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:800;color:var(--ink);padding:2px 0 4px}
+.pgo-row{position:relative;display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:6px;border:1px solid var(--border);background:var(--card);border-radius:8px;padding:5px 8px 7px;cursor:pointer;font-family:var(--sans);color:var(--ink);text-align:left;overflow:hidden}
+.pgo-row.off{opacity:.38}
+.pgo-pos{font-size:14px;font-weight:800;color:var(--gray);text-align:center}
+.pgo-nom{font-size:12px;font-weight:600;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:2px 5px}
+.pgo-nom i{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
+.pgo-hoy{font-size:10px;font-weight:600;color:var(--green)}
+.pgo-tot{display:flex;flex-direction:column;align-items:flex-end;font-size:12px;line-height:1.2}
+.pgo-dif{font-size:10px;color:var(--red)}
+.pgo-dif.lid{color:var(--green);font-weight:800}
+.pgo-bar{position:absolute;left:0;bottom:0;height:3px;opacity:.75}
+.pgo-acc{display:inline-flex;gap:4px}
 .pgo-acc button{border:1px solid var(--border);background:none;border-radius:6px;padding:2px 9px;font-size:11px;cursor:pointer;color:var(--ink);font-family:var(--sans)}
-.pgo-ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;opacity:.92}
+.pgo-ln{fill:none;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round;opacity:.92}
+@media(max-width:900px){.pgo-body{flex-direction:column}.pgo-rank{width:100%}}
 .prod-mens-hdr{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
 .prod-mens-hdr span:first-child{font-size:12px;font-weight:800;color:var(--ink)}
 .prod-mens-chart{padding:10px 14px 8px}
@@ -6906,19 +6916,20 @@ async function renderProdMensualTapas(inst) {
     + '</div>';
 }
 
-// ── Productividad de TODOS los operarios en un solo gráfico (oct/2026) ─────────────────────
-// Una línea por persona (supervisión incluida: también registra producción), solo unidades de tareas
-// Terminadas de comandas APROBADAS (mismo criterio que el termómetro). Dos modos con botón:
-// 'mes' = unidades por mes (últimos 6 o 12 meses, terminando en el mes de #prodMes) ·
-// 'dia' = unidades por día del mes de #prodMes, con la meta de 10,000 und/día.
-// Un mes/día sin ninguna comanda de esa persona NO se dibuja (la línea se corta), no cuenta como 0.
-var pgoModo = 'mes';
-var pgoMeses = 6;
+// ── "La competencia": carrera acumulada de TODOS los operarios, día a día del mes (oct/2026) ──
+// Una línea por persona (supervisión incluida) con sus unidades ACUMULADAS desde el día 1: se ve quién va
+// adelante, quién lo alcanza y por cuánto. Solo tareas Terminadas de comandas APROBADAS (mismo criterio del
+// termómetro). El mes es el de #prodMes. A la derecha, el ranking al último día con datos (clic = ocultar o
+// mostrar la línea). Línea punteada verde = ritmo de la meta (META_DIA_GRAFICO por día laborable: sin
+// domingos ni feriados). Un punto grande marca dónde va cada quien; los puntos chicos son los días en que
+// esa persona produjo.
 var pgoOcultos = {};
 var pgoCache = { key: '', data: [] };
 var pgoOps = [];
 var pgoSeq = 0;
-var PGO_MESES_ABR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+var PGO_MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+var PGO_MEDALLA = ['🥇', '🥈', '🥉'];
+var PGO_RANK_ANCHO = 280;
 
 function pgoMesBase() {
   var el = document.getElementById('prodMes');
@@ -6928,16 +6939,6 @@ function pgoMesBase() {
 function pgoNombreCorto(n) {
   var w = String(n || '').trim().split(/\s+/);
   return w.length > 1 ? w[0] + ' ' + w[1].charAt(0).toUpperCase() + '.' : (w[0] || '—');
-}
-
-// ['YYYY-MM', …] ascendente, n meses terminando en ymFin
-function pgoListaMeses(ymFin, n) {
-  var y = parseInt(ymFin.slice(0, 4), 10), m = parseInt(ymFin.slice(5, 7), 10) - 1, out = [];
-  for (var i = n - 1; i >= 0; i--) {
-    var d = new Date(y, m - i, 1);
-    out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
-  }
-  return out;
 }
 
 function pgoCompacto(v) {
@@ -6952,7 +6953,7 @@ function pgoMaxBonito(v) {
   return 10 * pot;
 }
 
-// Comandas del rango, paginadas de a 1000 (12 meses de toda el área pasan del límite de PostgREST)
+// Comandas del mes, paginadas de a 1000 por si el volumen pasa el límite de PostgREST
 async function pgoCargar(desde, hasta) {
   var key = desde + '|' + hasta;
   if (pgoCache.key === key) return pgoCache.data;
@@ -6972,35 +6973,51 @@ async function pgoCargar(desde, hasta) {
   return out;
 }
 
-function pgoSetModo(m) { pgoModo = m; pgoRender(); }
-function pgoSetMeses(n) { pgoMeses = n; pgoRender(); }
 function pgoToggle(i) {
   var o = pgoOps[i];
   if (!o) return;
   if (pgoOcultos[o.id]) delete pgoOcultos[o.id]; else pgoOcultos[o.id] = true;
   pgoRender();
 }
+
 function pgoMostrar(cuantos) {
   pgoOcultos = {};
   if (cuantos) pgoOps.forEach(function(o, i) { if (i >= cuantos) pgoOcultos[o.id] = true; });
   pgoRender();
 }
 
-function pgoSerie(comandas, cols) {
+// Cambia el mes del selector de arriba (así la tabla de abajo queda en el mismo mes) y recarga
+function pgoNavMes(delta) {
+  var base = pgoMesBase();
+  var d = new Date(parseInt(base.slice(0, 4), 10), parseInt(base.slice(5, 7), 10) - 1 + delta, 1);
+  var ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  if (ym > fechaHoy().slice(0, 7)) return;
+  var el = document.getElementById('prodMes');
+  if (el) el.value = ym;
+  cargarProductividad();
+}
+
+// dias = ['YYYY-MM-DD'…] del mes · lim = cuántos días ya transcurridos (se acumula hasta ahí)
+function pgoSerie(comandas, dias, lim) {
   var porOp = {};
   comandas.filter(comandaCuenta).forEach(function(c) {
     var k = c.operario_id || '—';
-    var o = porOp[k] || (porOp[k] = { id: k, nombre: c.operario_nombre || k, vals: {}, total: 0 });
-    var col = pgoModo === 'mes' ? String(c.fecha).slice(0, 7) : c.fecha;
+    var o = porOp[k] || (porOp[k] = { id: k, nombre: c.operario_nombre || k, diario: {}, total: 0 });
     var u = 0;
     (c.comanda_tareas || []).forEach(function(t) {
       if (t.estado === 'Terminada') u += (t.unidades_completadas || t.cantidad || 0);
     });
-    o.vals[col] = (o.vals[col] || 0) + u;
+    o.diario[c.fecha] = (o.diario[c.fecha] || 0) + u;
     o.total += u;
   });
   var ops = Object.keys(porOp).map(function(k) { return porOp[k]; }).filter(function(o) { return o.total > 0; });
-  // color estable por nombre (no cambia al alternar mes/día ni al ocultar personas)
+  ops.forEach(function(o) {
+    var run = 0;
+    o.cum = [];
+    for (var i = 0; i < lim; i++) { run += (o.diario[dias[i]] || 0); o.cum.push(run); }
+    o.ultimo = o.diario[dias[lim - 1]] || 0;
+  });
+  // color estable por nombre (no cambia al ocultar personas ni al cambiar de mes)
   ops.slice().sort(function(a, b) { return a.nombre.localeCompare(b.nombre); }).forEach(function(o, i) {
     o.color = 'hsl(' + Math.round((i * 137.5) % 360) + ',62%,44%)';
   });
@@ -7008,58 +7025,76 @@ function pgoSerie(comandas, cols) {
   return ops;
 }
 
-function pgoSvg(ops, cols, ancho) {
-  var W = Math.max(320, ancho), H = 320, ml = 50, mr = 14, mt = 14, mb = 34;
-  var pw = W - ml - mr, ph = H - mt - mb, n = cols.length, bw = pw / n;
-  var porDia = pgoModo === 'dia';
+function pgoSvg(ops, dias, lim, ancho) {
+  var W = Math.max(320, ancho), H = 340, ml = 50, mr = 16, mt = 14, mb = 30;
+  var pw = W - ml - mr, ph = H - mt - mb, n = dias.length, bw = pw / n;
   var vis = ops.filter(function(o) { return !pgoOcultos[o.id]; });
-  var vmax = porDia ? META_DIA_GRAFICO : 0;
-  vis.forEach(function(o) { cols.forEach(function(c) { if (o.vals[c] > vmax) vmax = o.vals[c]; }); });
+  // ritmo de la meta: META_DIA_GRAFICO por día laborable (sin domingos ni feriados) acumulado
+  var ritmo = [], acum = 0;
+  for (var i = 0; i < lim; i++) {
+    var dow = new Date(dias[i] + 'T12:00:00').getDay();
+    if (dow !== 0 && !feriadosSet[dias[i]]) acum += META_DIA_GRAFICO;
+    ritmo.push(acum);
+  }
+  var vmax = lim ? ritmo[lim - 1] : 0;
+  vis.forEach(function(o) { if (lim && o.cum[lim - 1] > vmax) vmax = o.cum[lim - 1]; });
   var ymax = pgoMaxBonito(vmax);
   var yDe = function(v) { return mt + ph - (v / ymax) * ph; };
-  var xDe = function(i) { return ml + (i + 0.5) * bw; };
+  var xDe = function(k) { return ml + (k + 0.5) * bw; };
   var s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" style="display:block;font-family:var(--sans)">';
-  // cuadrícula y eje Y
   for (var g = 0; g <= 4; g++) {
     var gv = ymax * g / 4, gy = yDe(gv);
     s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + gy + '" y2="' + gy + '" style="stroke:var(--border)" stroke-width="1"/>'
       + '<text x="' + (ml - 6) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="10" style="fill:var(--gray-l)">' + pgoCompacto(Math.round(gv)) + '</text>';
   }
-  // eje X
-  cols.forEach(function(c, i) {
-    var x = xDe(i), lbl, dom = false;
-    if (porDia) {
-      var dow = new Date(c + 'T12:00:00').getDay();
-      dom = dow === 0;
-      if (dom) s += '<rect x="' + (ml + i * bw) + '" y="' + mt + '" width="' + bw + '" height="' + ph + '" style="fill:var(--amber)" opacity=".08"/>';
-      lbl = parseInt(c.slice(8), 10);
-      if (bw < 14 && i % 2 === 1) lbl = '';
-    } else {
-      lbl = PGO_MESES_ABR[parseInt(c.slice(5, 7), 10) - 1] + ' ' + c.slice(2, 4);
-    }
-    if (lbl !== '') s += '<text x="' + x + '" y="' + (H - mb + 15) + '" text-anchor="middle" font-size="' + (porDia ? 10 : 11) + '" style="fill:' + (dom ? 'var(--amber)' : 'var(--gray)') + '" font-weight="' + (dom ? '800' : '500') + '">' + lbl + '</text>';
+  dias.forEach(function(f, k) {
+    var esDom = new Date(f + 'T12:00:00').getDay() === 0;
+    var fer = !!feriadosSet[f];
+    if (esDom || fer) s += '<rect x="' + (ml + k * bw) + '" y="' + mt + '" width="' + bw + '" height="' + ph + '" style="fill:var(--amber)" opacity=".08"/>';
+    var lbl = parseInt(f.slice(8), 10);
+    if (bw < 14 && k % 2 === 1) lbl = '';
+    if (lbl !== '') s += '<text x="' + xDe(k) + '" y="' + (H - mb + 15) + '" text-anchor="middle" font-size="10" style="fill:' + ((esDom || fer) ? 'var(--amber)' : 'var(--gray)') + '" font-weight="' + ((esDom || fer) ? '800' : '500') + '">' + lbl + '</text>';
   });
-  if (porDia) {
-    var ym = yDe(META_DIA_GRAFICO);
-    s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + ym + '" y2="' + ym + '" style="stroke:var(--green)" stroke-width="1.5" stroke-dasharray="5 4"/>'
-      + '<text x="' + (W - mr - 2) + '" y="' + (ym - 4) + '" text-anchor="end" font-size="10" font-weight="700" style="fill:var(--green)">Meta ' + META_DIA_GRAFICO.toLocaleString() + '</text>';
+  if (lim) {
+    var dr = '';
+    ritmo.forEach(function(v, k) { dr += (k ? 'L' : 'M') + xDe(k).toFixed(1) + ' ' + yDe(v).toFixed(1) + ' '; });
+    s += '<path d="' + dr + '" fill="none" style="stroke:var(--green)" stroke-width="1.6" stroke-dasharray="5 4"/>'
+      + '<text x="' + (xDe(lim - 1) - 4) + '" y="' + (yDe(ritmo[lim - 1]) - 6) + '" text-anchor="end" font-size="10" font-weight="700" style="fill:var(--green)">Ritmo de meta · ' + ritmo[lim - 1].toLocaleString() + '</text>';
   }
-  // líneas (se cortan donde no hay registro) y puntos con su detalle
-  vis.forEach(function(o) {
-    var d = '', abierto = false, pts = '';
-    cols.forEach(function(c, i) {
-      var v = o.vals[c];
-      if (v === undefined) { abierto = false; return; }
-      var x = xDe(i), y = yDe(v);
-      d += (abierto ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
-      abierto = true;
-      var cLbl = porDia ? c : (PGO_MESES_ABR[parseInt(c.slice(5, 7), 10) - 1] + ' ' + c.slice(0, 4));
-      pts += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3.2" fill="' + o.color + '" stroke="#fff" stroke-width="1"><title>'
-        + escHtml(o.nombre) + ' · ' + cLbl + ': ' + v.toLocaleString() + ' und</title></circle>';
-    });
-    s += '<path class="pgo-ln" d="' + d + '" stroke="' + o.color + '"/>' + pts;
+  // las líneas de los que van atrás se dibujan primero y las del frente al final (el líder queda arriba)
+  vis.slice().reverse().forEach(function(o) {
+    var d = '', pts = '';
+    for (var k = 0; k < lim; k++) {
+      d += (k ? 'L' : 'M') + xDe(k).toFixed(1) + ' ' + yDe(o.cum[k]).toFixed(1) + ' ';
+      var u = o.diario[dias[k]];
+      if (u && k < lim - 1) {
+        pts += '<circle cx="' + xDe(k).toFixed(1) + '" cy="' + yDe(o.cum[k]).toFixed(1) + '" r="2.6" fill="' + o.color + '"><title>'
+          + escHtml(o.nombre) + ' · día ' + parseInt(dias[k].slice(8), 10) + ': +' + u.toLocaleString() + ' und · acumulado ' + o.cum[k].toLocaleString() + '</title></circle>';
+      }
+    }
+    var kf = lim - 1;
+    s += '<path class="pgo-ln" d="' + d + '" stroke="' + o.color + '"/>' + pts
+      + '<circle cx="' + xDe(kf).toFixed(1) + '" cy="' + yDe(o.cum[kf]).toFixed(1) + '" r="5" fill="' + o.color + '" stroke="#fff" stroke-width="1.6"><title>'
+      + escHtml(o.nombre) + ' · acumulado ' + o.cum[kf].toLocaleString() + ' und</title></circle>';
   });
   return s + '</svg>';
+}
+
+function pgoRankHtml(lim, dias) {
+  var lider = pgoOps.length ? pgoOps[0].total : 0;
+  var filas = pgoOps.map(function(o, i) {
+    var pos = i < 3 ? PGO_MEDALLA[i] : (i + 1) + '°';
+    var dif = i === 0 ? '<span class="pgo-dif lid">líder</span>' : '<span class="pgo-dif">−' + (lider - o.total).toLocaleString() + '</span>';
+    var hoy = o.ultimo ? ' <span class="pgo-hoy">día ' + parseInt(dias[lim - 1].slice(8), 10) + ': +' + o.ultimo.toLocaleString() + '</span>' : '';
+    var pct = lider ? Math.max(2, Math.round(o.total / lider * 100)) : 0;
+    return '<button class="pgo-row' + (pgoOcultos[o.id] ? ' off' : '') + '" onclick="pgoToggle(' + i + ')" title="' + escHtml(o.nombre) + ' (clic para ocultar o mostrar su línea)">'
+      + '<span class="pgo-pos">' + pos + '</span>'
+      + '<span class="pgo-nom"><i style="background:' + o.color + '"></i>' + escHtml(pgoNombreCorto(o.nombre)) + hoy + '</span>'
+      + '<span class="pgo-tot"><b>' + o.total.toLocaleString() + '</b>' + dif + '</span>'
+      + '<em class="pgo-bar" style="width:' + pct + '%;background:' + o.color + '"></em></button>';
+  }).join('');
+  return '<div class="pgo-rank"><div class="pgo-rank-h"><span>🏁 Posiciones al día ' + parseInt(dias[lim - 1].slice(8), 10) + '</span>'
+    + '<span class="pgo-acc"><button onclick="pgoMostrar(0)">Todos</button><button onclick="pgoMostrar(5)">Top 5</button></span></div>' + filas + '</div>';
 }
 
 async function pgoRender() {
@@ -7067,63 +7102,52 @@ async function pgoRender() {
   if (!cont) return;
   var seq = ++pgoSeq;
   var base = pgoMesBase();
-  var meses = pgoModo === 'mes' ? pgoListaMeses(base, pgoMeses) : [base];
-  var desde = meses[0] + '-01', hasta = rangoMes(meses[meses.length - 1]).hasta;
-  var rangoTxt = pgoModo === 'mes'
-    ? 'Últimos ' + pgoMeses + ' meses · hasta ' + PGO_MESES_ABR[parseInt(base.slice(5, 7), 10) - 1] + ' ' + base.slice(0, 4)
-    : PGO_MESES_ABR[parseInt(base.slice(5, 7), 10) - 1] + ' ' + base.slice(0, 4) + ' · por día';
+  var rg = rangoMes(base);
   var comandas;
   try {
-    comandas = await pgoCargar(desde, hasta);
+    comandas = await pgoCargar(rg.desde, rg.hasta);
   } catch (e) {
     console.error('pgoCargar:', e);
-    cont.innerHTML = '<div class="prod-mens-wrap"><div class="empty" style="padding:18px;text-align:center;color:var(--gray)">❌ No se pudo cargar el gráfico de operarios.</div></div>';
+    cont.innerHTML = '<div class="prod-mens-wrap"><div class="empty" style="padding:18px;text-align:center;color:var(--gray)">❌ No se pudo cargar la competencia entre operarios.</div></div>';
     return;
   }
   if (seq !== pgoSeq) return;
   cont = document.getElementById('prodGrafOperarios');
   if (!cont) return;
 
-  var cols = [];
-  if (pgoModo === 'mes') cols = meses;
-  else {
-    var nd = new Date(parseInt(base.slice(0, 4), 10), parseInt(base.slice(5, 7), 10), 0).getDate();
-    for (var d = 1; d <= nd; d++) cols.push(base + '-' + String(d).padStart(2, '0'));
-  }
-  pgoOps = pgoSerie(comandas, cols);
+  var hoy = fechaHoy();
+  var nd = parseInt(rg.hasta.slice(8), 10);
+  var dias = [];
+  for (var d = 1; d <= nd; d++) dias.push(base + '-' + String(d).padStart(2, '0'));
+  var lim = base === hoy.slice(0, 7) ? parseInt(hoy.slice(8), 10) : nd;
+  pgoOps = pgoSerie(comandas, dias, lim);
   var visibles = pgoOps.filter(function(o) { return !pgoOcultos[o.id]; });
   var totalVis = visibles.reduce(function(a, o) { return a + o.total; }, 0);
-
-  var btn = function(act, txt, fn, tit) {
-    return '<button onclick="' + fn + '" title="' + tit + '" style="border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;white-space:nowrap;border:1px solid '
-      + (act ? 'var(--teal)' : 'var(--border)') + ';font-weight:' + (act ? '700' : '400') + ';color:' + (act ? 'var(--teal)' : 'var(--ink)') + ';background:' + (act ? 'var(--teal-xl)' : 'none') + '">' + txt + '</button>';
-  };
-  var chips = pgoOps.map(function(o, i) {
-    return '<button class="pgo-chip' + (pgoOcultos[o.id] ? ' off' : '') + '" onclick="pgoToggle(' + i + ')" title="' + escHtml(o.nombre) + ' · ' + o.total.toLocaleString() + ' und (clic para ocultar o mostrar)">'
-      + '<i style="background:' + o.color + '"></i>' + escHtml(pgoNombreCorto(o.nombre)) + ' <b>' + pgoCompacto(o.total) + '</b></button>';
-  }).join('');
+  var mesTxt = PGO_MESES[parseInt(base.slice(5, 7), 10) - 1] + ' ' + base.slice(0, 4);
+  var esMesActual = base === hoy.slice(0, 7);
 
   var cuerpo;
   if (!pgoOps.length) {
-    cuerpo = '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay producción aprobada en este período</div>';
+    cuerpo = '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay producción aprobada en este mes</div>';
   } else {
-    var ancho = (cont.clientWidth || 900) - 28;
-    cuerpo = '<div style="padding:10px 14px 0;overflow-x:auto">' + pgoSvg(pgoOps, cols, ancho) + '</div>'
-      + '<div class="pgo-leyenda">' + chips
-      + '<span class="pgo-acc"><button onclick="pgoMostrar(0)">Todos</button><button onclick="pgoMostrar(5)">Top 5</button></span></div>'
+    var cw = cont.clientWidth || 1000;
+    var lado = cw >= 900;
+    var ancho = lado ? cw - PGO_RANK_ANCHO - 14 * 3 : cw - 28;
+    cuerpo = '<div class="pgo-body"><div class="pgo-chart">' + pgoSvg(pgoOps, dias, lim, ancho) + '</div>' + pgoRankHtml(lim, dias) + '</div>'
       + '<div class="prod-mens-total">'
-      +   '<div class="prod-stat"><span class="prod-stat-val">' + totalVis.toLocaleString() + '</span><span class="prod-stat-lbl">Und en el período (' + visibles.length + ' de ' + pgoOps.length + ' personas)</span></div>'
+      +   '<div class="prod-stat"><span class="prod-stat-val">' + pgoNombreCorto(pgoOps[0].nombre) + '</span><span class="prod-stat-lbl">Va de líder · ' + pgoOps[0].total.toLocaleString() + ' und</span></div>'
+      +   '<div class="prod-stat"><span class="prod-stat-val">' + totalVis.toLocaleString() + '</span><span class="prod-stat-lbl">Und acumuladas (' + visibles.length + ' de ' + pgoOps.length + ' personas)</span></div>'
       +   '<div class="prod-stat"><span class="prod-stat-val">' + (visibles.length ? Math.round(totalVis / visibles.length).toLocaleString() : 0) + '</span><span class="prod-stat-lbl">Promedio por persona</span></div>'
       + '</div>';
   }
 
   cont.innerHTML = '<div class="prod-mens-wrap">'
     + '<div class="prod-mens-hdr">'
-    +   '<span>👥 Productividad por operario — todos en un gráfico <i style="font-weight:400;color:var(--gray-l);font-size:11px">' + rangoTxt + '</i></span>'
-    +   '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
-    +     btn(pgoModo === 'mes', '📅 Por mes', "pgoSetModo('mes')", 'Unidades de cada persona mes a mes')
-    +     btn(pgoModo === 'dia', '📈 Por día', "pgoSetModo('dia')", 'Unidades de cada persona día a día en el mes elegido arriba')
-    +     (pgoModo === 'mes' ? btn(pgoMeses === 6, '6 meses', 'pgoSetMeses(6)', 'Últimos 6 meses') + btn(pgoMeses === 12, '12 meses', 'pgoSetMeses(12)', 'Últimos 12 meses') : '')
+    +   '<span>🏁 La competencia — acumulado día a día de todos los operarios</span>'
+    +   '<div style="display:flex;align-items:center;gap:6px">'
+    +     '<button class="asist-nav-arr" onclick="pgoNavMes(-1)" title="Mes anterior">‹</button>'
+    +     '<span style="font-size:11px;font-weight:700;color:var(--ink);text-transform:capitalize;min-width:110px;text-align:center">' + mesTxt + '</span>'
+    +     '<button class="asist-nav-arr"' + (esMesActual ? ' disabled' : '') + ' onclick="pgoNavMes(1)" title="Mes siguiente">›</button>'
     +   '</div>'
     + '</div>'
     + cuerpo
