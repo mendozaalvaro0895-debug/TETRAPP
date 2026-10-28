@@ -416,6 +416,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 /* Ficha que la supervisora marcó COMPLETADA: sigue visible al final del listado, transparente */
 .cp-chip.completada{background:#F0FDF4;border-color:#16A34A;box-shadow:inset 3px 0 0 #16A34A;opacity:.65;transition:opacity .15s}
 .cp-chip.completada:hover,.cp-chip.completada.open{opacity:1}
+.cp-parc{margin-top:6px;border:1px solid #FDE047;background:#FEFCE8;color:#854D0E;border-radius:7px;padding:4px 8px;font-size:11px;line-height:1.35}
+.cp-parc b{font-family:var(--mono)}
+.cp-parc .sr{color:#B45309;font-weight:800}
+.cp-parc .cr{color:#047857;font-weight:800}
+.cp-parc .ent{display:flex;gap:6px;align-items:baseline;margin-top:2px;padding-top:2px;border-top:1px dashed #FDE047}
+.cp-parc .ent span{color:#64748B;min-width:44px}
+.cp-parc .ent em{font-style:normal;font-size:10px;font-weight:800;color:#047857}
 .cp-comp-tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#15803D;margin-bottom:2px}
 
 .cp-chip-t{display:flex;justify-content:space-between;gap:4px;font-size:11px;font-weight:800;align-items:baseline}
@@ -4412,6 +4419,19 @@ function codClienteChipHtml(s) {
 }
 
 // Ficha marcada COMPLETADA por Tapas: chip verde y transparente con la nota, quién la marcó y cuándo
+// Entregas que la supervisora registró desde Tapas: una línea por entrega con fecha + cantidad (ESPEJO de pedParcChipHtml)
+function entregasChipHtml(s) {
+  var p = parcialesDeFicha(s);
+  if (!p.lista.length) return '';
+  var fc = function(f) { var t = String(f || ''); return t.length >= 10 ? parseInt(t.slice(8, 10), 10) + '-' + ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(t.slice(5, 7), 10) - 1] : t; };
+  return '<div class="cp-parc">🟡 Reportado por Tapas: <b>' + p.total.toLocaleString() + '</b> und · '
+    + (p.sinRequi > 0 ? '<span class="sr">⏳ ' + p.sinRequi.toLocaleString() + ' sin requi</span>' : '<span class="cr">✓ con requi</span>')
+    + p.lista.map(function(it) {
+        return '<div class="ent"><span>' + escHtml(fc(it.e.fecha)) + '</span><b>' + (it.e.cantidad || 0).toLocaleString() + ' und</b>' + (it.e.cierra ? '<em>✅ completó</em>' : '') + '</div>';
+      }).join('')
+    + '</div>';
+}
+
 function chipCompletadoTapas(x, conCliente) {
   var idq = escHtml(String(x.id));
   var tag = '✓ COMPLETADA' + (x.s.marcadoTapasPor ? ' · ' + x.s.marcadoTapasPor : '') + (x.s.marcadoTapasEn ? ' · ' + comentFechaHoraTapas(x.s.marcadoTapasEn) : '');
@@ -4421,6 +4441,7 @@ function chipCompletadoTapas(x, conCliente) {
     + '<div class="cp-chip-t"><span>' + escHtml(x.codigo) + comentBadgeHtml(x.s) + '</span><b title="Entregado / pedido">' + entregadoTotalFichaTapas(x.s).toLocaleString() + '/' + x.cant.toLocaleString() + '</b></div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
     + notaChipHtml(x.s.notas)
+    + entregasChipHtml(x.s)
     + '<div class="cp-acc"><button onclick="event.stopPropagation();abrirFichaTapas(\'' + idq + '\')">Ver detalle de la ficha</button></div>'
     + '</div>';
 }
@@ -4436,6 +4457,7 @@ function buildChipCompacto(x, conCliente) {
     + codClienteChipHtml(x.s)
     + stkPTHtml(x.sku, x.saldo)
     + notaChipHtml(x.s.notas)
+    + entregasChipHtml(x.s)
     + '<div class="cp-resum">' + (enProc ? '<span class="cp-res-b proc">▶ ' + x.enProc.toLocaleString() + ' en proceso</span>' : '') + componentesResumenHtml(x.s) + '</div>'
     + '<div class="cp-more">'
     +   '<div class="cp-chip-s">' + (enProc ? '▶ ' + x.enProc.toLocaleString() + ' en proceso' : 'de ' + x.cant.toLocaleString() + (x.ent ? ' · ent. ' + x.ent.toLocaleString() : '')) + '</div>'

@@ -365,6 +365,9 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-parc b{font-family:'DM Mono',monospace}
 .ped-parc .sr{color:#B45309;font-weight:800}
 .ped-parc .cr{color:#047857;font-weight:800}
+.ped-parc .ent{display:flex;gap:6px;align-items:baseline;margin-top:2px;padding-top:2px;border-top:1px dashed #FDE047}
+.ped-parc .ent span{color:#64748B;min-width:44px}
+.ped-parc .ent em{font-style:normal;font-size:10px;font-weight:800;color:#047857}
 .ped-pe{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid #FDE047;background:#FEFCE8;border-radius:8px;padding:6px 9px;margin-bottom:6px;font-size:12px}
 .ped-pe b{font-family:'DM Mono',monospace;color:#854D0E}
 .ped-pe .t{flex:1;min-width:120px;color:#64748B}
@@ -1722,6 +1725,7 @@ function pedChipCompletada(x, conCliente) {
     + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + pedComentBadge(x) + '</span><b title="Entregado / pedido">' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</b></div>'
     + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
     + pedNotaHtml(x.s.notas)
+    + pedParcChipHtml(x)
     + '<div>' + pedComentBtn(x) + '</div>'
     + '<div class="ped-acc"><button onclick="event.stopPropagation();abrirPedido(\'' + idq + '\')">Ver ficha</button></div>'
     + '</div>';
@@ -2183,7 +2187,12 @@ function pedEntregaInput(el) {
 function pedParcChipHtml(x) {
   if (!x.parc.total) return '';
   return '<div class="ped-parc">🟡 Reportado por Tapas: <b>' + pedNum(x.parc.total) + '</b> und · '
-    + (x.parc.sinRequi > 0 ? '<span class="sr">⏳ ' + pedNum(x.parc.sinRequi) + ' sin requi</span>' : '<span class="cr">✓ con requi</span>') + '</div>';
+    + (x.parc.sinRequi > 0 ? '<span class="sr">⏳ ' + pedNum(x.parc.sinRequi) + ' sin requi</span>' : '<span class="cr">✓ con requi</span>')
+    // una línea por entrega registrada: fecha + cantidad
+    + x.parc.lista.map(function(e) {
+        return '<div class="ent"><span>' + escHtml(pedFechaCorta(e.fecha)) + '</span><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<em>✅ completó</em>' : '') + '</div>';
+      }).join('')
+    + '</div>';
 }
 
 // Historial de entregas parciales de la ficha (la supervisora puede quitar una puesta por error)
