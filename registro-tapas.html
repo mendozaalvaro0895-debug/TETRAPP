@@ -277,6 +277,11 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 @media(max-width:700px){.ped-comp-r{grid-template-columns:70px 1fr auto}.ped-comp-r .cl,.ped-comp-r .fi,.ped-comp-r .pr{display:none}}
 .ped-ov{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(12,12,11,.72);z-index:9000;align-items:center;justify-content:center;padding:14px}
 .ped-ov.open{display:flex}
+.clv-in{width:100%;border:2px solid #E0DED8;border-radius:10px;padding:12px;font-size:20px;text-align:center;letter-spacing:6px;font-family:'DM Sans',sans-serif;margin:4px 0 8px}
+.clv-in:focus{outline:none;border-color:#1A6B5B}
+.clv-err{min-height:18px;font-size:12px;font-weight:700;color:#B83232;margin-bottom:8px}
+.clv-btn{width:100%;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;background:#1A6B5B;color:#fff;font-family:'DM Sans',sans-serif}
+.clv-btn.sec{background:#fff;color:#6B6B6A;border:1.5px solid #E0DED8;margin-top:8px}
 .ped-box{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:16px 18px;max-height:92vh;overflow:auto}
 .ped-box h3{font-family:'Playfair Display',serif;font-size:18px;color:#1A6B5B;margin-bottom:2px}
 .ped-box .pd{font-size:12px;color:#3A3A38;margin:6px 0 10px;line-height:1.4}
@@ -559,6 +564,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
       <div class="ped-h1">📋 Pedidos de Tapas</div>
       <div class="ped-sub" id="pedAct">—</div>
       <button class="ped-ref" onclick="cargarPedidos()">↻ Actualizar</button>
+      <button class="ped-ref" id="pedBloqBtn" style="margin-left:8px" onclick="pedBloquear()">🔒 Bloquear</button>
     </div>
     <div id="pedAviso"></div>
     <div id="pedCuerpo"><div class="cargando"><div class="spinner"></div><div>Cargando pedidos…</div></div></div>
@@ -575,6 +581,17 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
     </div>
   </div>
 
+</div>
+
+<div class="ped-ov" id="claveOv" onclick="if(event.target===this)claveCerrar()">
+  <div class="ped-box" style="max-width:340px;text-align:center">
+    <h3>🔒 Pedidos</h3>
+    <div class="pd">Esta sección es solo para la supervisión. Escribe la clave para entrar.</div>
+    <input type="password" class="clv-in" id="claveIn" autocomplete="off" placeholder="Clave" onkeydown="if(event.key==='Enter')claveEnviar()">
+    <div class="clv-err" id="claveErr"></div>
+    <button class="clv-btn" id="claveBtn" onclick="claveEnviar()">Entrar</button>
+    <button class="clv-btn sec" onclick="claveCerrar()">Cancelar</button>
+  </div>
 </div>
 
 <div class="ped-ov" id="pedOv" onclick="if(event.target===this)cerrarPedido()">
@@ -1170,8 +1187,73 @@ function mostrarPantalla(id) {
   pedAutoRefresco(enPed);
 }
 
+// ── Clave de la pestaña Pedidos (solo supervisión; master entra sin clave) ──
+// La clave vive hasheada en la base (tapas_acceso) y se valida con la función tapas_pedidos_verificar (sql/tapas_pedidos_clave_v1.sql).
+var CLAVE = { ok: false, intentos: 0, bloqueoHasta: 0, enviando: false };
+try { CLAVE.ok = sessionStorage.getItem('tapas_ped_ok') === '1'; } catch(e) {}
+
+function pedAccesoLibre() {
+  return (typeof TETRA !== 'undefined' && TETRA.rol === 'master') || CLAVE.ok;
+}
+
+function claveAbrir() {
+  document.getElementById('claveIn').value = '';
+  document.getElementById('claveErr').textContent = '';
+  document.getElementById('claveOv').classList.add('open');
+  setTimeout(function() { document.getElementById('claveIn').focus(); }, 80);
+}
+
+function claveCerrar() {
+  document.getElementById('claveOv').classList.remove('open');
+}
+
+async function claveEnviar() {
+  if (CLAVE.enviando) return;
+  var err = document.getElementById('claveErr');
+  var v = document.getElementById('claveIn').value;
+  if (!v) { err.textContent = 'Escribe la clave'; return; }
+  var espera = Math.ceil((CLAVE.bloqueoHasta - Date.now()) / 1000);
+  if (espera > 0) { err.textContent = 'Demasiados intentos. Espera ' + espera + ' s'; return; }
+  CLAVE.enviando = true;
+  document.getElementById('claveBtn').disabled = true;
+  var r = await db.rpc('tapas_pedidos_verificar', { p_clave: v });
+  CLAVE.enviando = false;
+  document.getElementById('claveBtn').disabled = false;
+  if (r.error) {
+    var msg = r.error.message || String(r.error);
+    err.textContent = /function|does not exist|schema cache|tapas_pedidos_verificar/i.test(msg) ? 'Falta correr sql/tapas_pedidos_clave_v1.sql en Supabase' : msg;
+    return;
+  }
+  if (r.data === true) {
+    CLAVE.ok = true; CLAVE.intentos = 0;
+    try { sessionStorage.setItem('tapas_ped_ok', '1'); } catch(e) {}
+    claveCerrar();
+    irTab('ped');
+    return;
+  }
+  CLAVE.intentos++;
+  document.getElementById('claveIn').value = '';
+  if (CLAVE.intentos >= 5) {
+    CLAVE.intentos = 0; CLAVE.bloqueoHasta = Date.now() + 30000;
+    err.textContent = 'Demasiados intentos. Espera 30 s';
+  } else {
+    err.textContent = 'Clave incorrecta';
+  }
+  document.getElementById('claveIn').focus();
+}
+
+function pedBloquear() {
+  CLAVE.ok = false;
+  try { sessionStorage.removeItem('tapas_ped_ok'); } catch(e) {}
+  irTab('reg');
+}
+
 function irTab(t) {
-  if (t === 'ped') { mostrarPantalla('scrPed'); cargarPedidos(); }
+  if (t === 'ped') {
+    if (!pedAccesoLibre()) { claveAbrir(); return; }
+    document.getElementById('pedBloqBtn').style.display = (typeof TETRA !== 'undefined' && TETRA.rol === 'master') ? 'none' : '';
+    mostrarPantalla('scrPed'); cargarPedidos();
+  }
   else mostrarPantalla(ultimaPantalla);
   window.scrollTo(0, 0);
 }

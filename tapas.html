@@ -755,6 +755,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <span class="tbadge tb-teal" id="cnt-tapas">0</span>
     </div>
     <div class="tabs-r">
+      <button class="btn btn-g btn-sm" onclick="cambiarClavePedidos()" title="Cambiar la clave de la pestaña Pedidos del perfil de Tapas">🔑 Clave Pedidos</button>
       <button class="btn btn-g btn-sm" onclick="imprimirFichasTapas()" title="Imprimir fichas activas por cliente">🖨 Imprimir</button>
       <button class="btn btn-t btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button>
     </div>
@@ -4709,6 +4710,21 @@ function renderInicioPedidosTapas() {
 // cada cliente: rojo → amarillo → verde, y por antigüedad. "Entregado" = suma de ingresos
 // a PT (movimientos_materiales entrada_pt) de cada ficha. Mismo mecanismo que Serigrafía:
 // ventana nueva + window.print() (el navegador la guarda como PDF).
+// Clave de la pestaña Pedidos del perfil de Tapas (registro-tapas.html). Se guarda hasheada en la base: sql/tapas_pedidos_clave_v1.sql
+async function cambiarClavePedidos() {
+  var nueva = prompt('Nueva clave para la pestaña Pedidos del perfil de Tapas (mínimo 4 caracteres).\n\nLa supervisora deberá usar la nueva clave la próxima vez que entre.');
+  if (nueva === null) return;
+  nueva = nueva.trim();
+  if (nueva.length < 4) { showToast('⚠️ La clave debe tener al menos 4 caracteres', '#B83232'); return; }
+  var r = await db.rpc('tapas_pedidos_cambiar_clave', { p_nueva: nueva });
+  if (r.error) {
+    var msg = r.error.message || String(r.error);
+    showToast('❌ ' + (/function|does not exist|schema cache|tapas_pedidos_cambiar_clave/i.test(msg) ? 'Falta correr sql/tapas_pedidos_clave_v1.sql en Supabase' : msg), '#B83232');
+    return;
+  }
+  showToast('🔑 Clave de Pedidos actualizada');
+}
+
 async function imprimirFichasTapas() {
   var w = window.open('', '_blank'); // se abre ya, dentro del clic, para que no lo bloquee el navegador
   if (!w) { showToast('Activa las ventanas emergentes para exportar', '#92400e'); return; }
