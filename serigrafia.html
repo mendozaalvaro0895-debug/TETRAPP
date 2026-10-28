@@ -7007,13 +7007,12 @@ async function mostrarDetalle(id) {
   if (!s) return;
   selId = s.id;
 
-  var fugas = { salidas: 0, entradas: 0, perdidas: 0, fugaTotal: 0 };
+  var fugas = { salidas: 0, entradas: 0, fugaTotal: 0 };
   try {
     var r = await db.from('movimientos_materiales').select('*').eq('solicitud_id', s.dbId);
     if (r.data) {
       fugas.salidas  = r.data.filter(function(m){return m.tipo==='salida_bodega';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
       fugas.entradas = r.data.filter(function(m){return m.tipo==='entrada_pt';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
-      fugas.perdidas = r.data.filter(function(m){return m.tipo==='perdida';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
     }
   } catch(e) {}
   // Ingresos PT registrados como entregas manuales (Movimientos > Ingresos PT / bloque Entregados)
@@ -7024,7 +7023,8 @@ async function mostrarDetalle(id) {
       fugas.entradas += (m.cant || 0);
     }
   });
-  fugas.fugaTotal = fugas.salidas - fugas.entradas - fugas.perdidas;
+  // Todo lo que salió de bodega y no volvió como PT se considera merma (sin paso aparte de "pérdidas")
+  fugas.fugaTotal = fugas.salidas - fugas.entradas;
 
   var det = document.getElementById('modalDetalleBody');
   if (!det) return;
@@ -7130,16 +7130,14 @@ async function mostrarDetalle(id) {
       })() +
 
       '<div class="dc" style="border-color:var(--amber)">' +
-        '<div class="dc-h" style="background:var(--amber-l);color:var(--amber)">📉 Trazabilidad de fugas</div>' +
+        '<div class="dc-h" style="background:var(--amber-l);color:var(--amber)">📉 Trazabilidad de merma</div>' +
         '<div class="dc-b">' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px">' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">' +
             '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Salida bodega</div><div style="font-size:20px;font-weight:800;color:var(--teal)">' + fugas.salidas.toLocaleString() + '</div></div>' +
             '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Entrada PT</div><div style="font-size:20px;font-weight:800;color:var(--green)">' + fugas.entradas.toLocaleString() + '</div></div>' +
-            '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Pérdidas</div><div style="font-size:20px;font-weight:800;color:var(--red)">' + fugas.perdidas.toLocaleString() + '</div></div>' +
-            '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Fuga total</div><div style="font-size:20px;font-weight:800;color:' + fugaColor + '">' + fugas.fugaTotal.toLocaleString() + '</div></div>' +
+            '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Merma</div><div style="font-size:20px;font-weight:800;color:' + fugaColor + '">' + fugas.fugaTotal.toLocaleString() + '</div></div>' +
           '</div>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-            '<button class="btn btn-s btn-sm" onclick="abrirModalPerdida(\'' + s.id + '\')">➕ Registrar pérdida</button>' +
             '<button class="btn btn-g btn-sm" onclick="registrarEntradaRapida(\'' + s.id + '\')">📦 Registrar entrada PT</button>' +
             '<button class="btn btn-g btn-sm" onclick="registrarSalidaRapida(\'' + s.id + '\')">📤 Registrar salida bodega</button>' +
           '</div>' +
