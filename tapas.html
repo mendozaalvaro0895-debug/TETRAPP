@@ -3466,8 +3466,17 @@ function compactoUnd(n) {
   return n >= 1000 ? (Math.round(n / 100) / 10).toString().replace(/\.0$/, '') + 'k' : String(n);
 }
 
-// Meta diaria por persona (línea punteada del gráfico de producción diaria)
-var META_DIA_GRAFICO = 10000;
+// Meta diaria por persona (línea punteada del gráfico de producción diaria y de "La competencia"), SEGÚN LA FECHA: así los
+// meses pasados conservan la meta que regía entonces. 10,000 hasta oct/2026 y 13,000 desde el 1-nov-2026 (decisión de Alvaro).
+// Para otro cambio basta agregar una fila { desde, meta }. ESPEJO en registro-tapas.html.
+var META_DIA_HISTORIAL = [{ desde: '2000-01-01', meta: 10000 }, { desde: '2026-11-01', meta: 13000 }];
+function metaDiaTapas(fecha) {
+  var f = String(fecha || fechaHoy());
+  if (f.length === 7) f += '-01';
+  var m = META_DIA_HISTORIAL[0].meta;
+  META_DIA_HISTORIAL.forEach(function(h) { if (h.desde <= f) m = h.meta; });
+  return m;
+}
 var ALTO_BARRAS_DIA = 180; // px de la barra más alta posible; el gráfico mide 210px
 
 function buildTermDiario(o) {
@@ -3490,8 +3499,9 @@ function buildTermDiario(o) {
   }
 
   // La escala llega siempre hasta la meta, así la línea punteada queda en su sitio aunque nadie la alcance
-  var escalaDia = Math.max(maxDia, META_DIA_GRAFICO);
-  var lineaMeta = '<div class="dg-meta" style="bottom:' + Math.round(META_DIA_GRAFICO / escalaDia * ALTO_BARRAS_DIA) + 'px"><span>Meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>';
+  var metaDia = metaDiaTapas(ym);
+  var escalaDia = Math.max(maxDia, metaDia);
+  var lineaMeta = '<div class="dg-meta" style="bottom:' + Math.round(metaDia / escalaDia * ALTO_BARRAS_DIA) + 'px"><span>Meta ' + metaDia.toLocaleString() + ' und/día</span></div>';
 
   var cols = estados.map(function(e) {
     var titulo = 'Día ' + e.d + ' · ';
@@ -3546,7 +3556,7 @@ function buildTermDiario(o) {
     + '<span><i style="background:var(--red-l);border:1px dashed var(--red)"></i>sin registro</span>'
     + '<span><i style="background:var(--bg2)"></i>ausente</span>'
     + '<span><i style="background:var(--amber)"></i>por aprobar</span>'
-    + '<span><i style="background:none;border-top:2px dashed var(--red);height:0;width:14px;vertical-align:3px"></i>meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>';
+    + '<span><i style="background:none;border-top:2px dashed var(--red);height:0;width:14px;vertical-align:3px"></i>meta ' + metaDia.toLocaleString() + ' und/día</span></div>';
 }
 
 // Aprobar / rechazar una comanda pendiente directo desde el historial o el popup del día.
@@ -7012,8 +7022,8 @@ async function renderProdMensualTapas(inst) {
 // ── "La competencia": productividad por operador, en barras (oct/2026) ──────────────────────
 // Una barra por persona (supervisión incluida) y una línea punteada con la meta. Dos vistas (botón):
 //  · MENSUAL (por defecto): total del mes por persona vs la meta del mes al día de hoy = días laborables
-//    transcurridos (sin domingos ni feriados) × META_DIA_GRAFICO; el tooltip trae días con producción y promedio.
-//  · DIARIA: un día a la vez vs META_DIA_GRAFICO (10,000 und/día); el día se elige con la tira de días del mes
+//    transcurridos (sin domingos ni feriados) × metaDiaTapas(día); el tooltip trae días con producción y promedio.
+//  · DIARIA: un día a la vez vs metaDiaTapas(día) (10,000 hasta oct/2026, 13,000 desde nov); el día se elige con la tira de días del mes
 //    (o ‹ ›); al abrir muestra hoy o, si hoy no tiene producción, el último día con datos.
 // Color de la barra: verde ≥ meta · ámbar 80–99% · rojo < 80%. Solo tareas Terminadas de comandas APROBADAS
 // (mismo criterio del termómetro). El mes es el de #prodMes.
@@ -7200,17 +7210,17 @@ async function pgoRender() {
   var porDia = pgoPorDia(comandas);
   var esMesActual = base === hoy.slice(0, 7);
   var mesTxt = PGO_MESES[parseInt(base.slice(5, 7), 10) - 1] + ' ' + base.slice(0, 4);
-  var lista = [], meta = META_DIA_GRAFICO, metaTxt = '', sufijo = '', tira = '', sinProd = '', stats = '', vacio = '';
+  var lista = [], meta = metaDiaTapas(base), metaTxt = '', sufijo = '', tira = '', sinProd = '', stats = '', vacio = '';
 
   if (pgoVista === 'mes') {
     // Vista MENSUAL: total del mes por persona vs la meta del mes al día de hoy (días laborables × meta diaria)
     var lim = esMesActual ? parseInt(hoy.slice(8), 10) : nd;
-    var laborables = 0;
+    var metaAcum = 0;
     for (var d = 1; d <= lim; d++) {
       var fd = base + '-' + String(d).padStart(2, '0');
-      if (new Date(fd + 'T12:00:00').getDay() !== 0 && !feriadosSet[fd]) laborables++;
+      if (new Date(fd + 'T12:00:00').getDay() !== 0 && !feriadosSet[fd]) metaAcum += metaDiaTapas(fd);
     }
-    meta = Math.max(laborables, 1) * META_DIA_GRAFICO;
+    meta = Math.max(metaAcum, metaDiaTapas(base));
     metaTxt = 'Meta al día ' + lim + ' · ' + meta.toLocaleString();
     var acum = {};
     Object.keys(porDia).forEach(function(f) {
@@ -7242,7 +7252,8 @@ async function pgoRender() {
     var dow = new Date(pgoDia + 'T12:00:00').getDay();
     var diaTxt = PGO_DIAS[dow] + ' ' + parseInt(pgoDia.slice(8), 10) + ' de ' + PGO_MESES[parseInt(pgoDia.slice(5, 7), 10) - 1];
     sufijo = diaTxt.charAt(0).toUpperCase() + diaTxt.slice(1);
-    metaTxt = 'Meta ' + META_DIA_GRAFICO.toLocaleString();
+    meta = metaDiaTapas(pgoDia);
+    metaTxt = 'Meta ' + meta.toLocaleString();
     vacio = 'Sin producción aprobada el ' + diaTxt;
     tira = pgoTiraDias(base, nd, porDia, hoy);
     // quiénes tuvieron producción en el mes pero no ese día (salvo domingo/feriado)
@@ -7273,7 +7284,7 @@ async function pgoRender() {
       + '</div>';
     cuerpo = '<div class="pgo-chart">' + pgoSvg(lista, (cont.clientWidth || 900) - 28, meta, metaTxt) + '</div>'
       + '<div class="pgo-leyenda"><span><i style="background:var(--green)"></i>Llegó a la meta</span><span><i style="background:var(--amber)"></i>80–99%</span><span><i style="background:var(--red)"></i>Menos de 80%</span>'
-      + '<span><i class="dash"></i>' + (esMes ? 'Meta al día de hoy: días laborables × ' + META_DIA_GRAFICO.toLocaleString() : 'Meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día') + '</span></div>'
+      + '<span><i class="dash"></i>' + (esMes ? 'Meta al día de hoy: días laborables × ' + metaDiaTapas(base).toLocaleString() : 'Meta ' + meta.toLocaleString() + ' und/día') + '</span></div>'
       + sinProd + stats;
   }
 

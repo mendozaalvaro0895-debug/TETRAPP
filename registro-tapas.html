@@ -332,6 +332,11 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-res-b.ok{background:#DCFCE7;color:#166534}
 .ped-res-b.mal{background:#FEE2E2;color:#B83232}
 .ped-res-b.proc{background:#DBEAFE;color:#1E3A8A}
+.aviso-meta{display:flex;gap:12px;align-items:flex-start;background:#FEF3C7;border:2px solid #F59E0B;border-radius:14px;padding:13px 14px;margin:0 0 14px;box-shadow:0 2px 10px rgba(245,158,11,.25)}
+.am-ic{font-size:28px;line-height:1}
+.am-tx{flex:1;display:flex;flex-direction:column;gap:4px;font-size:14px;line-height:1.4;color:#78350F}
+.am-tx>b{font-size:16px;color:#92400E}
+.am-tx button{align-self:flex-start;margin-top:6px;background:#F59E0B;color:#fff;border:none;border-radius:9px;padding:9px 20px;font-size:14px;font-weight:800;cursor:pointer;font-family:'DM Sans',sans-serif}
 .ped-cm-b{margin-left:5px;font-size:10px;font-weight:800;border-radius:10px;padding:1px 7px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;white-space:nowrap}
 .ped-cm-b.ok{background:#F1F5F9;color:#64748B;border-color:#E2E8F0}
 .ped-cm{border:1px solid #FCD34D;border-left-width:4px;background:#FFFBEB;border-radius:8px;padding:6px 9px;margin-bottom:6px}
@@ -458,6 +463,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 
   <!-- PANTALLA 1: SELECCIÓN DE OPERARIO -->
   <div class="pantalla vis" id="scrSel">
+    <div id="avisoMeta"></div>
     <div class="titulo">¿Quién registra su producción?</div>
     <div class="subtitulo">Toca tu nombre para comenzar</div>
     <div id="opGrid" class="op-grid">
@@ -740,8 +746,16 @@ function compactoUnd(n) {
   return n >= 1000 ? (Math.round(n / 100) / 10).toString().replace(/\.0$/, '') + 'k' : String(n);
 }
 
-// Meta diaria por persona (línea punteada del gráfico) y alto máximo de barra (el gráfico mide 210px)
-var META_DIA_GRAFICO = 10000;
+// Meta diaria por persona (línea punteada del gráfico) SEGÚN LA FECHA: 10,000 hasta oct/2026 y 13,000 desde el 1-nov-2026.
+// ESPEJO de metaDiaTapas/META_DIA_HISTORIAL de tapas.html. Alto máximo de barra: el gráfico mide 210px
+var META_DIA_HISTORIAL = [{ desde: '2000-01-01', meta: 10000 }, { desde: '2026-11-01', meta: 13000 }];
+function metaDiaTapas(fecha) {
+  var f = String(fecha || fechaGT());
+  if (f.length === 7) f += '-01';
+  var m = META_DIA_HISTORIAL[0].meta;
+  META_DIA_HISTORIAL.forEach(function(h) { if (h.desde <= f) m = h.meta; });
+  return m;
+}
 var ALTO_BARRAS_DIA = (window.innerWidth <= 700) ? 120 : 180;
 
 function buildTermDiario(o) {
@@ -763,8 +777,9 @@ function buildTermDiario(o) {
   }
 
   // La escala llega siempre hasta la meta, así la línea punteada queda en su altura real
-  var escalaDia = Math.max(maxDia, META_DIA_GRAFICO);
-  var lineaMeta = '<div class="dg-meta" style="bottom:' + Math.round(META_DIA_GRAFICO / escalaDia * ALTO_BARRAS_DIA) + 'px"><span>Meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>';
+  var metaDia = metaDiaTapas(ym);
+  var escalaDia = Math.max(maxDia, metaDia);
+  var lineaMeta = '<div class="dg-meta" style="bottom:' + Math.round(metaDia / escalaDia * ALTO_BARRAS_DIA) + 'px"><span>Meta ' + metaDia.toLocaleString() + ' und/día</span></div>';
 
   var cols = estados.map(function(e) {
     var titulo = 'Día ' + e.d + ' · ';
@@ -819,7 +834,7 @@ function buildTermDiario(o) {
     + '<span><i style="background:#FEE2E2;border:1px dashed #B83232"></i>sin registro</span>'
     + '<span><i style="background:#D8D6D0"></i>ausente</span>'
     + '<span><i style="background:#B87200"></i>por aprobar</span>'
-    + '<span><i style="background:none;border-top:2px dashed #B83232;height:0;width:14px;vertical-align:3px"></i>meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>';
+    + '<span><i style="background:none;border-top:2px dashed #B83232;height:0;width:14px;vertical-align:3px"></i>meta ' + metaDia.toLocaleString() + ' und/día</span></div>';
 }
 
 // Texto "SKU — descripción" de una tarea (o solo la descripción si no hay SKU)
@@ -1060,8 +1075,40 @@ function elegirOperario(codigo) {
   window.scrollTo(0, 0);
 }
 
+// ── Anuncio: la meta diaria sube a 13,000 und desde el 1 de noviembre de 2026 ──────────────────
+// Se muestra arriba de la selección de operario solo entre AVISO_META.desde y .hasta (hora de Guatemala) y se repite DOS veces
+// al día: una por la mañana (antes de las 12:00) y otra por la tarde. "Entendido" oculta el aviso de ESE turno en ese teléfono
+// (localStorage, solo conveniencia); la pantalla lo vuelve a evaluar cada 15 min, así el recordatorio de la tarde sale solo.
+var AVISO_META = { desde: '2026-10-28', hasta: '2026-10-29', meta: 13000, vigente: '1 de noviembre' };
+
+function avisoMetaClave() {
+  var h = new Date(Date.now() - 6 * 3600 * 1000);
+  return 'tetra_aviso_meta_' + h.toISOString().slice(0, 10) + (h.getUTCHours() < 12 ? '_AM' : '_PM');
+}
+
+function pintarAvisoMeta() {
+  var el = document.getElementById('avisoMeta');
+  if (!el) return;
+  var hoy = fechaGT();
+  var visto = false;
+  try { visto = !!localStorage.getItem(avisoMetaClave()); } catch (e) {}
+  if (hoy < AVISO_META.desde || hoy > AVISO_META.hasta || visto) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="aviso-meta"><div class="am-ic">📣</div><div class="am-tx"><b>¡Aviso importante!</b>'
+    + '<span>A partir del <b>' + AVISO_META.vigente + '</b> la meta diaria de Tapas sube a <b>' + AVISO_META.meta.toLocaleString() + ' unidades</b> por persona.</span>'
+    + '<button onclick="avisoMetaEntendido()">Entendido</button></div></div>';
+}
+
+function avisoMetaEntendido() {
+  try { localStorage.setItem(avisoMetaClave(), '1'); } catch (e) {}
+  pintarAvisoMeta();
+}
+
+window.addEventListener('load', pintarAvisoMeta);
+setInterval(pintarAvisoMeta, 15 * 60 * 1000);
+
 function volverSeleccion() {
   opActual = null;
+  pintarAvisoMeta();
   cargarTermometro();
   mostrarPantalla('scrSel');
   window.scrollTo(0, 0);
