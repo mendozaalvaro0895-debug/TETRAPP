@@ -234,6 +234,10 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-chip.cubierta:hover,.ped-chip.cubierta.open{opacity:1}
 .ped-chip.cubierta.proc{border-color:#86EFAC;background:#F0FDF4}
 .ped-chip.cubierta::before{content:'✓ COMPLETADA · el stock cubre el saldo';display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#15803D;margin-bottom:2px}
+/* Ficha que la supervisora marcó COMPLETADA: sigue visible al final del listado, transparente (pedCompletadaTag) */
+.ped-chip.completada{background:#F0FDF4;border-color:#86EFAC;opacity:.5;transition:opacity .15s}
+.ped-chip.completada:hover,.ped-chip.completada.open{opacity:1}
+.ped-comp-tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#15803D;margin-bottom:2px}
 
 .ped-chip-t{display:flex;justify-content:space-between;gap:4px;font-size:11px;font-weight:800}
 .ped-chip-t b{font-family:'DM Mono',monospace;color:#1A6B5B}
@@ -1415,6 +1419,7 @@ async function guardarRegistro() {
 // ya hechos con su requi, marcados Parcial / Completa según lo acumulado de la ficha.
 var PED = { stockInv: {}, stockB7: {}, salidas: [], tipos: {}, sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, coment: [], comentOk: true, comentTxt: '', parc: [], parcOk: true, parcForm: false, parcCant: '', parcFecha: '', parcNota: '', form: null, selOp: [], selProc: [], cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40 };
 var PED_VIVOS = ['nueva', 'proceso', 'parcial'];
+var PED_COMPLETADAS_DIAS = 15; // las fichas marcadas COMPLETADA siguen a la vista (al final, transparentes) este tiempo
 
 // TIPO / SUBFAMILIA de tapa — ESPEJO de tapas.html (detectarTipoTapa/tipoDeSkuTapa): el tipo guardado en el
 // Recetario (sku_especificaciones, area 'tapas', campo 'Familia') manda; si el SKU no tiene, se sugiere por
@@ -1480,7 +1485,10 @@ async function cargarPedidos(silencioso) {
     // Con componentes (sku_base…) y plazo_tipo; si alguna columna aún no existe (SQL #29 / #37 sin correr) se reintenta sin ella
     var cBase = 'id,codigo,cliente_nombre,estado,created_at,fecha_limite,prioridad,notas';
     var lin = 'sku,descripcion,cantidad,procesos', linC = lin + ',sku_base,sku_contratapa,sku_liner,sku_banda';
-    var intentos = [cBase + ',plazo_tipo,solicitud_lineas(' + linC + ')', cBase + ',solicitud_lineas(' + linC + ')',
+    // marcado_tapas_por/en (sql/tapas_marcar_ficha_v2.sql) dicen quién y cuándo marcó la ficha COMPLETADA; sin esas columnas se reintenta sin ellas
+    var cMarca = cBase + ',marcado_tapas_por,marcado_tapas_en';
+    var intentos = [cMarca + ',plazo_tipo,solicitud_lineas(' + linC + ')', cMarca + ',solicitud_lineas(' + linC + ')',
+                    cBase + ',plazo_tipo,solicitud_lineas(' + linC + ')', cBase + ',solicitud_lineas(' + linC + ')',
                     cBase + ',plazo_tipo,solicitud_lineas(' + lin + ')', cBase + ',solicitud_lineas(' + lin + ')'];
     var rs = null;
     for (var q = 0; q < intentos.length; q++) {
@@ -1672,7 +1680,11 @@ function pedModelo() {
       parcTotal += e.cantidad; parcSin += e.cantidad - cub;
     });
     var l0 = lins[0] || {};
+    // COMPLETADA por Tapas: estado 'lista' + marca de la supervisora, durante PED_COMPLETADAS_DIAS días (después sale del listado)
+    var tMarca = s.marcado_tapas_en ? new Date(s.marcado_tapas_en).getTime() : 0;
+    var completada = s.estado === 'lista' && tMarca > 0 && (Date.now() - tMarca) <= PED_COMPLETADAS_DIAS * 86400000;
     return { s: s, id: s.id, codigo: s.codigo || String(s.id).slice(0, 6), cliente: s.cliente_nombre || '—', cant: cant, entregado: entregado,
+             completada: completada,
              saldo: saldo, enProc: enProc, libre: Math.max(0, saldo - enProc), abiertos: abiertos, ings: ings,
              sku: l0.sku || '', desc: (l0.descripcion || '') + (lins.length > 1 ? ' (+' + (lins.length - 1) + ')' : ''),
              viva: PED_VIVOS.indexOf(s.estado) >= 0, limite: s.fecha_limite || '', plazo: s.plazo_tipo || 'fecha', urgente: s.prioridad === 'urgente',
@@ -1695,6 +1707,23 @@ function pedLimiteHtml(x) {
 }
 
 function pedNum(n) { return (n || 0).toLocaleString(); }
+
+// Ficha marcada COMPLETADA por Tapas: chip verde y transparente con la nota, quién la marcó y cuándo
+function pedCompletadaTexto(x) {
+  return '✓ COMPLETADA' + (x.s.marcado_tapas_por ? ' · ' + pedCorto(x.s.marcado_tapas_por) : '') + (x.s.marcado_tapas_en ? ' · ' + pedFechaHoraCorta(x.s.marcado_tapas_en) : '');
+}
+function pedChipCompletada(x, conCliente) {
+  var idq = escHtml(String(x.id));
+  return '<div class="ped-chip completada' + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
+    + '<span class="ped-comp-tag">' + escHtml(pedCompletadaTexto(x)) + '</span>'
+    + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
+    + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + pedComentBadge(x) + '</span><b>' + pedNum(x.cant) + '</b></div>'
+    + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
+    + pedNotaHtml(x.s.notas)
+    + '<div>' + pedComentBtn(x) + '</div>'
+    + '<div class="ped-acc"><button onclick="event.stopPropagation();abrirPedido(\'' + idq + '\')">Ver ficha</button></div>'
+    + '</div>';
+}
 
 function renderPedidos() {
   var m = pedModelo();
@@ -1720,12 +1749,15 @@ function renderPedidos() {
   }).join('') + '</div>' : '<div class="ped-vacio">Nada marcado en proceso. Toca un pedido de abajo para marcarlo.</div>';
 
   // 2) Todos los pedidos: por TIPO de tapa (default) o por cliente — idéntico a Fichas de Trabajo de tapas.html
+  // Las COMPLETADAS por Tapas se muestran también (al final y transparentes) pero no cuentan como saldo por entregar
+  var visibles = m.filter(function(x) { return (x.viva && x.saldo > 0) || x.completada; });
   var porCli = {}, clis = [];
-  vivas.forEach(function(x) {
+  visibles.forEach(function(x) {
     if (!porCli[x.cliente]) { porCli[x.cliente] = []; clis.push(x.cliente); }
     porCli[x.cliente].push(x);
   });
   clis.sort(function(a, b) { return a.localeCompare(b); });
+  var saldoVivo = function(x) { return x.completada ? 0 : x.saldo; };
   // Orden de los chips (igual en las 3 vistas; ESPEJO de ordenChipsCompactos de tapas.html): 1) primero las SIN stock del producto
   // terminado, luego las de stock parcial y al final las CUBIERTAS (con stock hay 1 despacho o más de ventaja, pueden esperar) ·
   // 2) las que ya tienen Base y Contratapa suficientes (el Liner no cuenta) antes que las que no · 3) las que MÁS falta fabricar
@@ -1733,11 +1765,12 @@ function renderPedidos() {
   var nivelStock = function(p) { return p.cubierta ? 2 : ((p.stock || 0) > 0 ? 1 : 0); };
   var ordenChips = function(a, b) {
     var pa = pedProducirInfo(a), pb = pedProducirInfo(b);
-    return (nivelStock(pa) - nivelStock(pb)) || ((pb.matOk ? 1 : 0) - (pa.matOk ? 1 : 0)) || (pb.producir - pa.producir) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at));
+    return ((a.completada ? 1 : 0) - (b.completada ? 1 : 0)) || (nivelStock(pa) - nivelStock(pb)) || ((pb.matOk ? 1 : 0) - (pa.matOk ? 1 : 0)) || (pb.producir - pa.producir) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at));
   };
   var chip = function(x, conCliente) {
     var proc = x.abiertos.length > 0;
     var idq = escHtml(String(x.id));
+    if (x.completada) return pedChipCompletada(x, conCliente);
     return '<div class="ped-chip' + (proc ? ' proc' : '') + (pedProducirInfo(x).cubierta ? ' cubierta' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
       + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + pedEstadoBadge(x) + pedComentBadge(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
@@ -1757,12 +1790,12 @@ function renderPedidos() {
   var htmlGrid;
   if (pedAgrupar === 'tipo') {
     var porTipo = {}, tipos = [];
-    vivas.forEach(function(x) {
+    visibles.forEach(function(x) {
       var t = tipoDeSkuTapa(x.sku, x.desc);
       if (!porTipo[t]) { porTipo[t] = []; tipos.push(t); }
       porTipo[t].push(x);
     });
-    var saldoDe = function(t) { return porTipo[t].reduce(function(a, x) { return a + x.saldo; }, 0); };
+    var saldoDe = function(t) { return porTipo[t].reduce(function(a, x) { return a + saldoVivo(x); }, 0); };
     tipos.sort(function(a, b) { return (a === PED_TIPO_SIN) - (b === PED_TIPO_SIN) || saldoDe(b) - saldoDe(a) || a.localeCompare(b); });
     var idDe = function(t) { return 'pedtipo-' + t.replace(/[^A-Za-z0-9]/g, '_'); };
     var resumen = tipos.map(function(t) {
@@ -1783,21 +1816,21 @@ function renderPedidos() {
     var porFecha = ordenChips; // dentro de cada bloque: las que más falta fabricar primero y las cubiertas por stock al final
     var bloque = function(titulo, items, cls) {
       return '<div class="ped-tipo' + pedCol('prio:' + titulo) + '"><div class="ped-tipo-h' + (cls || '') + '"' + pedClic('prio:' + titulo) + '><span class="ped-chev">▾</span><span class="ped-tipo-n">' + titulo + '</span>'
-        + '<span class="ped-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + pedNum(items.reduce(function(a, x) { return a + x.saldo; }, 0)) + '</b> und</span></div>'
+        + '<span class="ped-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + pedNum(items.reduce(function(a, x) { return a + saldoVivo(x); }, 0)) + '</b> und</span></div>'
         + '<div class="ped-tipo-c">' + items.map(function(x) { return chip(x, true); }).join('') + '</div></div>';
     };
-    if (!vivas.length) htmlGrid = '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
+    if (!visibles.length) htmlGrid = '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
     else {
-      var urg = vivas.filter(function(x) { return x.urgente; }).sort(porFecha);
-      var resto = vivas.filter(function(x) { return !x.urgente; }).sort(porFecha);
+      var urg = visibles.filter(function(x) { return x.urgente && !x.completada; }).sort(porFecha);
+      var resto = visibles.filter(function(x) { return !x.urgente || x.completada; }).sort(porFecha);
       htmlGrid = (urg.length ? bloque('🔴 Urgentes', urg, ' urg') : '<div class="ped-vacio">No hay pedidos urgentes.</div>')
         + (resto.length ? bloque('Demás pedidos', resto, '') : '');
     }
   } else {
     var filas = clis.map(function(c) {
       var items = porCli[c].slice().sort(ordenChips);
-      var saldoTot = items.reduce(function(a, x) { return a + x.saldo; }, 0);
-      var urg = items.filter(function(x) { return x.urgente; }).length;
+      var saldoTot = items.reduce(function(a, x) { return a + saldoVivo(x); }, 0);
+      var urg = items.filter(function(x) { return x.urgente && !x.completada; }).length;
       return '<div class="ped-tipo' + pedCol('cli:' + c) + '"><div class="ped-tipo-h"' + pedClic('cli:' + c) + '><span class="ped-chev">▾</span><span class="ped-tipo-n">' + escHtml(c) + '</span>'
         + '<span class="ped-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo <b>' + pedNum(saldoTot) + '</b> und'
         + (urg ? ' · <span style="color:#B83232;font-weight:800">🔴 ' + urg + ' urgente' + (urg !== 1 ? 's' : '') + '</span>' : '') + '</span></div>'
@@ -2032,9 +2065,8 @@ function pintarPedido() {
     + pedBloqueBodegaHtml(x)
     + pedFrame('📊 Avance del pedido', '<div class="ped-nums"><div><b>' + pedNum(x.cant) + '</b><span>Pedido</span></div><div><b>' + pedNum(x.entregado) + '</b><span>Entregado</span></div>'
       + '<div><b>' + pedNum(x.enProc) + '</b><span>En proceso</span></div><div><b>' + pedNum(x.libre) + '</b><span>Sin iniciar</span></div></div>', 's')
-    + (lotes ? pedFrame('🔵 Lotes en proceso', lotes, 'b') : '')
-    + pedFrame('▶ ' + formTit, form, 'b')
-    + pedEstadoHtml(x)
+    + (x.completada ? '' : (lotes ? pedFrame('🔵 Lotes en proceso', lotes, 'b') : '') + pedFrame('▶ ' + formTit, form, 'b'))
+    + (x.completada ? pedFrame('✅ Ficha COMPLETADA', '<div class="ped-est-n" style="margin:0">' + escHtml(pedCompletadaTexto(x)) + '. Ya no está en producción; si fue un error, avisa al administrador para reabrirla.</div>', 'g') + pedParcHistHtml(x) : pedEstadoHtml(x))
     + pedComentariosHtml(x)
     + '<button class="ped-cerrar" onclick="cerrarPedido()">Cerrar</button>';
   document.getElementById('pedOv').classList.add('open');
