@@ -4111,6 +4111,7 @@ function bloqueParcialesTapas(s) {
     var e = it.e, ok = it.cubierto >= e.cantidad;
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed #FDE68A">'
       + '<b style="font-family:var(--mono)">' + (e.cantidad || 0).toLocaleString() + ' und</b>'
+      + (e.cierra ? '<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;background:#ECFDF5;color:#047857">✅ completó la ficha</span>' : '')
       + '<span>' + escHtml(String(e.fecha || '')) + '</span>'
       + '<span style="flex:1;min-width:100px;color:var(--gray)">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + e.registrado_por : '')) + '</span>'
       + '<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;background:' + (ok ? '#ECFDF5' : '#FEF3C7') + ';color:' + (ok ? '#047857' : '#92400E') + '">'
@@ -4175,13 +4176,20 @@ function bloqueComentariosFicha(s) {
 
 // La supervisora marcó la ficha COMPLETADA o con ENTREGA PARCIAL desde registro-tapas.html (función tapas_marcar_ficha,
 // sql/tapas_marcar_ficha_v1.sql). Aquí se ve quién y cuándo, y el master puede reabrirla (vuelve a "nueva" y reaparece en Pedidos).
+// Lo entregado de verdad = ingresos PT con requi + lo reportado por Tapas que aún no tiene requi (puede superar lo pedido)
+function entregadoTotalFichaTapas(s) {
+  var ent = ingresoMovs.filter(function(m) { return m.solicitud_id === s.id && m.area !== 'serig'; })
+    .reduce(function(a, m) { return a + (m.cantidad || 0); }, 0);
+  return ent + parcialesDeFicha(s).sinRequi;
+}
+
 function bloqueMarcaTapasFicha(s) {
   if (!s.marcadoTapasPor && !s.marcadoTapasEn) return '';
   if (s.estado !== 'lista' && s.estado !== 'parcial') return '';
   var lista = s.estado === 'lista';
   var idq = escHtml(String(s.id));
   return '<div class="dc" style="border-color:' + (lista ? '#6EE7B7' : '#FDE047') + ';border-width:2px"><div class="dc-h" style="background:' + (lista ? '#ECFDF5' : '#FEF9C3') + ';color:' + (lista ? '#047857' : '#A16207') + '">'
-    + (lista ? '✅ Marcada COMPLETADA desde Tapas' : '🟡 Entrega parcial marcada desde Tapas') + '</div><div class="dc-b" style="font-size:12px">'
+    + (lista ? '✅ Marcada COMPLETADA desde Tapas · entregado ' + entregadoTotalFichaTapas(s).toLocaleString() + '/' + s.cant.toLocaleString() : '🟡 Entrega parcial marcada desde Tapas') + '</div><div class="dc-b" style="font-size:12px">'
     + escHtml(s.marcadoTapasPor || 'Tapas') + (s.marcadoTapasEn ? ' · ' + escHtml(comentFechaHoraTapas(s.marcadoTapasEn)) : '')
     + ' <button class="btn btn-g btn-xs" style="margin-left:8px" onclick="reabrirFichaTapas(\'' + idq + '\')">↩ Reabrir ficha</button></div></div>';
 }
@@ -4189,16 +4197,20 @@ function bloqueMarcaTapasFicha(s) {
 async function reabrirFichaTapas(id) {
   var s = solicitudes.find(function(x) { return x.id === id; });
   if (!s) return;
-  if (!confirm('¿Reabrir ' + (s.id_display || 'la ficha') + '? Vuelve a estado "nueva" y reaparece en Pedidos.')) return;
-  var r1 = await db.from('solicitudes').update({ estado: 'nueva', marcado_tapas_por: null, marcado_tapas_en: null }).eq('id', s.dbId).select('id');
+  var hayEntregas = parcialesTapas.some(function(e) { return e.solicitud_id === s.id; });
+  var dest = hayEntregas ? 'parcial' : 'nueva';
+  if (!confirm('¿Reabrir ' + (s.id_display || 'la ficha') + '? Vuelve a estado "' + dest + '" y reaparece en Pedidos' + (hayEntregas ? ' (conserva las entregas reportadas).' : '.'))) return;
+  var patch = hayEntregas ? { estado: dest } : { estado: dest, marcado_tapas_por: null, marcado_tapas_en: null };
+  var r1 = await db.from('solicitudes').update(patch).eq('id', s.dbId).select('id');
   if (r1.error || !(r1.data || []).length) { showToast('❌ ' + (r1.error ? r1.error.message : 'No se pudo reabrir (sin permiso)'), '#B83232'); return; }
   var ids = (s.lineas || []).map(function(l) { return l.id; }).filter(Boolean);
   if (ids.length) {
-    var r2 = await db.from('solicitud_lineas').update({ estado: 'nueva' }).in('id', ids);
+    var r2 = await db.from('solicitud_lineas').update({ estado: dest }).in('id', ids);
     if (r2.error) { showToast('❌ ' + r2.error.message, '#B83232'); return; }
   }
-  s.estado = 'nueva'; s.marcadoTapasPor = ''; s.marcadoTapasEn = '';
-  (s.lineas || []).forEach(function(l) { l.estado = 'nueva'; });
+  s.estado = dest;
+  if (!hayEntregas) { s.marcadoTapasPor = ''; s.marcadoTapasEn = ''; }
+  (s.lineas || []).forEach(function(l) { l.estado = dest; });
   renderListas();
   if (typeof renderFichasTapas === 'function') renderFichasTapas();
   if (selId) mostrarDetalle(selId);
@@ -4406,7 +4418,7 @@ function chipCompletadoTapas(x, conCliente) {
   return '<div class="cp-chip completada' + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
     + '<span class="cp-comp-tag">' + escHtml(tag) + '</span>'
     + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
-    + '<div class="cp-chip-t"><span>' + escHtml(x.codigo) + comentBadgeHtml(x.s) + '</span><b>' + x.cant.toLocaleString() + '</b></div>'
+    + '<div class="cp-chip-t"><span>' + escHtml(x.codigo) + comentBadgeHtml(x.s) + '</span><b title="Entregado / pedido">' + entregadoTotalFichaTapas(x.s).toLocaleString() + '/' + x.cant.toLocaleString() + '</b></div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
     + notaChipHtml(x.s.notas)
     + '<div class="cp-acc"><button onclick="event.stopPropagation();abrirFichaTapas(\'' + idq + '\')">Ver detalle de la ficha</button></div>'

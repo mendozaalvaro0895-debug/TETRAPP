@@ -1685,6 +1685,8 @@ function pedModelo() {
     var completada = s.estado === 'lista' && tMarca > 0 && (Date.now() - tMarca) <= PED_COMPLETADAS_DIAS * 86400000;
     return { s: s, id: s.id, codigo: s.codigo || String(s.id).slice(0, 6), cliente: s.cliente_nombre || '—', cant: cant, entregado: entregado,
              completada: completada,
+             // lo entregado de verdad = ingresos PT con requi + lo reportado por Tapas que aún no tiene requi; "falta" = lo que resta del pedido
+             entregadoTotal: entregado + parcSin, falta: Math.max(0, cant - entregado - parcSin),
              saldo: saldo, enProc: enProc, libre: Math.max(0, saldo - enProc), abiertos: abiertos, ings: ings,
              sku: l0.sku || '', desc: (l0.descripcion || '') + (lins.length > 1 ? ' (+' + (lins.length - 1) + ')' : ''),
              viva: PED_VIVOS.indexOf(s.estado) >= 0, limite: s.fecha_limite || '', plazo: s.plazo_tipo || 'fecha', urgente: s.prioridad === 'urgente',
@@ -1717,7 +1719,7 @@ function pedChipCompletada(x, conCliente) {
   return '<div class="ped-chip completada' + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
     + '<span class="ped-comp-tag">' + escHtml(pedCompletadaTexto(x)) + '</span>'
     + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
-    + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + pedComentBadge(x) + '</span><b>' + pedNum(x.cant) + '</b></div>'
+    + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + pedComentBadge(x) + '</span><b title="Entregado / pedido">' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</b></div>'
     + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
     + pedNotaHtml(x.s.notas)
     + '<div>' + pedComentBtn(x) + '</div>'
@@ -2066,7 +2068,8 @@ function pintarPedido() {
     + pedFrame('📊 Avance del pedido', '<div class="ped-nums"><div><b>' + pedNum(x.cant) + '</b><span>Pedido</span></div><div><b>' + pedNum(x.entregado) + '</b><span>Entregado</span></div>'
       + '<div><b>' + pedNum(x.enProc) + '</b><span>En proceso</span></div><div><b>' + pedNum(x.libre) + '</b><span>Sin iniciar</span></div></div>', 's')
     + (x.completada ? '' : (lotes ? pedFrame('🔵 Lotes en proceso', lotes, 'b') : '') + pedFrame('▶ ' + formTit, form, 'b'))
-    + (x.completada ? pedFrame('✅ Ficha COMPLETADA', '<div class="ped-est-n" style="margin:0">' + escHtml(pedCompletadaTexto(x)) + '. Ya no está en producción; si fue un error, avisa al administrador para reabrirla.</div>', 'g') + pedParcHistHtml(x) : pedEstadoHtml(x))
+    + (x.completada ? pedFrame('✅ Ficha COMPLETADA · ' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant), '<div class="ped-est-n" style="margin:0 0 6px">' + escHtml(pedCompletadaTexto(x)) + (x.entregadoTotal > x.cant ? '. Se entregaron ' + pedNum(x.entregadoTotal - x.cant) + ' und de más.' : '.') + '</div>'
+      + (pedPuedeDeshacer(x) ? '<div class="ped-est" style="margin:0"><button class="e-p" onclick="deshacerEntrega()">↩ Deshacer (fue un error)</button></div>' : '<div class="ped-est-n" style="margin:0">Si fue un error, pídele al administrador que la reabra.</div>'), 'g') + pedParcHistHtml(x) : pedEstadoHtml(x))
     + pedComentariosHtml(x)
     + '<button class="ped-cerrar" onclick="cerrarPedido()">Cerrar</button>';
   document.getElementById('pedOv').classList.add('open');
@@ -2131,8 +2134,8 @@ function cerrarPedido() {
   PED.parcForm = false;
 }
 
-// ── Estado de la ficha: la supervisora la marca COMPLETADA o ENTREGA PARCIAL ───────────────────
-// Va por la función tapas_marcar_ficha (sql/tapas_marcar_ficha_v1.sql): este rol no puede escribir en `solicitudes`.
+// ── Entrega de la ficha: botón único ENTREGA; la cantidad decide si queda PARCIAL o COMPLETADA ──────────
+// Va por las funciones tapas_registrar_entrega / tapas_deshacer_entrega (sql/tapas_entrega_v1.sql): este rol no puede escribir en `solicitudes`.
 // Completada = estado 'lista' (sale de Pedidos); Entrega parcial = 'parcial' (sigue activa, en amarillo). Lo ven master y operarios.
 // Cualquier perfil de esta página (el login de Tapas puede ser 'operativo' o 'supervisor_tapas'); la función de la base lo respalda.
 function pedPuedeMarcar() { return typeof TETRA !== 'undefined' && (TETRA.rol === 'supervisor_tapas' || TETRA.rol === 'operativo' || TETRA.rol === 'master'); }
@@ -2153,13 +2156,27 @@ function pedComentBtn(x) {
 
 function pedEstadoHtml(x) {
   if (!pedPuedeMarcar()) return pedParcHistHtml(x);
-  var par = x.s.estado === 'parcial';
   return pedFrame('🚚 Entrega de la ficha',
-    '<div class="ped-est" style="margin-top:0"><button class="e-c" onclick="marcarEstadoFicha(\'lista\')">✅ Marcar COMPLETADA</button>'
-    + '<button class="e-p" onclick="abrirParcialForm()">' + (par ? '🟡 Registrar otra entrega parcial' : '🟡 Entrega parcial') + '</button></div>'
-    + (PED.parcForm ? pedParcFormHtml(x) : '')
-    + '<div class="ped-est-n" style="margin-bottom:0"><b>Completada:</b> la ficha sale de Pedidos. <b>Entrega parcial:</b> anotas cuántas unidades entregaste; la ficha sigue activa en amarillo y el saldo NO baja hasta que oficina registre la requi. El administrador puede reabrirla.</div>', 'a')
+    (PED.parcForm ? pedParcFormHtml(x)
+      : '<div class="ped-est" style="margin-top:0"><button class="e-c" onclick="abrirParcialForm()">🚚 ENTREGA</button></div>')
+    + '<div class="ped-est-n" style="margin-bottom:0">Escribe cuántas unidades entregaste: si faltan más para completar el pedido queda como <b>entrega parcial</b> (la ficha sigue activa en amarillo); si con eso se completa, la ficha queda <b>COMPLETADA</b>. El saldo NO baja hasta que oficina registre la requi. Falta por entregar: <b>'
+    + pedNum(x.falta) + ' und</b> de ' + pedNum(x.cant) + '.</div>', 'a')
     + pedParcHistHtml(x);
+}
+
+// ¿Cómo quedaría la ficha con las unidades escritas? (parcial / completa / completa con unidades de más)
+function pedEntregaHint(x, cant) {
+  if (!cant || cant <= 0) return '';
+  if (cant < x.falta) return '🟡 Quedará como <b>ENTREGA PARCIAL</b>: faltarán ' + pedNum(x.falta - cant) + ' und.';
+  var demas = cant - x.falta;
+  return '✅ Con esto la ficha queda <b>COMPLETADA</b>' + (demas > 0 ? ' (entregas ' + pedNum(demas) + ' und de más: ' + pedNum(x.entregadoTotal + cant) + '/' + pedNum(x.cant) + ')' : '') + '.';
+}
+
+function pedEntregaInput(el) {
+  PED.parcCant = el.value;
+  var x = PED.modelo.find(function(m) { return String(m.id) === String(PED.abierto); });
+  var h = document.getElementById('pedEntregaHint');
+  if (x && h) h.innerHTML = pedEntregaHint(x, parseInt(el.value, 10));
 }
 
 // Resumen en el chip: lo reportado por Tapas y cuánto sigue sin requi
@@ -2175,12 +2192,12 @@ function pedParcHistHtml(x) {
   var filas = x.parc.lista.map(function(e) {
     var ok = (e.cubierto || 0) >= e.cantidad;
     var falta = e.cantidad - (e.cubierto || 0);
-    return '<div class="ped-pe"><b>' + pedNum(e.cantidad) + ' und</b><span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>'
+    return '<div class="ped-pe"><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<span class="e cr">✅ completó la ficha</span>' : '') + '<span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>'
       + '<span class="t">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + pedCorto(e.registrado_por) : '')) + '</span>'
       + '<span class="e ' + (ok ? 'cr' : 'sr') + '">' + (ok ? '✓ con requi' : (e.cubierto ? '⏳ faltan ' + pedNum(falta) + ' por requi' : '⏳ sin requi')) + '</span>'
       + (pedPuedeMarcar() ? '<button title="Quitar esta entrega" onclick="quitarParcial(\'' + escHtml(String(e.id)) + '\')">✕</button>' : '') + '</div>';
   }).join('');
-  return pedFrame('🟡 Entregas parciales reportadas <i>(' + pedNum(x.parc.total) + ' und · ' + (x.parc.sinRequi > 0 ? pedNum(x.parc.sinRequi) + ' sin requi' : 'todas con requi') + ')</i>', filas, 'y');
+  return pedFrame('🟡 Entregas reportadas <i>(' + pedNum(x.parc.total) + ' und · ' + (x.parc.sinRequi > 0 ? pedNum(x.parc.sinRequi) + ' sin requi' : 'todas con requi') + ')</i>', filas, 'y');
 }
 
 function pedFechaCorta(f) {
@@ -2189,16 +2206,16 @@ function pedFechaCorta(f) {
 }
 
 function pedParcFormHtml(x) {
-  if (!PED.parcOk) return '<div class="ped-aviso">Falta correr <b>sql/tapas_entregas_parciales_v1.sql</b> en Supabase para registrar entregas parciales.</div>';
-  var max = x.saldo > 0 ? x.saldo : x.cant;
-  return '<div class="ped-pf"><b style="font-size:13px;color:#854D0E">🟡 Entrega parcial de ' + escHtml(x.codigo) + '</b>'
-    + '<label>¿Cuántas unidades entregaste? <span style="font-weight:500">(saldo: ' + pedNum(x.saldo) + ' und)</span></label>'
-    + '<input type="number" inputmode="numeric" id="pedParcCant" min="1" max="' + max + '" value="' + escHtml(String(PED.parcCant)) + '" oninput="PED.parcCant=this.value" placeholder="Ej. 3000">'
+  if (!PED.parcOk) return '<div class="ped-aviso">Falta correr <b>sql/tapas_entregas_parciales_v1.sql</b> y <b>sql/tapas_entrega_v1.sql</b> en Supabase para registrar entregas.</div>';
+  return '<div class="ped-pf"><b style="font-size:13px;color:#854D0E">🚚 Entrega de ' + escHtml(x.codigo) + '</b>'
+    + '<label>¿Cuántas unidades entregaste? <span style="font-weight:500">(faltan: ' + pedNum(x.falta) + ' und)</span></label>'
+    + '<input type="number" inputmode="numeric" id="pedParcCant" min="1" value="' + escHtml(String(PED.parcCant)) + '" oninput="pedEntregaInput(this)" placeholder="Ej. ' + (x.falta > 0 ? x.falta : 1000) + '">'
+    + '<div id="pedEntregaHint" style="font-size:12px;margin-top:6px;color:#475569;line-height:1.4">' + pedEntregaHint(x, parseInt(PED.parcCant, 10)) + '</div>'
     + '<label>Fecha de la entrega</label>'
     + '<input type="date" id="pedParcFecha" value="' + escHtml(PED.parcFecha || fechaGT()) + '" oninput="PED.parcFecha=this.value">'
     + '<label>Nota (opcional)</label>'
     + '<textarea id="pedParcNota" rows="2" maxlength="300" oninput="PED.parcNota=this.value" placeholder="Ej. entrega 1 de 3, se llevó el cliente…">' + escHtml(PED.parcNota) + '</textarea>'
-    + '<div class="acc"><button class="g" onclick="guardarParcial()">Guardar entrega parcial</button><button class="c" onclick="cancelarParcialForm()">Cancelar</button></div></div>';
+    + '<div class="acc"><button class="g" onclick="guardarParcial()">Guardar entrega</button><button class="c" onclick="cancelarParcialForm()">Cancelar</button></div></div>';
 }
 
 function abrirParcialForm() {
@@ -2215,20 +2232,42 @@ async function guardarParcial() {
   var x = PED.modelo.find(function(m) { return String(m.id) === String(PED.abierto); });
   if (!x) return;
   var cant = parseInt(PED.parcCant, 10);
-  var max = x.saldo > 0 ? x.saldo : x.cant;
   if (!cant || cant <= 0) { showToast('⚠️ Escribe cuántas unidades entregaste', '#B83232'); return; }
-  if (cant > max) { showToast('⚠️ No puede ser más que el saldo (' + pedNum(max) + ' und)', '#B83232'); return; }
+  var completa = cant >= x.falta;
+  if (completa && !confirm('Con ' + pedNum(cant) + ' und la ficha ' + x.codigo + ' (' + x.cliente + ') queda COMPLETADA'
+      + (cant > x.falta ? ' (' + pedNum(cant - x.falta) + ' und de más: ' + pedNum(x.entregadoTotal + cant) + '/' + pedNum(x.cant) + ')' : '') + '.\n\n¿Confirmas?')) return;
   var fecha = PED.parcFecha || fechaGT();
   var quien = supervisorActual.nombre || (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
-  var r = await db.rpc('tapas_registrar_parcial', { p_id: x.id, p_cantidad: cant, p_fecha: fecha, p_nota: PED.parcNota || null, p_por: quien });
+  var r = await db.rpc('tapas_registrar_entrega', { p_id: x.id, p_cantidad: cant, p_completa: completa, p_fecha: fecha, p_nota: PED.parcNota || null, p_por: quien });
   if (r.error) {
     var msg = r.error.message || String(r.error);
-    showToast('❌ ' + (/function|does not exist|schema cache|tapas_registrar_parcial|tapas_entregas_parciales/i.test(msg) ? 'Falta correr sql/tapas_entregas_parciales_v1.sql en Supabase' : msg), '#B83232');
+    showToast('❌ ' + (/function|does not exist|schema cache|tapas_registrar_entrega|tapas_entregas_parciales|cierra/i.test(msg) ? 'Falta correr sql/tapas_entrega_v1.sql en Supabase' : msg), '#B83232');
     return;
   }
   PED.parcForm = false; PED.parcCant = ''; PED.parcNota = '';
   await cargarPedidos(true);
-  showToast('🟡 Entrega parcial de ' + pedNum(cant) + ' und registrada en ' + x.codigo);
+  showToast(completa ? '✅ ' + x.codigo + ' COMPLETADA con ' + pedNum(cant) + ' und' : '🟡 Entrega parcial de ' + pedNum(cant) + ' und registrada en ' + x.codigo);
+}
+
+// Corrige un cierre equivocado: la supervisora tiene 24 h desde que se marcó (la función de la base lo valida; master sin límite)
+function pedPuedeDeshacer(x) {
+  var t = x.s.marcado_tapas_en ? new Date(x.s.marcado_tapas_en).getTime() : 0;
+  return pedPuedeMarcar() && (TETRA.rol === 'master' || (t > 0 && Date.now() - t <= 86400000));
+}
+
+async function deshacerEntrega() {
+  var x = PED.modelo.find(function(m) { return String(m.id) === String(PED.abierto); });
+  if (!x) return;
+  if (!confirm('¿Deshacer el cierre de ' + x.codigo + ' (' + x.cliente + ')?\n\nSe borra la entrega que la completó y la ficha vuelve a Pedidos. Después registra la entrega correcta.')) return;
+  var r = await db.rpc('tapas_deshacer_entrega', { p_id: x.id });
+  if (r.error) {
+    var msg = r.error.message || String(r.error);
+    showToast('❌ ' + (/function|does not exist|schema cache|tapas_deshacer_entrega/i.test(msg) ? 'Falta correr sql/tapas_entrega_v1.sql en Supabase' : msg), '#B83232');
+    return;
+  }
+  cerrarPedido();
+  await cargarPedidos(true);
+  showToast('↩ ' + x.codigo + ' volvió a Pedidos');
 }
 
 async function quitarParcial(id) {
@@ -2237,26 +2276,6 @@ async function quitarParcial(id) {
   if (r.error || !(r.data || []).length) { showToast('❌ ' + (r.error ? r.error.message : 'No se pudo quitar (sin permiso)'), '#B83232'); return; }
   await cargarPedidos(true);
   showToast('Entrega parcial quitada');
-}
-
-async function marcarEstadoFicha(estado) {
-  var x = PED.modelo.find(function(m) { return String(m.id) === String(PED.abierto); });
-  if (!x) return;
-  var completa = estado === 'lista';
-  if (!confirm(completa
-    ? '¿Marcar ' + x.codigo + ' (' + x.cliente + ') como COMPLETADA?\n\nSaldo pendiente: ' + pedNum(x.saldo) + ' und. La ficha saldrá de Pedidos.'
-    : '¿Marcar ' + x.codigo + ' (' + x.cliente + ') con ENTREGA PARCIAL?\n\nLa ficha sigue activa, marcada en amarillo.')) return;
-  var quien = supervisorActual.nombre || (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
-  var r = await db.rpc('tapas_marcar_ficha', { p_id: x.id, p_estado: estado, p_por: quien });
-  if (r.error) {
-    var msg = r.error.message || String(r.error);
-    showToast('❌ ' + (/function|does not exist|schema cache|tapas_marcar_ficha/i.test(msg) ? 'Falta correr sql/tapas_marcar_ficha_v2.sql en Supabase' : msg), '#B83232');
-    return;
-  }
-  x.s.estado = estado;
-  if (completa) cerrarPedido();
-  renderPedidos();
-  showToast(completa ? '✅ Ficha ' + x.codigo + ' marcada como COMPLETADA' : '🟡 Ficha ' + x.codigo + ' con entrega parcial');
 }
 
 function pedErrorSql(e) {
