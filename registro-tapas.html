@@ -1608,11 +1608,14 @@ function renderPedidos() {
     porCli[x.cliente].push(x);
   });
   clis.sort(function(a, b) { return a.localeCompare(b); });
-  // Orden de los chips: 1) las CUBIERTAS por stock al final · 2) las que ya tienen Base y Contratapa suficientes (el Liner no cuenta)
-  // antes que las que no · 3) las que MÁS falta fabricar primero · 4) fecha límite · 5) antigüedad
+  // Orden de los chips (igual en las 3 vistas; ESPEJO de ordenChipsCompactos de tapas.html): 1) primero las SIN stock del producto
+  // terminado, luego las de stock parcial y al final las CUBIERTAS (con stock hay 1 despacho o más de ventaja, pueden esperar) ·
+  // 2) las que ya tienen Base y Contratapa suficientes (el Liner no cuenta) antes que las que no · 3) las que MÁS falta fabricar
+  // primero · 4) fecha límite · 5) antigüedad
+  var nivelStock = function(p) { return p.cubierta ? 2 : ((p.stock || 0) > 0 ? 1 : 0); };
   var ordenChips = function(a, b) {
     var pa = pedProducirInfo(a), pb = pedProducirInfo(b);
-    return (pa.cubierta ? 1 : 0) - (pb.cubierta ? 1 : 0) || ((pb.matOk ? 1 : 0) - (pa.matOk ? 1 : 0)) || (pb.producir - pa.producir) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at));
+    return (nivelStock(pa) - nivelStock(pb)) || ((pb.matOk ? 1 : 0) - (pa.matOk ? 1 : 0)) || (pb.producir - pa.producir) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at));
   };
   var chip = function(x, conCliente) {
     var proc = x.abiertos.length > 0;

@@ -4201,11 +4201,17 @@ function buildChipCompacto(x, conCliente) {
     + '</div>';
 }
 
-// Orden de los chips: 1) las CUBIERTAS por stock al final (no hay que fabricar nada) · 2) las que YA tienen Base y Contratapa
-// suficientes (se pueden fabricar hoy; el Liner no cuenta) antes que las que no · 3) las que MÁS falta fabricar primero ·
-// 4) fecha límite más cercana · 5) antigüedad
+// Nivel de stock PT del SKU principal: 0 = SIN stock (0 o sin dato) · 1 = stock parcial · 2 = el stock cubre el saldo
+function nivelStockChip(x) {
+  return x.cubierta ? 2 : ((x.stockPT || 0) > 0 ? 1 : 0);
+}
+
+// Orden de los chips (igual en Por tipo, Por cliente y Por prioridad): 1) primero las SIN stock del producto terminado, luego
+// las de stock parcial y al final las CUBIERTAS (con stock hay 1 despacho o más de ventaja, pueden esperar) · 2) las que YA tienen
+// Base y Contratapa suficientes (se pueden fabricar hoy; el Liner no cuenta) antes que las que no · 3) las que MÁS falta fabricar
+// primero · 4) fecha límite más cercana · 5) antigüedad
 function ordenChipsCompactos(a, b) {
-  return (a.cubierta ? 1 : 0) - (b.cubierta ? 1 : 0) || ((b.matOk ? 1 : 0) - (a.matOk ? 1 : 0)) || (b.producir - a.producir) || (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt));
+  return (nivelStockChip(a) - nivelStockChip(b)) || ((b.matOk ? 1 : 0) - (a.matOk ? 1 : 0)) || (b.producir - a.producir) || (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt));
 }
 
 function modeloFichasCompactas() {
