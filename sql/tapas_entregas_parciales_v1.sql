@@ -8,7 +8,8 @@
 -- Por qué una función: el rol de Tapas no puede escribir en `solicitudes`; registrar la entrega también deja la ficha
 -- en estado 'parcial' (en `solicitudes` y `solicitud_lineas`). Correr DESPUÉS de sql/tapas_marcar_ficha_v1.sql
 -- (usa las columnas marcado_tapas_por / marcado_tapas_en que crea ese archivo).
--- Lectura: cualquiera con perfil · Registrar: master y supervisor_tapas (vía función) · Borrar: master y supervisor_tapas.
+-- Lectura: cualquiera con perfil · Registrar: master, supervisor_tapas y operativo (vía función) · Borrar: master, supervisor_tapas y operativo.
+-- (v1.1: se agregó 'operativo' porque el login del perfil de Tapas puede ser ese rol.) Idempotente: se puede volver a correr.
 -- Correr en Supabase Dashboard → SQL Editor.
 -- ════════════════════════════════════════════════════════════════
 
@@ -33,7 +34,7 @@ create policy lectura_con_perfil on public.tapas_entregas_parciales
   for select to authenticated using (public.rol_actual() is not null);
 create policy delete_tapas on public.tapas_entregas_parciales
   for delete to authenticated
-  using (public.rol_actual() in ('master', 'supervisor_tapas'));
+  using (public.rol_actual() in ('master', 'supervisor_tapas', 'operativo'));
 
 revoke all on public.tapas_entregas_parciales from anon;
 grant select, delete on public.tapas_entregas_parciales to authenticated;
@@ -50,7 +51,7 @@ declare
   v_pedido integer;
   v_nuevo  uuid;
 begin
-  if coalesce(public.rol_actual(), '') not in ('master', 'supervisor_tapas') then
+  if coalesce(public.rol_actual(), '') not in ('master', 'supervisor_tapas', 'operativo') then
     raise exception 'Sin permiso para registrar entregas parciales';
   end if;
   if p_cantidad is null or p_cantidad <= 0 then
