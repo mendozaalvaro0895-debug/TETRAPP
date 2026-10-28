@@ -339,6 +339,15 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .am-tx button{align-self:flex-start;margin-top:6px;background:#F59E0B;color:#fff;border:none;border-radius:9px;padding:9px 20px;font-size:14px;font-weight:800;cursor:pointer;font-family:'DM Sans',sans-serif}
 .ped-cm-b{margin-left:5px;font-size:10px;font-weight:800;border-radius:10px;padding:1px 7px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;white-space:nowrap}
 .ped-cm-b.ok{background:#F1F5F9;color:#64748B;border-color:#E2E8F0}
+.ped-cm-btn{display:inline-block;margin-top:6px;border:1px solid #CBD5E1;background:#fff;color:#334155;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
+.ped-cm-btn:hover{background:#F1F5F9}
+.ped-est-b{margin-left:5px;font-size:10px;font-weight:800;border-radius:10px;padding:1px 7px;background:#FEF9C3;color:#A16207;border:1px solid #FDE047;white-space:nowrap}
+.ped-est{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 6px}
+.ped-est button{flex:1;min-width:150px;min-height:42px;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;font-family:'DM Sans',sans-serif;border:2px solid}
+.ped-est .e-c{background:#ECFDF5;color:#047857;border-color:#6EE7B7}
+.ped-est .e-p{background:#FEF9C3;color:#A16207;border-color:#FDE047}
+.ped-est button:disabled{opacity:.55;cursor:default}
+.ped-est-n{font-size:11px;color:#64748B;margin-bottom:8px;line-height:1.4}
 .ped-cm{border:1px solid #FCD34D;border-left-width:4px;background:#FFFBEB;border-radius:8px;padding:6px 9px;margin-bottom:6px}
 .ped-cm.ok{border-color:#E2E8F0;background:#F8FAFC;opacity:.85}
 .ped-cm-h{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;font-size:11px;color:#6B6B6A}
@@ -1660,7 +1669,8 @@ function renderPedidos() {
       + '<div class="ped-pc-d">' + escHtml((p.x.sku ? p.x.sku + ' — ' : '') + p.x.desc) + '</div>'
       + (p.l.tareas.length ? '<div class="ped-pc-p">' + pedTareasResumen(p.l.tareas) + '</div>' : '')
       + pedNotaHtml(p.x.s.notas)
-      + '<div class="ped-bar"><i style="width:' + pct + '%"></i></div></div>';
+      + '<div class="ped-bar"><i style="width:' + pct + '%"></i></div>'
+      + pedComentBtn(p.x) + '</div>';
   }).join('') + '</div>' : '<div class="ped-vacio">Nada marcado en proceso. Toca un pedido de abajo para marcarlo.</div>';
 
   // 2) Todos los pedidos: por TIPO de tapa (default) o por cliente — idéntico a Fichas de Trabajo de tapas.html
@@ -1684,11 +1694,12 @@ function renderPedidos() {
     var idq = escHtml(String(x.id));
     return '<div class="ped-chip' + (proc ? ' proc' : '') + (pedProducirInfo(x).cubierta ? ' cubierta' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
-      + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + pedComentBadge(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
+      + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + pedEstadoBadge(x) + pedComentBadge(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
       + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
       + pedStkPTHtml(x.sku, x.saldo)
       + pedNotaHtml(x.s.notas)
       + '<div class="ped-resum">' + (proc ? '<span class="ped-res-b proc">▶ ' + pedNum(x.enProc) + ' en proceso</span>' : '') + pedCompResumenHtml(x) + '</div>'
+      + '<div>' + pedComentBtn(x) + '</div>'
       + '<div class="ped-more">'
       +   '<div class="ped-chip-s">' + (proc ? '▶ ' + pedNum(x.enProc) + ' en proceso' : 'de ' + pedNum(x.cant) + (x.entregado ? ' · ent. ' + pedNum(x.entregado) : '')) + '</div>'
       +   (function() { var k = pedCompStockHtml(x); return k ? '<div class="ped-comps">' + k + '</div>' : ''; })()
@@ -1900,6 +1911,15 @@ function pedForm(loteId) {
 
 function abrirPedido(id) {
   PED.abierto = id;
+  PED.soloComent = false;
+  PED.form = null; PED.selOp = []; PED.selProc = []; PED.cantTmp = null; PED.comentTxt = '';
+  pintarPedido();
+}
+
+// Ventana corta solo de comentarios (botón 💬 del chip): no hace falta abrir toda la ficha para dejar una observación
+function abrirComentarios(id) {
+  PED.abierto = id;
+  PED.soloComent = true;
   PED.form = null; PED.selOp = []; PED.selProc = []; PED.cantTmp = null; PED.comentTxt = '';
   pintarPedido();
 }
@@ -1907,6 +1927,16 @@ function abrirPedido(id) {
 function pintarPedido() {
   var x = PED.modelo.find(function(m) { return String(m.id) === String(PED.abierto); });
   if (!x) { cerrarPedido(); return; }
+  if (PED.soloComent) {
+    document.getElementById('pedBox').innerHTML =
+      '<h3>' + escHtml(x.codigo) + ' · ' + escHtml(x.cliente) + pedLimiteHtml(x) + '</h3>'
+      + '<div class="pd"><b>' + escHtml(x.sku) + '</b> ' + escHtml(x.desc) + '</div>'
+      + pedComentariosHtml(x)
+      + '<button class="ped-link" style="padding-left:0" onclick="abrirPedido(\'' + escHtml(String(x.id)) + '\')">Abrir la ficha completa →</button>'
+      + '<button class="ped-cerrar" onclick="cerrarPedido()">Cerrar</button>';
+    document.getElementById('pedOv').classList.add('open');
+    return;
+  }
   var tarea = PED.form ? x.abiertos.find(function(l) { return String(l.id) === String(PED.form.lote); }) : null;
   if (PED.form && !tarea) PED.form = null; // el lote ya se completó o se quitó
 
@@ -1954,6 +1984,7 @@ function pintarPedido() {
     + '<div><b>' + pedNum(x.enProc) + '</b><span>En proceso</span></div><div><b>' + pedNum(x.libre) + '</b><span>Sin iniciar</span></div></div>'
     + (lotes ? '<div class="ped-sec-t" style="margin-top:0">Lotes en proceso</div>' + lotes : '')
     + form
+    + pedEstadoHtml(x)
     + pedComentariosHtml(x)
     + '<button class="ped-cerrar" onclick="cerrarPedido()">Cerrar</button>';
   document.getElementById('pedOv').classList.add('open');
@@ -2014,6 +2045,50 @@ async function agregarComentario() {
 function cerrarPedido() {
   document.getElementById('pedOv').classList.remove('open');
   PED.abierto = null;
+  PED.soloComent = false;
+}
+
+// ── Estado de la ficha: la supervisora la marca COMPLETADA o ENTREGA PARCIAL ───────────────────
+// Va por la función tapas_marcar_ficha (sql/tapas_marcar_ficha_v1.sql): este rol no puede escribir en `solicitudes`.
+// Completada = estado 'lista' (sale de Pedidos); Entrega parcial = 'parcial' (sigue activa, en amarillo). Lo ven master y operarios.
+function pedPuedeMarcar() { return typeof TETRA !== 'undefined' && (TETRA.rol === 'supervisor_tapas' || TETRA.rol === 'master'); }
+
+function pedEstadoBadge(x) {
+  return x.s.estado === 'parcial' ? '<span class="ped-est-b" title="La supervisora marcó esta ficha con entrega parcial">🟡 Parcial</span>' : '';
+}
+
+function pedComentBtn(x) {
+  var n = (x.coment || []).length;
+  return '<button class="ped-cm-btn" onclick="event.stopPropagation();abrirComentarios(\'' + escHtml(String(x.id)) + '\')">💬 ' + (n ? 'Comentarios (' + n + ')' : 'Comentar') + '</button>';
+}
+
+function pedEstadoHtml(x) {
+  if (!pedPuedeMarcar()) return '';
+  var par = x.s.estado === 'parcial';
+  return '<div class="ped-sec-t">Estado de la ficha</div>'
+    + '<div class="ped-est"><button class="e-c" onclick="marcarEstadoFicha(\'lista\')">✅ Marcar COMPLETADA</button>'
+    + '<button class="e-p"' + (par ? ' disabled' : '') + ' onclick="marcarEstadoFicha(\'parcial\')">' + (par ? '🟡 Ya está en entrega parcial' : '🟡 Entrega parcial') + '</button></div>'
+    + '<div class="ped-est-n"><b>Completada:</b> la ficha sale de Pedidos. <b>Entrega parcial:</b> sigue activa y queda marcada en amarillo. El administrador puede reabrirla.</div>';
+}
+
+async function marcarEstadoFicha(estado) {
+  var x = PED.modelo.find(function(m) { return String(m.id) === String(PED.abierto); });
+  if (!x) return;
+  var completa = estado === 'lista';
+  if (!confirm(completa
+    ? '¿Marcar ' + x.codigo + ' (' + x.cliente + ') como COMPLETADA?\n\nSaldo pendiente: ' + pedNum(x.saldo) + ' und. La ficha saldrá de Pedidos.'
+    : '¿Marcar ' + x.codigo + ' (' + x.cliente + ') con ENTREGA PARCIAL?\n\nLa ficha sigue activa, marcada en amarillo.')) return;
+  var quien = supervisorActual.nombre || (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
+  var r = await db.rpc('tapas_marcar_ficha', { p_id: x.id, p_estado: estado, p_por: quien });
+  if (r.error) {
+    var msg = r.error.message || String(r.error);
+    showToast('❌ ' + (/function|does not exist|schema cache|tapas_marcar_ficha/i.test(msg) ? 'Falta correr sql/tapas_marcar_ficha_v1.sql en Supabase' : msg), '#B83232');
+    return;
+  }
+  x.s.estado = estado;
+  if (completa) cerrarPedido();
+  renderPedidos();
+  showToast(completa ? '✅ Ficha ' + x.codigo + ' marcada como COMPLETADA' : '🟡 Ficha ' + x.codigo + ' con entrega parcial');
 }
 
 function pedErrorSql(e) {

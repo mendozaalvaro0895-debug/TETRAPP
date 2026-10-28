@@ -1420,10 +1420,12 @@ async function cargarSolicitudes() {
         prog: s.progreso_pct || 0,
         ops: [],
         notas: s.notas || '',
+        marcadoTapasPor: s.marcado_tapas_por || '',
+        marcadoTapasEn: s.marcado_tapas_en || '',
         created: new Date(s.created_at).toLocaleString('es-GT')
       };
     });
-    
+
     renderListas();
     refreshKPIs();
     renderInicioPedidosTapas();
@@ -1842,6 +1844,7 @@ async function mostrarDetalle(id) {
   const cuerpo = `
       ${(s.lineas[0] && s.lineas[0].codigoCliente) ? `<div class="dc"><div class="dc-b" style="font-size:12px">🏷 Código del cliente: <b style="font-family:var(--mono)">${escHtml(s.lineas[0].codigoCliente)}</b></div></div>` : ''}
       ${s.notas ? `<div class="dc" style="border-color:#FDE047;border-width:2px"><div class="dc-h" style="background:#FEF9C3;color:#A16207">📝 Notas</div><div class="dc-b" style="white-space:pre-line;background:#FFFDF0">${escHtml(s.notas)}</div></div>` : ''}
+      ${bloqueMarcaTapasFicha(s)}
       ${bloqueComentariosFicha(s)}
       ${buildBloqueBodegaFicha(s, filasBod)}
       ${lotesAbiertosPlazoHtml(s)}
@@ -4109,6 +4112,39 @@ function bloqueComentariosFicha(s) {
   }).join('');
   return '<div class="dc" style="border-color:#FCD34D;border-width:2px"><div class="dc-h" style="background:#FEF3C7;color:#92400E">💬 Comentarios de la supervisora'
     + (pend ? ' · ' + pend + ' pendiente' + (pend !== 1 ? 's' : '') : ' · todos atendidos') + '</div><div class="dc-b">' + filas + '</div></div>';
+}
+
+// La supervisora marcó la ficha COMPLETADA o con ENTREGA PARCIAL desde registro-tapas.html (función tapas_marcar_ficha,
+// sql/tapas_marcar_ficha_v1.sql). Aquí se ve quién y cuándo, y el master puede reabrirla (vuelve a "nueva" y reaparece en Pedidos).
+function bloqueMarcaTapasFicha(s) {
+  if (!s.marcadoTapasPor && !s.marcadoTapasEn) return '';
+  if (s.estado !== 'lista' && s.estado !== 'parcial') return '';
+  var lista = s.estado === 'lista';
+  var idq = escHtml(String(s.id));
+  return '<div class="dc" style="border-color:' + (lista ? '#6EE7B7' : '#FDE047') + ';border-width:2px"><div class="dc-h" style="background:' + (lista ? '#ECFDF5' : '#FEF9C3') + ';color:' + (lista ? '#047857' : '#A16207') + '">'
+    + (lista ? '✅ Marcada COMPLETADA desde Tapas' : '🟡 Entrega parcial marcada desde Tapas') + '</div><div class="dc-b" style="font-size:12px">'
+    + escHtml(s.marcadoTapasPor || 'Tapas') + (s.marcadoTapasEn ? ' · ' + escHtml(comentFechaHoraTapas(s.marcadoTapasEn)) : '')
+    + ' <button class="btn btn-g btn-xs" style="margin-left:8px" onclick="reabrirFichaTapas(\'' + idq + '\')">↩ Reabrir ficha</button></div></div>';
+}
+
+async function reabrirFichaTapas(id) {
+  var s = solicitudes.find(function(x) { return x.id === id; });
+  if (!s) return;
+  if (!confirm('¿Reabrir ' + (s.id_display || 'la ficha') + '? Vuelve a estado "nueva" y reaparece en Pedidos.')) return;
+  var r1 = await db.from('solicitudes').update({ estado: 'nueva', marcado_tapas_por: null, marcado_tapas_en: null }).eq('id', s.dbId).select('id');
+  if (r1.error || !(r1.data || []).length) { showToast('❌ ' + (r1.error ? r1.error.message : 'No se pudo reabrir (sin permiso)'), '#B83232'); return; }
+  var ids = (s.lineas || []).map(function(l) { return l.id; }).filter(Boolean);
+  if (ids.length) {
+    var r2 = await db.from('solicitud_lineas').update({ estado: 'nueva' }).in('id', ids);
+    if (r2.error) { showToast('❌ ' + r2.error.message, '#B83232'); return; }
+  }
+  s.estado = 'nueva'; s.marcadoTapasPor = ''; s.marcadoTapasEn = '';
+  (s.lineas || []).forEach(function(l) { l.estado = 'nueva'; });
+  renderListas();
+  if (typeof renderFichasTapas === 'function') renderFichasTapas();
+  if (selId) mostrarDetalle(selId);
+  if (fichaModalId) mostrarDetalle(fichaModalId);
+  showToast('↩ Ficha reabierta');
 }
 
 function refrescarTrasComentarioTapas() {
