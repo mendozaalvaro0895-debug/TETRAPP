@@ -645,6 +645,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .pgo-leyenda span{display:inline-flex;align-items:center;gap:5px}
 .pgo-leyenda i{width:10px;height:10px;border-radius:2px;display:inline-block}
 .pgo-leyenda i.dash{width:18px;height:0;border-top:2px dashed var(--ink);border-radius:0}
+.pgo-vista{display:inline-flex;gap:2px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:2px}
+.pgo-vista button{border:none;background:none;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;color:var(--gray);cursor:pointer;font-family:var(--sans)}
+.pgo-vista button.act{background:var(--teal);color:#fff}
 .pgo-sin{padding:2px 14px 10px;font-size:11px;color:var(--gray)}
 .pgo-sin b{color:var(--red)}
 .prod-mens-hdr{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
@@ -6916,13 +6919,16 @@ async function renderProdMensualTapas(inst) {
     + '</div>';
 }
 
-// ── "La competencia": productividad DIARIA por operador, en barras (oct/2026) ──────────────
-// Un día a la vez: una barra por persona (supervisión incluida) con las unidades que produjo ese día,
-// de mayor a menor, y una línea punteada con la meta (META_DIA_GRAFICO = 10,000 und/día). Color de la
-// barra: verde ≥ meta · ámbar 80–99% · rojo < 80%. El día se elige con la tira de días del mes (o ‹ ›);
-// al abrir muestra hoy o, si hoy aún no tiene producción, el último día con datos. Solo tareas
-// Terminadas de comandas APROBADAS (mismo criterio del termómetro). El mes es el de #prodMes.
+// ── "La competencia": productividad por operador, en barras (oct/2026) ──────────────────────
+// Una barra por persona (supervisión incluida) y una línea punteada con la meta. Dos vistas (botón):
+//  · MENSUAL (por defecto): total del mes por persona vs la meta del mes al día de hoy = días laborables
+//    transcurridos (sin domingos ni feriados) × META_DIA_GRAFICO; el tooltip trae días con producción y promedio.
+//  · DIARIA: un día a la vez vs META_DIA_GRAFICO (10,000 und/día); el día se elige con la tira de días del mes
+//    (o ‹ ›); al abrir muestra hoy o, si hoy no tiene producción, el último día con datos.
+// Color de la barra: verde ≥ meta · ámbar 80–99% · rojo < 80%. Solo tareas Terminadas de comandas APROBADAS
+// (mismo criterio del termómetro). El mes es el de #prodMes.
 var pgoDia = null;
+var pgoVista = 'mes';   // 'mes' (por defecto) | 'dia'
 var pgoCache = { key: '', data: [] };
 var pgoSeq = 0;
 var PGO_MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -7018,17 +7024,17 @@ function pgoPorDia(comandas) {
   return m;
 }
 
-function pgoColorBarra(und) {
-  var pct = und / META_DIA_GRAFICO * 100;
+function pgoColorBarra(und, meta) {
+  var pct = und / meta * 100;
   return pct >= 100 ? 'var(--green)' : (pct >= 80 ? 'var(--amber)' : 'var(--red)');
 }
 
-function pgoSvg(lista, ancho) {
+function pgoSvg(lista, ancho, meta, metaTxt) {
   var n = lista.length, W = Math.max(320, ancho), ml = 50, mr = 16, mt = 24;
   var pw = W - ml - mr, bw = pw / n;
   var girar = bw < 70;
   var mb = girar ? 80 : 40, H = 330 + (girar ? 40 : 0), ph = H - mt - mb;
-  var vmax = META_DIA_GRAFICO;
+  var vmax = meta;
   lista.forEach(function(o) { if (o.und > vmax) vmax = o.und; });
   var ymax = pgoMaxBonito(vmax * 1.05);
   var yDe = function(v) { return mt + ph - (v / ymax) * ph; };
@@ -7041,18 +7047,18 @@ function pgoSvg(lista, ancho) {
   var barw = Math.min(54, bw * 0.64);
   lista.forEach(function(o, i) {
     var cx = ml + (i + 0.5) * bw, top = yDe(o.und), alto = Math.max(mt + ph - top, 1);
-    var pct = Math.round(o.und / META_DIA_GRAFICO * 100);
-    s += '<rect x="' + (cx - barw / 2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + barw.toFixed(1) + '" height="' + alto.toFixed(1) + '" rx="3" style="fill:' + pgoColorBarra(o.und) + '"><title>'
-      + escHtml(o.nombre) + ': ' + o.und.toLocaleString() + ' und (' + pct + '% de la meta)</title></rect>'
+    var pct = Math.round(o.und / meta * 100);
+    s += '<rect x="' + (cx - barw / 2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + barw.toFixed(1) + '" height="' + alto.toFixed(1) + '" rx="3" style="fill:' + pgoColorBarra(o.und, meta) + '"><title>'
+      + escHtml(o.nombre) + ': ' + o.und.toLocaleString() + ' und (' + pct + '% de la meta)' + (o.nota ? ' · ' + escHtml(o.nota) : '') + '</title></rect>'
       + '<text x="' + cx.toFixed(1) + '" y="' + (top - 5).toFixed(1) + '" text-anchor="middle" font-size="10.5" font-weight="700" style="fill:var(--ink)">' + pgoCompacto(o.und) + '</text>';
     var ny = mt + ph + 14, nm = escHtml(pgoNombreCorto(o.nombre));
     s += girar
       ? '<text transform="rotate(-40 ' + cx.toFixed(1) + ' ' + ny + ')" x="' + cx.toFixed(1) + '" y="' + ny + '" text-anchor="end" font-size="11" style="fill:var(--gray)">' + nm + '</text>'
       : '<text x="' + cx.toFixed(1) + '" y="' + ny + '" text-anchor="middle" font-size="11" style="fill:var(--gray)">' + nm + '</text>';
   });
-  var ym = yDe(META_DIA_GRAFICO);
+  var ym = yDe(meta);
   s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + ym + '" y2="' + ym + '" style="stroke:var(--ink)" stroke-width="1.6" stroke-dasharray="6 4"/>'
-    + '<text x="' + (W - mr - 2) + '" y="' + (ym - 5) + '" text-anchor="end" font-size="10.5" font-weight="800" style="fill:var(--ink)">Meta ' + META_DIA_GRAFICO.toLocaleString() + '</text>';
+    + '<text x="' + (W - mr - 2) + '" y="' + (ym - 5) + '" text-anchor="end" font-size="10.5" font-weight="800" style="fill:var(--ink)">' + escHtml(metaTxt) + '</text>';
   return s + '</svg>';
 }
 
@@ -7076,6 +7082,11 @@ function pgoTiraDias(base, nd, porDia, hoy) {
     + '<button class="asist-nav-arr"' + (pgoDia >= hoy ? ' disabled' : '') + ' onclick="pgoMoverDia(1)" title="Día siguiente">›</button></div>';
 }
 
+function pgoSetVista(v) {
+  pgoVista = v;
+  pgoRender();
+}
+
 async function pgoRender() {
   var cont = document.getElementById('prodGrafOperarios');
   if (!cont) return;
@@ -7087,7 +7098,7 @@ async function pgoRender() {
     comandas = await pgoCargar(rg.desde, rg.hasta);
   } catch (e) {
     console.error('pgoCargar:', e);
-    cont.innerHTML = '<div class="prod-mens-wrap"><div class="empty" style="padding:18px;text-align:center;color:var(--gray)">❌ No se pudo cargar la productividad diaria.</div></div>';
+    cont.innerHTML = '<div class="prod-mens-wrap"><div class="empty" style="padding:18px;text-align:center;color:var(--gray)">❌ No se pudo cargar la productividad por operador.</div></div>';
     return;
   }
   if (seq !== pgoSeq) return;
@@ -7097,59 +7108,97 @@ async function pgoRender() {
   var hoy = fechaHoy();
   var nd = parseInt(rg.hasta.slice(8), 10);
   var porDia = pgoPorDia(comandas);
-  // día por defecto: hoy si ya tiene producción; si no, el último día del mes con datos
-  if (!pgoDia || pgoDia.slice(0, 7) !== base) {
-    var conDatos = Object.keys(porDia).filter(function(f) { return f <= hoy; }).sort();
-    pgoDia = (base === hoy.slice(0, 7) && porDia[hoy]) ? hoy : (conDatos.length ? conDatos[conDatos.length - 1] : (base === hoy.slice(0, 7) ? hoy : base + '-01'));
-  }
-  var delDia = porDia[pgoDia] || {};
-  var lista = Object.keys(delDia).map(function(k) { return delDia[k]; }).filter(function(o) { return o.und > 0; })
-    .sort(function(a, b) { return b.und - a.und; });
-  var total = lista.reduce(function(a, o) { return a + o.und; }, 0);
-  var enMeta = lista.filter(function(o) { return o.und >= META_DIA_GRAFICO; }).length;
-  var dow = new Date(pgoDia + 'T12:00:00').getDay();
-  var diaTxt = PGO_DIAS[dow] + ' ' + parseInt(pgoDia.slice(8), 10) + ' de ' + PGO_MESES[parseInt(pgoDia.slice(5, 7), 10) - 1];
-  var mesTxt = PGO_MESES[parseInt(base.slice(5, 7), 10) - 1] + ' ' + base.slice(0, 4);
   var esMesActual = base === hoy.slice(0, 7);
+  var mesTxt = PGO_MESES[parseInt(base.slice(5, 7), 10) - 1] + ' ' + base.slice(0, 4);
+  var lista = [], meta = META_DIA_GRAFICO, metaTxt = '', sufijo = '', tira = '', sinProd = '', stats = '', vacio = '';
 
-  // quiénes tuvieron producción en el mes pero no ese día (salvo domingo/feriado)
-  var sinProd = '';
-  if (dow !== 0 && !feriadosSet[pgoDia]) {
-    var delMes = {};
+  if (pgoVista === 'mes') {
+    // Vista MENSUAL: total del mes por persona vs la meta del mes al día de hoy (días laborables × meta diaria)
+    var lim = esMesActual ? parseInt(hoy.slice(8), 10) : nd;
+    var laborables = 0;
+    for (var d = 1; d <= lim; d++) {
+      var fd = base + '-' + String(d).padStart(2, '0');
+      if (new Date(fd + 'T12:00:00').getDay() !== 0 && !feriadosSet[fd]) laborables++;
+    }
+    meta = Math.max(laborables, 1) * META_DIA_GRAFICO;
+    metaTxt = 'Meta al día ' + lim + ' · ' + meta.toLocaleString();
+    var acum = {};
     Object.keys(porDia).forEach(function(f) {
-      Object.keys(porDia[f]).forEach(function(k) { if (porDia[f][k].und > 0) delMes[k] = porDia[f][k].nombre; });
+      Object.keys(porDia[f]).forEach(function(k) {
+        var o = porDia[f][k];
+        if (o.und <= 0) return;
+        var a = acum[k] || (acum[k] = { id: k, nombre: o.nombre, und: 0, dias: 0 });
+        a.und += o.und;
+        a.dias++;
+      });
     });
-    var faltan = Object.keys(delMes).filter(function(k) { return !(delDia[k] && delDia[k].und > 0); })
-      .map(function(k) { return pgoNombreCorto(delMes[k]); }).sort();
-    if (faltan.length) sinProd = '<div class="pgo-sin"><b>Sin producción aprobada este día (' + faltan.length + '):</b> ' + escHtml(faltan.join(', ')) + '</div>';
+    lista = Object.keys(acum).map(function(k) {
+      var a = acum[k];
+      a.nota = a.dias + ' días con producción · promedio ' + Math.round(a.und / a.dias).toLocaleString() + ' und/día';
+      return a;
+    }).sort(function(a, b) { return b.und - a.und; });
+    sufijo = mesTxt.charAt(0).toUpperCase() + mesTxt.slice(1);
+    vacio = 'Sin producción aprobada en ' + mesTxt;
+  } else {
+    // Vista DIARIA: un día a la vez vs la meta diaria
+    // día por defecto: hoy si ya tiene producción; si no, el último día del mes con datos
+    if (!pgoDia || pgoDia.slice(0, 7) !== base) {
+      var conDatos = Object.keys(porDia).filter(function(f) { return f <= hoy; }).sort();
+      pgoDia = (esMesActual && porDia[hoy]) ? hoy : (conDatos.length ? conDatos[conDatos.length - 1] : (esMesActual ? hoy : base + '-01'));
+    }
+    var delDia = porDia[pgoDia] || {};
+    lista = Object.keys(delDia).map(function(k) { return delDia[k]; }).filter(function(o) { return o.und > 0; })
+      .sort(function(a, b) { return b.und - a.und; });
+    var dow = new Date(pgoDia + 'T12:00:00').getDay();
+    var diaTxt = PGO_DIAS[dow] + ' ' + parseInt(pgoDia.slice(8), 10) + ' de ' + PGO_MESES[parseInt(pgoDia.slice(5, 7), 10) - 1];
+    sufijo = diaTxt.charAt(0).toUpperCase() + diaTxt.slice(1);
+    metaTxt = 'Meta ' + META_DIA_GRAFICO.toLocaleString();
+    vacio = 'Sin producción aprobada el ' + diaTxt;
+    tira = pgoTiraDias(base, nd, porDia, hoy);
+    // quiénes tuvieron producción en el mes pero no ese día (salvo domingo/feriado)
+    if (dow !== 0 && !feriadosSet[pgoDia]) {
+      var delMes = {};
+      Object.keys(porDia).forEach(function(f) {
+        Object.keys(porDia[f]).forEach(function(k) { if (porDia[f][k].und > 0) delMes[k] = porDia[f][k].nombre; });
+      });
+      var faltan = Object.keys(delMes).filter(function(k) { return !(delDia[k] && delDia[k].und > 0); })
+        .map(function(k) { return pgoNombreCorto(delMes[k]); }).sort();
+      if (faltan.length) sinProd = '<div class="pgo-sin"><b>Sin producción aprobada este día (' + faltan.length + '):</b> ' + escHtml(faltan.join(', ')) + '</div>';
+    }
   }
+
+  var total = lista.reduce(function(a, o) { return a + o.und; }, 0);
+  var enMeta = lista.filter(function(o) { return o.und >= meta; }).length;
+  var esMes = pgoVista === 'mes';
 
   var cuerpo;
   if (!lista.length) {
-    cuerpo = '<div class="empty" style="padding:28px;text-align:center;color:var(--gray)">📭 Sin producción aprobada el ' + diaTxt + '</div>' + sinProd;
+    cuerpo = '<div class="empty" style="padding:28px;text-align:center;color:var(--gray)">📭 ' + vacio + '</div>' + sinProd;
   } else {
-    cuerpo = '<div class="pgo-chart">' + pgoSvg(lista, (cont.clientWidth || 900) - 28) + '</div>'
-      + '<div class="pgo-leyenda"><span><i style="background:var(--green)"></i>Llegó a la meta</span><span><i style="background:var(--amber)"></i>80–99%</span><span><i style="background:var(--red)"></i>Menos de 80%</span>'
-      + '<span><i class="dash"></i>Meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>'
-      + sinProd
-      + '<div class="prod-mens-total">'
-      +   '<div class="prod-stat"><span class="prod-stat-val">' + pgoNombreCorto(lista[0].nombre) + '</span><span class="prod-stat-lbl">Ganó el día · ' + lista[0].und.toLocaleString() + ' und</span></div>'
-      +   '<div class="prod-stat"><span class="prod-stat-val">' + total.toLocaleString() + '</span><span class="prod-stat-lbl">Und del día (' + lista.length + ' personas)</span></div>'
-      +   '<div class="prod-stat"><span class="prod-stat-val">' + enMeta + ' de ' + lista.length + '</span><span class="prod-stat-lbl">Llegaron a la meta</span></div>'
-      +   '<div class="prod-stat"><span class="prod-stat-val">' + Math.round(total / lista.length).toLocaleString() + '</span><span class="prod-stat-lbl">Promedio por persona</span></div>'
+    stats = '<div class="prod-mens-total">'
+      + '<div class="prod-stat"><span class="prod-stat-val">' + pgoNombreCorto(lista[0].nombre) + '</span><span class="prod-stat-lbl">' + (esMes ? 'Líder del mes' : 'Ganó el día') + ' · ' + lista[0].und.toLocaleString() + ' und</span></div>'
+      + '<div class="prod-stat"><span class="prod-stat-val">' + total.toLocaleString() + '</span><span class="prod-stat-lbl">' + (esMes ? 'Und del mes' : 'Und del día') + ' (' + lista.length + ' personas)</span></div>'
+      + '<div class="prod-stat"><span class="prod-stat-val">' + enMeta + ' de ' + lista.length + '</span><span class="prod-stat-lbl">Llegaron a la meta</span></div>'
+      + '<div class="prod-stat"><span class="prod-stat-val">' + Math.round(total / lista.length).toLocaleString() + '</span><span class="prod-stat-lbl">Promedio por persona</span></div>'
       + '</div>';
+    cuerpo = '<div class="pgo-chart">' + pgoSvg(lista, (cont.clientWidth || 900) - 28, meta, metaTxt) + '</div>'
+      + '<div class="pgo-leyenda"><span><i style="background:var(--green)"></i>Llegó a la meta</span><span><i style="background:var(--amber)"></i>80–99%</span><span><i style="background:var(--red)"></i>Menos de 80%</span>'
+      + '<span><i class="dash"></i>' + (esMes ? 'Meta al día de hoy: días laborables × ' + META_DIA_GRAFICO.toLocaleString() : 'Meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día') + '</span></div>'
+      + sinProd + stats;
   }
 
   cont.innerHTML = '<div class="prod-mens-wrap">'
     + '<div class="prod-mens-hdr">'
-    +   '<span>🏁 La competencia — productividad diaria por operador <i style="font-weight:600;color:var(--teal);font-size:12px">· ' + diaTxt.charAt(0).toUpperCase() + diaTxt.slice(1) + '</i></span>'
-    +   '<div style="display:flex;align-items:center;gap:6px">'
+    +   '<span>🏁 La competencia — productividad por operador <i style="font-weight:600;color:var(--teal);font-size:12px">· ' + sufijo + '</i></span>'
+    +   '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +     '<span class="pgo-vista"><button class="' + (esMes ? 'act' : '') + '" onclick="pgoSetVista(\'mes\')">📅 Mensual</button>'
+    +     '<button class="' + (esMes ? '' : 'act') + '" onclick="pgoSetVista(\'dia\')">📆 Diario</button></span>'
     +     '<button class="asist-nav-arr" onclick="pgoNavMes(-1)" title="Mes anterior">‹</button>'
     +     '<span style="font-size:11px;font-weight:700;color:var(--ink);text-transform:capitalize;min-width:110px;text-align:center">' + mesTxt + '</span>'
     +     '<button class="asist-nav-arr"' + (esMesActual ? ' disabled' : '') + ' onclick="pgoNavMes(1)" title="Mes siguiente">›</button>'
     +   '</div>'
     + '</div>'
-    + pgoTiraDias(base, nd, porDia, hoy)
+    + tira
     + cuerpo
     + '</div>';
 }

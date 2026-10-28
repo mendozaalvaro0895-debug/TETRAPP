@@ -246,17 +246,21 @@ view-productividad  Mensual (prodMes) sobre comandas+comanda_tareas, solo tareas
   und ÷ horas_efectivas devuelve siempre la meta (100% artificial). Por eso la vista por
   proceso muestra volumen y meta, no und/hora real: la comanda no reparte el turno por proceso.
   metaDeProceso(nombre) normaliza tildes ('Impresión' → clave 'impresion' = 1500, no default).
-  GRÁFICO "🏁 La competencia — productividad diaria por operador" (oct/2026, `pgoRender`, contenedor
+  GRÁFICO "🏁 La competencia — productividad por operador" (oct/2026, `pgoRender`, contenedor
   `prodGrafOperarios`, arriba de todo; solo tapas.html/master; es la 3ª versión — Alvaro descartó primero un
-  gráfico de líneas por mes/día y luego una carrera acumulada): BARRAS, una por persona (supervisión incluida),
-  con las unidades de UN día, de mayor a menor, y línea punteada de la meta (`META_DIA_GRAFICO` = 10,000).
-  Color: verde ≥ meta · ámbar 80–99% · rojo < 80%; el tooltip trae el % de la meta. El día se elige con la TIRA
-  de días del mes (atenuado = sin producción, ámbar = domingo/feriado) o con ‹ › (cruzan de mes y mueven el
-  selector #prodMes, así la tabla de abajo queda en el mismo mes); al abrir muestra hoy o, si hoy no tiene
-  producción, el último día con datos. Debajo: quién tuvo producción en el mes pero no ese día ("Sin producción
-  aprobada este día", salvo domingo/feriado; no consulta asistencia), ganador del día, total, cuántos llegaron a
-  la meta y promedio. Solo tareas Terminadas de comandas APROBADAS (criterio del termómetro). `pgoCargar`
-  pagina de a 1000 y cachea por mes (🔄 Actualizar lo invalida); se redibuja al cambiar el ancho. Sin SQL nuevo.
+  gráfico de líneas por mes/día y luego una carrera acumulada): BARRAS, una por persona (supervisión incluida)
+  y línea punteada de meta, con botón "📅 Mensual" (POR DEFECTO, `pgoVista`) / "📆 Diario".
+  · MENSUAL: total del mes por persona vs la meta del mes al día de hoy = días laborables transcurridos (sin
+    domingos ni `feriadosSet`) × `META_DIA_GRAFICO` (10,000); el tooltip trae días con producción y promedio
+    por día con producción. Las flechas ‹ › de la esquina cambian el mes (mueven el selector #prodMes, así la
+    tabla de abajo queda en el mismo mes).
+  · DIARIO: un día a la vez vs 10,000 und/día, con la TIRA de días del mes (atenuado = sin producción, ámbar =
+    domingo/feriado) y ‹ › que cruzan de mes; al abrir muestra hoy o, si hoy no tiene producción, el último día
+    con datos. Debajo: quién tuvo producción en el mes pero no ese día (salvo domingo/feriado; no consulta
+    asistencia).
+  Color: verde ≥ meta · ámbar 80–99% · rojo < 80%. Debajo: líder, total, cuántos llegaron a la meta y promedio.
+  Solo tareas Terminadas de comandas APROBADAS (criterio del termómetro). `pgoCargar` pagina de a 1000 y
+  cachea por mes (🔄 Actualizar lo invalida); se redibuja al cambiar el ancho. Sin SQL nuevo.
   Arriba de la tabla, "📦 Producción mensual — Ingreso PT" (renderProdMensualTapas,
   instancia 'productividad', contenedor `prodMensualTapas`): barras diarias sobre
   movimientos_materiales (tipo='entrada_pt') — equivalente de renderProdMensual en
