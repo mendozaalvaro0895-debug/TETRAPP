@@ -6134,7 +6134,8 @@ function entregadoSolInput(val, i) {
   // de este mes: sirven para cargar un sobrante/ajuste a una ficha que ya se entregó completa.
   // Al escribir algo se buscan también completadas de meses anteriores (por código/cliente/desc).
   var perHoy = periodoActualKey();
-  var esActivaMes = function(s) { return ['nueva','proceso','parcial'].indexOf(s.estado) >= 0 && mesSol(s) === perHoy; };
+  // Las activas de meses FUTUROS (ej. ficha ya programada para NOV) también se pueden vincular.
+  var esActivaMes = function(s) { return ['nueva','proceso','parcial'].indexOf(s.estado) >= 0 && mesSol(s) >= perHoy; };
   var candidatos = solicitudes.filter(function(s) {
     if (esActivaMes(s)) return true;
     return s.estado === 'lista' && (v.length > 0 || mesSol(s) === perHoy || fichaCompletadaEsteMes(s));
