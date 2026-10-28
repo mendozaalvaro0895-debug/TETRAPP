@@ -246,17 +246,17 @@ view-productividad  Mensual (prodMes) sobre comandas+comanda_tareas, solo tareas
   und ÷ horas_efectivas devuelve siempre la meta (100% artificial). Por eso la vista por
   proceso muestra volumen y meta, no und/hora real: la comanda no reparte el turno por proceso.
   metaDeProceso(nombre) normaliza tildes ('Impresión' → clave 'impresion' = 1500, no default).
-  GRÁFICO "🏁 La competencia — acumulado día a día de todos los operarios" (oct/2026, `pgoRender`,
-  contenedor `prodGrafOperarios`, arriba de todo; solo tapas.html/master; reemplazó a un primer gráfico de
-  líneas por mes/por día que Alvaro descartó): una LÍNEA POR PERSONA (supervisión incluida) con sus unidades
-  ACUMULADAS desde el día 1 del mes de #prodMes (flechas ‹ › cambian ese mismo selector, así la tabla de abajo
-  queda en el mismo mes) — se ve quién va adelante y quién lo alcanza. Solo tareas Terminadas de comandas
-  APROBADAS (criterio del termómetro). Línea punteada verde = ritmo de la meta (`META_DIA_GRAFICO` por día
-  laborable, sin domingos ni `feriadosSet`); punto grande = dónde va cada quien, puntos chicos = días en que
-  produjo (el tooltip trae el día, lo del día y el acumulado). Panel derecho "🏁 Posiciones al día X":
-  medallas 🥇🥈🥉, total, diferencia contra el líder y lo del último día; clic en una fila oculta/muestra su línea
-  ("Todos" / "Top 5"). En pantalla angosta el panel baja bajo el gráfico. `pgoCargar` pagina de a 1000 y
-  cachea por mes (🔄 Actualizar lo invalida); se redibuja al cambiar el ancho. Sin SQL nuevo.
+  GRÁFICO "🏁 La competencia — productividad diaria por operador" (oct/2026, `pgoRender`, contenedor
+  `prodGrafOperarios`, arriba de todo; solo tapas.html/master; es la 3ª versión — Alvaro descartó primero un
+  gráfico de líneas por mes/día y luego una carrera acumulada): BARRAS, una por persona (supervisión incluida),
+  con las unidades de UN día, de mayor a menor, y línea punteada de la meta (`META_DIA_GRAFICO` = 10,000).
+  Color: verde ≥ meta · ámbar 80–99% · rojo < 80%; el tooltip trae el % de la meta. El día se elige con la TIRA
+  de días del mes (atenuado = sin producción, ámbar = domingo/feriado) o con ‹ › (cruzan de mes y mueven el
+  selector #prodMes, así la tabla de abajo queda en el mismo mes); al abrir muestra hoy o, si hoy no tiene
+  producción, el último día con datos. Debajo: quién tuvo producción en el mes pero no ese día ("Sin producción
+  aprobada este día", salvo domingo/feriado; no consulta asistencia), ganador del día, total, cuántos llegaron a
+  la meta y promedio. Solo tareas Terminadas de comandas APROBADAS (criterio del termómetro). `pgoCargar`
+  pagina de a 1000 y cachea por mes (🔄 Actualizar lo invalida); se redibuja al cambiar el ancho. Sin SQL nuevo.
   Arriba de la tabla, "📦 Producción mensual — Ingreso PT" (renderProdMensualTapas,
   instancia 'productividad', contenedor `prodMensualTapas`): barras diarias sobre
   movimientos_materiales (tipo='entrada_pt') — equivalente de renderProdMensual en

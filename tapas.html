@@ -629,24 +629,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 
 /* Producción mensual (Productividad · Requis de Ingreso PT) */
 .prod-mens-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
-.pgo-body{display:flex;gap:14px;align-items:flex-start;padding:10px 14px 4px}
-.pgo-chart{flex:1;min-width:0;overflow-x:auto}
-.pgo-rank{width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:3px}
-.pgo-rank-h{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:800;color:var(--ink);padding:2px 0 4px}
-.pgo-row{position:relative;display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:6px;border:1px solid var(--border);background:var(--card);border-radius:8px;padding:5px 8px 7px;cursor:pointer;font-family:var(--sans);color:var(--ink);text-align:left;overflow:hidden}
-.pgo-row.off{opacity:.38}
-.pgo-pos{font-size:14px;font-weight:800;color:var(--gray);text-align:center}
-.pgo-nom{font-size:12px;font-weight:600;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:2px 5px}
-.pgo-nom i{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
-.pgo-hoy{font-size:10px;font-weight:600;color:var(--green)}
-.pgo-tot{display:flex;flex-direction:column;align-items:flex-end;font-size:12px;line-height:1.2}
-.pgo-dif{font-size:10px;color:var(--red)}
-.pgo-dif.lid{color:var(--green);font-weight:800}
-.pgo-bar{position:absolute;left:0;bottom:0;height:3px;opacity:.75}
-.pgo-acc{display:inline-flex;gap:4px}
-.pgo-acc button{border:1px solid var(--border);background:none;border-radius:6px;padding:2px 9px;font-size:11px;cursor:pointer;color:var(--ink);font-family:var(--sans)}
-.pgo-ln{fill:none;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round;opacity:.92}
-@media(max-width:900px){.pgo-body{flex-direction:column}.pgo-rank{width:100%}}
+.pgo-chart{padding:10px 14px 0;overflow-x:auto}
+.pgo-tira{display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border)}
+.pgo-dias{flex:1;min-width:0;display:flex;gap:3px;overflow-x:auto}
+.pgo-dia{flex:1 0 26px;display:flex;flex-direction:column;align-items:center;border:1px solid var(--border);background:var(--card);border-radius:6px;padding:2px 0;cursor:pointer;font-family:var(--sans);color:var(--ink);line-height:1.15}
+.pgo-dia b{font-size:11px}
+.pgo-dia span{font-size:8px;color:var(--gray-l)}
+.pgo-dia.dom{background:rgba(180,83,9,.08);border-color:rgba(180,83,9,.25)}
+.pgo-dia.dom b,.pgo-dia.dom span{color:var(--amber)}
+.pgo-dia.vacio{opacity:.5}
+.pgo-dia.sel{background:var(--teal);border-color:var(--teal);opacity:1}
+.pgo-dia.sel b,.pgo-dia.sel span{color:#fff}
+.pgo-dia:disabled{opacity:.25;cursor:default}
+.pgo-leyenda{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:4px 14px 8px;font-size:11px;color:var(--gray)}
+.pgo-leyenda span{display:inline-flex;align-items:center;gap:5px}
+.pgo-leyenda i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.pgo-leyenda i.dash{width:18px;height:0;border-top:2px dashed var(--ink);border-radius:0}
+.pgo-sin{padding:2px 14px 10px;font-size:11px;color:var(--gray)}
+.pgo-sin b{color:var(--red)}
 .prod-mens-hdr{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
 .prod-mens-hdr span:first-child{font-size:12px;font-weight:800;color:var(--ink)}
 .prod-mens-chart{padding:10px 14px 8px}
@@ -6916,20 +6916,17 @@ async function renderProdMensualTapas(inst) {
     + '</div>';
 }
 
-// ── "La competencia": carrera acumulada de TODOS los operarios, día a día del mes (oct/2026) ──
-// Una línea por persona (supervisión incluida) con sus unidades ACUMULADAS desde el día 1: se ve quién va
-// adelante, quién lo alcanza y por cuánto. Solo tareas Terminadas de comandas APROBADAS (mismo criterio del
-// termómetro). El mes es el de #prodMes. A la derecha, el ranking al último día con datos (clic = ocultar o
-// mostrar la línea). Línea punteada verde = ritmo de la meta (META_DIA_GRAFICO por día laborable: sin
-// domingos ni feriados). Un punto grande marca dónde va cada quien; los puntos chicos son los días en que
-// esa persona produjo.
-var pgoOcultos = {};
+// ── "La competencia": productividad DIARIA por operador, en barras (oct/2026) ──────────────
+// Un día a la vez: una barra por persona (supervisión incluida) con las unidades que produjo ese día,
+// de mayor a menor, y una línea punteada con la meta (META_DIA_GRAFICO = 10,000 und/día). Color de la
+// barra: verde ≥ meta · ámbar 80–99% · rojo < 80%. El día se elige con la tira de días del mes (o ‹ ›);
+// al abrir muestra hoy o, si hoy aún no tiene producción, el último día con datos. Solo tareas
+// Terminadas de comandas APROBADAS (mismo criterio del termómetro). El mes es el de #prodMes.
+var pgoDia = null;
 var pgoCache = { key: '', data: [] };
-var pgoOps = [];
 var pgoSeq = 0;
 var PGO_MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-var PGO_MEDALLA = ['🥇', '🥈', '🥉'];
-var PGO_RANK_ANCHO = 280;
+var PGO_DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 
 function pgoMesBase() {
   var el = document.getElementById('prodMes');
@@ -6973,128 +6970,110 @@ async function pgoCargar(desde, hasta) {
   return out;
 }
 
-function pgoToggle(i) {
-  var o = pgoOps[i];
-  if (!o) return;
-  if (pgoOcultos[o.id]) delete pgoOcultos[o.id]; else pgoOcultos[o.id] = true;
-  pgoRender();
-}
-
-function pgoMostrar(cuantos) {
-  pgoOcultos = {};
-  if (cuantos) pgoOps.forEach(function(o, i) { if (i >= cuantos) pgoOcultos[o.id] = true; });
-  pgoRender();
-}
-
 // Cambia el mes del selector de arriba (así la tabla de abajo queda en el mismo mes) y recarga
 function pgoNavMes(delta) {
   var base = pgoMesBase();
   var d = new Date(parseInt(base.slice(0, 4), 10), parseInt(base.slice(5, 7), 10) - 1 + delta, 1);
   var ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   if (ym > fechaHoy().slice(0, 7)) return;
+  pgoDia = null;
   var el = document.getElementById('prodMes');
   if (el) el.value = ym;
   cargarProductividad();
 }
 
-// dias = ['YYYY-MM-DD'…] del mes · lim = cuántos días ya transcurridos (se acumula hasta ahí)
-function pgoSerie(comandas, dias, lim) {
-  var porOp = {};
+// Elige el día; si cae en otro mes, mueve el selector de mes y recarga
+function pgoSetDia(f) {
+  if (!f || f > fechaHoy()) return;
+  pgoDia = f;
+  if (f.slice(0, 7) !== pgoMesBase()) {
+    var el = document.getElementById('prodMes');
+    if (el) el.value = f.slice(0, 7);
+    cargarProductividad();
+  } else {
+    pgoRender();
+  }
+}
+
+function pgoMoverDia(delta) {
+  if (!pgoDia) return;
+  var d = new Date(pgoDia + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  pgoSetDia(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+}
+
+// { 'YYYY-MM-DD': { operario_id: { id, nombre, und } } } con solo lo aprobado y Terminado
+function pgoPorDia(comandas) {
+  var m = {};
   comandas.filter(comandaCuenta).forEach(function(c) {
-    var k = c.operario_id || '—';
-    var o = porOp[k] || (porOp[k] = { id: k, nombre: c.operario_nombre || k, diario: {}, total: 0 });
     var u = 0;
     (c.comanda_tareas || []).forEach(function(t) {
       if (t.estado === 'Terminada') u += (t.unidades_completadas || t.cantidad || 0);
     });
-    o.diario[c.fecha] = (o.diario[c.fecha] || 0) + u;
-    o.total += u;
+    var k = c.operario_id || '—';
+    var dia = m[c.fecha] || (m[c.fecha] = {});
+    var o = dia[k] || (dia[k] = { id: k, nombre: c.operario_nombre || k, und: 0 });
+    o.und += u;
   });
-  var ops = Object.keys(porOp).map(function(k) { return porOp[k]; }).filter(function(o) { return o.total > 0; });
-  ops.forEach(function(o) {
-    var run = 0;
-    o.cum = [];
-    for (var i = 0; i < lim; i++) { run += (o.diario[dias[i]] || 0); o.cum.push(run); }
-    o.ultimo = o.diario[dias[lim - 1]] || 0;
-  });
-  // color estable por nombre (no cambia al ocultar personas ni al cambiar de mes)
-  ops.slice().sort(function(a, b) { return a.nombre.localeCompare(b.nombre); }).forEach(function(o, i) {
-    o.color = 'hsl(' + Math.round((i * 137.5) % 360) + ',62%,44%)';
-  });
-  ops.sort(function(a, b) { return b.total - a.total; });
-  return ops;
+  return m;
 }
 
-function pgoSvg(ops, dias, lim, ancho) {
-  var W = Math.max(320, ancho), H = 340, ml = 50, mr = 16, mt = 14, mb = 30;
-  var pw = W - ml - mr, ph = H - mt - mb, n = dias.length, bw = pw / n;
-  var vis = ops.filter(function(o) { return !pgoOcultos[o.id]; });
-  // ritmo de la meta: META_DIA_GRAFICO por día laborable (sin domingos ni feriados) acumulado
-  var ritmo = [], acum = 0;
-  for (var i = 0; i < lim; i++) {
-    var dow = new Date(dias[i] + 'T12:00:00').getDay();
-    if (dow !== 0 && !feriadosSet[dias[i]]) acum += META_DIA_GRAFICO;
-    ritmo.push(acum);
-  }
-  var vmax = lim ? ritmo[lim - 1] : 0;
-  vis.forEach(function(o) { if (lim && o.cum[lim - 1] > vmax) vmax = o.cum[lim - 1]; });
-  var ymax = pgoMaxBonito(vmax);
+function pgoColorBarra(und) {
+  var pct = und / META_DIA_GRAFICO * 100;
+  return pct >= 100 ? 'var(--green)' : (pct >= 80 ? 'var(--amber)' : 'var(--red)');
+}
+
+function pgoSvg(lista, ancho) {
+  var n = lista.length, W = Math.max(320, ancho), ml = 50, mr = 16, mt = 24;
+  var pw = W - ml - mr, bw = pw / n;
+  var girar = bw < 70;
+  var mb = girar ? 80 : 40, H = 330 + (girar ? 40 : 0), ph = H - mt - mb;
+  var vmax = META_DIA_GRAFICO;
+  lista.forEach(function(o) { if (o.und > vmax) vmax = o.und; });
+  var ymax = pgoMaxBonito(vmax * 1.05);
   var yDe = function(v) { return mt + ph - (v / ymax) * ph; };
-  var xDe = function(k) { return ml + (k + 0.5) * bw; };
   var s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" style="display:block;font-family:var(--sans)">';
   for (var g = 0; g <= 4; g++) {
     var gv = ymax * g / 4, gy = yDe(gv);
     s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + gy + '" y2="' + gy + '" style="stroke:var(--border)" stroke-width="1"/>'
       + '<text x="' + (ml - 6) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="10" style="fill:var(--gray-l)">' + pgoCompacto(Math.round(gv)) + '</text>';
   }
-  dias.forEach(function(f, k) {
-    var esDom = new Date(f + 'T12:00:00').getDay() === 0;
-    var fer = !!feriadosSet[f];
-    if (esDom || fer) s += '<rect x="' + (ml + k * bw) + '" y="' + mt + '" width="' + bw + '" height="' + ph + '" style="fill:var(--amber)" opacity=".08"/>';
-    var lbl = parseInt(f.slice(8), 10);
-    if (bw < 14 && k % 2 === 1) lbl = '';
-    if (lbl !== '') s += '<text x="' + xDe(k) + '" y="' + (H - mb + 15) + '" text-anchor="middle" font-size="10" style="fill:' + ((esDom || fer) ? 'var(--amber)' : 'var(--gray)') + '" font-weight="' + ((esDom || fer) ? '800' : '500') + '">' + lbl + '</text>';
+  var barw = Math.min(54, bw * 0.64);
+  lista.forEach(function(o, i) {
+    var cx = ml + (i + 0.5) * bw, top = yDe(o.und), alto = Math.max(mt + ph - top, 1);
+    var pct = Math.round(o.und / META_DIA_GRAFICO * 100);
+    s += '<rect x="' + (cx - barw / 2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + barw.toFixed(1) + '" height="' + alto.toFixed(1) + '" rx="3" style="fill:' + pgoColorBarra(o.und) + '"><title>'
+      + escHtml(o.nombre) + ': ' + o.und.toLocaleString() + ' und (' + pct + '% de la meta)</title></rect>'
+      + '<text x="' + cx.toFixed(1) + '" y="' + (top - 5).toFixed(1) + '" text-anchor="middle" font-size="10.5" font-weight="700" style="fill:var(--ink)">' + pgoCompacto(o.und) + '</text>';
+    var ny = mt + ph + 14, nm = escHtml(pgoNombreCorto(o.nombre));
+    s += girar
+      ? '<text transform="rotate(-40 ' + cx.toFixed(1) + ' ' + ny + ')" x="' + cx.toFixed(1) + '" y="' + ny + '" text-anchor="end" font-size="11" style="fill:var(--gray)">' + nm + '</text>'
+      : '<text x="' + cx.toFixed(1) + '" y="' + ny + '" text-anchor="middle" font-size="11" style="fill:var(--gray)">' + nm + '</text>';
   });
-  if (lim) {
-    var dr = '';
-    ritmo.forEach(function(v, k) { dr += (k ? 'L' : 'M') + xDe(k).toFixed(1) + ' ' + yDe(v).toFixed(1) + ' '; });
-    s += '<path d="' + dr + '" fill="none" style="stroke:var(--green)" stroke-width="1.6" stroke-dasharray="5 4"/>'
-      + '<text x="' + (xDe(lim - 1) - 4) + '" y="' + (yDe(ritmo[lim - 1]) - 6) + '" text-anchor="end" font-size="10" font-weight="700" style="fill:var(--green)">Ritmo de meta · ' + ritmo[lim - 1].toLocaleString() + '</text>';
-  }
-  // las líneas de los que van atrás se dibujan primero y las del frente al final (el líder queda arriba)
-  vis.slice().reverse().forEach(function(o) {
-    var d = '', pts = '';
-    for (var k = 0; k < lim; k++) {
-      d += (k ? 'L' : 'M') + xDe(k).toFixed(1) + ' ' + yDe(o.cum[k]).toFixed(1) + ' ';
-      var u = o.diario[dias[k]];
-      if (u && k < lim - 1) {
-        pts += '<circle cx="' + xDe(k).toFixed(1) + '" cy="' + yDe(o.cum[k]).toFixed(1) + '" r="2.6" fill="' + o.color + '"><title>'
-          + escHtml(o.nombre) + ' · día ' + parseInt(dias[k].slice(8), 10) + ': +' + u.toLocaleString() + ' und · acumulado ' + o.cum[k].toLocaleString() + '</title></circle>';
-      }
-    }
-    var kf = lim - 1;
-    s += '<path class="pgo-ln" d="' + d + '" stroke="' + o.color + '"/>' + pts
-      + '<circle cx="' + xDe(kf).toFixed(1) + '" cy="' + yDe(o.cum[kf]).toFixed(1) + '" r="5" fill="' + o.color + '" stroke="#fff" stroke-width="1.6"><title>'
-      + escHtml(o.nombre) + ' · acumulado ' + o.cum[kf].toLocaleString() + ' und</title></circle>';
-  });
+  var ym = yDe(META_DIA_GRAFICO);
+  s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + ym + '" y2="' + ym + '" style="stroke:var(--ink)" stroke-width="1.6" stroke-dasharray="6 4"/>'
+    + '<text x="' + (W - mr - 2) + '" y="' + (ym - 5) + '" text-anchor="end" font-size="10.5" font-weight="800" style="fill:var(--ink)">Meta ' + META_DIA_GRAFICO.toLocaleString() + '</text>';
   return s + '</svg>';
 }
 
-function pgoRankHtml(lim, dias) {
-  var lider = pgoOps.length ? pgoOps[0].total : 0;
-  var filas = pgoOps.map(function(o, i) {
-    var pos = i < 3 ? PGO_MEDALLA[i] : (i + 1) + '°';
-    var dif = i === 0 ? '<span class="pgo-dif lid">líder</span>' : '<span class="pgo-dif">−' + (lider - o.total).toLocaleString() + '</span>';
-    var hoy = o.ultimo ? ' <span class="pgo-hoy">día ' + parseInt(dias[lim - 1].slice(8), 10) + ': +' + o.ultimo.toLocaleString() + '</span>' : '';
-    var pct = lider ? Math.max(2, Math.round(o.total / lider * 100)) : 0;
-    return '<button class="pgo-row' + (pgoOcultos[o.id] ? ' off' : '') + '" onclick="pgoToggle(' + i + ')" title="' + escHtml(o.nombre) + ' (clic para ocultar o mostrar su línea)">'
-      + '<span class="pgo-pos">' + pos + '</span>'
-      + '<span class="pgo-nom"><i style="background:' + o.color + '"></i>' + escHtml(pgoNombreCorto(o.nombre)) + hoy + '</span>'
-      + '<span class="pgo-tot"><b>' + o.total.toLocaleString() + '</b>' + dif + '</span>'
-      + '<em class="pgo-bar" style="width:' + pct + '%;background:' + o.color + '"></em></button>';
-  }).join('');
-  return '<div class="pgo-rank"><div class="pgo-rank-h"><span>🏁 Posiciones al día ' + parseInt(dias[lim - 1].slice(8), 10) + '</span>'
-    + '<span class="pgo-acc"><button onclick="pgoMostrar(0)">Todos</button><button onclick="pgoMostrar(5)">Top 5</button></span></div>' + filas + '</div>';
+// Tira con los días del mes: clic = ver ese día. Atenuado = sin producción · ámbar = domingo/feriado
+function pgoTiraDias(base, nd, porDia, hoy) {
+  var chips = '';
+  for (var d = 1; d <= nd; d++) {
+    var f = base + '-' + String(d).padStart(2, '0');
+    var dow = new Date(f + 'T12:00:00').getDay();
+    var cierra = dow === 0 || !!feriadosSet[f];
+    var futuro = f > hoy;
+    var tiene = !!porDia[f];
+    var cls = 'pgo-dia' + (f === pgoDia ? ' sel' : '') + (cierra ? ' dom' : '') + (!tiene ? ' vacio' : '');
+    var tot = 0;
+    if (tiene) Object.keys(porDia[f]).forEach(function(k) { tot += porDia[f][k].und; });
+    chips += '<button class="' + cls + '"' + (futuro ? ' disabled' : ' onclick="pgoSetDia(\'' + f + '\')"') + ' title="' + PGO_DIAS[dow] + ' ' + d + (tiene ? ' · ' + tot.toLocaleString() + ' und' : ' · sin producción') + '">'
+      + '<b>' + d + '</b><span>' + PGO_DIAS[dow].charAt(0).toUpperCase() + '</span></button>';
+  }
+  return '<div class="pgo-tira"><button class="asist-nav-arr" onclick="pgoMoverDia(-1)" title="Día anterior">‹</button>'
+    + '<div class="pgo-dias">' + chips + '</div>'
+    + '<button class="asist-nav-arr"' + (pgoDia >= hoy ? ' disabled' : '') + ' onclick="pgoMoverDia(1)" title="Día siguiente">›</button></div>';
 }
 
 async function pgoRender() {
@@ -7108,7 +7087,7 @@ async function pgoRender() {
     comandas = await pgoCargar(rg.desde, rg.hasta);
   } catch (e) {
     console.error('pgoCargar:', e);
-    cont.innerHTML = '<div class="prod-mens-wrap"><div class="empty" style="padding:18px;text-align:center;color:var(--gray)">❌ No se pudo cargar la competencia entre operarios.</div></div>';
+    cont.innerHTML = '<div class="prod-mens-wrap"><div class="empty" style="padding:18px;text-align:center;color:var(--gray)">❌ No se pudo cargar la productividad diaria.</div></div>';
     return;
   }
   if (seq !== pgoSeq) return;
@@ -7117,39 +7096,60 @@ async function pgoRender() {
 
   var hoy = fechaHoy();
   var nd = parseInt(rg.hasta.slice(8), 10);
-  var dias = [];
-  for (var d = 1; d <= nd; d++) dias.push(base + '-' + String(d).padStart(2, '0'));
-  var lim = base === hoy.slice(0, 7) ? parseInt(hoy.slice(8), 10) : nd;
-  pgoOps = pgoSerie(comandas, dias, lim);
-  var visibles = pgoOps.filter(function(o) { return !pgoOcultos[o.id]; });
-  var totalVis = visibles.reduce(function(a, o) { return a + o.total; }, 0);
+  var porDia = pgoPorDia(comandas);
+  // día por defecto: hoy si ya tiene producción; si no, el último día del mes con datos
+  if (!pgoDia || pgoDia.slice(0, 7) !== base) {
+    var conDatos = Object.keys(porDia).filter(function(f) { return f <= hoy; }).sort();
+    pgoDia = (base === hoy.slice(0, 7) && porDia[hoy]) ? hoy : (conDatos.length ? conDatos[conDatos.length - 1] : (base === hoy.slice(0, 7) ? hoy : base + '-01'));
+  }
+  var delDia = porDia[pgoDia] || {};
+  var lista = Object.keys(delDia).map(function(k) { return delDia[k]; }).filter(function(o) { return o.und > 0; })
+    .sort(function(a, b) { return b.und - a.und; });
+  var total = lista.reduce(function(a, o) { return a + o.und; }, 0);
+  var enMeta = lista.filter(function(o) { return o.und >= META_DIA_GRAFICO; }).length;
+  var dow = new Date(pgoDia + 'T12:00:00').getDay();
+  var diaTxt = PGO_DIAS[dow] + ' ' + parseInt(pgoDia.slice(8), 10) + ' de ' + PGO_MESES[parseInt(pgoDia.slice(5, 7), 10) - 1];
   var mesTxt = PGO_MESES[parseInt(base.slice(5, 7), 10) - 1] + ' ' + base.slice(0, 4);
   var esMesActual = base === hoy.slice(0, 7);
 
+  // quiénes tuvieron producción en el mes pero no ese día (salvo domingo/feriado)
+  var sinProd = '';
+  if (dow !== 0 && !feriadosSet[pgoDia]) {
+    var delMes = {};
+    Object.keys(porDia).forEach(function(f) {
+      Object.keys(porDia[f]).forEach(function(k) { if (porDia[f][k].und > 0) delMes[k] = porDia[f][k].nombre; });
+    });
+    var faltan = Object.keys(delMes).filter(function(k) { return !(delDia[k] && delDia[k].und > 0); })
+      .map(function(k) { return pgoNombreCorto(delMes[k]); }).sort();
+    if (faltan.length) sinProd = '<div class="pgo-sin"><b>Sin producción aprobada este día (' + faltan.length + '):</b> ' + escHtml(faltan.join(', ')) + '</div>';
+  }
+
   var cuerpo;
-  if (!pgoOps.length) {
-    cuerpo = '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay producción aprobada en este mes</div>';
+  if (!lista.length) {
+    cuerpo = '<div class="empty" style="padding:28px;text-align:center;color:var(--gray)">📭 Sin producción aprobada el ' + diaTxt + '</div>' + sinProd;
   } else {
-    var cw = cont.clientWidth || 1000;
-    var lado = cw >= 900;
-    var ancho = lado ? cw - PGO_RANK_ANCHO - 14 * 3 : cw - 28;
-    cuerpo = '<div class="pgo-body"><div class="pgo-chart">' + pgoSvg(pgoOps, dias, lim, ancho) + '</div>' + pgoRankHtml(lim, dias) + '</div>'
+    cuerpo = '<div class="pgo-chart">' + pgoSvg(lista, (cont.clientWidth || 900) - 28) + '</div>'
+      + '<div class="pgo-leyenda"><span><i style="background:var(--green)"></i>Llegó a la meta</span><span><i style="background:var(--amber)"></i>80–99%</span><span><i style="background:var(--red)"></i>Menos de 80%</span>'
+      + '<span><i class="dash"></i>Meta ' + META_DIA_GRAFICO.toLocaleString() + ' und/día</span></div>'
+      + sinProd
       + '<div class="prod-mens-total">'
-      +   '<div class="prod-stat"><span class="prod-stat-val">' + pgoNombreCorto(pgoOps[0].nombre) + '</span><span class="prod-stat-lbl">Va de líder · ' + pgoOps[0].total.toLocaleString() + ' und</span></div>'
-      +   '<div class="prod-stat"><span class="prod-stat-val">' + totalVis.toLocaleString() + '</span><span class="prod-stat-lbl">Und acumuladas (' + visibles.length + ' de ' + pgoOps.length + ' personas)</span></div>'
-      +   '<div class="prod-stat"><span class="prod-stat-val">' + (visibles.length ? Math.round(totalVis / visibles.length).toLocaleString() : 0) + '</span><span class="prod-stat-lbl">Promedio por persona</span></div>'
+      +   '<div class="prod-stat"><span class="prod-stat-val">' + pgoNombreCorto(lista[0].nombre) + '</span><span class="prod-stat-lbl">Ganó el día · ' + lista[0].und.toLocaleString() + ' und</span></div>'
+      +   '<div class="prod-stat"><span class="prod-stat-val">' + total.toLocaleString() + '</span><span class="prod-stat-lbl">Und del día (' + lista.length + ' personas)</span></div>'
+      +   '<div class="prod-stat"><span class="prod-stat-val">' + enMeta + ' de ' + lista.length + '</span><span class="prod-stat-lbl">Llegaron a la meta</span></div>'
+      +   '<div class="prod-stat"><span class="prod-stat-val">' + Math.round(total / lista.length).toLocaleString() + '</span><span class="prod-stat-lbl">Promedio por persona</span></div>'
       + '</div>';
   }
 
   cont.innerHTML = '<div class="prod-mens-wrap">'
     + '<div class="prod-mens-hdr">'
-    +   '<span>🏁 La competencia — acumulado día a día de todos los operarios</span>'
+    +   '<span>🏁 La competencia — productividad diaria por operador <i style="font-weight:600;color:var(--teal);font-size:12px">· ' + diaTxt.charAt(0).toUpperCase() + diaTxt.slice(1) + '</i></span>'
     +   '<div style="display:flex;align-items:center;gap:6px">'
     +     '<button class="asist-nav-arr" onclick="pgoNavMes(-1)" title="Mes anterior">‹</button>'
     +     '<span style="font-size:11px;font-weight:700;color:var(--ink);text-transform:capitalize;min-width:110px;text-align:center">' + mesTxt + '</span>'
     +     '<button class="asist-nav-arr"' + (esMesActual ? ' disabled' : '') + ' onclick="pgoNavMes(1)" title="Mes siguiente">›</button>'
     +   '</div>'
     + '</div>'
+    + pgoTiraDias(base, nd, porDia, hoy)
     + cuerpo
     + '</div>';
 }
