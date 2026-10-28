@@ -348,6 +348,24 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-est .e-p{background:#FEF9C3;color:#A16207;border-color:#FDE047}
 .ped-est button:disabled{opacity:.55;cursor:default}
 .ped-est-n{font-size:11px;color:#64748B;margin-bottom:8px;line-height:1.4}
+.ped-parc{margin-top:6px;border:1px solid #FDE047;background:#FEFCE8;color:#854D0E;border-radius:7px;padding:4px 8px;font-size:11px;line-height:1.35}
+.ped-parc b{font-family:'DM Mono',monospace}
+.ped-parc .sr{color:#B45309;font-weight:800}
+.ped-parc .cr{color:#047857;font-weight:800}
+.ped-pe{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid #FDE047;background:#FEFCE8;border-radius:8px;padding:6px 9px;margin-bottom:6px;font-size:12px}
+.ped-pe b{font-family:'DM Mono',monospace;color:#854D0E}
+.ped-pe .t{flex:1;min-width:120px;color:#64748B}
+.ped-pe .e{font-size:10px;font-weight:800;border-radius:10px;padding:1px 7px;white-space:nowrap}
+.ped-pe .e.sr{background:#FEF3C7;color:#92400E;border:1px solid #FCD34D}
+.ped-pe .e.cr{background:#ECFDF5;color:#047857;border:1px solid #6EE7B7}
+.ped-pe button{border:none;background:none;color:#B83232;font-size:14px;cursor:pointer;padding:0 4px}
+.ped-pf{border:2px solid #FDE047;background:#FEFCE8;border-radius:10px;padding:10px;margin:4px 0 8px}
+.ped-pf label{display:block;font-size:11px;font-weight:700;color:#854D0E;margin:6px 0 2px}
+.ped-pf input,.ped-pf textarea{width:100%;box-sizing:border-box;border:1px solid #CBD5E1;border-radius:8px;padding:8px 10px;font-size:14px;font-family:'DM Sans',sans-serif}
+.ped-pf .acc{display:flex;gap:8px;margin-top:10px}
+.ped-pf .acc button{flex:1;min-height:42px;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;font-family:'DM Sans',sans-serif;border:none}
+.ped-pf .g{background:#A16207;color:#fff}
+.ped-pf .c{background:#E2E8F0;color:#334155}
 .ped-cm{border:1px solid #FCD34D;border-left-width:4px;background:#FFFBEB;border-radius:8px;padding:6px 9px;margin-bottom:6px}
 .ped-cm.ok{border-color:#E2E8F0;background:#F8FAFC;opacity:.85}
 .ped-cm-h{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;font-size:11px;color:#6B6B6A}
@@ -1386,7 +1404,7 @@ async function guardarRegistro() {
 // ficha (movimientos_materiales entrada_pt, bloque Entregados de tapas.html). Reparto de ingresos a lotes
 // = FIFO por fecha de marcado (solo cuentan ingresos posteriores al marcado). Abajo se listan los ingresos
 // ya hechos con su requi, marcados Parcial / Completa según lo acumulado de la ficha.
-var PED = { stockInv: {}, stockB7: {}, salidas: [], tipos: {}, sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, coment: [], comentOk: true, comentTxt: '', form: null, selOp: [], selProc: [], cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40 };
+var PED = { stockInv: {}, stockB7: {}, salidas: [], tipos: {}, sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, coment: [], comentOk: true, comentTxt: '', parc: [], parcOk: true, parcForm: false, parcCant: '', parcFecha: '', parcNota: '', form: null, selOp: [], selProc: [], cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40 };
 var PED_VIVOS = ['nueva', 'proceso', 'parcial'];
 
 // TIPO / SUBFAMILIA de tapa — ESPEJO de tapas.html (detectarTipoTapa/tipoDeSkuTapa): el tipo guardado en el
@@ -1472,7 +1490,11 @@ async function cargarPedidos(silencioso) {
     var rc = await db.from('tapas_ficha_comentarios').select('*').order('created_at', { ascending: true });
     PED.comentOk = !rc.error;
     PED.coment = rc.error ? [] : (rc.data || []);
-    var re = await db.from('sku_especificaciones').select('sku,valor').eq('area', 'tapas').eq('campo', 'Familia');
+    // entregas parciales que reporta la supervisora (sql/tapas_entregas_parciales_v1.sql): informativas, no descuentan del saldo
+    var rpa = await db.from('tapas_entregas_parciales').select('*').order('fecha', { ascending: true }).order('created_at', { ascending: true });
+    PED.parcOk = !rpa.error;
+    PED.parc = rpa.error ? [] : (rpa.data || []);
+    var re =await db.from('sku_especificaciones').select('sku,valor').eq('area', 'tapas').eq('campo', 'Familia');
     if (!re.error) {
       PED.tipos = {};
       (re.data || []).forEach(function(e) { if (e.valor && String(e.valor).trim()) PED.tipos[e.sku] = String(e.valor).trim(); });
@@ -1626,13 +1648,28 @@ function pedModelo() {
     var abiertos = lotes.filter(function(l) { return !l.completo; });
     var enProc = abiertos.reduce(function(a, l) { return a + (l.cantidad - l.hecho); }, 0);
     var saldo = Math.max(0, cant - entregado);
+    // Entregas parciales reportadas: cada una queda "con requi" cuando hay ingresos PT POSTERIORES a su registro que la cubren
+    // (mismo reparto por fecha que los lotes); mientras tanto es solo informativa y NO resta del saldo.
+    var ppool = ings.map(function(m) { return { ts: new Date(m.created_at).getTime(), rem: m.cantidad || 0 }; });
+    var parcLista = PED.parc.filter(function(e) { return e.solicitud_id === s.id; }), parcTotal = 0, parcSin = 0;
+    parcLista.forEach(function(e) {
+      var t0p = new Date(e.created_at).getTime() - 1000, faltaP = e.cantidad, cub = 0;
+      ppool.forEach(function(it) {
+        if (faltaP <= 0 || it.rem <= 0 || it.ts < t0p) return;
+        var tk = Math.min(it.rem, faltaP);
+        it.rem -= tk; faltaP -= tk; cub += tk;
+      });
+      e.cubierto = cub;
+      parcTotal += e.cantidad; parcSin += e.cantidad - cub;
+    });
     var l0 = lins[0] || {};
     return { s: s, id: s.id, codigo: s.codigo || String(s.id).slice(0, 6), cliente: s.cliente_nombre || '—', cant: cant, entregado: entregado,
              saldo: saldo, enProc: enProc, libre: Math.max(0, saldo - enProc), abiertos: abiertos, ings: ings,
              sku: l0.sku || '', desc: (l0.descripcion || '') + (lins.length > 1 ? ' (+' + (lins.length - 1) + ')' : ''),
              viva: PED_VIVOS.indexOf(s.estado) >= 0, limite: s.fecha_limite || '', plazo: s.plazo_tipo || 'fecha', urgente: s.prioridad === 'urgente',
              procs: pedProcsDe(lins),
-             coment: PED.coment.filter(function(c) { return c.solicitud_id === s.id; }) };
+             parc: { lista: parcLista, total: parcTotal, sinRequi: parcSin },
+             coment:PED.coment.filter(function(c) { return c.solicitud_id === s.id; }) };
   });
 }
 
@@ -1698,6 +1735,7 @@ function renderPedidos() {
       + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
       + pedStkPTHtml(x.sku, x.saldo)
       + pedNotaHtml(x.s.notas)
+      + pedParcChipHtml(x)
       + '<div class="ped-resum">' + (proc ? '<span class="ped-res-b proc">▶ ' + pedNum(x.enProc) + ' en proceso</span>' : '') + pedCompResumenHtml(x) + '</div>'
       + '<div>' + pedComentBtn(x) + '</div>'
       + '<div class="ped-more">'
@@ -1912,6 +1950,7 @@ function pedForm(loteId) {
 function abrirPedido(id) {
   PED.abierto = id;
   PED.soloComent = false;
+  PED.parcForm = false;
   PED.form = null; PED.selOp = []; PED.selProc = []; PED.cantTmp = null; PED.comentTxt = '';
   pintarPedido();
 }
@@ -2046,6 +2085,7 @@ function cerrarPedido() {
   document.getElementById('pedOv').classList.remove('open');
   PED.abierto = null;
   PED.soloComent = false;
+  PED.parcForm = false;
 }
 
 // ── Estado de la ficha: la supervisora la marca COMPLETADA o ENTREGA PARCIAL ───────────────────
@@ -2063,12 +2103,91 @@ function pedComentBtn(x) {
 }
 
 function pedEstadoHtml(x) {
-  if (!pedPuedeMarcar()) return '';
+  if (!pedPuedeMarcar()) return pedParcHistHtml(x);
   var par = x.s.estado === 'parcial';
   return '<div class="ped-sec-t">Estado de la ficha</div>'
     + '<div class="ped-est"><button class="e-c" onclick="marcarEstadoFicha(\'lista\')">✅ Marcar COMPLETADA</button>'
-    + '<button class="e-p"' + (par ? ' disabled' : '') + ' onclick="marcarEstadoFicha(\'parcial\')">' + (par ? '🟡 Ya está en entrega parcial' : '🟡 Entrega parcial') + '</button></div>'
-    + '<div class="ped-est-n"><b>Completada:</b> la ficha sale de Pedidos. <b>Entrega parcial:</b> sigue activa y queda marcada en amarillo. El administrador puede reabrirla.</div>';
+    + '<button class="e-p" onclick="abrirParcialForm()">' + (par ? '🟡 Registrar otra entrega parcial' : '🟡 Entrega parcial') + '</button></div>'
+    + (PED.parcForm ? pedParcFormHtml(x) : '')
+    + '<div class="ped-est-n"><b>Completada:</b> la ficha sale de Pedidos. <b>Entrega parcial:</b> anotas cuántas unidades entregaste; la ficha sigue activa en amarillo y el saldo NO baja hasta que oficina registre la requi. El administrador puede reabrirla.</div>'
+    + pedParcHistHtml(x);
+}
+
+// Resumen en el chip: lo reportado por Tapas y cuánto sigue sin requi
+function pedParcChipHtml(x) {
+  if (!x.parc.total) return '';
+  return '<div class="ped-parc">🟡 Reportado por Tapas: <b>' + pedNum(x.parc.total) + '</b> und · '
+    + (x.parc.sinRequi > 0 ? '<span class="sr">⏳ ' + pedNum(x.parc.sinRequi) + ' sin requi</span>' : '<span class="cr">✓ con requi</span>') + '</div>';
+}
+
+// Historial de entregas parciales de la ficha (la supervisora puede quitar una puesta por error)
+function pedParcHistHtml(x) {
+  if (!x.parc.lista.length) return '';
+  var filas = x.parc.lista.map(function(e) {
+    var ok = (e.cubierto || 0) >= e.cantidad;
+    var falta = e.cantidad - (e.cubierto || 0);
+    return '<div class="ped-pe"><b>' + pedNum(e.cantidad) + ' und</b><span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>'
+      + '<span class="t">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + pedCorto(e.registrado_por) : '')) + '</span>'
+      + '<span class="e ' + (ok ? 'cr' : 'sr') + '">' + (ok ? '✓ con requi' : (e.cubierto ? '⏳ faltan ' + pedNum(falta) + ' por requi' : '⏳ sin requi')) + '</span>'
+      + (pedPuedeMarcar() ? '<button title="Quitar esta entrega" onclick="quitarParcial(\'' + escHtml(String(e.id)) + '\')">✕</button>' : '') + '</div>';
+  }).join('');
+  return '<div class="ped-sec-t">Entregas parciales reportadas <i>(' + pedNum(x.parc.total) + ' und · ' + (x.parc.sinRequi > 0 ? pedNum(x.parc.sinRequi) + ' sin requi' : 'todas con requi') + ')</i></div>' + filas;
+}
+
+function pedFechaCorta(f) {
+  var s = String(f || '');
+  return s.length >= 10 ? parseInt(s.slice(8, 10), 10) + '-' + PED_MESES[parseInt(s.slice(5, 7), 10) - 1] : s;
+}
+
+function pedParcFormHtml(x) {
+  if (!PED.parcOk) return '<div class="ped-aviso">Falta correr <b>sql/tapas_entregas_parciales_v1.sql</b> en Supabase para registrar entregas parciales.</div>';
+  var max = x.saldo > 0 ? x.saldo : x.cant;
+  return '<div class="ped-pf"><b style="font-size:13px;color:#854D0E">🟡 Entrega parcial de ' + escHtml(x.codigo) + '</b>'
+    + '<label>¿Cuántas unidades entregaste? <span style="font-weight:500">(saldo: ' + pedNum(x.saldo) + ' und)</span></label>'
+    + '<input type="number" inputmode="numeric" id="pedParcCant" min="1" max="' + max + '" value="' + escHtml(String(PED.parcCant)) + '" oninput="PED.parcCant=this.value" placeholder="Ej. 3000">'
+    + '<label>Fecha de la entrega</label>'
+    + '<input type="date" id="pedParcFecha" value="' + escHtml(PED.parcFecha || fechaGT()) + '" oninput="PED.parcFecha=this.value">'
+    + '<label>Nota (opcional)</label>'
+    + '<textarea id="pedParcNota" rows="2" maxlength="300" oninput="PED.parcNota=this.value" placeholder="Ej. entrega 1 de 3, se llevó el cliente…">' + escHtml(PED.parcNota) + '</textarea>'
+    + '<div class="acc"><button class="g" onclick="guardarParcial()">Guardar entrega parcial</button><button class="c" onclick="cancelarParcialForm()">Cancelar</button></div></div>';
+}
+
+function abrirParcialForm() {
+  PED.parcForm = true; PED.parcCant = ''; PED.parcFecha = ''; PED.parcNota = '';
+  pintarPedido();
+}
+
+function cancelarParcialForm() {
+  PED.parcForm = false;
+  pintarPedido();
+}
+
+async function guardarParcial() {
+  var x = PED.modelo.find(function(m) { return String(m.id) === String(PED.abierto); });
+  if (!x) return;
+  var cant = parseInt(PED.parcCant, 10);
+  var max = x.saldo > 0 ? x.saldo : x.cant;
+  if (!cant || cant <= 0) { showToast('⚠️ Escribe cuántas unidades entregaste', '#B83232'); return; }
+  if (cant > max) { showToast('⚠️ No puede ser más que el saldo (' + pedNum(max) + ' und)', '#B83232'); return; }
+  var fecha = PED.parcFecha || fechaGT();
+  var quien = supervisorActual.nombre || (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
+  var r = await db.rpc('tapas_registrar_parcial', { p_id: x.id, p_cantidad: cant, p_fecha: fecha, p_nota: PED.parcNota || null, p_por: quien });
+  if (r.error) {
+    var msg = r.error.message || String(r.error);
+    showToast('❌ ' + (/function|does not exist|schema cache|tapas_registrar_parcial|tapas_entregas_parciales/i.test(msg) ? 'Falta correr sql/tapas_entregas_parciales_v1.sql en Supabase' : msg), '#B83232');
+    return;
+  }
+  PED.parcForm = false; PED.parcCant = ''; PED.parcNota = '';
+  await cargarPedidos(true);
+  showToast('🟡 Entrega parcial de ' + pedNum(cant) + ' und registrada en ' + x.codigo);
+}
+
+async function quitarParcial(id) {
+  if (!confirm('¿Quitar esta entrega parcial? (la ficha conserva su estado)')) return;
+  var r = await db.from('tapas_entregas_parciales').delete().eq('id', id).select('id');
+  if (r.error || !(r.data || []).length) { showToast('❌ ' + (r.error ? r.error.message : 'No se pudo quitar (sin permiso)'), '#B83232'); return; }
+  await cargarPedidos(true);
+  showToast('Entrega parcial quitada');
 }
 
 async function marcarEstadoFicha(estado) {

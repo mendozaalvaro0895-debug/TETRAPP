@@ -1845,6 +1845,7 @@ async function mostrarDetalle(id) {
       ${(s.lineas[0] && s.lineas[0].codigoCliente) ? `<div class="dc"><div class="dc-b" style="font-size:12px">🏷 Código del cliente: <b style="font-family:var(--mono)">${escHtml(s.lineas[0].codigoCliente)}</b></div></div>` : ''}
       ${s.notas ? `<div class="dc" style="border-color:#FDE047;border-width:2px"><div class="dc-h" style="background:#FEF9C3;color:#A16207">📝 Notas</div><div class="dc-b" style="white-space:pre-line;background:#FFFDF0">${escHtml(s.notas)}</div></div>` : ''}
       ${bloqueMarcaTapasFicha(s)}
+      ${bloqueParcialesTapas(s)}
       ${bloqueComentariosFicha(s)}
       ${buildBloqueBodegaFicha(s, filasBod)}
       ${lotesAbiertosPlazoHtml(s)}
@@ -4070,6 +4071,59 @@ async function cargarComentariosTapas() {
     var r = await db.from('tapas_ficha_comentarios').select('*').order('created_at', { ascending: true });
     comentariosTapas = r.error ? [] : (r.data || []);
   } catch(e) { comentariosTapas = []; }
+  try {
+    var rp = await db.from('tapas_entregas_parciales').select('*').order('fecha', { ascending: true }).order('created_at', { ascending: true });
+    parcialesTapas = rp.error ? [] : (rp.data || []);
+  } catch(e) { parcialesTapas = []; }
+}
+
+// Entregas parciales que reporta la supervisora (tabla tapas_entregas_parciales, sql/tapas_entregas_parciales_v1.sql): INFORMATIVAS,
+// no descuentan del saldo. Cada una queda "con requi" cuando hay ingresos PT de la ficha POSTERIORES a su registro que la cubren
+// (mismo reparto por fecha que los lotes: modeloFichasCompactas / pedModelo de registro-tapas.html).
+var parcialesTapas = [];
+function parcialesDeFicha(s) {
+  var ings = ingresoMovs.filter(function(m) { return m.solicitud_id === s.id && m.area !== 'serig'; })
+    .sort(function(a, b) { return String(a.created_at).localeCompare(String(b.created_at)); })
+    .map(function(m) { return { ts: new Date(m.created_at).getTime(), rem: m.cantidad || 0 }; });
+  var total = 0, sin = 0;
+  var lista = parcialesTapas.filter(function(e) { return e.solicitud_id === s.id; }).map(function(e) {
+    var t0 = new Date(e.created_at).getTime() - 1000, falta = e.cantidad, cub = 0;
+    ings.forEach(function(it) {
+      if (falta <= 0 || it.rem <= 0 || it.ts < t0) return;
+      var tk = Math.min(it.rem, falta);
+      it.rem -= tk; falta -= tk; cub += tk;
+    });
+    total += e.cantidad; sin += e.cantidad - cub;
+    return { e: e, cubierto: cub };
+  });
+  return { lista: lista, total: total, sinRequi: sin };
+}
+
+function bloqueParcialesTapas(s) {
+  var p = parcialesDeFicha(s);
+  if (!p.lista.length) return '';
+  var filas = p.lista.map(function(it) {
+    var e = it.e, ok = it.cubierto >= e.cantidad;
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed #FDE68A">'
+      + '<b style="font-family:var(--mono)">' + (e.cantidad || 0).toLocaleString() + ' und</b>'
+      + '<span>' + escHtml(String(e.fecha || '')) + '</span>'
+      + '<span style="flex:1;min-width:100px;color:var(--gray)">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + e.registrado_por : '')) + '</span>'
+      + '<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;background:' + (ok ? '#ECFDF5' : '#FEF3C7') + ';color:' + (ok ? '#047857' : '#92400E') + '">'
+      + (ok ? '✓ con requi' : (it.cubierto ? '⏳ faltan ' + (e.cantidad - it.cubierto).toLocaleString() + ' por requi' : '⏳ sin requi')) + '</span>'
+      + '<button class="btn btn-del btn-xs" title="Borrar esta entrega reportada" onclick="parcialBorrarTapas(\'' + escHtml(String(e.id)) + '\')">🗑</button></div>';
+  }).join('');
+  return '<div class="dc" style="border-color:#FDE047;border-width:2px"><div class="dc-h" style="background:#FEF9C3;color:#A16207">🟡 Entregas parciales reportadas por Tapas · '
+    + p.total.toLocaleString() + ' und' + (p.sinRequi > 0 ? ' · ' + p.sinRequi.toLocaleString() + ' sin requi' : ' · todas con requi') + '</div><div class="dc-b" style="font-size:12px">'
+    + filas + '<div style="font-size:10px;color:var(--gray);margin-top:6px">Informativo: no descuenta del saldo. El saldo baja cuando registras la requi (ingreso PT) vinculada a esta ficha en Entregados.</div></div></div>';
+}
+
+async function parcialBorrarTapas(id) {
+  if (!confirm('¿Borrar esta entrega parcial reportada?')) return;
+  var r = await db.from('tapas_entregas_parciales').delete().eq('id', id).select('id');
+  if (r.error || !(r.data || []).length) { showToast('❌ ' + (r.error ? r.error.message : 'No se pudo borrar (sin permiso)'), '#B83232'); return; }
+  await cargarComentariosTapas();
+  refrescarTrasComentarioTapas();
+  showToast('Entrega parcial borrada');
 }
 
 function comentariosDeFicha(s) {
