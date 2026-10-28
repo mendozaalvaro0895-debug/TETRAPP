@@ -464,6 +464,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-res-b.ok{background:#DCFCE7;color:#166534}
 .cp-res-b.mal{background:#FEE2E2;color:#B83232}
 .cp-res-b.proc{background:#DBEAFE;color:#1E3A8A}
+.cp-cm-b{margin-left:5px;font-size:10px;font-weight:800;border-radius:10px;padding:1px 7px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;white-space:nowrap}
+.cp-cm-b.ok{background:#F1F5F9;color:#64748B;border-color:#E2E8F0}
+.cm-fila{border:1px solid #FCD34D;border-left-width:4px;background:#FFFBEB;border-radius:8px;padding:7px 10px;margin-bottom:7px}
+.cm-fila.ok{border-color:#E2E8F0;background:#F8FAFC;opacity:.85}
+.cm-h{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;font-size:11px;color:var(--gray)}
+.cm-h b{color:var(--ink)}
+.cm-h em{margin-left:auto;font-style:normal;font-weight:800;color:#92400E}
+.cm-fila.ok .cm-h em{color:#166534}
+.cm-t{font-size:12.5px;line-height:1.4;color:var(--ink);white-space:pre-line;overflow-wrap:anywhere;margin:3px 0 6px}
+.cm-acc{display:flex;gap:6px;justify-content:flex-end}
 /* ── VISTA CELULAR (≤700px): el chip muestra solo lo esencial y el resto aparece al tocarlo ── */
 @media(max-width:700px){
   .fich-hdr{flex-wrap:wrap;gap:6px 8px;padding:8px 10px}
@@ -1832,6 +1842,7 @@ async function mostrarDetalle(id) {
   const cuerpo = `
       ${(s.lineas[0] && s.lineas[0].codigoCliente) ? `<div class="dc"><div class="dc-b" style="font-size:12px">🏷 Código del cliente: <b style="font-family:var(--mono)">${escHtml(s.lineas[0].codigoCliente)}</b></div></div>` : ''}
       ${s.notas ? `<div class="dc" style="border-color:#FDE047;border-width:2px"><div class="dc-h" style="background:#FEF9C3;color:#A16207">📝 Notas</div><div class="dc-b" style="white-space:pre-line;background:#FFFDF0">${escHtml(s.notas)}</div></div>` : ''}
+      ${bloqueComentariosFicha(s)}
       ${buildBloqueBodegaFicha(s, filasBod)}
       ${lotesAbiertosPlazoHtml(s)}
       ${bloqueTiempo}
@@ -4035,6 +4046,85 @@ async function cargarLotesTapas() {
     var rt = await db.from('tapas_lote_tareas').select('*').order('iniciado_en', { ascending: true });
     lotesTareasTapas = rt.error ? [] : (rt.data || []);
   } catch(e) { lotesTapas = []; lotesTareasTapas = []; }
+  await cargarComentariosTapas();
+}
+
+// Comentarios que la supervisora deja en cada ficha desde registro-tapas.html (tabla tapas_ficha_comentarios,
+// sql/tapas_ficha_comentarios_v1.sql). Sin la tabla simplemente no se muestra nada. Solo master los marca atendidos/borra.
+var comentariosTapas = [];
+async function cargarComentariosTapas() {
+  try {
+    var r = await db.from('tapas_ficha_comentarios').select('*').order('created_at', { ascending: true });
+    comentariosTapas = r.error ? [] : (r.data || []);
+  } catch(e) { comentariosTapas = []; }
+}
+
+function comentariosDeFicha(s) {
+  return comentariosTapas.filter(function(c) { return c.solicitud_id === s.id; });
+}
+
+function comentFechaHoraTapas(ts) {
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('es-GT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+// Marca "💬 N" en el chip: pendientes en ámbar; si todos están atendidos, gris
+function comentBadgeHtml(s) {
+  var l = comentariosDeFicha(s);
+  if (!l.length) return '';
+  var p = l.filter(function(c) { return c.estado !== 'atendido'; }).length;
+  return p
+    ? '<span class="cp-cm-b" title="' + p + ' comentario' + (p !== 1 ? 's' : '') + ' pendiente' + (p !== 1 ? 's' : '') + ' de la supervisora: ábrelo en la ficha">💬 ' + p + '</span>'
+    : '<span class="cp-cm-b ok" title="' + l.length + ' comentario' + (l.length !== 1 ? 's' : '') + ', todos atendidos">💬 ✓</span>';
+}
+
+// Bloque "Comentarios de la supervisora" de la ventana de la ficha, con ✓ Atendido / 🗑 (solo master por RLS)
+function bloqueComentariosFicha(s) {
+  var l = comentariosDeFicha(s);
+  if (!l.length) return '';
+  var pend = l.filter(function(c) { return c.estado !== 'atendido'; }).length;
+  var filas = l.slice().sort(function(a, b) {
+    return ((a.estado === 'atendido') - (b.estado === 'atendido')) || String(b.created_at).localeCompare(String(a.created_at));
+  }).map(function(c) {
+    var ok = c.estado === 'atendido';
+    var idq = escHtml(String(c.id));
+    return '<div class="cm-fila' + (ok ? ' ok' : '') + '"><div class="cm-h"><b>' + escHtml(c.autor || 'Tapas') + '</b><span>' + escHtml(comentFechaHoraTapas(c.created_at)) + '</span>'
+      + '<em>' + (ok ? '✓ Atendido' + (c.atendido_por ? ' por ' + escHtml(c.atendido_por) : '') : 'Pendiente') + '</em></div>'
+      + '<div class="cm-t">' + escHtml(c.comentario) + '</div>'
+      + '<div class="cm-acc">'
+      + (ok ? '<button class="btn btn-g btn-xs" onclick="comentarioEstadoTapas(\'' + idq + '\',false)">↩ Reabrir</button>'
+            : '<button class="btn btn-t btn-xs" onclick="comentarioEstadoTapas(\'' + idq + '\',true)">✓ Marcar atendido</button>')
+      + '<button class="btn btn-del btn-xs" title="Borrar comentario" onclick="comentarioBorrarTapas(\'' + idq + '\')">🗑</button></div></div>';
+  }).join('');
+  return '<div class="dc" style="border-color:#FCD34D;border-width:2px"><div class="dc-h" style="background:#FEF3C7;color:#92400E">💬 Comentarios de la supervisora'
+    + (pend ? ' · ' + pend + ' pendiente' + (pend !== 1 ? 's' : '') : ' · todos atendidos') + '</div><div class="dc-b">' + filas + '</div></div>';
+}
+
+function refrescarTrasComentarioTapas() {
+  renderFichasTapas();
+  if (selId) mostrarDetalle(selId);
+  if (fichaModalId) mostrarDetalle(fichaModalId);
+}
+
+async function comentarioEstadoTapas(id, atendido) {
+  var quien = (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
+  var patch = atendido ? { estado: 'atendido', atendido_por: quien, atendido_en: new Date().toISOString() }
+                       : { estado: 'pendiente', atendido_por: null, atendido_en: null };
+  var r = await db.from('tapas_ficha_comentarios').update(patch).eq('id', id).select('id');
+  if (r.error || !(r.data || []).length) { showToast('❌ ' + (r.error ? r.error.message : 'No se pudo actualizar (sin permiso)'), '#B83232'); return; }
+  await cargarComentariosTapas();
+  refrescarTrasComentarioTapas();
+  showToast(atendido ? '✓ Comentario atendido' : 'Comentario reabierto');
+}
+
+async function comentarioBorrarTapas(id) {
+  if (!confirm('¿Borrar este comentario?')) return;
+  var r = await db.from('tapas_ficha_comentarios').delete().eq('id', id).select('id');
+  if (r.error || !(r.data || []).length) { showToast('❌ ' + (r.error ? r.error.message : 'No se pudo borrar (sin permiso)'), '#B83232'); return; }
+  await cargarComentariosTapas();
+  refrescarTrasComentarioTapas();
+  showToast('Comentario borrado');
 }
 
 // Unidades aún en proceso de una ficha: cada lote se completa con los ingresos PT vinculados a la ficha
@@ -4209,7 +4299,7 @@ function buildChipCompacto(x, conCliente) {
   var idq = escHtml(String(x.id));
   return '<div class="cp-chip' + (enProc ? ' proc' : '') + (x.cubierta ? ' cubierta' : '') + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
     + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
-    + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
+    + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + comentBadgeHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
     + codClienteChipHtml(x.s)
     + stkPTHtml(x.sku, x.saldo)

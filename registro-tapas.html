@@ -332,6 +332,16 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-res-b.ok{background:#DCFCE7;color:#166534}
 .ped-res-b.mal{background:#FEE2E2;color:#B83232}
 .ped-res-b.proc{background:#DBEAFE;color:#1E3A8A}
+.ped-cm-b{margin-left:5px;font-size:10px;font-weight:800;border-radius:10px;padding:1px 7px;background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;white-space:nowrap}
+.ped-cm-b.ok{background:#F1F5F9;color:#64748B;border-color:#E2E8F0}
+.ped-cm{border:1px solid #FCD34D;border-left-width:4px;background:#FFFBEB;border-radius:8px;padding:6px 9px;margin-bottom:6px}
+.ped-cm.ok{border-color:#E2E8F0;background:#F8FAFC;opacity:.85}
+.ped-cm-h{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;font-size:11px;color:#6B6B6A}
+.ped-cm-h b{color:#1A1A19}
+.ped-cm-h em{margin-left:auto;font-style:normal;font-weight:800;color:#92400E}
+.ped-cm.ok .ped-cm-h em{color:#166534}
+.ped-cm-t{font-size:12.5px;line-height:1.4;color:#1A1A19;white-space:pre-line;overflow-wrap:anywhere;margin-top:3px}
+.ped-cm-ta{display:block;width:100%;box-sizing:border-box;margin-top:6px;border:1.5px solid #D6D3CB;border-radius:10px;padding:9px 10px;font-size:16px;font-family:'DM Sans',sans-serif;resize:vertical;min-height:70px}
 /* ── VISTA CELULAR (≤700px): el chip muestra solo lo esencial y el resto aparece al tocarlo ── */
 @media(max-width:700px){
   .wrap.wide{padding:10px 8px 50px}
@@ -1320,7 +1330,7 @@ async function guardarRegistro() {
 // ficha (movimientos_materiales entrada_pt, bloque Entregados de tapas.html). Reparto de ingresos a lotes
 // = FIFO por fecha de marcado (solo cuentan ingresos posteriores al marcado). Abajo se listan los ingresos
 // ya hechos con su requi, marcados Parcial / Completa según lo acumulado de la ficha.
-var PED = { stockInv: {}, stockB7: {}, salidas: [], tipos: {}, sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, form: null, selOp: [], selProc: [], cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40 };
+var PED = { stockInv: {}, stockB7: {}, salidas: [], tipos: {}, sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, coment: [], comentOk: true, comentTxt: '', form: null, selOp: [], selProc: [], cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40 };
 var PED_VIVOS = ['nueva', 'proceso', 'parcial'];
 
 // TIPO / SUBFAMILIA de tapa — ESPEJO de tapas.html (detectarTipoTapa/tipoDeSkuTapa): el tipo guardado en el
@@ -1402,6 +1412,10 @@ async function cargarPedidos(silencioso) {
     var rt = await db.from('tapas_lote_tareas').select('*').order('iniciado_en', { ascending: true });
     PED.tareasOk = !rt.error;
     PED.tareas = rt.error ? [] : (rt.data || []);
+    // comentarios de la supervisora sobre cada ficha (sql/tapas_ficha_comentarios_v1.sql); sin la tabla solo se avisa en la ventana
+    var rc = await db.from('tapas_ficha_comentarios').select('*').order('created_at', { ascending: true });
+    PED.comentOk = !rc.error;
+    PED.coment = rc.error ? [] : (rc.data || []);
     var re = await db.from('sku_especificaciones').select('sku,valor').eq('area', 'tapas').eq('campo', 'Familia');
     if (!re.error) {
       PED.tipos = {};
@@ -1561,7 +1575,8 @@ function pedModelo() {
              saldo: saldo, enProc: enProc, libre: Math.max(0, saldo - enProc), abiertos: abiertos, ings: ings,
              sku: l0.sku || '', desc: (l0.descripcion || '') + (lins.length > 1 ? ' (+' + (lins.length - 1) + ')' : ''),
              viva: PED_VIVOS.indexOf(s.estado) >= 0, limite: s.fecha_limite || '', plazo: s.plazo_tipo || 'fecha', urgente: s.prioridad === 'urgente',
-             procs: pedProcsDe(lins) };
+             procs: pedProcsDe(lins),
+             coment: PED.coment.filter(function(c) { return c.solicitud_id === s.id; }) };
   });
 }
 
@@ -1622,7 +1637,7 @@ function renderPedidos() {
     var idq = escHtml(String(x.id));
     return '<div class="ped-chip' + (proc ? ' proc' : '') + (pedProducirInfo(x).cubierta ? ' cubierta' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
-      + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
+      + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + pedComentBadge(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
       + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
       + pedStkPTHtml(x.sku, x.saldo)
       + pedNotaHtml(x.s.notas)
@@ -1838,7 +1853,7 @@ function pedForm(loteId) {
 
 function abrirPedido(id) {
   PED.abierto = id;
-  PED.form = null; PED.selOp = []; PED.selProc = []; PED.cantTmp = null;
+  PED.form = null; PED.selOp = []; PED.selProc = []; PED.cantTmp = null; PED.comentTxt = '';
   pintarPedido();
 }
 
@@ -1892,8 +1907,61 @@ function pintarPedido() {
     + '<div><b>' + pedNum(x.enProc) + '</b><span>En proceso</span></div><div><b>' + pedNum(x.libre) + '</b><span>Sin iniciar</span></div></div>'
     + (lotes ? '<div class="ped-sec-t" style="margin-top:0">Lotes en proceso</div>' + lotes : '')
     + form
+    + pedComentariosHtml(x)
     + '<button class="ped-cerrar" onclick="cerrarPedido()">Cerrar</button>';
   document.getElementById('pedOv').classList.add('open');
+}
+
+// ── Comentarios de la supervisora sobre una ficha (tabla tapas_ficha_comentarios) ──────────────
+// Cualquiera de Tapas puede leerlos y agregar; solo el master los marca como atendidos o los borra (tapas.html).
+// ESPEJO parcial: tapas.html (vista master) los pinta con comentBadgeHtml / bloqueComentariosFicha.
+function pedComentBadge(x) {
+  var l = x.coment || [];
+  if (!l.length) return '';
+  var p = l.filter(function(c) { return c.estado !== 'atendido'; }).length;
+  return p
+    ? '<span class="ped-cm-b" title="' + p + ' comentario' + (p !== 1 ? 's' : '') + ' pendiente' + (p !== 1 ? 's' : '') + ' de revisar por el administrador">💬 ' + p + '</span>'
+    : '<span class="ped-cm-b ok" title="' + l.length + ' comentario' + (l.length !== 1 ? 's' : '') + ', todos atendidos">💬 ✓</span>';
+}
+
+function pedFechaHoraCorta(ts) {
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  return d.getDate() + '-' + PED_MESES[d.getMonth()] + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function pedComentariosHtml(x) {
+  var h = '<div class="ped-sec-t">💬 Comentarios de esta ficha</div>';
+  if (!PED.comentOk) return h + '<div class="ped-aviso">Falta correr <b>sql/tapas_ficha_comentarios_v1.sql</b> en Supabase para poder dejar comentarios.</div>';
+  var lista = (x.coment || []).map(function(c) {
+    var ok = c.estado === 'atendido';
+    return '<div class="ped-cm' + (ok ? ' ok' : '') + '"><div class="ped-cm-h"><b>' + escHtml(c.autor || 'Tapas') + '</b><span>' + escHtml(pedFechaHoraCorta(c.created_at)) + '</span>'
+      + '<em>' + (ok ? '✓ Atendido' + (c.atendido_por ? ' por ' + escHtml(pedCorto(c.atendido_por)) : '') : 'Pendiente') + '</em></div>'
+      + '<div class="ped-cm-t">' + escHtml(c.comentario) + '</div></div>';
+  }).join('');
+  return h + (lista || '<div class="ped-vacio" style="padding:6px 0 10px">Sin comentarios todavía.</div>')
+    + '<textarea id="pedComentTxt" class="ped-cm-ta" rows="3" maxlength="1500" placeholder="Escribe una solicitud de cambio u observación sobre esta ficha…" oninput="PED.comentTxt=this.value">' + escHtml(PED.comentTxt || '') + '</textarea>'
+    + '<button class="ped-add-btn" onclick="agregarComentario()">💬 Agregar comentario</button>';
+}
+
+async function agregarComentario() {
+  var x = PED.modelo.find(function(m) { return String(m.id) === String(PED.abierto); });
+  if (!x) return;
+  var ta = document.getElementById('pedComentTxt');
+  var txt = String((ta && ta.value) || PED.comentTxt || '').trim();
+  if (!txt) { showToast('⚠️ Escribe el comentario', '#B83232'); return; }
+  var quien = supervisorActual.nombre || (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
+  var r = await db.from('tapas_ficha_comentarios').insert({ solicitud_id: x.id, comentario: txt, autor: quien }).select('*').single();
+  if (r.error) {
+    var msg = r.error.message || String(r.error);
+    showToast('❌ ' + (/relation|does not exist|schema cache|tapas_ficha_comentarios/i.test(msg) ? 'Falta correr sql/tapas_ficha_comentarios_v1.sql en Supabase' : msg), '#B83232');
+    return;
+  }
+  PED.coment.push(r.data);
+  PED.comentOk = true;
+  PED.comentTxt = '';
+  renderPedidos();
+  showToast('💬 Comentario agregado');
 }
 
 function cerrarPedido() {
