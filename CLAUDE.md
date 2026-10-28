@@ -246,6 +246,15 @@ view-productividad  Mensual (prodMes) sobre comandas+comanda_tareas, solo tareas
   und ÷ horas_efectivas devuelve siempre la meta (100% artificial). Por eso la vista por
   proceso muestra volumen y meta, no und/hora real: la comanda no reparte el turno por proceso.
   metaDeProceso(nombre) normaliza tildes ('Impresión' → clave 'impresion' = 1500, no default).
+  GRÁFICO "👥 Productividad por operario — todos en un gráfico" (oct/2026, `pgoRender`, contenedor
+  `prodGrafOperarios`, arriba de todo; solo tapas.html/master): UNA LÍNEA POR PERSONA (supervisión incluida)
+  con las unidades de tareas Terminadas de comandas APROBADAS (mismo criterio del termómetro). Botón
+  "📅 Por mes" (últimos 6 o 12 meses terminando en el mes de #prodMes) / "📈 Por día" (días del mes de
+  #prodMes, domingos sombreados, línea punteada de meta `META_DIA_GRAFICO`=10,000). Un mes/día sin comanda de
+  esa persona NO se dibuja (la línea se corta; no cuenta como 0). Leyenda con un chip por persona
+  (clic = ocultar/mostrar; "Todos" / "Top 5"), color estable por nombre, total y promedio de lo visible.
+  `pgoCargar` pagina las comandas de a 1000 (12 meses pasan del límite de PostgREST) y se cachea por rango
+  (🔄 Actualizar lo invalida); se redibuja al cambiar el ancho de la ventana. Sin SQL nuevo.
   Arriba de la tabla, "📦 Producción mensual — Ingreso PT" (renderProdMensualTapas,
   instancia 'productividad', contenedor `prodMensualTapas`): barras diarias sobre
   movimientos_materiales (tipo='entrada_pt') — equivalente de renderProdMensual en
