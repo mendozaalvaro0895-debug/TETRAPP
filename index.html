@@ -534,7 +534,7 @@ setInterval(cargarKPIs, 30000);
 
 // ══ GUÍA DE ALIMENTACIÓN DIARIA ═════════════════════════════
 // Reglas (oct/2026): inventario AM desde el primer ingreso del día (ya NO se exige el PM);
-// requis de Tapas/Serigrafía, ventas, asistencia y validación de productividad de Tapas (comandas por
+// requis de Serigrafía (la de Tapas ya NO se exige), ventas, asistencia y validación de productividad de Tapas (comandas por
 // aprobar): al día hasta el día hábil anterior.
 // Domingos y feriados (dias_feriados) no se exige nada. El bloqueo de fichas aplica solo a master.
 function guiaSumarDias(fecha, n) {
@@ -591,14 +591,13 @@ async function guiaConstruir() {
 
   var res = await Promise.all([
     guiaSafe(db.from('tareas_diarias').select('tarea,estado,motivo').eq('fecha', hoy)),
-    guiaSafe(db.from('movimientos_materiales').select('observaciones,created_at').or('area.is.null,area.eq.tapas').gte('created_at', desde).limit(1000)),
     guiaSafe(db.from('movimientos_materiales').select('observaciones,created_at').eq('area', 'serig').gte('created_at', desde).limit(1000)),
     guiaSafe(db.from('entregas_serig').select('fecha').order('fecha', { ascending: false }).limit(1)),
     guiaSafe(db.from('ventas').select('fecha').order('fecha', { ascending: false }).limit(1)),
     guiaSafe(db.from('asistencia_diaria').select('area').eq('fecha', ayer).in('area', ['tapas', 'serig']).limit(500)),
     guiaSafe(db.from('comandas').select('fecha').eq('estado_aprobacion', 'pendiente').order('fecha', { ascending: true }).limit(1000))
   ]);
-  var tareasHoy = res[0], movTapas = res[1], movSerig = res[2], entSerig = res[3], ventas = res[4], asist = res[5], comPend = res[6];
+  var tareasHoy = res[0], movSerig = res[1], entSerig = res[2], ventas = res[3], asist = res[4], comPend = res[5];
 
   var t = [];
   // Inventario AM (un registro PM posterior también lo da por cumplido). Si la tabla nueva aún no existe se cae al localStorage de este equipo
@@ -618,7 +617,6 @@ async function guiaConstruir() {
     if (done === true) det = 'Al día · ' + det;
     t.push(guiaTarea(id, label, hoyHabil, done, det, ir));
   }
-  porFecha('req_tapas', 'Requis de Tapas', movTapas === null ? null : guiaMax(movTapas.map(guiaFechaMov)), '#central');
   var mxSerig = (movSerig === null && entSerig === null) ? null :
     guiaMax((movSerig || []).map(guiaFechaMov).concat((entSerig || []).map(function (e) { return e.fecha; })));
   porFecha('req_serig', 'Requis de Serigrafía', mxSerig, '#central');
