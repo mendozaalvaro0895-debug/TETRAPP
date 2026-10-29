@@ -433,12 +433,6 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-pf .acc button{flex:1;min-height:42px;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;font-family:'DM Sans',sans-serif;border:none}
 .ped-pf .g{background:#A16207;color:#fff}
 .ped-pf .c{background:#E2E8F0;color:#334155}
-.ped-foto{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.ped-foto button,.ped-foto label.ped-fbt{border:1.5px solid #CBD5E1;background:#fff;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer;color:#334155;font-family:'DM Sans',sans-serif;min-height:40px;display:inline-flex;align-items:center;box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
-.ped-foto label.ped-fbt:active{background:#F1F5F9}
-.ped-pf .ped-fin,.ped-fin{position:absolute !important;width:1px !important;height:1px !important;padding:0 !important;margin:-1px !important;border:0 !important;opacity:0 !important;overflow:hidden;clip:rect(0,0,0,0);pointer-events:none}
-.ped-foto .pv{display:flex;align-items:center;gap:10px;width:100%}
-.ped-foto .pv img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #CBD5E1}
 .ped-fbtn,.ped-pe button.ped-fbtn{border:none;background:none;cursor:pointer;font-size:15px;padding:0 3px;color:#334155}
 #fotoOv{z-index:9500}
 #fotoOv img{max-width:100%;max-height:78vh;border-radius:10px;display:block;margin:0 auto 10px}
@@ -1571,7 +1565,7 @@ async function guardarRegistro() {
 // ficha (movimientos_materiales entrada_pt, bloque Entregados de tapas.html). Reparto de ingresos a lotes
 // = FIFO por fecha de marcado (solo cuentan ingresos posteriores al marcado). Abajo se listan los ingresos
 // ya hechos con su requi, marcados Parcial / Completa según lo acumulado de la ficha.
-var PED = { stockInv: {}, stockB7: {}, salidas: [], tipos: {}, sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, coment: [], comentOk: true, comentTxt: '', parc: [], parcOk: true, parcForm: false, parcCant: '', parcFecha: '', parcNota: '', form: null, selOp: [], selProc: [], cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40 };
+var PED = { stockInv: {}, stockB7: {}, salidas: [], tipos: {}, sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, coment: [], comentOk: true, comentTxt: '', parc: [], parcOk: true, parcForm: false, parcCant: '', parcFecha: '', parcNota: '', parcLote: '', form: null, selOp: [], selProc: [], cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40 };
 var PED_VIVOS = ['nueva', 'proceso', 'parcial'];
 var PED_COMPLETADAS_DIAS = 15; // las fichas marcadas COMPLETADA siguen a la vista (al final, transparentes) este tiempo
 
@@ -1926,13 +1920,22 @@ function pedEstadoNombre(x) {
 }
 
 // Entregas reportadas por Tapas, en solo lectura (verde = ya vinculada a una requi, amarillo = sin requi)
+// "Lote X · nota · quien" de una entrega (el lote va primero para que se lea de un vistazo)
+function pedNotaEntrega(e) {
+  var t = [];
+  if (e.lote) t.push('Lote ' + e.lote);
+  if (e.nota) t.push(e.nota);
+  if (e.registrado_por) t.push(pedCorto(e.registrado_por));
+  return t.join(' · ');
+}
+
 function pedParcLecturaHtml(x) {
   if (!x.parc.lista.length) return '<div class="ped-vacio">La supervisora aún no ha reportado entregas de esta ficha.</div>';
   return x.parc.lista.map(function(e) {
     var ok = (e.cubierto || 0) >= e.cantidad;
     return '<div class="ped-pe' + (ok ? ' ok' : '') + '"><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<span class="e cr">✅ completó la ficha</span>' : '')
       + '<span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>' + pedFotoBtn(e, false)
-      + '<span class="t">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + pedCorto(e.registrado_por) : '')) + '</span>'
+      + '<span class="t">' + escHtml(pedNotaEntrega(e)) + '</span>'
       + '<span class="e ' + (ok ? 'cr' : 'sr') + '">' + (ok ? '✓ con requi' : ((e.cubierto || 0) ? '⏳ faltan ' + pedNum(e.cantidad - e.cubierto) + ' por requi' : '⏳ sin requi')) + '</span></div>';
   }).join('');
 }
@@ -2500,6 +2503,7 @@ function pedParcChipHtml(x) {
     + x.parc.lista.map(function(e) {
         var okE = (e.cubierto || 0) >= e.cantidad;
         return '<div class="ent ' + (okE ? 'ok' : 'y') + '"><span>' + escHtml(pedFechaCorta(e.fecha)) + '</span><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<em>✅ completó</em>' : '')
+          + (e.lote ? '<span style="min-width:0;font-weight:700;color:#334155">Lote ' + escHtml(e.lote) + '</span>' : '')
           + '<i>' + (okE ? '✓ con requi' : ((e.cubierto || 0) ? '⏳ faltan ' + pedNum(e.cantidad - e.cubierto) : '⏳ sin requi')) + '</i>' + pedFotoBtn(e, true) + '</div>';
       }).join('')
     + '</div>';
@@ -2513,7 +2517,7 @@ function pedParcHistHtml(x) {
     var falta = e.cantidad - (e.cubierto || 0);
     if (PED.editEnt && String(PED.editEnt) === String(e.id)) return pedEditEntregaHtml(e);
     return '<div class="ped-pe' + (ok ? ' ok' : '') + '"><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<span class="e cr">✅ completó la ficha</span>' : '') + '<span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>' + pedFotoBtn(e, false)
-      + '<span class="t">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + pedCorto(e.registrado_por) : '')) + '</span>'
+      + '<span class="t">' + escHtml(pedNotaEntrega(e)) + '</span>'
       + '<span class="e ' + (ok ? 'cr' : 'sr') + '">' + (ok ? '✓ con requi' : (e.cubierto ? '⏳ faltan ' + pedNum(falta) + ' por requi' : '⏳ sin requi')) + '</span>'
       + (pedPuedeEditarEntrega(e) ? '<button title="Corregir la cantidad" onclick="abrirEdicionEntrega(\'' + escHtml(String(e.id)) + '\')">✏️</button>' : '')
       + (pedPuedeMarcar() ? '<button title="Quitar esta entrega" onclick="quitarParcial(\'' + escHtml(String(e.id)) + '\')">✕</button>' : '') + '</div>';
@@ -2599,57 +2603,12 @@ function pedParcFormHtml(x) {
     + '<input type="date" id="pedParcFecha" value="' + escHtml(PED.parcFecha || fechaGT()) + '" oninput="PED.parcFecha=this.value">'
     + '<label>Nota (opcional)</label>'
     + '<textarea id="pedParcNota" rows="2" maxlength="300" oninput="PED.parcNota=this.value" placeholder="Ej. entrega 1 de 3, se llevó el cliente…">' + escHtml(PED.parcNota) + '</textarea>'
-    + '<label>Foto de la entrega (opcional)</label>' + pedFotoBlockHtml()
+    + '<label>No. de LOTE</label>'
+    + '<input type="text" id="pedParcLote" maxlength="40" autocomplete="off" autocapitalize="characters" value="' + escHtml(PED.parcLote) + '" oninput="PED.parcLote=this.value" placeholder="Ej. L-2410-03">'
     + '<div class="acc"><button class="g" onclick="guardarParcial()">Guardar entrega</button><button class="c" onclick="cancelarParcialForm()">Cancelar</button></div></div>';
 }
 
-// ── Foto de la entrega: se toma con la cámara o se elige de la galería, se reduce (máx. 1280 px) y se sube al bucket privado
-// `tapas-entregas` (sql/tapas_entrega_foto_v1.sql) al guardar la entrega. La ruta queda en tapas_entregas_parciales.foto_path.
-function pedFotoBlockHtml() {
-  var f = PED.parcFoto;
-  return '<div class="ped-foto">'
-    + (f ? '<div class="pv"><img src="' + f.url + '" alt="Foto de la entrega"><button type="button" onclick="pedFotoQuitar()">✕ Quitar</button></div>' : '')
-    + '<label class="ped-fbt" for="pedFotoCam">📷 ' + (f ? 'Tomar otra' : 'Tomar foto') + '</label>'
-    + '<input type="file" class="ped-fin" id="pedFotoCam" accept="image/*" capture="environment" onchange="pedFotoElegida(this)">'
-    + '<label class="ped-fbt" for="pedFotoGal">🖼 Elegir de la galería</label>'
-    + '<input type="file" class="ped-fin" id="pedFotoGal" accept="image/*" onchange="pedFotoElegida(this)"></div>';
-}
-
-function pedFotoLimpiar() {
-  if (PED.parcFoto && PED.parcFoto.url) { try { URL.revokeObjectURL(PED.parcFoto.url); } catch(e) {} }
-  PED.parcFoto = null;
-}
-
-function pedFotoQuitar() {
-  pedFotoLimpiar();
-  pintarPedido();
-}
-
-function pedReducirFoto(file, cb) {
-  var url = URL.createObjectURL(file), img = new Image();
-  img.onload = function() {
-    var k = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
-    var c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    URL.revokeObjectURL(url);
-    c.toBlob(function(b) { cb(b); }, 'image/jpeg', 0.78);
-  };
-  img.onerror = function() { URL.revokeObjectURL(url); cb(null); };
-  img.src = url;
-}
-
-function pedFotoElegida(inp) {
-  var f = inp.files && inp.files[0];
-  if (!f) return;
-  pedReducirFoto(f, function(blob) {
-    if (!blob) { showToast('⚠️ No se pudo leer la foto', '#B83232'); return; }
-    pedFotoLimpiar();
-    PED.parcFoto = { blob: blob, url: URL.createObjectURL(blob) };
-    pintarPedido();
-  });
-}
-
+// Las entregas hechas ANTES de oct/2026 pueden traer foto (tapas_entregas_parciales.foto_path): ya no se toma una nueva, pero se siguen viendo.
 // Botón 📷 de una entrega que trae foto; abre la imagen en grande (enlace firmado de 10 min)
 function pedFotoBtn(e, enChip) {
   if (!e.foto_path) return '';
@@ -2675,13 +2634,11 @@ function cerrarFotoEntrega() {
 }
 
 function abrirParcialForm() {
-  pedFotoLimpiar();
-  PED.parcForm = true; PED.parcCant = ''; PED.parcFecha = ''; PED.parcNota = '';
+  PED.parcForm = true; PED.parcCant = ''; PED.parcFecha = ''; PED.parcNota = ''; PED.parcLote = '';
   pintarPedido();
 }
 
 function cancelarParcialForm() {
-  pedFotoLimpiar();
   PED.parcForm = false;
   pintarPedido();
 }
@@ -2698,27 +2655,17 @@ async function guardarParcial() {
   var quien = supervisorActual.nombre || (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
   if (PED.guardandoEntrega) return;
   PED.guardandoEntrega = true;
-  var fotoPath = null;
-  if (PED.parcFoto) {
-    fotoPath = x.id + '/' + Date.now() + '.jpg';
-    var up = await db.storage.from('tapas-entregas').upload(fotoPath, PED.parcFoto.blob, { contentType: 'image/jpeg' });
-    if (up.error) {
-      PED.guardandoEntrega = false;
-      var um = up.error.message || String(up.error);
-      showToast('❌ Foto: ' + (/bucket|not found/i.test(um) ? 'Falta correr sql/tapas_entrega_foto_v1.sql en Supabase' : um), '#B83232');
-      return;
-    }
-  }
-  var r = await db.rpc('tapas_registrar_entrega', { p_id: x.id, p_cantidad: cant, p_completa: completa, p_fecha: fecha, p_nota: PED.parcNota || null, p_por: quien, p_foto: fotoPath });
+  var args = { p_id: x.id, p_cantidad: cant, p_completa: completa, p_fecha: fecha, p_nota: PED.parcNota || null, p_por: quien };
+  var lote = String(PED.parcLote || '').trim();
+  if (lote) args.p_lote = lote; // solo se manda si se escribió: sin el SQL del lote, registrar sin lote sigue funcionando
+  var r = await db.rpc('tapas_registrar_entrega', args);
   PED.guardandoEntrega = false;
   if (r.error) {
-    if (fotoPath) { try { await db.storage.from('tapas-entregas').remove([fotoPath]); } catch(e) {} }
     var msg = r.error.message || String(r.error);
-    showToast('❌ ' + (/function|does not exist|schema cache|tapas_registrar_entrega|tapas_entregas_parciales|cierra|foto_path/i.test(msg) ? 'Falta correr sql/tapas_entrega_v1.sql y sql/tapas_entrega_foto_v1.sql en Supabase' : msg), '#B83232');
+    showToast('❌ ' + (/function|does not exist|schema cache|tapas_registrar_entrega|tapas_entregas_parciales|cierra|lote/i.test(msg) ? 'Falta correr sql/tapas_entrega_v1.sql y sql/tapas_entrega_lote_v1.sql en Supabase' : msg), '#B83232');
     return;
   }
-  pedFotoLimpiar();
-  PED.parcForm = false; PED.parcCant = ''; PED.parcNota = '';
+  PED.parcForm = false; PED.parcCant = ''; PED.parcNota = ''; PED.parcLote = '';
   await cargarPedidos(true);
   showToast(completa ? '✅ ' + x.codigo + ' COMPLETADA con ' + pedNum(cant) + ' und' : '🟡 Entrega parcial de ' + pedNum(cant) + ' und registrada en ' + x.codigo);
 }

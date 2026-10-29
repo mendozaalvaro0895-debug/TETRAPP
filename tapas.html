@@ -4310,6 +4310,15 @@ function parcialesDeFicha(s) {
   return { lista: lista, total: total, sinRequi: sin };
 }
 
+// "Lote X · nota · quien" de una entrega (el lote va primero). ESPEJO de pedNotaEntrega de registro-tapas.html
+function notaEntregaTapas(e) {
+  var t = [];
+  if (e.lote) t.push('Lote ' + e.lote);
+  if (e.nota) t.push(e.nota);
+  if (e.registrado_por) t.push(e.registrado_por);
+  return t.join(' · ');
+}
+
 function bloqueParcialesTapas(s) {
   var p = parcialesDeFicha(s);
   if (!p.lista.length) return '';
@@ -4319,7 +4328,7 @@ function bloqueParcialesTapas(s) {
       + '<b style="font-family:var(--mono)">' + (e.cantidad || 0).toLocaleString() + ' und</b>'
       + (e.cierra ? '<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;background:#ECFDF5;color:#047857">✅ completó la ficha</span>' : '')
       + '<span>' + escHtml(String(e.fecha || '')) + '</span>' + fotoBtnTapas(e, false)
-      + '<span style="flex:1;min-width:100px;color:var(--gray)">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + e.registrado_por : '')) + '</span>'
+      + '<span style="flex:1;min-width:100px;color:var(--gray)">' + escHtml(notaEntregaTapas(e)) + '</span>'
       + '<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;background:' + (ok ? '#ECFDF5' : '#FEF3C7') + ';color:' + (ok ? '#047857' : '#92400E') + '">'
       + (ok ? '✓ con requi' : (it.cubierto ? '⏳ faltan ' + (e.cantidad - it.cubierto).toLocaleString() + ' por requi' : '⏳ sin requi')) + '</span>'
       + '<button class="btn btn-g btn-xs" title="Corregir la cantidad" onclick="parcialEditarTapas(\'' + escHtml(String(e.id)) + '\')">✏️</button>'
@@ -4693,6 +4702,7 @@ function entregasChipHtml(s) {
     + p.lista.map(function(it) {
         var okE = it.cubierto >= (it.e.cantidad || 0);
         return '<div class="ent ' + (okE ? 'ok' : 'y') + '"><span>' + escHtml(fc(it.e.fecha)) + '</span><b>' + (it.e.cantidad || 0).toLocaleString() + ' und</b>' + (it.e.cierra ? '<em>✅ completó</em>' : '')
+          + (it.e.lote ? '<span style="min-width:0;font-weight:700;color:#334155">Lote ' + escHtml(it.e.lote) + '</span>' : '')
           + '<i>' + (okE ? '✓ con requi' : (it.cubierto ? '⏳ faltan ' + ((it.e.cantidad || 0) - it.cubierto).toLocaleString() : '⏳ sin requi')) + '</i>' + fotoBtnTapas(it.e, true) + '</div>';
       }).join('')
     + '</div>';
@@ -6567,7 +6577,7 @@ function entPendientesFiltrados(toks) {
   if (!toks.length) return lista;
   return lista.filter(function(p) {
     var l = (p.s.lineas && p.s.lineas[0]) || {};
-    var n = normBusqueda('sin requi tapas ' + (p.s.cliente || '') + ' ' + (p.s.id_display || '') + ' ' + (l.sku || '') + ' ' + getSkuDesc(l.sku) + ' ' + (p.e.nota || '') + ' ' + (p.e.registrado_por || ''));
+    var n = normBusqueda('sin requi tapas ' + (p.s.cliente || '') + ' ' + (p.s.id_display || '') + ' ' + (l.sku || '') + ' ' + getSkuDesc(l.sku) + ' ' + (p.e.nota || '') + ' ' + (p.e.lote || '') + ' ' + (p.e.registrado_por || ''));
     return toks.every(function(t) { return n.indexOf(t) !== -1; });
   });
 }
@@ -6595,7 +6605,7 @@ function buildEntPendHtml(p, mp) {
     + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(String(e.fecha || '—')) + '</td>'
     + '<td><span class="ent-orig" style="background:#F59E0B;color:#fff">TAPAS</span>'
     + (e.cierra ? ' <span style="font-size:10px;font-weight:800;color:#047857">✅ completó la ficha</span>' : '') + fotoBtnTapas(e, false)
-    + (quien || e.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml((e.nota ? e.nota + (quien ? ' · ' : '') : '') + quien) + '</span>' : '') + '</td>'
+    + (quien || e.nota || e.lote ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(notaEntregaTapas(e)) + '</span>' : '') + '</td>'
     + '<td style="font-size:11px;font-family:var(--mono);color:var(--gray-l)">' + escHtml(sal) + '</td>'
     + '<td class="ent-act" style="white-space:nowrap"><button class="ent-pend-act" title="Abrir el registro de entregado con esta ficha y cantidad" onclick="entRegistrarDesdeEntrega(\'' + escHtml(String(e.id)) + '\')">📝 Registrar requi</button></td>'
     + '</tr>';
