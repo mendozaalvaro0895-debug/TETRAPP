@@ -2665,6 +2665,7 @@ function boardBuildCard(item) {
     '<div style="font-size:12px;font-weight:700;color:var(--ink);line-height:1.2;margin-bottom:0">' + item.cliente + '</div>' +
     '<div style="font-size:11px;line-height:1.35;margin-bottom:2px;word-break:break-word">' + descTxt + '</div>' +
     cantAndProg +
+    (item.estado === 'lista' ? buildMermaChip(item.solId, entregado) : '') +
     buildBaseStockRow(item) +
     buildStockPTRow(item, Math.max(0, (item.cant || 0) - entregado)) +
     fechasRow +
@@ -2765,6 +2766,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
     '</div>' +
     '<div style="margin-top:2px;font-size:10px;color:' + descClr + ';font-weight:' + descWt + ';line-height:1.35">' + escHtml(desc) + '</div>' +
     fechasRow +
+    (isComplete ? buildMermaChip(item.solId, entregado) : '') +
     buildBaseStockChip(item) +
     buildStockPTChip(item, Math.max(0, total - entregado)) +
     notasRow +
@@ -5912,6 +5914,50 @@ async function cargarSalidaRequiMap() {
       });
     }
   } catch(e) { console.error('cargarSalidaRequiMap:', e); }
+  await cargarMermaMap();
+}
+
+// Merma por ficha para mostrarla en las tarjetas completadas: salida de bodega vs ingreso PT.
+// Mismas fuentes que "Trazabilidad de merma" del detalle (movimientos_materiales por solicitud_id
+// + entregas manuales vinculadas, que se suman aparte en mermaDeFicha).
+var mermaMap = {}; // solicitud_id → { sal, ent }  (sumas de movimientos_materiales)
+async function cargarMermaMap() {
+  try {
+    var mapa = {}, desde = 0, paso = 1000, fin = false;
+    while (!fin) {
+      var r = await db.from('movimientos_materiales')
+        .select('solicitud_id,tipo,cantidad')
+        .in('tipo', ['salida_bodega', 'entrada_pt'])
+        .not('solicitud_id', 'is', null)
+        .order('id', { ascending: true })
+        .range(desde, desde + paso - 1);
+      if (r.error) throw r.error;
+      (r.data || []).forEach(function(m) {
+        var e = mapa[m.solicitud_id] || (mapa[m.solicitud_id] = { sal: 0, ent: 0 });
+        if (m.tipo === 'salida_bodega') e.sal += (m.cantidad || 0); else e.ent += (m.cantidad || 0);
+      });
+      fin = !r.data || r.data.length < paso;
+      desde += paso;
+    }
+    mermaMap = mapa;
+  } catch(e) { console.error('cargarMermaMap:', e); }
+}
+
+// Chip "📉 Merma" de una ficha completada. entregadoManual = ingresos PT de entregas_serig ya
+// calculados en la tarjeta. Sin salida de bodega registrada no hay base para calcularla.
+function buildMermaChip(solId, entregadoManual) {
+  var m = mermaMap[solId] || { sal: 0, ent: 0 };
+  if (!(m.sal > 0)) {
+    return '<div style="margin-top:2px"><span title="Esta ficha no tiene salida de bodega registrada, no se puede calcular la merma" style="font-size:9px;color:var(--gray-l)">📉 Merma: — (sin salida de bodega)</span></div>';
+  }
+  var merma = m.sal - m.ent - (entregadoManual || 0);
+  var pct = Math.round(Math.abs(merma) / m.sal * 1000) / 10;
+  var bg, clr, txt;
+  if (merma > 0)      { bg = '#fee2e2'; clr = '#b91c1c'; txt = '📉 Merma ' + merma.toLocaleString() + ' und · ' + pct + '%'; }
+  else if (merma < 0) { bg = '#dbeafe'; clr = '#1d4ed8'; txt = '📈 Entregó ' + Math.abs(merma).toLocaleString() + ' de más'; }
+  else                { bg = '#dcfce7'; clr = '#15803d'; txt = '✓ Sin merma'; }
+  return '<div style="margin-top:2px"><span title="Salió de bodega ' + m.sal.toLocaleString() + ' · ingresó como PT ' + (m.ent + (entregadoManual || 0)).toLocaleString() +
+    '" style="display:inline-block;background:' + bg + ';color:' + clr + ';border:1px solid ' + clr + '55;border-radius:10px;padding:1px 8px;font-size:10px;font-weight:800">' + txt + '</span></div>';
 }
 
 async function cargarEntregasSerig() {
