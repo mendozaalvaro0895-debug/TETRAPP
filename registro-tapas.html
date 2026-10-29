@@ -396,7 +396,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-parc b{font-family:'DM Mono',monospace}
 .ped-parc .sr{color:#B45309;font-weight:800}
 .ped-parc .cr{color:#047857;font-weight:800}
-.ped-parc .ent{display:flex;gap:6px;align-items:baseline;margin-top:2px;padding-top:2px;border-top:1px dashed #FDE047}
+.ped-parc .ent{display:flex;flex-wrap:wrap;gap:2px 6px;align-items:baseline;margin-top:2px;padding-top:2px;border-top:1px dashed #FDE047}
 .ped-parc .ent span{color:#64748B;min-width:44px}
 .ped-parc .ent em{font-style:normal;font-size:10px;font-weight:800;color:#047857}
 .ped-parc .top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-weight:800;font-size:11px;letter-spacing:.4px}
@@ -2494,18 +2494,30 @@ function pedEsquinaHtml(x) {
   return '<b class="ped-esq ' + (x.parc.sinRequi > 0 ? 'y' : 'g') + '" title="Entregado / pedido">' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</b>';
 }
 
-// Bloque ENTREGAS al final del chip (ESPEJO de entregasChipHtml de tapas.html): una línea por entrega reportada con fecha y cantidad.
-// Amarillo mientras quede algo sin requi; verde cuando todo está vinculado a una requi.
+// Bloque ENTREGAS al final del chip (ESPEJO de entregasChipHtml de tapas.html): el detalle de TODO lo entregado, una línea por entrega:
+// fecha · cantidad · No. de requi (verde, ya con requi de ingreso PT) y, en amarillo, lo que la supervisora reportó y aún no tiene requi.
+// Las entregas reportadas que ya quedaron cubiertas por una requi no se repiten (esa cantidad ya sale en la línea de su requi).
 function pedParcChipHtml(x) {
-  if (!x.parc.lista.length) return '';
+  var pend = x.parc.lista.filter(function(e) { return (e.cubierto || 0) < e.cantidad; });
+  var grupos = [], idx = {};
+  x.ings.forEach(function(g) {
+    var k = g.num_documento ? 'd' + g.num_documento : 'n' + grupos.length;
+    if (idx[k] === undefined) { idx[k] = grupos.length; grupos.push({ doc: g.num_documento || '', fecha: pedFechaMov(g), cant: 0 }); }
+    grupos[idx[k]].cant += g.cantidad || 0;
+  });
+  if (!grupos.length && !pend.length) return '';
+  var lineasReq = grupos.map(function(g) {
+    return '<div class="ent ok"><span>' + escHtml(pedFechaCorta(g.fecha)) + '</span><b>' + pedNum(g.cant) + ' und</b>'
+      + '<span style="min-width:0;font-weight:700;color:#334155">Requi ' + escHtml(g.doc || '—') + '</span><i>✓ con requi</i></div>';
+  }).join('');
+  var lineasPend = pend.map(function(e) {
+    return '<div class="ent y"><span>' + escHtml(pedFechaCorta(e.fecha)) + '</span><b>' + pedNum(e.cantidad - (e.cubierto || 0)) + ' und</b>' + (e.cierra ? '<em>✅ completó</em>' : '')
+      + (e.lote ? '<span style="min-width:0;font-weight:700;color:#334155">Lote ' + escHtml(e.lote) + '</span>' : '')
+      + '<i>⏳ sin requi</i>' + pedFotoBtn(e, true) + '</div>';
+  }).join('');
   return '<div class="ped-parc' + (x.parc.sinRequi > 0 ? '' : ' ok') + '">'
     + '<div class="top"><span>🚚 ENTREGAS</span><span class="det">' + pedEntDetHtml(x) + '</span></div>'
-    + x.parc.lista.map(function(e) {
-        var okE = (e.cubierto || 0) >= e.cantidad;
-        return '<div class="ent ' + (okE ? 'ok' : 'y') + '"><span>' + escHtml(pedFechaCorta(e.fecha)) + '</span><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<em>✅ completó</em>' : '')
-          + (e.lote ? '<span style="min-width:0;font-weight:700;color:#334155">Lote ' + escHtml(e.lote) + '</span>' : '')
-          + '<i>' + (okE ? '✓ con requi' : ((e.cubierto || 0) ? '⏳ faltan ' + pedNum(e.cantidad - e.cubierto) : '⏳ sin requi')) + '</i>' + pedFotoBtn(e, true) + '</div>';
-      }).join('')
+    + lineasReq + lineasPend
     + '</div>';
 }
 

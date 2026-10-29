@@ -448,7 +448,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-parc b{font-family:var(--mono)}
 .cp-parc .sr{color:#B45309;font-weight:800}
 .cp-parc .cr{color:#047857;font-weight:800}
-.cp-parc .ent{display:flex;gap:6px;align-items:baseline;margin-top:2px;padding-top:2px;border-top:1px dashed #FDE047}
+.cp-parc .ent{display:flex;flex-wrap:wrap;gap:2px 6px;align-items:baseline;margin-top:2px;padding-top:2px;border-top:1px dashed #FDE047}
 .cp-parc .ent span{color:#64748B;min-width:44px}
 .cp-parc .ent em{font-style:normal;font-size:10px;font-weight:800;color:#047857}
 .cp-parc .top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-weight:800;font-size:11px;letter-spacing:.4px}
@@ -4688,23 +4688,37 @@ function cpEsquinaHtml(x) {
   return '<b class="cp-esq ' + (parcialesDeFicha(x.s).sinRequi > 0 ? 'y' : 'g') + '" title="Entregado / pedido">' + tot.toLocaleString() + '/' + x.cant.toLocaleString() + '</b>';
 }
 
-// Bloque ENTREGAS al final del chip: una línea por entrega reportada con fecha y cantidad. Amarillo mientras quede algo sin requi;
-// verde cuando todo está vinculado a una requi (ESPEJO de pedParcChipHtml de registro-tapas.html)
+// Bloque ENTREGAS al final del chip: el detalle de TODO lo entregado, una línea por entrega: fecha · cantidad · No. de requi (verde, ya con
+// requi de ingreso PT) y, en amarillo, lo que la supervisora reportó y aún no tiene requi. Las entregas reportadas ya cubiertas por una
+// requi no se repiten (esa cantidad ya sale en la línea de su requi). ESPEJO de pedParcChipHtml de registro-tapas.html
 function entregasChipHtml(s) {
   var p = parcialesDeFicha(s);
-  if (!p.lista.length) return '';
+  var pend = p.lista.filter(function(it) { return it.cubierto < (it.e.cantidad || 0); });
+  var grupos = [], idx = {};
+  ingresoMovs.filter(function(m) { return m.solicitud_id === s.id && m.area !== 'serig'; })
+    .sort(function(a, b) { return String(a.created_at).localeCompare(String(b.created_at)); })
+    .forEach(function(m) {
+      var k = m.num_documento ? 'd' + m.num_documento : 'n' + grupos.length;
+      if (idx[k] === undefined) { idx[k] = grupos.length; grupos.push({ doc: m.num_documento || '', fecha: parseFechaDoc(m.observaciones) || String(m.created_at || '').slice(0, 10), cant: 0 }); }
+      grupos[idx[k]].cant += m.cantidad || 0;
+    });
+  if (!grupos.length && !pend.length) return '';
   var fc = function(f) { var t = String(f || ''); return t.length >= 10 ? parseInt(t.slice(8, 10), 10) + '-' + ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(t.slice(5, 7), 10) - 1] : t; };
   var con = entregadoTotalFichaTapas(s) - p.sinRequi, det = [];
   if (con > 0) det.push('<span class="cr">✓ ' + con.toLocaleString() + ' con requi</span>');
   if (p.sinRequi > 0) det.push('<span class="sr">⏳ ' + p.sinRequi.toLocaleString() + ' sin requi</span>');
+  var lineasReq = grupos.map(function(g) {
+    return '<div class="ent ok"><span>' + escHtml(fc(g.fecha)) + '</span><b>' + g.cant.toLocaleString() + ' und</b>'
+      + '<span style="min-width:0;font-weight:700;color:#334155">Requi ' + escHtml(g.doc || '—') + '</span><i>✓ con requi</i></div>';
+  }).join('');
+  var lineasPend = pend.map(function(it) {
+    return '<div class="ent y"><span>' + escHtml(fc(it.e.fecha)) + '</span><b>' + ((it.e.cantidad || 0) - it.cubierto).toLocaleString() + ' und</b>' + (it.e.cierra ? '<em>✅ completó</em>' : '')
+      + (it.e.lote ? '<span style="min-width:0;font-weight:700;color:#334155">Lote ' + escHtml(it.e.lote) + '</span>' : '')
+      + '<i>⏳ sin requi</i>' + fotoBtnTapas(it.e, true) + '</div>';
+  }).join('');
   return '<div class="cp-parc' + (p.sinRequi > 0 ? '' : ' ok') + '">'
     + '<div class="top"><span>🚚 ENTREGAS</span><span class="det">' + det.join(' · ') + '</span></div>'
-    + p.lista.map(function(it) {
-        var okE = it.cubierto >= (it.e.cantidad || 0);
-        return '<div class="ent ' + (okE ? 'ok' : 'y') + '"><span>' + escHtml(fc(it.e.fecha)) + '</span><b>' + (it.e.cantidad || 0).toLocaleString() + ' und</b>' + (it.e.cierra ? '<em>✅ completó</em>' : '')
-          + (it.e.lote ? '<span style="min-width:0;font-weight:700;color:#334155">Lote ' + escHtml(it.e.lote) + '</span>' : '')
-          + '<i>' + (okE ? '✓ con requi' : (it.cubierto ? '⏳ faltan ' + ((it.e.cantidad || 0) - it.cubierto).toLocaleString() : '⏳ sin requi')) + '</i>' + fotoBtnTapas(it.e, true) + '</div>';
-      }).join('')
+    + lineasReq + lineasPend
     + '</div>';
 }
 
