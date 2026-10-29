@@ -7312,7 +7312,12 @@ async function registrarEntradaRapida(solicitudId) {
   var sku = prompt('SKU del producto terminado (ej: 10041):');
   if (!sku) return;
   var result = await registrarEntradaPT(solicitudId, sku, parseInt(cant), 'operador', '');
-  if (result.ok) { showToast('✅ Entrada registrada: ' + cant + ' und de ' + sku); mostrarDetalle(solicitudId); refreshKPIs(); }
+  if (result.ok) {
+    showToast('✅ Entrada registrada: ' + cant + ' und de ' + sku);
+    await cargarMermaMap();   // el chip de merma de la tarjeta lee de este mapa
+    renderBoard();
+    mostrarDetalle(solicitudId); refreshKPIs();
+  }
   else showToast('❌ Error: ' + result.error, '#B83232');
 }
 
@@ -7322,7 +7327,14 @@ async function registrarSalidaRapida(solicitudId) {
   var sku = prompt('SKU del material que sale:');
   if (!sku) return;
   var result = await registrarSalidaBodega(solicitudId, sku, parseInt(cant), 'operador', '');
-  if (result.ok) { showToast('✅ Salida registrada: ' + cant + ' und de ' + sku); mostrarDetalle(solicitudId); refreshKPIs(); }
+  if (result.ok) {
+    showToast('✅ Salida registrada: ' + cant + ' und de ' + sku);
+    envSalidoCache = null;
+    await cargarSalidaRequiMap();   // incluye el mapa de merma que lee el chip de la tarjeta
+    renderBoard();
+    mostrarDetalle(solicitudId); refreshKPIs();
+    renderConsolidadoEnvases();
+  }
   else showToast('❌ Error: ' + result.error, '#B83232');
 }
 
