@@ -432,6 +432,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-parc .ent{display:flex;gap:6px;align-items:baseline;margin-top:2px;padding-top:2px;border-top:1px dashed #FDE047}
 .cp-parc .ent span{color:#64748B;min-width:44px}
 .cp-parc .ent em{font-style:normal;font-size:10px;font-weight:800;color:#047857}
+.cp-parc .top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-weight:800;font-size:11px;letter-spacing:.4px}
+.cp-parc .top b{font-size:17px;color:#A16207}
+.cp-parc .det{font-size:11px;margin-top:1px}
+.cp-parc .ent{padding:2px 6px;border-radius:5px;border-top:none;margin-top:3px}
+.cp-parc .ent.y{background:#FEF08A}
+.cp-parc .ent.ok{background:#DCFCE7}
+.cp-parc .ent i{font-style:normal;font-size:10px;font-weight:800;margin-left:auto}
+.cp-parc .ent.y i{color:#B45309}
+.cp-parc .ent.ok i{color:#047857}
+.cp-parc.ok{border-color:#86EFAC;background:#F0FDF4;color:#166534}
+.cp-parc.ok .top b{color:#15803D}
 .cp-comp-tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#15803D;margin-bottom:2px}
 
 .cp-chip-t{display:flex;justify-content:space-between;gap:4px;font-size:11px;font-weight:800;align-items:baseline}
@@ -1383,6 +1394,52 @@ async function cargarInventario() {
     console.error('Error cargando inventario:', e);
     return [];
   }
+}
+
+// STOCK EN VIVO: las existencias (producto terminado, Base, Contratapa en inventario; Liner y Banda en Bodega 7) se leen de nuevo cada minuto
+// mientras la página está a la vista, al volver a ella y al abrir una ficha, así los chips, la ventana de la ficha y las alertas de bajo
+// stock siempre reflejan lo que hay en Bodega. Solo trae los SKU que usan las fichas vivas y repinta si algo cambió.
+var stockVivoBusy = false;
+async function refrescarStockVivo() {
+  if (stockVivoBusy || typeof solicitudes === 'undefined' || !solicitudes.length) return;
+  stockVivoBusy = true;
+  try {
+    var ki = {}, kb = {};
+    solicitudes.forEach(function(s) {
+      if (!fichaViva(s)) return;
+      (s.lineas || []).forEach(function(l) {
+        [l.sku, l.skuBase, l.skuContratapa].forEach(function(k) { if (k && k !== '—') ki[k] = 1; });
+        [l.skuLiner, l.skuBanda].forEach(function(k) { if (k) kb[k] = 1; });
+      });
+    });
+    var nuevos = {}, nuevosB7 = {}, cambio = false;
+    var lki = Object.keys(ki), lkb = Object.keys(kb), i;
+    for (i = 0; i < lki.length; i += 150) {
+      var r = await db.from('inventario').select('sku,existencia,bodega').in('sku', lki.slice(i, i + 150));
+      if (r.error) throw r.error;
+      (r.data || []).forEach(function(row) { nuevos[row.sku + '|' + (row.bodega || '')] = row.existencia || 0; });
+    }
+    for (i = 0; i < lkb.length; i += 150) {
+      var r7 = await db.from('insumos_b7').select('sku,existencia').in('sku', lkb.slice(i, i + 150));
+      if (r7.error) throw r7.error;
+      (r7.data || []).forEach(function(row) { nuevosB7[row.sku] = row.existencia || 0; });
+    }
+    inventarioCache.forEach(function(it) {
+      var k = it.sku + '|' + (it.bodega || '');
+      if (k in nuevos && (it.existencia || 0) !== nuevos[k]) { it.existencia = nuevos[k]; cambio = true; }
+    });
+    insumosB7Cache.forEach(function(it) {
+      if (it.sku in nuevosB7 && (it.existencia || 0) !== nuevosB7[it.sku]) { it.existencia = nuevosB7[it.sku]; cambio = true; }
+    });
+    if (cambio) {
+      renderFichasTapas();
+      renderAlertasTapas();
+      // la ventana de la ficha se repinta solo si no se está escribiendo dentro de ella
+      var ae = document.activeElement, escribiendo = !!(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.closest && ae.closest('#modalFichaTapas'));
+      if (fichaModalId && !escribiendo) mostrarDetalle(fichaModalId);
+    }
+  } catch(e) { console.warn('refrescarStockVivo:', e); }
+  stockVivoBusy = false;
 }
 
 async function cargarPersonal() {
@@ -4145,8 +4202,9 @@ function bloqueParcialesTapas(s) {
       + (ok ? '✓ con requi' : (it.cubierto ? '⏳ faltan ' + (e.cantidad - it.cubierto).toLocaleString() + ' por requi' : '⏳ sin requi')) + '</span>'
       + '<button class="btn btn-del btn-xs" title="Borrar esta entrega reportada" onclick="parcialBorrarTapas(\'' + escHtml(String(e.id)) + '\')">🗑</button></div>';
   }).join('');
-  return '<div class="dc" style="border-color:#FDE047;border-width:2px"><div class="dc-h" style="background:#FEF9C3;color:#A16207">🟡 Entregas parciales reportadas por Tapas · '
-    + p.total.toLocaleString() + ' und' + (p.sinRequi > 0 ? ' · ' + p.sinRequi.toLocaleString() + ' sin requi' : ' · todas con requi') + '</div><div class="dc-b" style="font-size:12px">'
+  var sinR = p.sinRequi > 0;
+  return '<div class="dc" style="border-color:' + (sinR ? '#FDE047' : '#86EFAC') + ';border-width:2px"><div class="dc-h" style="background:' + (sinR ? '#FEF9C3' : '#DCFCE7') + ';color:' + (sinR ? '#A16207' : '#166534') + '">' + (sinR ? '🟡' : '🟢')
+    + ' Entregado ' + entregadoTotalFichaTapas(s).toLocaleString() + '/' + (s.cant || 0).toLocaleString() + ' · reportado por Tapas ' + p.total.toLocaleString() + ' und' + (sinR ? ' · ' + p.sinRequi.toLocaleString() + ' sin requi' : ' · todas con requi') + '</div><div class="dc-b" style="font-size:12px">'
     + filas + '<div style="font-size:10px;color:var(--gray);margin-top:6px">Informativo: no descuenta del saldo. El saldo baja cuando registras la requi (ingreso PT) vinculada a esta ficha en Entregados.</div></div></div>';
 }
 
@@ -4335,6 +4393,7 @@ function abrirFichaTapas(id) {
   fichaModalId = id;
   document.getElementById('modalFichaTapas').classList.add('open');
   mostrarDetalle(id);
+  refrescarStockVivo(); // existencias al día en el momento de consultar la ficha
 }
 
 // ── Vista COMPACTA de Fichas de Trabajo (oct/2026) ─────────────────────────────
@@ -4443,14 +4502,24 @@ function codClienteChipHtml(s) {
 
 // Ficha marcada COMPLETADA por Tapas: chip verde y transparente con la nota, quién la marcó y cuándo
 // Entregas que la supervisora registró desde Tapas: una línea por entrega con fecha + cantidad (ESPEJO de pedParcChipHtml)
+function entColorTapas(s) { return parcialesDeFicha(s).sinRequi > 0 ? '#A16207' : '#15803D'; }
+
 function entregasChipHtml(s) {
   var p = parcialesDeFicha(s);
-  if (!p.lista.length) return '';
+  var tot = entregadoTotalFichaTapas(s);
+  if (!tot && !p.lista.length) return '';
   var fc = function(f) { var t = String(f || ''); return t.length >= 10 ? parseInt(t.slice(8, 10), 10) + '-' + ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(t.slice(5, 7), 10) - 1] : t; };
-  return '<div class="cp-parc">🟡 Reportado por Tapas: <b>' + p.total.toLocaleString() + '</b> und · '
-    + (p.sinRequi > 0 ? '<span class="sr">⏳ ' + p.sinRequi.toLocaleString() + ' sin requi</span>' : '<span class="cr">✓ con requi</span>')
+  var det = [];
+  if (tot - p.sinRequi > 0) det.push('<span class="cr">✓ ' + (tot - p.sinRequi).toLocaleString() + ' con requi</span>');
+  if (p.sinRequi > 0) det.push('<span class="sr">⏳ ' + p.sinRequi.toLocaleString() + ' sin requi</span>');
+  // ENTREGADO N/total: amarillo mientras quede algo sin requi, verde cuando todo está vinculado a una requi (ESPEJO de pedParcChipHtml)
+  return '<div class="cp-parc' + (p.sinRequi > 0 ? '' : ' ok') + '">'
+    + '<div class="top"><span>🚚 ENTREGADO</span><b>' + tot.toLocaleString() + '/' + (s.cant || 0).toLocaleString() + '</b></div>'
+    + '<div class="det">' + det.join(' · ') + '</div>'
     + p.lista.map(function(it) {
-        return '<div class="ent"><span>' + escHtml(fc(it.e.fecha)) + '</span><b>' + (it.e.cantidad || 0).toLocaleString() + ' und</b>' + (it.e.cierra ? '<em>✅ completó</em>' : '') + fotoBtnTapas(it.e, true) + '</div>';
+        var okE = it.cubierto >= (it.e.cantidad || 0);
+        return '<div class="ent ' + (okE ? 'ok' : 'y') + '"><span>' + escHtml(fc(it.e.fecha)) + '</span><b>' + (it.e.cantidad || 0).toLocaleString() + ' und</b>' + (it.e.cierra ? '<em>✅ completó</em>' : '')
+          + '<i>' + (okE ? '✓ con requi' : (it.cubierto ? '⏳ faltan ' + ((it.e.cantidad || 0) - it.cubierto).toLocaleString() : '⏳ sin requi')) + '</i>' + fotoBtnTapas(it.e, true) + '</div>';
       }).join('')
     + '</div>';
 }
@@ -4461,7 +4530,7 @@ function chipCompletadoTapas(x, conCliente) {
   return '<div class="cp-chip completada' + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
     + '<span class="cp-comp-tag">' + escHtml(tag) + '</span>'
     + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
-    + '<div class="cp-chip-t"><span>' + escHtml(x.codigo) + comentBadgeHtml(x.s) + '</span><b title="Entregado / pedido">' + entregadoTotalFichaTapas(x.s).toLocaleString() + '/' + x.cant.toLocaleString() + '</b></div>'
+    + '<div class="cp-chip-t"><span>' + escHtml(x.codigo) + comentBadgeHtml(x.s) + '</span><b title="Entregado / pedido" style="color:' + entColorTapas(x.s) + '">' + entregadoTotalFichaTapas(x.s).toLocaleString() + '/' + x.cant.toLocaleString() + '</b></div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
     + notaChipHtml(x.s.notas)
     + entregasChipHtml(x.s)
@@ -5874,6 +5943,8 @@ async function init() {
   tick();
   setInterval(tick, 30000);
   setInterval(refreshKPIs, 30000);
+  setInterval(function() { if (!document.hidden) refrescarStockVivo(); }, 60000);
+  document.addEventListener('visibilitychange', function() { if (!document.hidden) refrescarStockVivo(); });
 
   // Arrancar en el hub de inicio
   switchTab('inicio');

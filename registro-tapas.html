@@ -380,6 +380,21 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-parc .ent{display:flex;gap:6px;align-items:baseline;margin-top:2px;padding-top:2px;border-top:1px dashed #FDE047}
 .ped-parc .ent span{color:#64748B;min-width:44px}
 .ped-parc .ent em{font-style:normal;font-size:10px;font-weight:800;color:#047857}
+.ped-parc .top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-weight:800;font-size:11px;letter-spacing:.4px}
+.ped-parc .top b{font-size:17px;color:#A16207}
+.ped-parc .det{font-size:11px;margin-top:1px}
+.ped-parc .ent{padding:2px 6px;border-radius:5px;border-top:none;margin-top:3px}
+.ped-parc .ent.y{background:#FEF08A}
+.ped-parc .ent.ok{background:#DCFCE7}
+.ped-parc .ent i{font-style:normal;font-size:10px;font-weight:800;margin-left:auto}
+.ped-parc .ent.y i{color:#B45309}
+.ped-parc .ent.ok i{color:#047857}
+.ped-parc.ok{border-color:#86EFAC;background:#F0FDF4;color:#166534}
+.ped-parc.ok .top b{color:#15803D}
+.ped-pe.ok{border-color:#86EFAC;background:#F0FDF4}
+.ped-ent-det{font-size:11px;margin-top:6px;text-align:center}
+.ped-ent-det .sr{color:#B45309;font-weight:800}
+.ped-ent-det .cr{color:#047857;font-weight:800}
 .ped-pe{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid #FDE047;background:#FEFCE8;border-radius:8px;padding:6px 9px;margin-bottom:6px;font-size:12px}
 .ped-pe b{font-family:'DM Mono',monospace;color:#854D0E}
 .ped-pe .t{flex:1;min-width:120px;color:#64748B}
@@ -1647,23 +1662,42 @@ async function pedCargarStock(sols) {
       [l.sku_liner, l.sku_banda].forEach(function(k) { if (k) skB7[k] = 1; });
     });
   });
-  PED.stockInv = {}; PED.stockB7 = {}; PED.salidas = [];
+  var nInv = {}, nB7 = {}, nSal = [];
   try {
     var ki = Object.keys(skInv);
     if (ki.length) {
       var r = await db.from('inventario').select('sku,descripcion,existencia,bodega').in('sku', ki);
-      (r.data || []).forEach(function(row) { if (!PED.stockInv[row.sku] || !row.bodega || row.bodega === 'B2') PED.stockInv[row.sku] = { ex: row.existencia || 0, desc: row.descripcion || '' }; });
+      (r.data || []).forEach(function(row) { if (!nInv[row.sku] || !row.bodega || row.bodega === 'B2') nInv[row.sku] = { ex: row.existencia || 0, desc: row.descripcion || '' }; });
     }
     var kb = Object.keys(skB7);
     if (kb.length) {
       var r7 = await db.from('insumos_b7').select('sku,descripcion,existencia').in('sku', kb);
-      (r7.data || []).forEach(function(row) { PED.stockB7[row.sku] = { ex: row.existencia || 0, desc: row.descripcion || '' }; });
+      (r7.data || []).forEach(function(row) { nB7[row.sku] = { ex: row.existencia || 0, desc: row.descripcion || '' }; });
     }
     var rsal = await db.from('movimientos_materiales').select('solicitud_id,sku_original,cantidad,area')
       .eq('tipo', 'salida_bodega').not('solicitud_id', 'is', null).limit(3000);
-    PED.salidas = (rsal.data || []).filter(function(m) { return m.area !== 'serig'; });
+    nSal = (rsal.data || []).filter(function(m) { return m.area !== 'serig'; });
   } catch(e) { console.warn('pedCargarStock:', e); }
+  PED.stockInv = nInv; PED.stockB7 = nB7; PED.salidas = nSal;
 }
+
+// Stock SIEMPRE ACTUAL: lee de nuevo las existencias de inventario / Bodega 7 al abrir una ficha y al volver a la app
+// (además del refresco de cada 45 s de la pestaña), y repinta chips y popup solo con lo que haya cambiado.
+async function pedRefrescarStock() {
+  if (PED.refrescandoStock) return;
+  PED.refrescandoStock = true;
+  try {
+    var antes = JSON.stringify([PED.stockInv, PED.stockB7]);
+    await pedCargarStock(PED.sols);
+    if (JSON.stringify([PED.stockInv, PED.stockB7]) !== antes) renderPedidos();
+  } finally { PED.refrescandoStock = false; }
+}
+
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) return;
+  var ped = document.getElementById('scrPed');
+  if (ped && ped.classList.contains('vis') && pedAccesoLibre() && !document.getElementById('pedOv').classList.contains('open')) cargarPedidos(true);
+});
 
 // ESPEJO de componentesStockHtml() de tapas.html: "BASE 10258 · 51,500 und · ✓ alcanza" / "✗ insuficiente: faltan N" /
 // "✓ ya retirada" — stock actual vs. lo que aún falta SACAR de bodega para la ficha (cantidad − salidas ya vinculadas, por SKU).
@@ -1828,7 +1862,7 @@ function pedChipCompletada(x, conCliente) {
   return '<div class="ped-chip completada' + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
     + '<span class="ped-comp-tag">' + escHtml(pedCompletadaTexto(x)) + '</span>'
     + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
-    + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + pedComentBadge(x) + '</span><b title="Entregado / pedido">' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</b></div>'
+    + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + pedComentBadge(x) + '</span><b title="Entregado / pedido" style="color:' + pedEntColor(x) + '">' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</b></div>'
     + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
     + pedNotaHtml(x.s.notas)
     + pedParcChipHtml(x)
@@ -2137,6 +2171,7 @@ function abrirPedido(id) {
   PED.parcForm = false;
   PED.form = null; PED.selOp = []; PED.selProc = []; PED.cantTmp = null; PED.comentTxt = '';
   pintarPedido();
+  pedRefrescarStock(); // existencias al día en el momento de consultar
 }
 
 // Ventana corta solo de comentarios (botón 💬 del chip): no hace falta abrir toda la ficha para dejar una observación
@@ -2205,8 +2240,9 @@ function pintarPedido() {
     + pedFrame('📄 Producto', '<div class="pd" style="margin:0"><b>' + escHtml(x.sku) + '</b> ' + escHtml(x.desc) + '</div>', 'g')
     + pedNotaHtml(x.s.notas, true)
     + pedBloqueBodegaHtml(x)
-    + pedFrame('📊 Avance del pedido', '<div class="ped-nums"><div><b>' + pedNum(x.cant) + '</b><span>Pedido</span></div><div><b>' + pedNum(x.entregado) + '</b><span>Entregado</span></div>'
-      + '<div><b>' + pedNum(x.enProc) + '</b><span>En proceso</span></div><div><b>' + pedNum(x.libre) + '</b><span>Sin iniciar</span></div></div>', 's')
+    + pedFrame('📊 Avance del pedido', '<div class="ped-nums"><div><b>' + pedNum(x.cant) + '</b><span>Pedido</span></div><div><b style="color:' + pedEntColor(x) + '">' + pedNum(x.entregadoTotal) + '</b><span>Entregado</span></div>'
+      + '<div><b>' + pedNum(x.enProc) + '</b><span>En proceso</span></div><div><b>' + pedNum(x.libre) + '</b><span>Sin iniciar</span></div></div>'
+      + (x.entregadoTotal > 0 ? '<div class="ped-ent-det">' + pedEntDetHtml(x) + '</div>' : ''), 's')
     + (x.completada ? '' : (lotes ? pedFrame('🔵 Lotes en proceso', lotes, 'b') : '') + pedFrame('▶ ' + formTit, form, 'b'))
     + (x.completada ? pedFrame('✅ Ficha COMPLETADA · ' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant), '<div class="ped-est-n" style="margin:0 0 6px">' + escHtml(pedCompletadaTexto(x)) + (x.entregadoTotal > x.cant ? '. Se entregaron ' + pedNum(x.entregadoTotal - x.cant) + ' und de más.' : '.') + '</div>'
       + (pedPuedeDeshacer(x) ? '<div class="ped-est" style="margin:0"><button class="e-p" onclick="deshacerEntrega()">↩ Deshacer (fue un error)</button></div>' : '<div class="ped-est-n" style="margin:0">Si fue un error, pídele al administrador que la reabra.</div>'), 'g') + pedParcHistHtml(x) : pedEstadoHtml(x))
@@ -2320,13 +2356,27 @@ function pedEntregaInput(el) {
 }
 
 // Resumen en el chip: lo reportado por Tapas y cuánto sigue sin requi
+function pedEntColor(x) { return x.parc.sinRequi > 0 ? '#A16207' : '#15803D'; }
+
+// "✓ 60 con requi · ⏳ 25 sin requi" (verde = ya vinculada a una requi de ingreso PT, amarillo = aún sin requi)
+function pedEntDetHtml(x) {
+  var det = [];
+  if (x.entregado > 0) det.push('<span class="cr">✓ ' + pedNum(x.entregado) + ' con requi</span>');
+  if (x.parc.sinRequi > 0) det.push('<span class="sr">⏳ ' + pedNum(x.parc.sinRequi) + ' sin requi</span>');
+  return det.join(' · ');
+}
+
+// Recuadro ENTREGADO 85/100 del chip (ESPEJO de entregasChipHtml de tapas.html): entregado = ingresos PT con requi + lo reportado
+// por Tapas que aún no la tiene. Amarillo mientras quede algo sin requi; verde cuando todo está vinculado. Una línea por entrega reportada.
 function pedParcChipHtml(x) {
-  if (!x.parc.total) return '';
-  return '<div class="ped-parc">🟡 Reportado por Tapas: <b>' + pedNum(x.parc.total) + '</b> und · '
-    + (x.parc.sinRequi > 0 ? '<span class="sr">⏳ ' + pedNum(x.parc.sinRequi) + ' sin requi</span>' : '<span class="cr">✓ con requi</span>')
-    // una línea por entrega registrada: fecha + cantidad
+  if (!x.entregadoTotal && !x.parc.lista.length) return '';
+  return '<div class="ped-parc' + (x.parc.sinRequi > 0 ? '' : ' ok') + '">'
+    + '<div class="top"><span>🚚 ENTREGADO</span><b>' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</b></div>'
+    + '<div class="det">' + pedEntDetHtml(x) + '</div>'
     + x.parc.lista.map(function(e) {
-        return '<div class="ent"><span>' + escHtml(pedFechaCorta(e.fecha)) + '</span><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<em>✅ completó</em>' : '') + pedFotoBtn(e, true) + '</div>';
+        var okE = (e.cubierto || 0) >= e.cantidad;
+        return '<div class="ent ' + (okE ? 'ok' : 'y') + '"><span>' + escHtml(pedFechaCorta(e.fecha)) + '</span><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<em>✅ completó</em>' : '')
+          + '<i>' + (okE ? '✓ con requi' : ((e.cubierto || 0) ? '⏳ faltan ' + pedNum(e.cantidad - e.cubierto) : '⏳ sin requi')) + '</i>' + pedFotoBtn(e, true) + '</div>';
       }).join('')
     + '</div>';
 }
@@ -2337,12 +2387,12 @@ function pedParcHistHtml(x) {
   var filas = x.parc.lista.map(function(e) {
     var ok = (e.cubierto || 0) >= e.cantidad;
     var falta = e.cantidad - (e.cubierto || 0);
-    return '<div class="ped-pe"><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<span class="e cr">✅ completó la ficha</span>' : '') + '<span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>' + pedFotoBtn(e, false)
+    return '<div class="ped-pe' + (ok ? ' ok' : '') + '"><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<span class="e cr">✅ completó la ficha</span>' : '') + '<span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>' + pedFotoBtn(e, false)
       + '<span class="t">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + pedCorto(e.registrado_por) : '')) + '</span>'
       + '<span class="e ' + (ok ? 'cr' : 'sr') + '">' + (ok ? '✓ con requi' : (e.cubierto ? '⏳ faltan ' + pedNum(falta) + ' por requi' : '⏳ sin requi')) + '</span>'
       + (pedPuedeMarcar() ? '<button title="Quitar esta entrega" onclick="quitarParcial(\'' + escHtml(String(e.id)) + '\')">✕</button>' : '') + '</div>';
   }).join('');
-  return pedFrame('🟡 Entregas reportadas <i>(' + pedNum(x.parc.total) + ' und · ' + (x.parc.sinRequi > 0 ? pedNum(x.parc.sinRequi) + ' sin requi' : 'todas con requi') + ')</i>', filas, 'y');
+  return pedFrame((x.parc.sinRequi > 0 ? '🟡' : '🟢') + ' Entregas reportadas <i>(' + pedNum(x.parc.total) + ' und · ' + (x.parc.sinRequi > 0 ? pedNum(x.parc.sinRequi) + ' sin requi' : 'todas con requi') + ')</i>', filas, x.parc.sinRequi > 0 ? 'y' : 'g');
 }
 
 function pedFechaCorta(f) {
