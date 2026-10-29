@@ -7048,6 +7048,74 @@ async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
 // DETALLE DE SOLICITUD
 // ════════════════════════════════════════════════════════════
 
+// Lista de salidas de bodega / ingresos PT de la ficha (movimientos_materiales) con ✏️ cantidad y 🗑,
+// para corregir un registro hecho mal desde el propio detalle. Cada cambio ajusta también el inventario.
+function buildMovimientosFicha(movs, solId) {
+  if (!movs.length) return '';
+  var filas = movs.map(function(m) {
+    var d = new Date(m.created_at);
+    var f = isNaN(d.getTime()) ? '' : d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    var esSal = m.tipo === 'salida_bodega';
+    return '<tr>' +
+      '<td>' + (esSal ? '📤 Salida' : '📦 Ingreso PT') + '</td>' +
+      '<td>' + fmtFechaCorta(f) + '</td>' +
+      '<td style="font-family:var(--mono)">' + (m.num_documento ? escHtml(m.num_documento) : '—') + '</td>' +
+      '<td style="font-family:var(--mono)">' + escHtml(m.sku_original || '—') + '</td>' +
+      '<td style="text-align:right;font-weight:700">' + (m.cantidad || 0).toLocaleString() + '</td>' +
+      '<td style="text-align:right;white-space:nowrap">' +
+        '<button class="btn btn-g btn-xs" title="Corregir la cantidad" onclick="editarMovimientoFicha(\'' + m.id + '\',\'' + solId + '\')">✏️</button> ' +
+        '<button class="btn btn-g btn-xs" title="Eliminar este registro" style="background:var(--red-l);color:var(--red)" onclick="eliminarMovimientoFicha(\'' + m.id + '\',\'' + solId + '\')">🗑</button>' +
+      '</td></tr>';
+  }).join('');
+  return '<div style="margin-bottom:10px;overflow-x:auto">' +
+    '<table class="dt"><thead><tr><th>Movimiento</th><th>Fecha</th><th>Requi</th><th>SKU</th><th style="text-align:right">Unidades</th><th></th></tr></thead>' +
+    '<tbody>' + filas + '</tbody></table></div>';
+}
+
+// Refresca todo lo que lee movimientos_materiales después de corregir/eliminar un registro de la ficha.
+async function refrescarTrasMovimientoFicha(solId) {
+  envSalidoCache = null;
+  await cargarSalidaRequiMap();   // incluye el mapa de merma que lee el chip de la tarjeta
+  renderBoard();
+  refreshKPIs();
+  renderConsolidadoEnvases();
+  mostrarDetalle(solId);
+}
+
+async function editarMovimientoFicha(movId, solId) {
+  try {
+    var g = await db.from('movimientos_materiales').select('*').eq('id', movId).single();
+    if (g.error || !g.data) throw (g.error || new Error('No se encontró el registro'));
+    var m = g.data, esSal = m.tipo === 'salida_bodega';
+    var txt = prompt((esSal ? 'Salida de bodega' : 'Ingreso PT') + ' · SKU ' + (m.sku_original || '—') + '\nCantidad actual: ' + (m.cantidad || 0) + '\n\nNueva cantidad:', m.cantidad || 0);
+    if (txt === null) return;
+    var nueva = parseInt(String(txt).replace(/[^\d]/g, ''), 10);
+    if (!nueva || nueva <= 0) { showToast('⚠️ Cantidad no válida', '#92400e'); return; }
+    if (nueva === (m.cantidad || 0)) return;
+    var u = await db.from('movimientos_materiales').update({ cantidad: nueva }).eq('id', movId);
+    if (u.error) throw u.error;
+    var delta = nueva - (m.cantidad || 0);
+    if (m.sku_original) await ajustarExistencia(m.sku_original, esSal ? -delta : +delta);
+    showToast('✅ Registro corregido: ' + (m.cantidad || 0).toLocaleString() + ' → ' + nueva.toLocaleString() + ' und');
+    await refrescarTrasMovimientoFicha(solId);
+  } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
+}
+
+async function eliminarMovimientoFicha(movId, solId) {
+  try {
+    var g = await db.from('movimientos_materiales').select('*').eq('id', movId).single();
+    if (g.error || !g.data) throw (g.error || new Error('No se encontró el registro'));
+    var m = g.data, esSal = m.tipo === 'salida_bodega';
+    if (!confirm('¿Eliminar este registro?\n' + (esSal ? 'Salida de bodega' : 'Ingreso PT') + ' · SKU ' + (m.sku_original || '—') + ' · ' + (m.cantidad || 0).toLocaleString() + ' und\n' +
+        (m.sku_original ? 'Se ' + (esSal ? 'devolverán al' : 'descontarán del') + ' inventario.' : ''))) return;
+    var d = await db.from('movimientos_materiales').delete().eq('id', movId);
+    if (d.error) throw d.error;
+    if (m.sku_original && (m.cantidad || 0) > 0) await ajustarExistencia(m.sku_original, esSal ? +m.cantidad : -m.cantidad);
+    showToast('✅ Registro eliminado');
+    await refrescarTrasMovimientoFicha(solId);
+  } catch(e) { showToast('❌ Error: ' + e.message, '#B83232'); }
+}
+
 // Bloque "Entregas" del detalle de la ficha: fecha, requi, línea y unidades de cada ingreso PT.
 function buildEntregasDetalle(entregas, pedido) {
   var total = entregas.reduce(function(sum, e) { return sum + (e.cant || 0); }, 0);
@@ -7074,9 +7142,12 @@ async function mostrarDetalle(id) {
 
   var fugas = { salidas: 0, entradas: 0, fugaTotal: 0 };
   var entregasDet = [];   // { fecha 'YYYY-MM-DD', requi, cant, linea } de cada ingreso PT de la ficha
+  var movsDet = [];       // salidas de bodega / ingresos PT de movimientos_materiales (editables desde el detalle)
   try {
     var r = await db.from('movimientos_materiales').select('*').eq('solicitud_id', s.dbId);
     if (r.data) {
+      movsDet = r.data.filter(function(m) { return m.tipo === 'salida_bodega' || m.tipo === 'entrada_pt'; })
+        .sort(function(a, b) { return (a.created_at || '') < (b.created_at || '') ? -1 : 1; });
       fugas.salidas  = r.data.filter(function(m){return m.tipo==='salida_bodega';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
       fugas.entradas = r.data.filter(function(m){return m.tipo==='entrada_pt';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
       r.data.filter(function(m){return m.tipo==='entrada_pt';}).forEach(function(m) {
@@ -7215,6 +7286,7 @@ async function mostrarDetalle(id) {
             '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Entrada PT</div><div style="font-size:20px;font-weight:800;color:var(--green)">' + fugas.entradas.toLocaleString() + '</div></div>' +
             '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Merma</div><div style="font-size:20px;font-weight:800;color:' + (fugas.salidas > 0 ? fugaColor : 'var(--gray-l)') + '" title="' + (fugas.salidas > 0 ? '' : 'Sin salida de bodega registrada: no se puede calcular') + '">' + mermaTxt + '</div></div>' +
           '</div>' +
+          buildMovimientosFicha(movsDet, s.id) +
           '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
             '<button class="btn btn-g btn-sm" onclick="registrarEntradaRapida(\'' + s.id + '\')">📦 Registrar entrada PT</button>' +
             '<button class="btn btn-g btn-sm" onclick="registrarSalidaRapida(\'' + s.id + '\')">📤 Registrar salida bodega</button>' +
