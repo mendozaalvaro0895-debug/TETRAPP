@@ -274,6 +274,16 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-comp-r .u{font-family:'DM Mono',monospace;font-weight:800;text-align:right}
 .ped-tag{font-size:9px;font-weight:800;border-radius:10px;padding:1px 7px;white-space:nowrap}
 .ped-comp-r .ped-tag{justify-self:start;align-self:center}
+.ped-comp-r .fi.lnk{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.ped-comp-r .fi.lnk:hover{color:#0F4D40;text-decoration-style:solid}
+#estOv{z-index:9300}
+.est-big{font-family:'DM Mono',monospace;font-size:28px;font-weight:800;text-align:center;line-height:1.1}
+.est-sub{font-size:11px;text-align:center;margin-top:2px;font-weight:700;color:#475569}
+.est-bar{height:11px;border-radius:7px;background:#E5E7EB;overflow:hidden;display:flex;margin:8px 0 6px}
+.est-bar i{display:block;height:100%}
+.est-bar .c{background:#16A34A}
+.est-bar .s{background:#EAB308}
+.est-estado{display:inline-block;font-size:11px;font-weight:800;border-radius:12px;padding:2px 10px;background:#F1F5F9;color:#334155;margin-left:6px;vertical-align:middle}
 .ped-tag.par{background:#FFF3D6;color:#7A4800}
 .ped-tag.ok{background:#DCFCE7;color:#166534}
 .ped-tag.sr{background:#F59E0B;color:#fff}
@@ -621,6 +631,10 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
     </div>
   </div>
 
+</div>
+
+<div class="ped-ov" id="estOv" onclick="if(event.target===this)cerrarEstadoFicha()">
+  <div class="ped-box" id="estBox"></div>
 </div>
 
 <div class="ped-ov" id="fotoOv" onclick="if(event.target===this)cerrarFotoEntrega()">
@@ -1879,6 +1893,72 @@ function pedChipCompletada(x, conCliente) {
     + '</div>';
 }
 
+// ── Estado actual de una ficha (clic en su código dentro de Entregados): ENTREGADO/TOTAL con barra, entregas reportadas por Tapas y requis ──
+// Solo lectura; desde aquí se puede abrir la ficha completa (marcar lotes, registrar entregas, comentarios).
+function abrirEstadoFicha(id) {
+  PED.estId = id;
+  pintarEstadoFicha();
+}
+
+function cerrarEstadoFicha() {
+  PED.estId = null;
+  document.getElementById('estOv').classList.remove('open');
+}
+
+function estAbrirFichaCompleta() {
+  var id = PED.estId;
+  cerrarEstadoFicha();
+  abrirPedido(id);
+}
+
+function pedEstadoNombre(x) {
+  var e = x.s.estado;
+  var n = e === 'lista' ? '✅ Completada' : (e === 'parcial' ? '🟡 Entrega parcial' : (e === 'proceso' ? '🔵 En proceso' : '⚪ Nueva'));
+  return n + (x.abiertos.length ? ' · ▶ ' + pedNum(x.enProc) + ' en proceso' : '');
+}
+
+// Entregas reportadas por Tapas, en solo lectura (verde = ya vinculada a una requi, amarillo = sin requi)
+function pedParcLecturaHtml(x) {
+  if (!x.parc.lista.length) return '<div class="ped-vacio">La supervisora aún no ha reportado entregas de esta ficha.</div>';
+  return x.parc.lista.map(function(e) {
+    var ok = (e.cubierto || 0) >= e.cantidad;
+    return '<div class="ped-pe' + (ok ? ' ok' : '') + '"><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<span class="e cr">✅ completó la ficha</span>' : '')
+      + '<span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>' + pedFotoBtn(e, false)
+      + '<span class="t">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + pedCorto(e.registrado_por) : '')) + '</span>'
+      + '<span class="e ' + (ok ? 'cr' : 'sr') + '">' + (ok ? '✓ con requi' : ((e.cubierto || 0) ? '⏳ faltan ' + pedNum(e.cantidad - e.cubierto) + ' por requi' : '⏳ sin requi')) + '</span></div>';
+  }).join('');
+}
+
+// Requis de ingreso PT ya registradas para la ficha
+function pedRequisLecturaHtml(x) {
+  if (!x.ings.length) return '<div class="ped-vacio">Todavía no hay requis de ingreso PT vinculadas a esta ficha.</div>';
+  return x.ings.slice().reverse().map(function(g) {
+    return '<div class="ped-pe ok"><b>' + pedNum(g.cantidad) + ' und</b><span>' + escHtml(pedFechaMov(g)) + '</span>'
+      + '<span class="t">Requi ' + escHtml(g.num_documento || '—') + '</span><span class="e cr">✓ ingresada</span></div>';
+  }).join('');
+}
+
+function pintarEstadoFicha() {
+  var x = PED.modelo.find(function(m) { return String(m.id) === String(PED.estId); });
+  if (!x) { cerrarEstadoFicha(); return; }
+  var tot = x.entregadoTotal, cant = x.cant || 0;
+  var conPct = cant > 0 ? Math.min(100, x.entregado / cant * 100) : 0;
+  var sinPct = cant > 0 ? Math.min(100 - conPct, x.parc.sinRequi / cant * 100) : 0;
+  document.getElementById('estBox').innerHTML =
+    '<h3>' + escHtml(x.codigo) + ' · ' + escHtml(x.cliente) + '<span class="est-estado">' + pedEstadoNombre(x) + '</span></h3>'
+    + pedFrame('📄 Producto', '<div class="pd" style="margin:0"><b>' + escHtml(x.sku) + '</b> ' + escHtml(x.desc) + '</div>', 'g')
+    + pedFrame('🚚 Entregado / pedido',
+        '<div class="est-big" style="color:' + (tot ? pedEntColor(x) : '#64748B') + '">' + pedNum(tot) + '/' + pedNum(cant) + '</div>'
+        + '<div class="est-bar"><i class="c" style="width:' + conPct + '%"></i><i class="s" style="width:' + sinPct + '%"></i></div>'
+        + '<div class="est-sub">' + (tot ? pedEntDetHtml(x) : 'Aún no se ha entregado nada') + '</div>'
+        + '<div class="est-sub" style="font-weight:500;color:#64748B">Falta por entregar: ' + pedNum(x.falta) + ' und</div>', x.parc.sinRequi > 0 ? 'y' : (tot ? 'g' : 's'))
+    + pedFrame('🟡 Entregas reportadas por Tapas <i>(' + x.parc.lista.length + ')</i>', pedParcLecturaHtml(x), 'y')
+    + pedFrame('📦 Requis de ingreso PT <i>(' + x.ings.length + ')</i>', pedRequisLecturaHtml(x), 'g')
+    + '<button class="ped-link" style="padding-left:0" onclick="estAbrirFichaCompleta()">Abrir la ficha completa →</button>'
+    + '<button class="ped-cerrar" onclick="cerrarEstadoFicha()">Cerrar</button>';
+  document.getElementById('estOv').classList.add('open');
+}
+
 // Encabezado de las columnas del bloque Entregados (las filas normales y las ámbar "sin requi" comparten las mismas columnas)
 function pedCompHeadHtml() {
   return '<div class="ped-comp-r ped-comp-h"><span class="f">Fecha</span><span class="rq">No. de requi</span><span class="cl">Cliente</span><span class="fi">Ficha</span>'
@@ -1902,7 +1982,7 @@ function pedPendientesSinRequi(m) {
 
 function pedPendRowHtml(p) {
   var x = p.x, e = p.e, idq = escHtml(String(x.id));
-  return '<div class="ped-comp-r pend" title="Entrega reportada por Tapas: falta la requi de ingreso" onclick="abrirPedido(\'' + idq + '\')">'
+  return '<div class="ped-comp-r pend" title="Entrega reportada por Tapas: falta la requi de ingreso" onclick="abrirEstadoFicha(\'' + idq + '\')">'
     + '<span class="f">' + escHtml(pedFechaCorta(e.fecha)) + '</span><span class="rq">⏳ SIN REQUI</span>'
     + '<span class="cl">' + escHtml(x.cliente) + '</span><span class="fi">' + escHtml(x.codigo) + '</span>'
     + '<span class="ped-tag sr"' + (e.cierra ? ' title="Esta entrega completó la ficha"' : '') + '>' + (e.cierra ? 'TAPAS ✓' : 'TAPAS') + '</span>'
@@ -2044,7 +2124,7 @@ function renderPedidos() {
   var filas = orden.slice(0, PED.masComp).map(function(g) {
     var completa = g.acum >= g.x.cant && g.x.cant > 0;
     return '<div class="ped-comp-r"><span class="f">' + escHtml(g.fecha) + '</span><span class="rq">' + escHtml(g.doc) + '</span>'
-      + '<span class="cl">' + escHtml(g.x.cliente) + '</span><span class="fi">' + escHtml(g.x.codigo) + '</span>'
+      + '<span class="cl">' + escHtml(g.x.cliente) + '</span><span class="fi lnk" title="Ver el estado de la ficha" onclick="abrirEstadoFicha(\'' + escHtml(String(g.x.id)) + '\')">' + escHtml(g.x.codigo) + '</span>'
       + '<span class="ped-tag ' + (completa ? 'ok' : 'par') + '">' + (completa ? 'Completa' : 'Parcial') + '</span>'
       + '<span class="pr">' + escHtml((g.x.sku ? g.x.sku + ' · ' : '') + g.x.desc) + '</span>'
       + '<span class="u">' + pedNum(g.und) + '</span></div>';
@@ -2064,6 +2144,7 @@ function renderPedidos() {
     + '<div class="ped-sec-t clic' + pedCol('comp') + '"' + pedClic('comp') + '><span class="ped-chev">▾</span>📦 Entregados — ingresos PT con su requi <i>(' + orden.length + ' requi' + (orden.length !== 1 ? 's' : '') + (pend.length ? ' · ⏳ ' + pend.length + ' sin requi' : '') + ')</i></div>' + htmlComp.replace('class="ped-comp"', 'class="ped-comp' + pedCol('comp') + '"').replace('class="ped-mas"', 'class="ped-mas' + pedCol('comp') + '"');
 
   if (document.getElementById('pedOv').classList.contains('open') && PED.abierto) pintarPedido();
+  if (document.getElementById('estOv').classList.contains('open') && PED.estId) pintarEstadoFicha();
 }
 
 // ── Popup de un pedido: números + lotes en proceso (con quién hace qué) + marcar/iniciar ──
