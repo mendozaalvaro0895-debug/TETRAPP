@@ -7048,29 +7048,61 @@ async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
 // DETALLE DE SOLICITUD
 // ════════════════════════════════════════════════════════════
 
+// Bloque "Entregas" del detalle de la ficha: fecha, requi, línea y unidades de cada ingreso PT.
+function buildEntregasDetalle(entregas, pedido) {
+  var total = entregas.reduce(function(sum, e) { return sum + (e.cant || 0); }, 0);
+  var filas = entregas.length
+    ? entregas.map(function(e) {
+        return '<tr><td style="font-weight:700">' + fmtFechaCorta(e.fecha) + '</td>' +
+          '<td style="font-family:var(--mono)">' + (e.requi ? escHtml(e.requi) : '—') + '</td>' +
+          '<td>' + (e.linea ? 'L' + escHtml(String(e.linea)) : '—') + '</td>' +
+          '<td style="text-align:right;font-weight:700">' + (e.cant || 0).toLocaleString() + '</td></tr>';
+      }).join('')
+    : '<tr><td colspan="4" style="color:var(--gray-l);font-style:italic">Sin entregas registradas</td></tr>';
+  return '<div class="dc"><div class="dc-h">🚚 Entregas' +
+      (entregas.length ? ' <span style="font-weight:600;color:var(--gray)">· ' + total.toLocaleString() + ' de ' + (pedido || 0).toLocaleString() + ' und</span>' : '') +
+    '</div><div class="dc-b">' +
+    '<table class="dt"><thead><tr><th>Fecha</th><th>Requi</th><th>Línea</th><th style="text-align:right">Unidades</th></tr></thead>' +
+    '<tbody>' + filas + '</tbody></table>' +
+  '</div></div>';
+}
+
 async function mostrarDetalle(id) {
   var s = solicitudes.find(function(x) { return x.id === id; });
   if (!s) return;
   selId = s.id;
 
   var fugas = { salidas: 0, entradas: 0, fugaTotal: 0 };
+  var entregasDet = [];   // { fecha 'YYYY-MM-DD', requi, cant, linea } de cada ingreso PT de la ficha
   try {
     var r = await db.from('movimientos_materiales').select('*').eq('solicitud_id', s.dbId);
     if (r.data) {
       fugas.salidas  = r.data.filter(function(m){return m.tipo==='salida_bodega';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
       fugas.entradas = r.data.filter(function(m){return m.tipo==='entrada_pt';}).reduce(function(sum,m){return sum+(m.cantidad||0);},0);
+      r.data.filter(function(m){return m.tipo==='entrada_pt';}).forEach(function(m) {
+        var d = new Date(m.created_at);
+        var f = isNaN(d.getTime()) ? '' : d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        entregasDet.push({ fecha: f, requi: m.num_documento || '', cant: m.cantidad || 0, linea: '' });
+      });
     }
   } catch(e) {}
   // Ingresos PT registrados como entregas manuales (Movimientos > Ingresos PT / bloque Entregados)
   (getEntregasManuales() || []).forEach(function(m) {
     if (m.lineas && m.lineas.length) {
-      m.lineas.forEach(function(l) { if (l.solId === s.id) fugas.entradas += (l.cant || 0); });
+      m.lineas.forEach(function(l) {
+        if (l.solId !== s.id) return;
+        fugas.entradas += (l.cant || 0);
+        entregasDet.push({ fecha: m.fecha || '', requi: m.requi || '', cant: l.cant || 0, linea: l.linea || '' });
+      });
     } else if (m.solId === s.id) {
       fugas.entradas += (m.cant || 0);
+      entregasDet.push({ fecha: m.fecha || '', requi: m.requi || '', cant: m.cant || 0, linea: '' });
     }
   });
+  entregasDet.sort(function(a, b) { return (a.fecha || '') < (b.fecha || '') ? -1 : 1; });
   // Todo lo que salió de bodega y no volvió como PT se considera merma (sin paso aparte de "pérdidas")
   fugas.fugaTotal = fugas.salidas - fugas.entradas;
+  var mermaTxt = fugas.salidas > 0 ? fugas.fugaTotal.toLocaleString() : '—';   // sin salida de bodega no hay base para la merma
 
   var det = document.getElementById('modalDetalleBody');
   if (!det) return;
@@ -7181,7 +7213,7 @@ async function mostrarDetalle(id) {
           '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">' +
             '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Salida bodega</div><div style="font-size:20px;font-weight:800;color:var(--teal)">' + fugas.salidas.toLocaleString() + '</div></div>' +
             '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Entrada PT</div><div style="font-size:20px;font-weight:800;color:var(--green)">' + fugas.entradas.toLocaleString() + '</div></div>' +
-            '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Merma</div><div style="font-size:20px;font-weight:800;color:' + fugaColor + '">' + fugas.fugaTotal.toLocaleString() + '</div></div>' +
+            '<div style="text-align:center"><div style="font-size:9px;color:var(--gray)">Merma</div><div style="font-size:20px;font-weight:800;color:' + (fugas.salidas > 0 ? fugaColor : 'var(--gray-l)') + '" title="' + (fugas.salidas > 0 ? '' : 'Sin salida de bodega registrada: no se puede calcular') + '">' + mermaTxt + '</div></div>' +
           '</div>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
             '<button class="btn btn-g btn-sm" onclick="registrarEntradaRapida(\'' + s.id + '\')">📦 Registrar entrada PT</button>' +
@@ -7189,6 +7221,8 @@ async function mostrarDetalle(id) {
           '</div>' +
         '</div>' +
       '</div>' +
+
+      buildEntregasDetalle(entregasDet, s.cant) +
 
       '<div class="dc"><div class="dc-h">Líneas del pedido</div><div class="dc-b">' +
         '<table class="dt"><thead><tr><th>SKU PT</th><th>Descripción</th><th>Envase Base</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Stock</th></tr></thead>' +
