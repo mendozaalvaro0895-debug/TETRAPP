@@ -2409,9 +2409,10 @@ function pedParcHistHtml(x) {
 }
 
 // ── Corregir la cantidad de una entrega ya reportada (función tapas_editar_entrega, sql/tapas_entrega_editar_v1.sql) ──
-// Las entregas que COMPLETARON la ficha no se editan (para eso está Deshacer); la supervisora tiene 24 h, master sin límite.
+// También se edita la que COMPLETÓ la ficha: si con la nueva cantidad ya no alcanza, la ficha vuelve a ENTREGA PARCIAL (la función
+// lo aplica con p_completa). La supervisora tiene 24 h, master sin límite.
 function pedPuedeEditarEntrega(e) {
-  if (!pedPuedeMarcar() || e.cierra) return false;
+  if (!pedPuedeMarcar()) return false;
   if (TETRA.rol === 'master') return true;
   var t = e.created_at ? new Date(e.created_at).getTime() : 0;
   return t > 0 && Date.now() - t <= 86400000;
@@ -2439,19 +2440,35 @@ function cancelarEdicionEntrega() {
 async function guardarEdicionEntrega() {
   var id = PED.editEnt;
   var e = PED.parc.find(function(p) { return String(p.id) === String(id); });
-  if (!e) return;
+  var x = PED.modelo.find(function(m) { return String(m.id) === String(PED.abierto); });
+  if (!e || !x) return;
   var n = parseInt(PED.editCant, 10);
   if (!n || n <= 0) { showToast('⚠️ Escribe la cantidad correcta', '#B83232'); return; }
   if (n === e.cantidad) { cancelarEdicionEntrega(); return; }
-  var r = await db.rpc('tapas_editar_entrega', { p_id: id, p_cantidad: n });
+  // ¿Con la nueva cantidad la ficha sigue COMPLETADA? (misma regla que al registrar: lo que esta entrega deja sin requi alcanza lo que falta)
+  var sinEsta = Math.max(0, e.cantidad - (e.cubierto || 0));
+  var faltaOtros = Math.max(0, x.cant - x.entregado - (x.parc.sinRequi - sinEsta));
+  var sinNueva = Math.max(0, n - (e.cubierto || 0));
+  var completaNueva = x.cant > 0 && sinNueva >= faltaOtros;
+  var pCompleta = null, aviso = '';
+  if (e.cierra && !completaNueva) {
+    pCompleta = false;
+    aviso = 'Con ' + pedNum(n) + ' und la ficha ' + x.codigo + ' deja de estar COMPLETADA y vuelve a ENTREGA PARCIAL (faltarán ' + pedNum(faltaOtros - sinNueva) + ' und).';
+  } else if (!e.cierra && x.s.estado !== 'lista' && completaNueva) {
+    pCompleta = true;
+    aviso = 'Con ' + pedNum(n) + ' und la ficha ' + x.codigo + ' queda COMPLETADA.';
+  }
+  if (aviso && !confirm(aviso + '\n\n¿Confirmas?')) return;
+  var quien = supervisorActual.nombre || (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
+  var r = await db.rpc('tapas_editar_entrega', { p_id: id, p_cantidad: n, p_completa: pCompleta, p_por: quien });
   if (r.error) {
     var msg = r.error.message || String(r.error);
-    showToast('❌ ' + (/function|does not exist|schema cache|tapas_editar_entrega/i.test(msg) ? 'Falta correr sql/tapas_entrega_editar_v1.sql en Supabase' : msg), '#B83232');
+    showToast('❌ ' + (/function|does not exist|schema cache|tapas_editar_entrega/i.test(msg) ? 'Falta correr sql/tapas_entrega_editar_v2.sql en Supabase' : msg), '#B83232');
     return;
   }
   PED.editEnt = null;
   await cargarPedidos(true);
-  showToast('✏️ Entrega corregida: ' + pedNum(e.cantidad) + ' → ' + pedNum(n) + ' und');
+  showToast('✏️ Entrega corregida: ' + pedNum(e.cantidad) + ' → ' + pedNum(n) + ' und' + (pCompleta === false ? ' · la ficha volvió a ENTREGA PARCIAL' : (pCompleta === true ? ' · ficha COMPLETADA' : '')));
 }
 
 function pedFechaCorta(f) {

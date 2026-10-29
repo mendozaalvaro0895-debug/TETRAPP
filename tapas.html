@@ -4202,7 +4202,7 @@ function bloqueParcialesTapas(s) {
       + '<span style="flex:1;min-width:100px;color:var(--gray)">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + e.registrado_por : '')) + '</span>'
       + '<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;background:' + (ok ? '#ECFDF5' : '#FEF3C7') + ';color:' + (ok ? '#047857' : '#92400E') + '">'
       + (ok ? '✓ con requi' : (it.cubierto ? '⏳ faltan ' + (e.cantidad - it.cubierto).toLocaleString() + ' por requi' : '⏳ sin requi')) + '</span>'
-      + (e.cierra ? '' : '<button class="btn btn-g btn-xs" title="Corregir la cantidad" onclick="parcialEditarTapas(\'' + escHtml(String(e.id)) + '\')">✏️</button>')
+      + '<button class="btn btn-g btn-xs" title="Corregir la cantidad" onclick="parcialEditarTapas(\'' + escHtml(String(e.id)) + '\')">✏️</button>'
       + '<button class="btn btn-del btn-xs" title="Borrar esta entrega reportada" onclick="parcialBorrarTapas(\'' + escHtml(String(e.id)) + '\')">🗑</button></div>';
   }).join('');
   var sinR = p.sinRequi > 0;
@@ -4211,24 +4211,49 @@ function bloqueParcialesTapas(s) {
     + filas + '<div style="font-size:10px;color:var(--gray);margin-top:6px">Informativo: no descuenta del saldo. El saldo baja cuando registras la requi (ingreso PT) vinculada a esta ficha en Entregados.</div></div></div>';
 }
 
-// Corregir la cantidad de una entrega reportada (las que completaron la ficha no se editan: usa "Reabrir ficha"). Función tapas_editar_entrega.
+// Corregir la cantidad de una entrega reportada, también la que completó la ficha (si con la nueva cantidad ya no alcanza, la ficha
+// vuelve a ENTREGA PARCIAL). Función tapas_editar_entrega; la regla de "completa" es la misma que al registrar en registro-tapas.html.
 async function parcialEditarTapas(id) {
   var ent = parcialesTapas.find(function(e) { return String(e.id) === String(id); });
   if (!ent) return;
+  var s = solicitudes.find(function(x) { return x.id === ent.solicitud_id; });
   var v = prompt('Nueva cantidad entregada (actual: ' + (ent.cantidad || 0).toLocaleString() + ' und)', ent.cantidad);
   if (v === null) return;
   var n = parseInt(v, 10);
   if (!n || n <= 0) { showToast('⚠️ Escribe una cantidad válida', '#B83232'); return; }
   if (n === ent.cantidad) return;
-  var r = await db.rpc('tapas_editar_entrega', { p_id: id, p_cantidad: n });
+  var pCompleta = null;
+  if (s) {
+    var p = parcialesDeFicha(s);
+    var it = p.lista.find(function(i) { return String(i.e.id) === String(id); });
+    var cub = it ? it.cubierto : 0;
+    var ing = entregadoTotalFichaTapas(s) - p.sinRequi; // ingresos PT ya registrados
+    var sinEsta = Math.max(0, ent.cantidad - cub);
+    var faltaOtros = Math.max(0, (s.cant || 0) - ing - (p.sinRequi - sinEsta));
+    var sinNueva = Math.max(0, n - cub);
+    var completaNueva = (s.cant || 0) > 0 && sinNueva >= faltaOtros;
+    var aviso = '';
+    if (ent.cierra && !completaNueva) {
+      pCompleta = false;
+      aviso = 'Con ' + n.toLocaleString() + ' und la ficha ' + (s.id_display || '') + ' deja de estar COMPLETADA y vuelve a ENTREGA PARCIAL (faltarán ' + (faltaOtros - sinNueva).toLocaleString() + ' und).';
+    } else if (!ent.cierra && s.estado !== 'lista' && completaNueva) {
+      pCompleta = true;
+      aviso = 'Con ' + n.toLocaleString() + ' und la ficha ' + (s.id_display || '') + ' queda COMPLETADA.';
+    }
+    if (aviso && !confirm(aviso + '\n\n¿Confirmas?')) return;
+  }
+  var quien = (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
+  var r = await db.rpc('tapas_editar_entrega', { p_id: id, p_cantidad: n, p_completa: pCompleta, p_por: quien });
   if (r.error) {
     var msg = r.error.message || String(r.error);
-    showToast('❌ ' + (/function|does not exist|schema cache|tapas_editar_entrega/i.test(msg) ? 'Falta correr sql/tapas_entrega_editar_v1.sql en Supabase' : msg), '#B83232');
+    showToast('❌ ' + (/function|does not exist|schema cache|tapas_editar_entrega/i.test(msg) ? 'Falta correr sql/tapas_entrega_editar_v2.sql en Supabase' : msg), '#B83232');
     return;
   }
+  await cargarSolicitudes();
   await cargarComentariosTapas();
+  renderInicioPedidosTapas();
   refrescarTrasComentarioTapas();
-  showToast('✏️ Entrega corregida: ' + (ent.cantidad || 0).toLocaleString() + ' → ' + n.toLocaleString() + ' und');
+  showToast('✏️ Entrega corregida: ' + (ent.cantidad || 0).toLocaleString() + ' → ' + n.toLocaleString() + ' und' + (pCompleta === false ? ' · la ficha volvió a ENTREGA PARCIAL' : (pCompleta === true ? ' · ficha COMPLETADA' : '')));
 }
 
 async function parcialBorrarTapas(id) {
