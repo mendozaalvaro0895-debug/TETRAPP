@@ -7015,7 +7015,8 @@ async function registrarPerdida(solicitudId, sku, cantidad, motivo, usuario, obs
   try {
     var r = await db.from('movimientos_materiales').insert({
       solicitud_id: solicitudId, sku_original: sku, cantidad: cantidad,
-      tipo: 'perdida', operador_id: usuario, motivo_perdida: motivo, observaciones: obs
+      tipo: 'perdida', operador_id: usuario, motivo_perdida: motivo, observaciones: obs,
+      area: 'serig'
     });
     if (!r.error) await ajustarExistencia(sku, -cantidad);
     return { ok: !r.error, error: r.error ? r.error.message : null };
@@ -7026,7 +7027,8 @@ async function registrarEntradaPT(solicitudId, sku, cantidad, usuario, obs) {
   try {
     var r = await db.from('movimientos_materiales').insert({
       solicitud_id: solicitudId, sku_original: sku, cantidad: cantidad,
-      tipo: 'entrada_pt', operador_id: usuario, observaciones: obs
+      tipo: 'entrada_pt', operador_id: usuario, observaciones: obs,
+      area: 'serig'
     });
     if (!r.error) await ajustarExistencia(sku, +cantidad);
     return { ok: !r.error, error: r.error ? r.error.message : null };
@@ -7037,7 +7039,8 @@ async function registrarSalidaBodega(solicitudId, sku, cantidad, usuario, obs) {
   try {
     var r = await db.from('movimientos_materiales').insert({
       solicitud_id: solicitudId, sku_original: sku, cantidad: cantidad,
-      tipo: 'salida_bodega', operador_id: usuario, observaciones: obs
+      tipo: 'salida_bodega', operador_id: usuario, observaciones: obs,
+      area: 'serig'   // sin esto la salida no aparece en Movimientos · Salidas de Bodega (filtra por area='serig')
     });
     if (!r.error) await ajustarExistencia(sku, -cantidad);
     return { ok: !r.error, error: r.error ? r.error.message : null };
