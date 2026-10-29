@@ -394,6 +394,13 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-pf .acc button{flex:1;min-height:42px;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;font-family:'DM Sans',sans-serif;border:none}
 .ped-pf .g{background:#A16207;color:#fff}
 .ped-pf .c{background:#E2E8F0;color:#334155}
+.ped-foto{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ped-foto button{border:1.5px solid #CBD5E1;background:#fff;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer;color:#334155;font-family:'DM Sans',sans-serif;min-height:40px}
+.ped-foto .pv{display:flex;align-items:center;gap:10px;width:100%}
+.ped-foto .pv img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #CBD5E1}
+.ped-fbtn,.ped-pe button.ped-fbtn{border:none;background:none;cursor:pointer;font-size:15px;padding:0 3px;color:#334155}
+#fotoOv{z-index:9500}
+#fotoOv img{max-width:100%;max-height:78vh;border-radius:10px;display:block;margin:0 auto 10px}
 .ped-cm{border:1px solid #FCD34D;border-left-width:4px;background:#FFFBEB;border-radius:8px;padding:6px 9px;margin-bottom:6px}
 .ped-cm.ok{border-color:#E2E8F0;background:#F8FAFC;opacity:.85}
 .ped-cm-h{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;font-size:11px;color:#6B6B6A}
@@ -588,6 +595,13 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
     </div>
   </div>
 
+</div>
+
+<div class="ped-ov" id="fotoOv" onclick="if(event.target===this)cerrarFotoEntrega()">
+  <div class="ped-box" style="max-width:680px;text-align:center">
+    <div id="fotoCuerpo"></div>
+    <button class="clv-btn sec" onclick="cerrarFotoEntrega()">Cerrar</button>
+  </div>
 </div>
 
 <div class="ped-ov" id="claveOv" onclick="if(event.target===this)claveCerrar()">
@@ -2309,7 +2323,7 @@ function pedParcChipHtml(x) {
     + (x.parc.sinRequi > 0 ? '<span class="sr">⏳ ' + pedNum(x.parc.sinRequi) + ' sin requi</span>' : '<span class="cr">✓ con requi</span>')
     // una línea por entrega registrada: fecha + cantidad
     + x.parc.lista.map(function(e) {
-        return '<div class="ent"><span>' + escHtml(pedFechaCorta(e.fecha)) + '</span><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<em>✅ completó</em>' : '') + '</div>';
+        return '<div class="ent"><span>' + escHtml(pedFechaCorta(e.fecha)) + '</span><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<em>✅ completó</em>' : '') + pedFotoBtn(e, true) + '</div>';
       }).join('')
     + '</div>';
 }
@@ -2320,7 +2334,7 @@ function pedParcHistHtml(x) {
   var filas = x.parc.lista.map(function(e) {
     var ok = (e.cubierto || 0) >= e.cantidad;
     var falta = e.cantidad - (e.cubierto || 0);
-    return '<div class="ped-pe"><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<span class="e cr">✅ completó la ficha</span>' : '') + '<span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>'
+    return '<div class="ped-pe"><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<span class="e cr">✅ completó la ficha</span>' : '') + '<span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>' + pedFotoBtn(e, false)
       + '<span class="t">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + pedCorto(e.registrado_por) : '')) + '</span>'
       + '<span class="e ' + (ok ? 'cr' : 'sr') + '">' + (ok ? '✓ con requi' : (e.cubierto ? '⏳ faltan ' + pedNum(falta) + ' por requi' : '⏳ sin requi')) + '</span>'
       + (pedPuedeMarcar() ? '<button title="Quitar esta entrega" onclick="quitarParcial(\'' + escHtml(String(e.id)) + '\')">✕</button>' : '') + '</div>';
@@ -2343,15 +2357,89 @@ function pedParcFormHtml(x) {
     + '<input type="date" id="pedParcFecha" value="' + escHtml(PED.parcFecha || fechaGT()) + '" oninput="PED.parcFecha=this.value">'
     + '<label>Nota (opcional)</label>'
     + '<textarea id="pedParcNota" rows="2" maxlength="300" oninput="PED.parcNota=this.value" placeholder="Ej. entrega 1 de 3, se llevó el cliente…">' + escHtml(PED.parcNota) + '</textarea>'
+    + '<label>Foto de la entrega (opcional)</label>' + pedFotoBlockHtml()
     + '<div class="acc"><button class="g" onclick="guardarParcial()">Guardar entrega</button><button class="c" onclick="cancelarParcialForm()">Cancelar</button></div></div>';
 }
 
+// ── Foto de la entrega: se toma con la cámara o se elige de la galería, se reduce (máx. 1280 px) y se sube al bucket privado
+// `tapas-entregas` (sql/tapas_entrega_foto_v1.sql) al guardar la entrega. La ruta queda en tapas_entregas_parciales.foto_path.
+function pedFotoBlockHtml() {
+  var f = PED.parcFoto;
+  return '<div class="ped-foto">'
+    + '<input type="file" id="pedFotoCam" accept="image/*" capture="environment" style="display:none" onchange="pedFotoElegida(this)">'
+    + '<input type="file" id="pedFotoGal" accept="image/*" style="display:none" onchange="pedFotoElegida(this)">'
+    + (f ? '<div class="pv"><img src="' + f.url + '" alt="Foto de la entrega"><button type="button" onclick="pedFotoQuitar()">✕ Quitar</button></div>' : '')
+    + '<button type="button" onclick="document.getElementById(\'pedFotoCam\').click()">📷 ' + (f ? 'Tomar otra' : 'Tomar foto') + '</button>'
+    + '<button type="button" onclick="document.getElementById(\'pedFotoGal\').click()">🖼 Elegir de la galería</button></div>';
+}
+
+function pedFotoLimpiar() {
+  if (PED.parcFoto && PED.parcFoto.url) { try { URL.revokeObjectURL(PED.parcFoto.url); } catch(e) {} }
+  PED.parcFoto = null;
+}
+
+function pedFotoQuitar() {
+  pedFotoLimpiar();
+  pintarPedido();
+}
+
+function pedReducirFoto(file, cb) {
+  var url = URL.createObjectURL(file), img = new Image();
+  img.onload = function() {
+    var k = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    c.toBlob(function(b) { cb(b); }, 'image/jpeg', 0.78);
+  };
+  img.onerror = function() { URL.revokeObjectURL(url); cb(null); };
+  img.src = url;
+}
+
+function pedFotoElegida(inp) {
+  var f = inp.files && inp.files[0];
+  if (!f) return;
+  pedReducirFoto(f, function(blob) {
+    if (!blob) { showToast('⚠️ No se pudo leer la foto', '#B83232'); return; }
+    pedFotoLimpiar();
+    PED.parcFoto = { blob: blob, url: URL.createObjectURL(blob) };
+    pintarPedido();
+  });
+}
+
+// Botón 📷 de una entrega que trae foto; abre la imagen en grande (enlace firmado de 10 min)
+function pedFotoBtn(e, enChip) {
+  if (!e.foto_path) return '';
+  return '<button type="button" class="ped-fbtn" title="Ver la foto de esta entrega" onclick="' + (enChip ? 'event.stopPropagation();' : '')
+    + 'verFotoEntrega(\'' + escHtml(String(e.foto_path)) + '\')">📷</button>';
+}
+
+async function verFotoEntrega(path) {
+  var cuerpo = document.getElementById('fotoCuerpo');
+  cuerpo.innerHTML = '<div class="cargando"><div class="spinner"></div><div>Cargando foto…</div></div>';
+  document.getElementById('fotoOv').classList.add('open');
+  var r = await db.storage.from('tapas-entregas').createSignedUrl(path, 600);
+  if (r.error || !r.data) {
+    cuerpo.innerHTML = '<div class="ped-aviso">No se pudo abrir la foto: ' + escHtml((r.error && r.error.message) || 'sin permiso') + '</div>';
+    return;
+  }
+  cuerpo.innerHTML = '<img src="' + escHtml(r.data.signedUrl) + '" alt="Foto de la entrega">';
+}
+
+function cerrarFotoEntrega() {
+  document.getElementById('fotoOv').classList.remove('open');
+  document.getElementById('fotoCuerpo').innerHTML = '';
+}
+
 function abrirParcialForm() {
+  pedFotoLimpiar();
   PED.parcForm = true; PED.parcCant = ''; PED.parcFecha = ''; PED.parcNota = '';
   pintarPedido();
 }
 
 function cancelarParcialForm() {
+  pedFotoLimpiar();
   PED.parcForm = false;
   pintarPedido();
 }
@@ -2366,12 +2454,28 @@ async function guardarParcial() {
       + (cant > x.falta ? ' (' + pedNum(cant - x.falta) + ' und de más: ' + pedNum(x.entregadoTotal + cant) + '/' + pedNum(x.cant) + ')' : '') + '.\n\n¿Confirmas?')) return;
   var fecha = PED.parcFecha || fechaGT();
   var quien = supervisorActual.nombre || (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
-  var r = await db.rpc('tapas_registrar_entrega', { p_id: x.id, p_cantidad: cant, p_completa: completa, p_fecha: fecha, p_nota: PED.parcNota || null, p_por: quien });
+  if (PED.guardandoEntrega) return;
+  PED.guardandoEntrega = true;
+  var fotoPath = null;
+  if (PED.parcFoto) {
+    fotoPath = x.id + '/' + Date.now() + '.jpg';
+    var up = await db.storage.from('tapas-entregas').upload(fotoPath, PED.parcFoto.blob, { contentType: 'image/jpeg' });
+    if (up.error) {
+      PED.guardandoEntrega = false;
+      var um = up.error.message || String(up.error);
+      showToast('❌ Foto: ' + (/bucket|not found/i.test(um) ? 'Falta correr sql/tapas_entrega_foto_v1.sql en Supabase' : um), '#B83232');
+      return;
+    }
+  }
+  var r = await db.rpc('tapas_registrar_entrega', { p_id: x.id, p_cantidad: cant, p_completa: completa, p_fecha: fecha, p_nota: PED.parcNota || null, p_por: quien, p_foto: fotoPath });
+  PED.guardandoEntrega = false;
   if (r.error) {
+    if (fotoPath) { try { await db.storage.from('tapas-entregas').remove([fotoPath]); } catch(e) {} }
     var msg = r.error.message || String(r.error);
-    showToast('❌ ' + (/function|does not exist|schema cache|tapas_registrar_entrega|tapas_entregas_parciales|cierra/i.test(msg) ? 'Falta correr sql/tapas_entrega_v1.sql en Supabase' : msg), '#B83232');
+    showToast('❌ ' + (/function|does not exist|schema cache|tapas_registrar_entrega|tapas_entregas_parciales|cierra|foto_path/i.test(msg) ? 'Falta correr sql/tapas_entrega_v1.sql y sql/tapas_entrega_foto_v1.sql en Supabase' : msg), '#B83232');
     return;
   }
+  pedFotoLimpiar();
   PED.parcForm = false; PED.parcCant = ''; PED.parcNota = '';
   await cargarPedidos(true);
   showToast(completa ? '✅ ' + x.codigo + ' COMPLETADA con ' + pedNum(cant) + ' und' : '🟡 Entrega parcial de ' + pedNum(cant) + ' und registrada en ' + x.codigo);
@@ -2400,8 +2504,10 @@ async function deshacerEntrega() {
 
 async function quitarParcial(id) {
   if (!confirm('¿Quitar esta entrega parcial? (la ficha conserva su estado)')) return;
+  var ent = PED.parc.find(function(e) { return String(e.id) === String(id); });
   var r = await db.from('tapas_entregas_parciales').delete().eq('id', id).select('id');
   if (r.error || !(r.data || []).length) { showToast('❌ ' + (r.error ? r.error.message : 'No se pudo quitar (sin permiso)'), '#B83232'); return; }
+  if (ent && ent.foto_path) { try { await db.storage.from('tapas-entregas').remove([ent.foto_path]); } catch(e) {} }
   await cargarPedidos(true);
   showToast('Entrega parcial quitada');
 }

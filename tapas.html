@@ -247,6 +247,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ent-pend td:first-child{border-left:5px solid #F59E0B}
 .ent-pend-tag{display:inline-block;font-size:9px;font-weight:800;background:#F59E0B;color:#fff;border-radius:4px;padding:2px 6px;white-space:nowrap}
 .ent-pend-act{background:#F59E0B;color:#fff;border:none;border-radius:6px;padding:4px 9px;font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap}
+.foto-btn{border:none;background:none;cursor:pointer;font-size:14px;padding:0 3px}
+#fotoOvTapas img{max-width:100%;max-height:78vh;border-radius:10px;display:block;margin:0 auto}
 .ent-act button{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;color:var(--teal)}
 .ent-act button.ent-del{color:var(--gray-l);font-size:14px}
 .ent-mas{display:block;margin:10px auto 4px}
@@ -1248,6 +1250,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 </div>
 
 <!-- MODAL ENTREGADO (requi de ingreso PT) -->
+<div class="overlay" id="fotoOvTapas" style="z-index:10500" onclick="if(event.target===this)cerrarFotoEntrega()">
+  <div class="modal" style="max-width:700px;width:94%">
+    <div class="mh">
+      <div class="mh-title">📷 Foto de la entrega</div>
+      <button class="m-close" onclick="cerrarFotoEntrega()">✕</button>
+    </div>
+    <div class="mb" id="fotoCuerpoTapas" style="text-align:center"></div>
+  </div>
+</div>
+
 <div class="overlay" id="overlayIngPT">
   <div class="modal" style="max-width:860px">
     <div class="mh">
@@ -4127,7 +4139,7 @@ function bloqueParcialesTapas(s) {
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed #FDE68A">'
       + '<b style="font-family:var(--mono)">' + (e.cantidad || 0).toLocaleString() + ' und</b>'
       + (e.cierra ? '<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;background:#ECFDF5;color:#047857">✅ completó la ficha</span>' : '')
-      + '<span>' + escHtml(String(e.fecha || '')) + '</span>'
+      + '<span>' + escHtml(String(e.fecha || '')) + '</span>' + fotoBtnTapas(e, false)
       + '<span style="flex:1;min-width:100px;color:var(--gray)">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + e.registrado_por : '')) + '</span>'
       + '<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;background:' + (ok ? '#ECFDF5' : '#FEF3C7') + ';color:' + (ok ? '#047857' : '#92400E') + '">'
       + (ok ? '✓ con requi' : (it.cubierto ? '⏳ faltan ' + (e.cantidad - it.cubierto).toLocaleString() + ' por requi' : '⏳ sin requi')) + '</span>'
@@ -4140,8 +4152,10 @@ function bloqueParcialesTapas(s) {
 
 async function parcialBorrarTapas(id) {
   if (!confirm('¿Borrar esta entrega parcial reportada?')) return;
+  var ent = parcialesTapas.find(function(e) { return String(e.id) === String(id); });
   var r = await db.from('tapas_entregas_parciales').delete().eq('id', id).select('id');
   if (r.error || !(r.data || []).length) { showToast('❌ ' + (r.error ? r.error.message : 'No se pudo borrar (sin permiso)'), '#B83232'); return; }
+  if (ent && ent.foto_path) { try { await db.storage.from('tapas-entregas').remove([ent.foto_path]); } catch(e) {} }
   await cargarComentariosTapas();
   refrescarTrasComentarioTapas();
   showToast('Entrega parcial borrada');
@@ -4436,7 +4450,7 @@ function entregasChipHtml(s) {
   return '<div class="cp-parc">🟡 Reportado por Tapas: <b>' + p.total.toLocaleString() + '</b> und · '
     + (p.sinRequi > 0 ? '<span class="sr">⏳ ' + p.sinRequi.toLocaleString() + ' sin requi</span>' : '<span class="cr">✓ con requi</span>')
     + p.lista.map(function(it) {
-        return '<div class="ent"><span>' + escHtml(fc(it.e.fecha)) + '</span><b>' + (it.e.cantidad || 0).toLocaleString() + ' und</b>' + (it.e.cierra ? '<em>✅ completó</em>' : '') + '</div>';
+        return '<div class="ent"><span>' + escHtml(fc(it.e.fecha)) + '</span><b>' + (it.e.cantidad || 0).toLocaleString() + ' und</b>' + (it.e.cierra ? '<em>✅ completó</em>' : '') + fotoBtnTapas(it.e, true) + '</div>';
       }).join('')
     + '</div>';
 }
@@ -4718,6 +4732,30 @@ function renderInicioPedidosTapas() {
 // cada cliente: rojo → amarillo → verde, y por antigüedad. "Entregado" = suma de ingresos
 // a PT (movimientos_materiales entrada_pt) de cada ficha. Mismo mecanismo que Serigrafía:
 // ventana nueva + window.print() (el navegador la guarda como PDF).
+// Foto que la supervisora adjunta a una entrega (bucket privado `tapas-entregas`, sql/tapas_entrega_foto_v1.sql): se abre con un enlace firmado de 10 min
+function fotoBtnTapas(e, enChip) {
+  if (!e || !e.foto_path) return '';
+  return '<button type="button" class="foto-btn" title="Ver la foto de esta entrega" onclick="' + (enChip ? 'event.stopPropagation();' : '')
+    + 'verFotoEntrega(\'' + escHtml(String(e.foto_path)) + '\')">📷</button>';
+}
+
+async function verFotoEntrega(path) {
+  var cuerpo = document.getElementById('fotoCuerpoTapas');
+  cuerpo.innerHTML = '<div style="padding:30px;color:var(--gray)">Cargando foto…</div>';
+  document.getElementById('fotoOvTapas').classList.add('open');
+  var r = await db.storage.from('tapas-entregas').createSignedUrl(path, 600);
+  if (r.error || !r.data) {
+    cuerpo.innerHTML = '<div style="padding:30px;color:#B83232">No se pudo abrir la foto: ' + escHtml((r.error && r.error.message) || 'sin permiso') + '</div>';
+    return;
+  }
+  cuerpo.innerHTML = '<img src="' + escHtml(r.data.signedUrl) + '" alt="Foto de la entrega">';
+}
+
+function cerrarFotoEntrega() {
+  document.getElementById('fotoOvTapas').classList.remove('open');
+  document.getElementById('fotoCuerpoTapas').innerHTML = '';
+}
+
 // Clave de la pestaña Pedidos del perfil de Tapas (registro-tapas.html). Se guarda hasheada en la base: sql/tapas_pedidos_clave_v1.sql
 async function cambiarClavePedidos() {
   var nueva = prompt('Nueva clave para la pestaña Pedidos del perfil de Tapas (mínimo 4 caracteres).\n\nLa supervisora deberá usar la nueva clave la próxima vez que entre.');
@@ -6295,7 +6333,7 @@ function buildEntPendHtml(p, mp) {
     + (p.cubierto > 0 ? '<div style="font-size:9px;font-weight:600;color:var(--gray-l)">de ' + (e.cantidad || 0).toLocaleString() + '</div>' : '') + '</td>'
     + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(String(e.fecha || '—')) + '</td>'
     + '<td><span class="ent-orig" style="background:#F59E0B;color:#fff">TAPAS</span>'
-    + (e.cierra ? ' <span style="font-size:10px;font-weight:800;color:#047857">✅ completó la ficha</span>' : '')
+    + (e.cierra ? ' <span style="font-size:10px;font-weight:800;color:#047857">✅ completó la ficha</span>' : '') + fotoBtnTapas(e, false)
     + (quien || e.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml((e.nota ? e.nota + (quien ? ' · ' : '') : '') + quien) + '</span>' : '') + '</td>'
     + '<td style="font-size:11px;font-family:var(--mono);color:var(--gray-l)">' + escHtml(sal) + '</td>'
     + '<td class="ent-act" style="white-space:nowrap"><button class="ent-pend-act" title="Abrir el registro de entregado con esta ficha y cantidad" onclick="entRegistrarDesdeEntrega(\'' + escHtml(String(e.id)) + '\')">📝 Registrar requi</button></td>'
