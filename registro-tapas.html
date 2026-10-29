@@ -262,8 +262,10 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-chip.proc .ped-chip-s{color:#1E3A8A;font-weight:700}
 .ped-vacio{font-size:12px;color:#9A9A98;font-style:italic;padding:14px;text-align:center}
 .ped-comp{background:#fff;border:1.5px solid #E0DED8;border-radius:10px;overflow:hidden}
-.ped-comp-r{display:grid;grid-template-columns:78px 96px minmax(90px,150px) 54px minmax(0,1fr) 84px auto;gap:8px;align-items:baseline;font-size:11px;padding:5px 10px;border-bottom:1px solid #F0EDE8}
+.ped-comp-r{display:grid;grid-template-columns:78px 96px minmax(90px,150px) 54px minmax(0,1fr) 84px 112px;gap:8px;align-items:baseline;font-size:11px;padding:5px 10px;border-bottom:1px solid #F0EDE8}
 .ped-comp-r:last-child{border-bottom:none}
+.ped-comp-h{background:#EBF7F4;border-bottom:2px solid #1A6B5B !important;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#1A6B5B}
+.ped-comp-h span,.ped-comp-h .f,.ped-comp-h .rq,.ped-comp-h .fi,.ped-comp-h .pr{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:800;color:#1A6B5B}
 .ped-comp-r .f{font-family:'DM Mono',monospace;font-size:10px;color:#6B6B6A}
 .ped-comp-r .rq{font-family:'DM Mono',monospace;font-weight:800;color:#1A6B5B}
 .ped-comp-r .cl{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -280,7 +282,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-comp-r.pend{background:#FFFBEB;box-shadow:inset 5px 0 0 #F59E0B;cursor:pointer}
 .ped-comp-r.pend .rq{color:#B45309}
 .ped-mas{display:block;margin:8px auto 0;background:#fff;border:1.5px solid #E0DED8;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;color:#1A6B5B}
-@media(max-width:700px){.ped-comp-r{grid-template-columns:70px 1fr auto}.ped-comp-r .cl,.ped-comp-r .fi,.ped-comp-r .pr{display:none}
+@media(max-width:700px){.ped-comp-r{grid-template-columns:70px 1fr auto}.ped-comp-r .cl,.ped-comp-r .fi,.ped-comp-r .pr{display:none}.ped-comp-h{display:none !important}
   .ped-comp-r.pend{display:flex;flex-wrap:wrap;gap:3px 8px;padding-left:14px}.ped-comp-r.pend .cl,.ped-comp-r.pend .fi{display:block}.ped-comp-r.pend .u{margin-left:auto}}
 .ped-ov{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(12,12,11,.72);z-index:9000;align-items:center;justify-content:center;padding:14px}
 .ped-ov.open{display:flex}
@@ -1876,6 +1878,12 @@ function pedChipCompletada(x, conCliente) {
     + '</div>';
 }
 
+// Encabezado de las columnas del bloque Entregados (las filas normales y las ámbar "sin requi" comparten las mismas columnas)
+function pedCompHeadHtml() {
+  return '<div class="ped-comp-r ped-comp-h"><span class="f">Fecha</span><span class="rq">No. de requi</span><span class="cl">Cliente</span><span class="fi">Ficha</span>'
+    + '<span class="pr">SKU · Descripción</span><span class="u">Cantidad</span><span>Estado</span></div>';
+}
+
 // Entregas que reportó la supervisora y aún no tienen requi de ingreso PT (misma regla que Entregados de tapas.html: e.cubierto lo calcula pedModelo)
 function pedPendientesSinRequi(m) {
   var out = [];
@@ -2046,7 +2054,7 @@ function renderPedidos() {
     ? '<div class="ped-comp-sec pend">⏳ Entregas que reportaste · pendientes de requi · ' + pend.length + ' · ' + pedNum(pendTot) + ' und</div>' + pend.map(pedPendRowHtml).join('')
     : '';
   var htmlComp = (orden.length || pend.length)
-    ? '<div class="ped-comp">' + htmlPend + (pend.length && orden.length ? '<div class="ped-comp-sec ok">📦 Requis registradas</div>' : '') + filas + '</div>' + (orden.length > PED.masComp ? '<button class="ped-mas" onclick="PED.masComp+=40;renderPedidos()">Mostrar más (' + (orden.length - PED.masComp) + ')</button>' : '')
+    ? '<div class="ped-comp">' + pedCompHeadHtml() + htmlPend + (pend.length && orden.length ? '<div class="ped-comp-sec ok">📦 Requis registradas</div>' : '') + filas + '</div>' + (orden.length > PED.masComp ? '<button class="ped-mas" onclick="PED.masComp+=40;renderPedidos()">Mostrar más (' + (orden.length - PED.masComp) + ')</button>' : '')
     : '<div class="ped-vacio">Todavía no hay entregas ni ingresos PT vinculados a pedidos.</div>';
 
   document.getElementById('pedCuerpo').innerHTML =
