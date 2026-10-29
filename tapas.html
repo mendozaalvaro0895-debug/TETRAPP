@@ -323,6 +323,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .env-tipo-blk{margin-top:6px}
 .env-tipo-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:6px 12px;background:var(--teal-xl);border-top:2px solid var(--teal);font-size:11px}
 .env-tipo-h b{font-size:12px;color:var(--teal);text-transform:uppercase;letter-spacing:.4px}
+.env-tipo-h.clic{cursor:pointer;user-select:none}
+.env-tipo-h.clic:hover{background:#dff1ec}
+.env-tipo-h .chev{font-size:11px;color:var(--teal);transition:transform .15s}
+.env-tipo-blk.cerrado .chev{transform:rotate(-90deg)}
+.env-tipo-blk.cerrado .env-tipo-t{display:none}
 .env-tipo-h span{color:var(--gray);font-size:10px;font-weight:700}
 .env-huecos{margin-top:10px;padding:8px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:10px;color:#991b1b}
 @media(max-width:900px){.env-2col{grid-template-columns:1fr}.env-2col>div+div{border-left:none}}
@@ -4088,7 +4093,10 @@ function buildAlertaComponenteTapas(comp, rows) {
 
   var tools = '<div class="env-tools"><span>Ordenar:</span>'
     + '<button class="env-tb' + (vista === 'faltante' ? ' act' : '') + '" onclick="setAlertaVistaTapas(\'' + comp.tipo + '\',\'faltante\')">Por faltante</button>'
-    + '<button class="env-tb' + (vista === 'tipo' ? ' act' : '') + '" onclick="setAlertaVistaTapas(\'' + comp.tipo + '\',\'tipo\')">Por tipo de tapa</button></div>';
+    + '<button class="env-tb' + (vista === 'tipo' ? ' act' : '') + '" onclick="setAlertaVistaTapas(\'' + comp.tipo + '\',\'tipo\')">Por tipo de tapa</button>'
+    + (vista === 'tipo' ? '<span style="margin-left:auto;display:flex;gap:6px"><button class="env-tb" onclick="setAlertaTodosTapas(\'' + comp.tipo + '\',false)">▾ Abrir todos</button>'
+        + '<button class="env-tb" onclick="setAlertaTodosTapas(\'' + comp.tipo + '\',true)">▸ Cerrar todos</button></span>' : '')
+    + '</div>';
 
   var cuerpo;
   if (!rows.length) {
@@ -4099,11 +4107,13 @@ function buildAlertaComponenteTapas(comp, rows) {
       return '<button class="env-chip' + (g.falt > 0 ? ' falta' : '') + (sel === g.tipo ? ' sel' : '') + '" data-tipo="' + escHtml(g.tipo) + '" onclick="setAlertaTipoTapas(\'' + comp.tipo + '\',this.dataset.tipo)" title="Clic para ver solo este tipo (otro clic = todos)">'
         + '<b>' + escHtml(g.tipo) + '</b><span>' + (g.falt > 0 ? fmtNumTapas(g.falt) + ' und a pedir' : '✅ alcanza') + ' · ' + g.nFalt + '/' + g.n + ' SKU con faltante</span></button>';
     }).join('') + '</div>';
+    var cerr = alertaCerradosTapas(comp);
     cuerpo = chips + grupos.filter(function(g) { return !sel || g.tipo === sel; }).map(function(g) {
-      return '<div class="env-tipo-blk"><div class="env-tipo-h"><b>' + escHtml(g.tipo) + '</b>'
+      var cerrado = !sel && cerr[g.tipo]; // si se eligió un tipo en los chips, se muestra abierto
+      return '<div class="env-tipo-blk' + (cerrado ? ' cerrado' : '') + '"><div class="env-tipo-h clic" data-tipo="' + escHtml(g.tipo) + '" onclick="toggleAlertaTipoBlkTapas(event,\'' + comp.tipo + '\')" title="Clic para abrir o cerrar este tipo"><span class="chev">▾</span><b>' + escHtml(g.tipo) + '</b>'
         + '<span>' + g.n + ' SKU · ' + g.nFalt + ' con faltante · neto pend. ' + fmtNumTapas(g.neto) + '</span>'
         + '<span style="color:' + (g.falt > 0 ? '#b91c1c' : '#15803d') + '">' + (g.falt > 0 ? fmtNumTapas(g.falt) + ' und a pedir' : '✅ alcanza') + '</span></div>'
-        + buildTablaAlertaTapas(g.rows) + '</div>';
+        + '<div class="env-tipo-t">' + buildTablaAlertaTapas(g.rows) + '</div></div>';
     }).join('');
   } else {
     var mitad = Math.ceil(rows.length / 2);
@@ -4148,6 +4158,31 @@ function buildAlertaComponenteTapas(comp, rows) {
     +   '<span class="env-footer-kpi"><b>' + fmtNumTapas(totFalt) + '</b> und a pedir</span>'
     + '</div>'
     + '</div>';
+}
+
+// Tipos CERRADOS de cada bloque (se recuerdan en este navegador); por defecto todos abiertos
+function alertaCerradosTapas(comp) {
+  try { return JSON.parse(localStorage.getItem('alerta_tapas_' + comp.tipo + '_tipos_cerrados') || '{}') || {}; } catch(e) { return {}; }
+}
+function guardarCerradosTapas(tipoComp, m) {
+  try { localStorage.setItem('alerta_tapas_' + tipoComp + '_tipos_cerrados', JSON.stringify(m)); } catch(e) {}
+}
+function toggleAlertaTipoBlkTapas(ev, tipoComp) {
+  var h = ev.currentTarget, blk = h.closest('.env-tipo-blk');
+  if (!blk) return;
+  var comp = COMPONENTES_ALERTA.find(function(c) { return c.tipo === tipoComp; });
+  var m = alertaCerradosTapas(comp), t = h.dataset.tipo;
+  blk.classList.toggle('cerrado');
+  if (blk.classList.contains('cerrado')) m[t] = 1; else delete m[t];
+  guardarCerradosTapas(tipoComp, m);
+}
+function setAlertaTodosTapas(tipoComp, cerrar) {
+  var comp = COMPONENTES_ALERTA.find(function(c) { return c.tipo === tipoComp; });
+  var m = {};
+  if (cerrar) agruparAlertaPorTipo(calcularFilasAlertaTapas(comp, alertaSalidasTapas)).forEach(function(g) { m[g.tipo] = 1; });
+  guardarCerradosTapas(tipoComp, m);
+  alertaTipoSelTapas[tipoComp] = '';
+  repintarAlertaTapas(tipoComp);
 }
 
 function repintarAlertaTapas(tipoComp) {
