@@ -817,6 +817,8 @@ Notas críticas:
 
 47. ✅ YA CORRIDO (29-oct-2026, vía MCP de Supabase) — `sql/tapas_entrega_editar_v1.sql` — función `tapas_editar_entrega(p_id, p_cantidad)` (SECURITY DEFINER; master/supervisor_tapas/operativo; no edita entregas que cerraron la ficha; 24 h para no-master; deja rastro en la nota). Correr DESPUÉS del 44.
 
+48. ✅ YA CORRIDO (29-oct-2026, vía MCP de Supabase; solo afectó a T-123) — `sql/tapas_entrega_backfill_completadas_v1.sql` — las fichas que la supervisora marcó COMPLETADAS con el botón anterior (antes del botón único ENTREGA) quedaron en 'lista' sin ninguna fila en `tapas_entregas_parciales`, así que no salían como "pendientes de requi" ni mostraban lo entregado (0/2000). El script les crea una entrega que cerró la ficha por lo que aún no tiene ingreso PT (pedido − ingresos). Idempotente; no hace falta volver a correrlo salvo que reaparezca una ficha 'lista' marcada por Tapas sin entregas.
+
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
 para la misma persona (no un simple typo de UI) — confirmado con Karen Hernández y Blandina
