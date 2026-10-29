@@ -262,7 +262,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-chip.proc .ped-chip-s{color:#1E3A8A;font-weight:700}
 .ped-vacio{font-size:12px;color:#9A9A98;font-style:italic;padding:14px;text-align:center}
 .ped-comp{background:#fff;border:1.5px solid #E0DED8;border-radius:10px;overflow:hidden}
-.ped-comp-r{display:grid;grid-template-columns:78px 96px minmax(90px,150px) 54px minmax(0,1fr) 84px 112px;gap:8px;align-items:baseline;font-size:11px;padding:5px 10px;border-bottom:1px solid #F0EDE8}
+.ped-comp-r{display:grid;grid-template-columns:78px 96px minmax(90px,150px) 54px 112px minmax(0,1fr) 84px;gap:8px;align-items:baseline;font-size:11px;padding:5px 10px;border-bottom:1px solid #F0EDE8}
 .ped-comp-r:last-child{border-bottom:none}
 .ped-comp-h{background:#EBF7F4;border-bottom:2px solid #1A6B5B !important;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#1A6B5B}
 .ped-comp-h span,.ped-comp-h .f,.ped-comp-h .rq,.ped-comp-h .fi,.ped-comp-h .pr{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:800;color:#1A6B5B}
@@ -282,7 +282,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-comp-r.pend{background:#FFFBEB;box-shadow:inset 5px 0 0 #F59E0B;cursor:pointer}
 .ped-comp-r.pend .rq{color:#B45309}
 .ped-mas{display:block;margin:8px auto 0;background:#fff;border:1.5px solid #E0DED8;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;color:#1A6B5B}
-@media(max-width:700px){.ped-comp-r{grid-template-columns:70px 1fr auto}.ped-comp-r .cl,.ped-comp-r .fi,.ped-comp-r .pr{display:none}.ped-comp-h{display:none !important}
+@media(max-width:700px){.ped-comp-r{grid-template-columns:70px 1fr auto}.ped-comp-r .cl,.ped-comp-r .fi,.ped-comp-r .pr{display:none}.ped-comp-h{display:none !important}.ped-comp-r .u{order:1}.ped-comp-r .ped-tag{order:2}
   .ped-comp-r.pend{display:flex;flex-wrap:wrap;gap:3px 8px;padding-left:14px}.ped-comp-r.pend .cl,.ped-comp-r.pend .fi{display:block}.ped-comp-r.pend .u{margin-left:auto}}
 .ped-ov{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(12,12,11,.72);z-index:9000;align-items:center;justify-content:center;padding:14px}
 .ped-ov.open{display:flex}
@@ -1881,7 +1881,7 @@ function pedChipCompletada(x, conCliente) {
 // Encabezado de las columnas del bloque Entregados (las filas normales y las ámbar "sin requi" comparten las mismas columnas)
 function pedCompHeadHtml() {
   return '<div class="ped-comp-r ped-comp-h"><span class="f">Fecha</span><span class="rq">No. de requi</span><span class="cl">Cliente</span><span class="fi">Ficha</span>'
-    + '<span class="pr">SKU · Descripción</span><span class="u">Cantidad</span><span>Estado</span></div>';
+    + '<span>Estado</span><span class="pr">SKU · Descripción</span><span class="u">Cantidad</span></div>';
 }
 
 // Entregas que reportó la supervisora y aún no tienen requi de ingreso PT (misma regla que Entregados de tapas.html: e.cubierto lo calcula pedModelo)
@@ -1904,9 +1904,9 @@ function pedPendRowHtml(p) {
   return '<div class="ped-comp-r pend" title="Entrega reportada por Tapas: falta la requi de ingreso" onclick="abrirPedido(\'' + idq + '\')">'
     + '<span class="f">' + escHtml(pedFechaCorta(e.fecha)) + '</span><span class="rq">⏳ SIN REQUI</span>'
     + '<span class="cl">' + escHtml(x.cliente) + '</span><span class="fi">' + escHtml(x.codigo) + '</span>'
+    + '<span class="ped-tag sr">' + (e.cierra ? 'TAPAS · completó' : 'TAPAS') + '</span>'
     + '<span class="pr">' + escHtml((x.sku ? x.sku + ' · ' : '') + x.desc) + '</span>'
-    + '<span class="u">' + pedNum(p.falta) + '</span>'
-    + '<span class="ped-tag sr">' + (e.cierra ? 'TAPAS · completó' : 'TAPAS') + '</span></div>';
+    + '<span class="u">' + pedNum(p.falta) + '</span></div>';
 }
 
 function renderPedidos() {
@@ -2044,9 +2044,9 @@ function renderPedidos() {
     var completa = g.acum >= g.x.cant && g.x.cant > 0;
     return '<div class="ped-comp-r"><span class="f">' + escHtml(g.fecha) + '</span><span class="rq">' + escHtml(g.doc) + '</span>'
       + '<span class="cl">' + escHtml(g.x.cliente) + '</span><span class="fi">' + escHtml(g.x.codigo) + '</span>'
+      + '<span class="ped-tag ' + (completa ? 'ok' : 'par') + '">' + (completa ? 'Completa' : 'Parcial') + '</span>'
       + '<span class="pr">' + escHtml((g.x.sku ? g.x.sku + ' · ' : '') + g.x.desc) + '</span>'
-      + '<span class="u">' + pedNum(g.und) + '</span>'
-      + '<span class="ped-tag ' + (completa ? 'ok' : 'par') + '">' + (completa ? 'Completa' : 'Parcial') + '</span></div>';
+      + '<span class="u">' + pedNum(g.und) + '</span></div>';
   }).join('');
   var pend = pedPendientesSinRequi(m);
   var pendTot = pend.reduce(function(a, p) { return a + p.falta; }, 0);
