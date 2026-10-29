@@ -240,6 +240,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ent-ped{font-family:var(--mono);font-size:9px;font-weight:800;background:var(--teal-xl);color:var(--teal);border-radius:3px;padding:1px 5px}
 .ent-ped-x{background:#FEE2E2;color:#B91C1C;text-decoration:line-through}
 .ent-orig{font-size:9px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:2px 6px;font-weight:700}
+.ent-sec{padding:6px 10px;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+.ent-sec-pend{background:#FDE68A;color:#78350F;border-top:2px solid #F59E0B}
+.ent-sec-ok{background:var(--teal-xl);color:var(--teal);border-top:2px solid var(--border)}
+.ent-pend td{background:#FFFBEB}
+.ent-pend td:first-child{border-left:5px solid #F59E0B}
+.ent-pend-tag{display:inline-block;font-size:9px;font-weight:800;background:#F59E0B;color:#fff;border-radius:4px;padding:2px 6px;white-space:nowrap}
+.ent-pend-act{background:#F59E0B;color:#fff;border:none;border-radius:6px;padding:4px 9px;font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap}
 .ent-act button{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;color:var(--teal)}
 .ent-act button.ent-del{color:var(--gray-l);font-size:14px}
 .ent-mas{display:block;margin:10px auto 4px}
@@ -4228,6 +4235,7 @@ async function reabrirFichaTapas(id) {
 
 function refrescarTrasComentarioTapas() {
   renderFichasTapas();
+  renderEntTabla();
   if (selId) mostrarDetalle(selId);
   if (fichaModalId) mostrarDetalle(fichaModalId);
 }
@@ -6215,20 +6223,99 @@ function renderEntTabla() {
       return toks.every(function(t) { return n.indexOf(t) !== -1; });
     });
   }
+  var pend = entPendientesFiltrados(toks);
   var cu = document.getElementById('entCuenta');
-  if (cu) cu.textContent = grupos.length + ' requi' + (grupos.length !== 1 ? 's' : '') + (toks.length ? ' (filtradas)' : '') + ' · historial de ingresos a PT';
-  if (!grupos.length) {
+  if (cu) cu.textContent = grupos.length + ' requi' + (grupos.length !== 1 ? 's' : '') + (toks.length ? ' (filtradas)' : '')
+    + (pend.length ? ' · ⏳ ' + pend.length + ' entrega' + (pend.length !== 1 ? 's' : '') + ' de Tapas sin requi' : '') + ' · historial de ingresos a PT';
+  if (!grupos.length && !pend.length) {
     cont.innerHTML = '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">'
       + (toks.length ? '🔍 Ninguna requi coincide con la búsqueda' : '📭 No hay entregados registrados aún') + '</div>';
     return;
   }
-  var filas = grupos.slice(0, entVisibles).map(function(g, gi) { return buildEntGrupoHtml(g, gi, mp); }).join('');
+  var filas = buildEntPendSeccionHtml(pend, mp)
+    + (pend.length && grupos.length ? '<tr><td colspan="9" class="ent-sec ent-sec-ok">📦 Requis registradas</td></tr>' : '')
+    + grupos.slice(0, entVisibles).map(function(g, gi) { return buildEntGrupoHtml(g, gi, mp); }).join('');
   cont.innerHTML = '<div class="ent-scroll"><table class="mov-table ent-tabla"><thead><tr>'
     + '<th>No. Requi</th><th>Cliente</th><th>Pedido</th><th>Producto</th><th style="text-align:right">Unidades</th>'
     + '<th>Fecha</th><th>Origen</th><th>Requi Salida Bodega</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>'
     + (grupos.length > entVisibles
         ? '<button class="btn btn-g btn-sm ent-mas" onclick="entMasGrupos()">Mostrar más (' + (grupos.length - entVisibles) + ' requis restantes)</button>'
         : '');
+}
+
+// Entregas que la supervisora reportó desde el perfil de Tapas (tapas_entregas_parciales) y aún NO tienen requi de ingreso PT:
+// se listan arriba en ámbar para que oficina sepa qué requi falta registrar. Usa el mismo cruce por fecha que el chip de la ficha
+// (parcialesDeFicha): al registrar el ingreso PT vinculado a la ficha, la entrega deja de aparecer aquí.
+function entPendientesSinRequi() {
+  var ids = {}, out = [];
+  parcialesTapas.forEach(function(e) { ids[String(e.solicitud_id)] = 1; });
+  Object.keys(ids).forEach(function(id) {
+    var s = solicitudes.find(function(x) { return String(x.id) === id; });
+    if (!s) return;
+    parcialesDeFicha(s).lista.forEach(function(it) {
+      var falta = (it.e.cantidad || 0) - it.cubierto;
+      if (falta > 0) out.push({ s: s, e: it.e, falta: falta, cubierto: it.cubierto });
+    });
+  });
+  out.sort(function(a, b) {
+    return String(b.e.fecha || '').localeCompare(String(a.e.fecha || '')) || String(b.e.created_at || '').localeCompare(String(a.e.created_at || ''));
+  });
+  return out;
+}
+
+function entPendientesFiltrados(toks) {
+  var lista = entPendientesSinRequi();
+  if (!toks.length) return lista;
+  return lista.filter(function(p) {
+    var l = (p.s.lineas && p.s.lineas[0]) || {};
+    var n = normBusqueda('sin requi tapas ' + (p.s.cliente || '') + ' ' + (p.s.id_display || '') + ' ' + (l.sku || '') + ' ' + getSkuDesc(l.sku) + ' ' + (p.e.nota || '') + ' ' + (p.e.registrado_por || ''));
+    return toks.every(function(t) { return n.indexOf(t) !== -1; });
+  });
+}
+
+function buildEntPendSeccionHtml(pend, mp) {
+  if (!pend.length) return '';
+  var tot = pend.reduce(function(a, p) { return a + p.falta; }, 0);
+  return '<tr><td colspan="9" class="ent-sec ent-sec-pend">⏳ Entregas reportadas por Tapas · pendientes de requi de ingreso · '
+    + pend.length + ' entrega' + (pend.length !== 1 ? 's' : '') + ' · ' + tot.toLocaleString() + ' und</td></tr>'
+    + pend.map(function(p) { return buildEntPendHtml(p, mp); }).join('');
+}
+
+function buildEntPendHtml(p, mp) {
+  var s = p.s, e = p.e;
+  var l = (s.lineas && s.lineas[0]) || {};
+  var sal = mp.sal[s.id] ? mp.sal[s.id].join(', ') : '—';
+  var quien = e.registrado_por || '';
+  return '<tr class="ent-pend">'
+    + '<td><span class="ent-pend-tag">⏳ SIN REQUI</span></td>'
+    + '<td style="font-weight:600;font-size:11px">' + escHtml(s.cliente || '—') + '</td>'
+    + '<td><span class="ent-ped">' + escHtml(s.id_display || String(s.id).slice(0, 8)) + '</span></td>'
+    + '<td style="font-size:11px;color:var(--gray)"><span style="font-family:var(--mono);font-size:10px;margin-right:4px">' + escHtml(l.sku || '') + '</span>' + escHtml(l.sku ? getSkuDesc(l.sku) : (l.desc || s.desc || '')) + '</td>'
+    + '<td class="mov-cant" title="Reportado por Tapas">' + p.falta.toLocaleString()
+    + (p.cubierto > 0 ? '<div style="font-size:9px;font-weight:600;color:var(--gray-l)">de ' + (e.cantidad || 0).toLocaleString() + '</div>' : '') + '</td>'
+    + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(String(e.fecha || '—')) + '</td>'
+    + '<td><span class="ent-orig" style="background:#F59E0B;color:#fff">TAPAS</span>'
+    + (e.cierra ? ' <span style="font-size:10px;font-weight:800;color:#047857">✅ completó la ficha</span>' : '')
+    + (quien || e.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml((e.nota ? e.nota + (quien ? ' · ' : '') : '') + quien) + '</span>' : '') + '</td>'
+    + '<td style="font-size:11px;font-family:var(--mono);color:var(--gray-l)">' + escHtml(sal) + '</td>'
+    + '<td class="ent-act" style="white-space:nowrap"><button class="ent-pend-act" title="Abrir el registro de entregado con esta ficha y cantidad" onclick="entRegistrarDesdeEntrega(\'' + escHtml(String(e.id)) + '\')">📝 Registrar requi</button></td>'
+    + '</tr>';
+}
+
+// "Registrar requi" desde una entrega pendiente: abre el formulario ya con el pedido, el SKU (si la ficha tiene uno solo), el cliente y lo que falta
+function entRegistrarDesdeEntrega(entId) {
+  var p = entPendientesSinRequi().find(function(x) { return String(x.e.id) === String(entId); });
+  if (!p) { showToast('Esa entrega ya tiene requi', '#B83232'); renderEntTabla(); return; }
+  abrirIngPT();
+  var s = p.s;
+  var d = { sol: s.id, cant: p.falta };
+  if (s.lineas.length === 1 && s.lineas[0].sku) {
+    var it = invB2DeTapas(s.lineas[0].sku);
+    if (it) { d.sku = it.sku; d.desc = it.descripcion || ''; }
+  }
+  ingLineas = [ingNuevaLinea(d)];
+  ingCli = s.cliente || '';
+  renderIngLineas();
 }
 
 // Una requi = un grupo de filas: la fecha/origen/acciones salen en la primera, cada producto en su fila
