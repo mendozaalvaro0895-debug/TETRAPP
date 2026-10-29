@@ -1285,7 +1285,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
         <div class="ing-zone-s">ó <span onclick="event.stopPropagation();ingElegirArchivo()">selecciona un archivo o toma una foto</span> de la requi de ingreso PT</div>
         <img id="ingImgPrev" ondblclick="event.stopPropagation();ingAmpliarImagen(this.src)" title="Doble clic para ampliar">
       </div>
-      <div class="fr ing-hdr" style="grid-template-columns:1fr 1fr 1.2fr">
+      <div class="fr ing-hdr" style="grid-template-columns:1fr 1fr">
         <div class="fg">
           <div class="fl">No. de requi de ingreso PT *</div>
           <input class="fi" id="ingRequi" placeholder="Ej: PTI21056" autocomplete="off">
@@ -1294,13 +1294,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <div class="fl">Fecha del ingreso</div>
           <input class="fi" id="ingFecha" type="date">
         </div>
-        <div class="fg">
-          <div class="fl">Cliente <span style="font-weight:500;color:var(--gray-l)">(filtra los pedidos)</span></div>
-          <select class="fi" id="ingCli" onchange="ingCliChange(this.value)"></select>
-        </div>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <div class="fl">PRODUCTOS * <span style="font-weight:500;color:var(--gray-l)">(pedido opcional; suma al inventario de PT)</span></div>
+        <div class="fl">PRODUCTOS * <span style="font-weight:500;color:var(--gray-l)">(cada línea se vincula a su propio pedido, y de ahí sale su cliente; suma al inventario de PT)</span></div>
         <button class="btn btn-g btn-sm" onclick="ingAgregarLinea()">+ Agregar producto</button>
       </div>
       <div id="ingLineas"></div>
@@ -6477,7 +6473,6 @@ function entRegistrarDesdeEntrega(entId) {
     if (it) { d.sku = it.sku; d.desc = it.descripcion || ''; }
   }
   ingLineas = [ingNuevaLinea(d)];
-  ingCli = s.cliente || '';
   renderIngLineas();
 }
 
@@ -6515,34 +6510,6 @@ function ingNuevaLinea(d) {
   return { sol: d.sol || '', solTxt: '', sku: d.sku || '', desc: d.desc || '', skuTxt: '', cant: d.cant || '' };
 }
 
-// Clientes de las fichas de Tapas, los de más uso primero (el mismo orden del formulario de solicitud)
-function ingClientes() {
-  var uso = {};
-  solicitudes.forEach(function(x) { if (x.cliente) uso[x.cliente] = (uso[x.cliente] || 0) + 1; });
-  return Object.keys(uso).sort(function(a, b) { return (uso[b] || 0) - (uso[a] || 0) || a.localeCompare(b); });
-}
-
-// Cliente de la requi (uno solo, junto al No. de requi y la fecha): filtra los pedidos que se pueden vincular
-var ingCli = '';
-function ingPintarCliente() {
-  var sel = document.getElementById('ingCli');
-  if (!sel) return;
-  var lista = ingClientes();
-  if (ingCli && lista.indexOf(ingCli) < 0) lista.push(ingCli);
-  sel.innerHTML = '<option value="">— Todos —</option>' + lista.map(function(c) {
-    return '<option value="' + escHtml(c) + '"' + (c === ingCli ? ' selected' : '') + '>' + escHtml(c) + '</option>';
-  }).join('');
-}
-function ingCliChange(v) {
-  ingSincronizarCant();
-  ingCli = v;
-  ingLineas.forEach(function(l) {
-    var s = l.sol ? solicitudes.find(function(x) { return x.id === l.sol; }) : null;
-    if (s && v && s.cliente !== v) l.sol = ''; // el pedido elegido era de otro cliente
-  });
-  renderIngLineas();
-}
-
 function abrirIngPT(rowId) {
   var g = rowId ? grupoEntregadoDeFila(rowId) : null;
   ingEdit = g ? { doc: g.doc, rows: g.rows } : null;
@@ -6557,13 +6524,6 @@ function abrirIngPT(rowId) {
     var it = invB2DeTapas(m.sku_original);
     return ingNuevaLinea({ sol: solOk ? m.solicitud_id : '', sku: m.sku_original || '', desc: it ? (it.descripcion || '') : '', cant: m.cantidad || '' });
   }) : [ingNuevaLinea()];
-  ingCli = '';
-  if (g) {
-    var clis = {};
-    ingLineas.forEach(function(l) { var sx = l.sol ? solicitudes.find(function(x) { return x.id === l.sol; }) : null; if (sx && sx.cliente) clis[sx.cliente] = 1; });
-    var ck = Object.keys(clis);
-    if (ck.length === 1) ingCli = ck[0]; // todos los pedidos de la requi son del mismo cliente
-  }
   ingImgReset();
   document.getElementById('overlayIngPT').classList.add('open');
   renderIngLineas();
@@ -6618,7 +6578,6 @@ function renderIngLineas(focusId) {
       + '<button class="ing-x" title="Quitar" onclick="ingQuitarLinea(' + i + ')">✕</button>'
       + '</div>';
   }).join('');
-  ingPintarCliente();
   ingAjustarCampos();
   if (focusId) {
     var el = document.getElementById(focusId);
@@ -6654,7 +6613,9 @@ function ingMostrarDrop(el, html) {
   drop.classList.add('open');
 }
 
-// Pedido: fichas vivas (y las completadas si se escribe algo); filtra por código, cliente o producto
+// Pedido de CADA línea (una requi puede traer filas de varios clientes: el cliente sale del pedido elegido): fichas vivas (y las
+// completadas si se escribe algo); filtra por código, cliente o producto. Si la línea ya tiene SKU, salen primero —y solos mientras
+// no se escriba nada— los pedidos que llevan ese SKU.
 function ingSolInput(i, el, escribiendo) {
   var l = ingLineas[i];
   if (!l) return;
@@ -6663,15 +6624,17 @@ function ingSolInput(i, el, escribiendo) {
   ingAjustarCampos();
   var toks = normBusqueda(el.value).split(/[^a-z0-9]+/).filter(Boolean);
   var ent = mapasEntregados().ent;
+  var conSku = function(s) { return l.sku && s.lineas.some(function(x) { return x.sku === l.sku; }) ? 1 : 0; };
   var cand = solicitudes.filter(function(s) {
     if (!fichaViva(s) && !(s.estado === 'lista' && toks.length)) return false;
-    if (ingCli && s.cliente !== ingCli) return false;
     if (!toks.length) return true;
     var t = normBusqueda((s.id_display || '') + ' ' + (s.cliente || '') + ' ' + s.lineas.map(function(x) { return (x.sku || '') + ' ' + (x.desc || ''); }).join(' '));
     return toks.every(function(k) { return t.indexOf(k) !== -1; });
-  }).sort(function(a, b) { return (fichaViva(b) ? 1 : 0) - (fichaViva(a) ? 1 : 0); }).slice(0, 15);
+  }).sort(function(a, b) { return (fichaViva(b) ? 1 : 0) - (fichaViva(a) ? 1 : 0) || conSku(b) - conSku(a) || String(a.cliente || '').localeCompare(String(b.cliente || '')); });
+  if (!toks.length && l.sku) { var mismos = cand.filter(conSku); if (mismos.length) cand = mismos; }
+  cand = cand.slice(0, 15);
   if (!cand.length) { ingMostrarDrop(el, '<div class="lin-vacio">Sin pedidos que coincidan</div>'); return; }
-  var html = '<div class="lin-count">' + cand.length + ' pedido' + (cand.length === 1 ? '' : 's') + '</div>' + cand.map(function(s) {
+  var html = '<div class="lin-count">' + cand.length + ' pedido' + (cand.length === 1 ? '' : 's') + (!toks.length && l.sku && conSku(cand[0]) ? ' con este SKU' : '') + '</div>' + cand.map(function(s) {
     var e = ent[s.id] || 0;
     var chip = s.cant > 0 ? '<span>' + e.toLocaleString() + ' / ' + s.cant.toLocaleString() + ' und</span>' : '';
     var sub = s.lineas.length ? s.lineas.map(function(x) { return (x.sku ? x.sku + ' — ' : '') + (x.desc || ''); }).join(' · ') : (s.desc || '');
@@ -6688,7 +6651,6 @@ function ingSolSelect(i, solId) {
   var s = solicitudes.find(function(x) { return x.id === solId; });
   if (!l || !s) return;
   l.sol = s.id; l.solTxt = '';
-  if (!ingCli && s.cliente) ingCli = s.cliente;
   // Ficha de un solo producto: se completa el SKU solo (si hay varios, se elige a mano)
   if (!l.sku && s.lineas.length === 1 && s.lineas[0].sku) {
     var it = invB2DeTapas(s.lineas[0].sku);
@@ -6824,9 +6786,6 @@ function ingAplicarResultado(result) {
       return l;
     });
   }
-  var cliVinc = {};
-  ingLineas.forEach(function(l) { var sx = l.sol ? solicitudes.find(function(x) { return x.id === l.sol; }) : null; if (sx && sx.cliente) cliVinc[sx.cliente] = 1; });
-  if (Object.keys(cliVinc).length === 1) ingCli = Object.keys(cliVinc)[0];
   renderIngLineas();
   var warns = (result.warnings || []).slice();
   if (noEnc.length) warns.push('⚠️ Códigos que NO existen en inventario — revisa los dígitos: ' + noEnc.join(', '));
