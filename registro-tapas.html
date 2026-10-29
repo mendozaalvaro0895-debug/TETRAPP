@@ -392,6 +392,9 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-parc.ok{border-color:#86EFAC;background:#F0FDF4;color:#166534}
 .ped-parc.ok .top b{color:#15803D}
 .ped-pe.ok{border-color:#86EFAC;background:#F0FDF4}
+.ped-pe.edit input{width:120px;border:1.5px solid #CBD5E1;border-radius:8px;padding:7px 9px;font-size:15px;font-family:'DM Mono',monospace}
+.ped-pe.edit button.g{background:#A16207;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800}
+.ped-pe.edit button.c{color:#475569;font-size:15px}
 .ped-ent-det{font-size:11px;margin-top:6px;text-align:center}
 .ped-chip-t b.ped-esq.y{color:#A16207}
 .ped-chip-t b.ped-esq.g{color:#15803D}
@@ -2171,6 +2174,7 @@ function abrirPedido(id) {
   PED.abierto = id;
   PED.soloComent = false;
   PED.parcForm = false;
+  PED.editEnt = null;
   PED.form = null; PED.selOp = []; PED.selProc = []; PED.cantTmp = null; PED.comentTxt = '';
   pintarPedido();
   pedRefrescarStock(); // existencias al día en el momento de consultar
@@ -2394,12 +2398,60 @@ function pedParcHistHtml(x) {
   var filas = x.parc.lista.map(function(e) {
     var ok = (e.cubierto || 0) >= e.cantidad;
     var falta = e.cantidad - (e.cubierto || 0);
+    if (PED.editEnt && String(PED.editEnt) === String(e.id)) return pedEditEntregaHtml(e);
     return '<div class="ped-pe' + (ok ? ' ok' : '') + '"><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<span class="e cr">✅ completó la ficha</span>' : '') + '<span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>' + pedFotoBtn(e, false)
       + '<span class="t">' + escHtml((e.nota || '') + (e.registrado_por ? (e.nota ? ' · ' : '') + pedCorto(e.registrado_por) : '')) + '</span>'
       + '<span class="e ' + (ok ? 'cr' : 'sr') + '">' + (ok ? '✓ con requi' : (e.cubierto ? '⏳ faltan ' + pedNum(falta) + ' por requi' : '⏳ sin requi')) + '</span>'
+      + (pedPuedeEditarEntrega(e) ? '<button title="Corregir la cantidad" onclick="abrirEdicionEntrega(\'' + escHtml(String(e.id)) + '\')">✏️</button>' : '')
       + (pedPuedeMarcar() ? '<button title="Quitar esta entrega" onclick="quitarParcial(\'' + escHtml(String(e.id)) + '\')">✕</button>' : '') + '</div>';
   }).join('');
   return pedFrame((x.parc.sinRequi > 0 ? '🟡' : '🟢') + ' Entregas reportadas <i>(' + pedNum(x.parc.total) + ' und · ' + (x.parc.sinRequi > 0 ? pedNum(x.parc.sinRequi) + ' sin requi' : 'todas con requi') + ')</i>', filas, x.parc.sinRequi > 0 ? 'y' : 'g');
+}
+
+// ── Corregir la cantidad de una entrega ya reportada (función tapas_editar_entrega, sql/tapas_entrega_editar_v1.sql) ──
+// Las entregas que COMPLETARON la ficha no se editan (para eso está Deshacer); la supervisora tiene 24 h, master sin límite.
+function pedPuedeEditarEntrega(e) {
+  if (!pedPuedeMarcar() || e.cierra) return false;
+  if (TETRA.rol === 'master') return true;
+  var t = e.created_at ? new Date(e.created_at).getTime() : 0;
+  return t > 0 && Date.now() - t <= 86400000;
+}
+
+function pedEditEntregaHtml(e) {
+  return '<div class="ped-pe edit"><span>Cantidad entregada:</span>'
+    + '<input type="number" inputmode="numeric" id="pedEditCant" min="1" value="' + escHtml(String(PED.editCant)) + '" oninput="PED.editCant=this.value" onkeydown="if(event.key===\'Enter\')guardarEdicionEntrega()">'
+    + '<button class="g" onclick="guardarEdicionEntrega()">Guardar</button><button class="c" title="Cancelar" onclick="cancelarEdicionEntrega()">✕</button></div>';
+}
+
+function abrirEdicionEntrega(id) {
+  var e = PED.parc.find(function(p) { return String(p.id) === String(id); });
+  if (!e) return;
+  PED.editEnt = id; PED.editCant = e.cantidad;
+  pintarPedido();
+  setTimeout(function() { var i = document.getElementById('pedEditCant'); if (i) { i.focus(); i.select(); } }, 60);
+}
+
+function cancelarEdicionEntrega() {
+  PED.editEnt = null;
+  pintarPedido();
+}
+
+async function guardarEdicionEntrega() {
+  var id = PED.editEnt;
+  var e = PED.parc.find(function(p) { return String(p.id) === String(id); });
+  if (!e) return;
+  var n = parseInt(PED.editCant, 10);
+  if (!n || n <= 0) { showToast('⚠️ Escribe la cantidad correcta', '#B83232'); return; }
+  if (n === e.cantidad) { cancelarEdicionEntrega(); return; }
+  var r = await db.rpc('tapas_editar_entrega', { p_id: id, p_cantidad: n });
+  if (r.error) {
+    var msg = r.error.message || String(r.error);
+    showToast('❌ ' + (/function|does not exist|schema cache|tapas_editar_entrega/i.test(msg) ? 'Falta correr sql/tapas_entrega_editar_v1.sql en Supabase' : msg), '#B83232');
+    return;
+  }
+  PED.editEnt = null;
+  await cargarPedidos(true);
+  showToast('✏️ Entrega corregida: ' + pedNum(e.cantidad) + ' → ' + pedNum(n) + ' und');
 }
 
 function pedFechaCorta(f) {
