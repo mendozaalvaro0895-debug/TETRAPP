@@ -434,7 +434,9 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-pf .g{background:#A16207;color:#fff}
 .ped-pf .c{background:#E2E8F0;color:#334155}
 .ped-foto{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.ped-foto button{border:1.5px solid #CBD5E1;background:#fff;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer;color:#334155;font-family:'DM Sans',sans-serif;min-height:40px}
+.ped-foto button,.ped-foto label.ped-fbt{border:1.5px solid #CBD5E1;background:#fff;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer;color:#334155;font-family:'DM Sans',sans-serif;min-height:40px;display:inline-flex;align-items:center;box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+.ped-foto label.ped-fbt:active{background:#F1F5F9}
+.ped-pf .ped-fin,.ped-fin{position:absolute !important;width:1px !important;height:1px !important;padding:0 !important;margin:-1px !important;border:0 !important;opacity:0 !important;overflow:hidden;clip:rect(0,0,0,0);pointer-events:none}
 .ped-foto .pv{display:flex;align-items:center;gap:10px;width:100%}
 .ped-foto .pv img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #CBD5E1}
 .ped-fbtn,.ped-pe button.ped-fbtn{border:none;background:none;cursor:pointer;font-size:15px;padding:0 3px;color:#334155}
@@ -2591,11 +2593,11 @@ function pedParcFormHtml(x) {
 function pedFotoBlockHtml() {
   var f = PED.parcFoto;
   return '<div class="ped-foto">'
-    + '<input type="file" id="pedFotoCam" accept="image/*" capture="environment" style="display:none" onchange="pedFotoElegida(this)">'
-    + '<input type="file" id="pedFotoGal" accept="image/*" style="display:none" onchange="pedFotoElegida(this)">'
     + (f ? '<div class="pv"><img src="' + f.url + '" alt="Foto de la entrega"><button type="button" onclick="pedFotoQuitar()">✕ Quitar</button></div>' : '')
-    + '<button type="button" onclick="document.getElementById(\'pedFotoCam\').click()">📷 ' + (f ? 'Tomar otra' : 'Tomar foto') + '</button>'
-    + '<button type="button" onclick="document.getElementById(\'pedFotoGal\').click()">🖼 Elegir de la galería</button></div>';
+    + '<label class="ped-fbt" for="pedFotoCam">📷 ' + (f ? 'Tomar otra' : 'Tomar foto') + '</label>'
+    + '<input type="file" class="ped-fin" id="pedFotoCam" accept="image/*" capture="environment" onchange="pedFotoElegida(this)">'
+    + '<label class="ped-fbt" for="pedFotoGal">🖼 Elegir de la galería</label>'
+    + '<input type="file" class="ped-fin" id="pedFotoGal" accept="image/*" onchange="pedFotoElegida(this)"></div>';
 }
 
 function pedFotoLimpiar() {
