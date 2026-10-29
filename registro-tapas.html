@@ -393,6 +393,8 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-parc.ok .top b{color:#15803D}
 .ped-pe.ok{border-color:#86EFAC;background:#F0FDF4}
 .ped-ent-det{font-size:11px;margin-top:6px;text-align:center}
+.ped-chip-t b.ped-esq.y{color:#A16207}
+.ped-chip-t b.ped-esq.g{color:#15803D}
 .ped-ent-det .sr{color:#B45309;font-weight:800}
 .ped-ent-det .cr{color:#047857;font-weight:800}
 .ped-pe{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid #FDE047;background:#FEFCE8;border-radius:8px;padding:6px 9px;margin-bottom:6px;font-size:12px}
@@ -1865,8 +1867,8 @@ function pedChipCompletada(x, conCliente) {
     + '<div class="ped-chip-t"><span>' + escHtml(x.codigo) + pedComentBadge(x) + '</span><b title="Entregado / pedido" style="color:' + pedEntColor(x) + '">' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</b></div>'
     + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
     + pedNotaHtml(x.s.notas)
-    + pedParcChipHtml(x)
     + '<div>' + pedComentBtn(x) + '</div>'
+    + pedParcChipHtml(x)
     + '<div class="ped-acc"><button onclick="event.stopPropagation();abrirPedido(\'' + idq + '\')">Ver ficha</button></div>'
     + '</div>';
 }
@@ -1944,17 +1946,17 @@ function renderPedidos() {
     if (x.completada) return pedChipCompletada(x, conCliente);
     return '<div class="ped-chip' + (proc ? ' proc' : '') + (pedProducirInfo(x).cubierta ? ' cubierta' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
-      + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + pedEstadoBadge(x) + pedComentBadge(x) + '</span><b>' + pedNum(x.saldo) + '</b></div>'
+      + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + pedEstadoBadge(x) + pedComentBadge(x) + '</span>' + pedEsquinaHtml(x) + '</div>'
       + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
       + pedStkPTHtml(x.sku, x.saldo)
       + pedNotaHtml(x.s.notas)
-      + pedParcChipHtml(x)
       + '<div class="ped-resum">' + (proc ? '<span class="ped-res-b proc">▶ ' + pedNum(x.enProc) + ' en proceso</span>' : '') + pedCompResumenHtml(x) + '</div>'
       + '<div>' + pedComentBtn(x) + '</div>'
       + '<div class="ped-more">'
       +   '<div class="ped-chip-s">' + (proc ? '▶ ' + pedNum(x.enProc) + ' en proceso' : 'de ' + pedNum(x.cant) + (x.entregado ? ' · ent. ' + pedNum(x.entregado) : '')) + '</div>'
       +   (function() { var k = pedCompStockHtml(x); return k ? '<div class="ped-comps">' + k + '</div>' : ''; })()
       + '</div>'
+      + pedParcChipHtml(x)
       + '<div class="ped-acc"><button onclick="event.stopPropagation();abrirPedido(\'' + idq + '\')">Abrir pedido · marcar en proceso</button></div>'
       + '</div>';
   };
@@ -2366,13 +2368,18 @@ function pedEntDetHtml(x) {
   return det.join(' · ');
 }
 
-// Recuadro ENTREGADO 85/100 del chip (ESPEJO de entregasChipHtml de tapas.html): entregado = ingresos PT con requi + lo reportado
-// por Tapas que aún no la tiene. Amarillo mientras quede algo sin requi; verde cuando todo está vinculado. Una línea por entrega reportada.
+// Esquina superior derecha del chip: ENTREGADO/PEDIDO (ej. 1500/3000) cuando ya hay algo entregado; si no, el saldo por entregar
+function pedEsquinaHtml(x) {
+  if (!x.entregadoTotal) return '<b>' + pedNum(x.saldo) + '</b>';
+  return '<b class="ped-esq ' + (x.parc.sinRequi > 0 ? 'y' : 'g') + '" title="Entregado / pedido">' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</b>';
+}
+
+// Bloque ENTREGAS al final del chip (ESPEJO de entregasChipHtml de tapas.html): una línea por entrega reportada con fecha y cantidad.
+// Amarillo mientras quede algo sin requi; verde cuando todo está vinculado a una requi.
 function pedParcChipHtml(x) {
-  if (!x.entregadoTotal && !x.parc.lista.length) return '';
+  if (!x.parc.lista.length) return '';
   return '<div class="ped-parc' + (x.parc.sinRequi > 0 ? '' : ' ok') + '">'
-    + '<div class="top"><span>🚚 ENTREGADO</span><b>' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</b></div>'
-    + '<div class="det">' + pedEntDetHtml(x) + '</div>'
+    + '<div class="top"><span>🚚 ENTREGAS</span><span class="det">' + pedEntDetHtml(x) + '</span></div>'
     + x.parc.lista.map(function(e) {
         var okE = (e.cubierto || 0) >= e.cantidad;
         return '<div class="ent ' + (okE ? 'ok' : 'y') + '"><span>' + escHtml(pedFechaCorta(e.fecha)) + '</span><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<em>✅ completó</em>' : '')

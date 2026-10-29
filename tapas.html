@@ -443,6 +443,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-parc .ent.ok i{color:#047857}
 .cp-parc.ok{border-color:#86EFAC;background:#F0FDF4;color:#166534}
 .cp-parc.ok .top b{color:#15803D}
+.cp-chip-t b.cp-esq.y{color:#A16207}
+.cp-chip-t b.cp-esq.g{color:#15803D}
 .cp-comp-tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#15803D;margin-bottom:2px}
 
 .cp-chip-t{display:flex;justify-content:space-between;gap:4px;font-size:11px;font-weight:800;align-items:baseline}
@@ -4504,18 +4506,24 @@ function codClienteChipHtml(s) {
 // Entregas que la supervisora registró desde Tapas: una línea por entrega con fecha + cantidad (ESPEJO de pedParcChipHtml)
 function entColorTapas(s) { return parcialesDeFicha(s).sinRequi > 0 ? '#A16207' : '#15803D'; }
 
+// Esquina superior derecha del chip: ENTREGADO/PEDIDO (ej. 1500/3000) cuando ya hay algo entregado; si no, el saldo por entregar
+function cpEsquinaHtml(x) {
+  var tot = entregadoTotalFichaTapas(x.s);
+  if (!tot) return '<b>' + x.saldo.toLocaleString() + '</b>';
+  return '<b class="cp-esq ' + (parcialesDeFicha(x.s).sinRequi > 0 ? 'y' : 'g') + '" title="Entregado / pedido">' + tot.toLocaleString() + '/' + x.cant.toLocaleString() + '</b>';
+}
+
+// Bloque ENTREGAS al final del chip: una línea por entrega reportada con fecha y cantidad. Amarillo mientras quede algo sin requi;
+// verde cuando todo está vinculado a una requi (ESPEJO de pedParcChipHtml de registro-tapas.html)
 function entregasChipHtml(s) {
   var p = parcialesDeFicha(s);
-  var tot = entregadoTotalFichaTapas(s);
-  if (!tot && !p.lista.length) return '';
+  if (!p.lista.length) return '';
   var fc = function(f) { var t = String(f || ''); return t.length >= 10 ? parseInt(t.slice(8, 10), 10) + '-' + ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(t.slice(5, 7), 10) - 1] : t; };
-  var det = [];
-  if (tot - p.sinRequi > 0) det.push('<span class="cr">✓ ' + (tot - p.sinRequi).toLocaleString() + ' con requi</span>');
+  var con = entregadoTotalFichaTapas(s) - p.sinRequi, det = [];
+  if (con > 0) det.push('<span class="cr">✓ ' + con.toLocaleString() + ' con requi</span>');
   if (p.sinRequi > 0) det.push('<span class="sr">⏳ ' + p.sinRequi.toLocaleString() + ' sin requi</span>');
-  // ENTREGADO N/total: amarillo mientras quede algo sin requi, verde cuando todo está vinculado a una requi (ESPEJO de pedParcChipHtml)
   return '<div class="cp-parc' + (p.sinRequi > 0 ? '' : ' ok') + '">'
-    + '<div class="top"><span>🚚 ENTREGADO</span><b>' + tot.toLocaleString() + '/' + (s.cant || 0).toLocaleString() + '</b></div>'
-    + '<div class="det">' + det.join(' · ') + '</div>'
+    + '<div class="top"><span>🚚 ENTREGAS</span><span class="det">' + det.join(' · ') + '</span></div>'
     + p.lista.map(function(it) {
         var okE = it.cubierto >= (it.e.cantidad || 0);
         return '<div class="ent ' + (okE ? 'ok' : 'y') + '"><span>' + escHtml(fc(it.e.fecha)) + '</span><b>' + (it.e.cantidad || 0).toLocaleString() + ' und</b>' + (it.e.cierra ? '<em>✅ completó</em>' : '')
@@ -4544,17 +4552,17 @@ function buildChipCompacto(x, conCliente) {
   var idq = escHtml(String(x.id));
   return '<div class="cp-chip' + (enProc ? ' proc' : '') + (x.cubierta ? ' cubierta' : '') + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
     + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
-    + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + comentBadgeHtml(x.s) + '</span><b>' + x.saldo.toLocaleString() + '</b></div>'
+    + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + comentBadgeHtml(x.s) + '</span>' + cpEsquinaHtml(x) + '</div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
     + codClienteChipHtml(x.s)
     + stkPTHtml(x.sku, x.saldo)
     + notaChipHtml(x.s.notas)
-    + entregasChipHtml(x.s)
     + '<div class="cp-resum">' + (enProc ? '<span class="cp-res-b proc">▶ ' + x.enProc.toLocaleString() + ' en proceso</span>' : '') + componentesResumenHtml(x.s) + '</div>'
     + '<div class="cp-more">'
     +   '<div class="cp-chip-s">' + (enProc ? '▶ ' + x.enProc.toLocaleString() + ' en proceso' : 'de ' + x.cant.toLocaleString() + (x.ent ? ' · ent. ' + x.ent.toLocaleString() : '')) + '</div>'
     +   (function() { var k = componentesStockHtml(x.s); return k ? '<div class="cp-comps">' + k + '</div>' : ''; })()
     + '</div>'
+    + entregasChipHtml(x.s)
     + '<div class="cp-acc"><button onclick="event.stopPropagation();abrirFichaTapas(\'' + idq + '\')">Ver detalle de la ficha</button></div>'
     + '</div>';
 }
