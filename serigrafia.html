@@ -6385,8 +6385,8 @@ async function renderConsolidadoEnvases() {
   var mapa = {};
   solicitudes.forEach(function(s) {
     if (ESTADOS_VIVOS.indexOf(s.estado) < 0) return;
-    var esAgo = mesSol(s) === perHoy;
-    if (!esAgo) return; // solo fichas del mes en curso
+    var esAgo = mesSol(s) >= perHoy;
+    if (!esAgo) return; // fichas del mes en curso y de meses futuros
     (s.lineas || []).forEach(function(l) {
       if ((l.estado || s.estado) === 'lista') return;
       var kb = (l.sku_base || '').trim();
@@ -6406,11 +6406,11 @@ async function renderConsolidadoEnvases() {
     });
   });
 
-  // Huecos: líneas sin sku_base (solo fichas del mes en curso)
+  // Huecos: líneas sin sku_base (fichas del mes en curso y de meses futuros)
   var huecos = [];
   solicitudes.forEach(function(s) {
     if (ESTADOS_VIVOS.indexOf(s.estado) < 0) return;
-    if (mesSol(s) !== perHoy) return;
+    if (mesSol(s) < perHoy) return;
     (s.lineas || []).forEach(function(l) {
       if ((l.estado || s.estado) === 'lista') return;
       if (!(l.sku_base || '').trim()) {
@@ -6493,7 +6493,7 @@ async function renderConsolidadoEnvases() {
     return '<table class="env-table">' +
       '<thead style="position:sticky;top:0;z-index:1"><tr>' +
         '<th>SKU</th><th>Descripción</th><th class="r">Ped.</th>' +
-        '<th class="r">Este mes</th><th class="r">Neto pend.</th>' +
+        '<th class="r">Pedido</th><th class="r">Neto pend.</th>' +
         '<th class="r">Stock B2</th><th class="r">Pedir</th><th>Estado</th>' +
       '</tr></thead>' +
       '<tbody>' + arr.map(filaHtml).join('') + '</tbody>' +
@@ -6516,7 +6516,7 @@ async function renderConsolidadoEnvases() {
       '<div class="env-hdr" onclick="toggleEnvConsolidado(event)">' +
         '<span style="font-size:17px">📦</span>' +
         '<span class="env-hdr-title">Bajo Stock — Envases Base para Serigrafía</span>' +
-        '<span class="env-hdr-sub">Fichas activas ' + mesHdr + ' · vs B2</span>' +
+        '<span class="env-hdr-sub">Fichas activas ' + mesHdr + ' y meses siguientes · vs B2</span>' +
         (invFechaB2 ? '<span class="env-hdr-fecha">' + invFechaB2 + '</span>' : '') +
         '<button onclick="event.stopPropagation();refrescarInventarioEnvases(this)" title="Recargar inventario" style="font-size:13px;background:transparent;border:1px solid #d97706;border-radius:6px;padding:2px 7px;cursor:pointer;color:#92400e;line-height:1">↻</button>' +
         '<button onclick="event.stopPropagation();envPDF()" style="margin-left:auto;font-size:11px;font-weight:700;background:#92400e;color:#fff;border:none;border-radius:7px;padding:4px 12px;cursor:pointer;white-space:nowrap">⬇ PDF</button>' +
@@ -6530,7 +6530,7 @@ async function renderConsolidadoEnvases() {
         '<span class="env-footer-kpi"><b>' + rows.length + '</b> envases</span>' +
         '<span class="env-footer-kpi" style="color:#b91c1c"><b>' + nConFaltante + '</b> con faltante</span>' +
         '<span class="env-footer-kpi" style="color:#15803d"><b>' + nOk + '</b> ✅ alcanzan</span>' +
-        '<span class="env-footer-kpi"><b>' + fmtN(totAgo) + '</b> este mes</span>' +
+        '<span class="env-footer-kpi"><b>' + fmtN(totAgo) + '</b> pedido</span>' +
         '<span class="env-footer-kpi"><b>' + fmtN(totNeto) + '</b> neto pend.</span>' +
         '<span class="env-footer-kpi"><b>' + fmtN(totalFaltante) + '</b> und a pedir</span>' +
       '</div>' +
@@ -6706,11 +6706,11 @@ async function envPDF() {
   var mesPdfHdr = new Date(fechaHoy() + 'T12:00:00').toLocaleString('es-GT', { month:'long', year:'numeric' });
   var ESTADOS_VIVOS = ['nueva','proceso','parcial'];
   // Mismo criterio que renderConsolidadoEnvases(): período EFECTIVO
-  // (respeta periodo_efectivo) y SOLO fichas del mes en curso.
+  // (respeta periodo_efectivo): fichas del mes en curso y de meses futuros.
   var mapa = {};
   solicitudes.forEach(function(s) {
     if (ESTADOS_VIVOS.indexOf(s.estado) < 0) return;
-    if (mesSol(s) !== perHoy) return;
+    if (mesSol(s) < perHoy) return;
     (s.lineas || []).forEach(function(l) {
       if ((l.estado || s.estado) === 'lista') return;
       var kb = (l.sku_base || '').trim(); if (!kb) return;
@@ -6761,9 +6761,9 @@ async function envPDF() {
     '.alerta{color:#b91c1c;font-weight:800}' +
     '@media print{body{padding:8px}}</style></head><body>' +
     '<h1>📦 Bajo Stock — Envases Base para Serigrafía</h1>' +
-    '<p>Fichas activas de ' + escHtml(mesPdfHdr) + ' · Generado: ' + ahora + ' · Tetraplastic</p>' +
+    '<p>Fichas activas de ' + escHtml(mesPdfHdr) + ' y meses siguientes · Generado: ' + ahora + ' · Tetraplastic</p>' +
     '<table><thead><tr>' +
-    '<th>SKU</th><th>Descripción</th><th class="r">Este mes</th>' +
+    '<th>SKU</th><th>Descripción</th><th class="r">Pedido</th>' +
     '<th class="r">Neto pend.</th><th class="r">Stock B2</th>' +
     '<th class="r">Pedir</th><th>Estado</th></tr></thead>' +
     '<tbody>' + filas + '</tbody>' +
