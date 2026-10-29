@@ -4839,6 +4839,19 @@ function renderFichasCompactasTapas() {
   });
   clis.sort(function(a, b) { return a.localeCompare(b); });
 
+  // URGENTES SIEMPRE PRIMERO, en la vista que sea (Por tipo, Por cliente o Por prioridad): un bloque "🔴 Urgentes" arriba de todo con sus fichas,
+  // y los grupos de abajo ya no las repiten (así no se pierden al cambiar de vista). ESPEJO de registro-tapas.html.
+  var esUrgTop = function(x) { return x.s.prio === 'urgente' && !x.completada; };
+  var noUrg = function(x) { return !esUrgTop(x); };
+  var urgTop = visibles.filter(esUrgTop).sort(ordenChipsCompactos);
+  var bloqueUrgTop = function() {
+    if (!urgTop.length) return '';
+    return '<div class="cp-tipo' + cpCol('prio:🔴 Urgentes') + '"><div class="cp-tipo-h urg"' + cpClic('prio:🔴 Urgentes') + '><span class="cp-chev">▾</span><span class="cp-tipo-n">🔴 Urgentes</span>'
+      + '<span class="cp-tipo-s">' + urgTop.length + ' pedido' + (urgTop.length !== 1 ? 's' : '') + ' · por entregar <b>' + urgTop.reduce(function(a, x) { return a + saldoVivo(x); }, 0).toLocaleString() + '</b> und</span></div>'
+      + '<div class="cp-tipo-c">' + urgTop.map(function(x) { return buildChipCompacto(x, true); }).join('') + '</div></div>';
+  };
+  var notaUrgArriba = function(n) { return n ? ' · <span style="color:#B83232;font-weight:800">🔴 ' + n + ' urgente' + (n !== 1 ? 's' : '') + ' arriba</span>' : ''; };
+
   var cuerpo;
   if (fichasAgrupar === 'tipo') {
     // Por TIPO de tapa: cuánto se debe de cada una (saldo por entregar), el tipo con más pendiente primero
@@ -4857,13 +4870,15 @@ function renderFichasCompactasTapas() {
         + '<b>' + saldoDe(t).toLocaleString() + '</b><span>' + escHtml(t) + '</span><i>' + porTipo[t].length + ' pedido' + (porTipo[t].length !== 1 ? 's' : '') + '</i></div>';
     }).join('');
     var secciones = tipos.map(function(t) {
-      var items = porTipo[t].slice().sort(ordenChipsCompactos);
+      var items = porTipo[t].filter(noUrg).sort(ordenChipsCompactos);
+      if (!items.length) return '';
+      var saldoSec = items.reduce(function(a, x) { return a + saldoVivo(x); }, 0);
       return '<div class="cp-tipo' + cpCol('tipo:' + t) + '" id="cptipo-' + escHtml(t.replace(/[^A-Za-z0-9]/g, '_')) + '"><div class="cp-tipo-h"' + cpClic('tipo:' + t) + '><span class="cp-chev">▾</span><span class="cp-tipo-n">' + escHtml(t) + '</span>'
-        + '<span class="cp-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + saldoDe(t).toLocaleString() + '</b> und</span></div>'
+        + '<span class="cp-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + saldoSec.toLocaleString() + '</b> und' + notaUrgArriba(porTipo[t].length - items.length) + '</span></div>'
         + '<div class="cp-tipo-c">' + items.map(function(x) { return buildChipCompacto(x, true); }).join('') + '</div></div>';
     }).join('');
     cuerpo = tipos.length
-      ? '<div class="cp-sec">Por entregar según el tipo de tapa <i>clic en un total para ir a su grupo</i></div><div class="cp-resumen">' + resumen + '</div>' + secciones
+      ? bloqueUrgTop() + '<div class="cp-sec">Por entregar según el tipo de tapa <i>clic en un total para ir a su grupo</i></div><div class="cp-resumen">' + resumen + '</div>' + secciones
       : '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>';
   } else if (fichasAgrupar === 'prioridad') {
     // Por PRIORIDAD: primero los URGENTES y luego los demás, cada grupo ordenado por fecha límite
@@ -4883,15 +4898,16 @@ function renderFichasCompactasTapas() {
     }
   } else {
     var filas = clis.map(function(c) {
-      var items = porCli[c].slice().sort(ordenChipsCompactos);
+      var items = porCli[c].filter(noUrg).sort(ordenChipsCompactos);
+      if (!items.length) return '';
       var saldoTot = items.reduce(function(a, x) { return a + saldoVivo(x); }, 0);
-      var urg = items.filter(function(x) { return x.s.prio === 'urgente' && !x.completada; }).length;
+      var urg = porCli[c].length - items.length; // sus urgentes están en el bloque de arriba
       return '<div class="cp-tipo' + cpCol('cli:' + c) + '"><div class="cp-tipo-h"' + cpClic('cli:' + c) + '><span class="cp-chev">▾</span><span class="cp-tipo-n">' + escHtml(c) + '</span>'
         + '<span class="cp-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo <b>' + saldoTot.toLocaleString() + '</b> und'
-        + (urg ? ' · <span style="color:#B83232;font-weight:800">🔴 ' + urg + ' urgente' + (urg !== 1 ? 's' : '') + '</span>' : '') + '</span></div>'
+        + notaUrgArriba(urg) + '</span></div>'
         + '<div class="cp-tipo-c cp-cli-c">' + items.map(function(x) { return buildChipCompacto(x, false); }).join('') + '</div></div>';
     }).join('');
-    cuerpo = '<div class="cp-sec">Todos los pedidos por cliente <i>clic en un cliente para abrir o cerrar sus fichas</i></div>'
+    cuerpo = bloqueUrgTop() + '<div class="cp-sec">Todos los pedidos por cliente <i>clic en un cliente para abrir o cerrar sus fichas</i></div>'
       + (clis.length ? filas
                      : '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>');
   }
