@@ -929,6 +929,8 @@ ANUNCIO DEL CAMBIO (oct/2026): arriba de la selección de operario de registro-t
    negocio sin preguntar. Esta regla se carga al INICIAR una sesión: las que ya estaban abiertas no la ven.
 8. **Fecha "hoy" SIEMPRE con `fechaHoy()`** — NUNCA `new Date().toISOString().slice(0,10)`: devuelve fecha UTC y Guatemala es UTC-6, después de las 18:00 marca el día siguiente. `toISOString()` solo válido sobre fechas ancladas a mediodía o para timestamps completos.
 
+10. **Fechas MOSTRADAS con el mes en letras** (a pedido de Alvaro, oct/2026): `30/Oct/2026`, nunca `30/10/2026` ni `2026-10-30` (se confundía dd/mm con mm/dd). Helper `fmtFechaLetras(f, sinAnio)` / `fmtFechaHoraLetras(ts)` (ESPEJO en tapas.html, registro-tapas.html y comandas.html); las fechas internas, filtros y comparaciones siguen en ISO — el helper se aplica SOLO al pintar. Las formas cortas que ya llevaban el mes en letras ("30-oct" en chips) se dejaron. Los `<input type="date">` los pinta el navegador según su idioma y NO se cambiaron. Pendiente: el resto de módulos (serigrafia, ventas, bodega, gestión, index…) todavía muestran fechas numéricas.
+
 ---
 
 ## Personal

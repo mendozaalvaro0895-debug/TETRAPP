@@ -1050,7 +1050,7 @@ function toggleTermProceso(el) {
 }
 
 function buildRegistroProceso(r) {
-  var d = new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  var d = new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: 'numeric', month: 'short' });
   return '<div class="tp-reg" title="' + escHtml(r.cmd) + '"><span class="tp-reg-f">' + escHtml(d) + '</span>'
     + (r.tapa
         ? '<span class="tp-reg-t" title="' + escHtml(r.tapa) + '">' + escHtml(r.tapa) + '</span>'
@@ -1110,7 +1110,7 @@ function buildTermHistorial(o) {
     var e = ESTADO[c.estado_aprobacion] || ['ok', '✅ Aprobada'];
     var tareas = (c.comanda_tareas || []).filter(function(t) { return t.estado === 'Terminada'; });
     var total = tareas.reduce(function(s, t) { return s + undDeTarea(t); }, 0);
-    var d = new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    var d = new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: 'numeric', month: 'short' });
     var lineas = tareas.map(function(t) {
       var tapa = etiquetaTapaTarea(t);
       return '<div class="hi-t"><span class="hi-t-p">' + escHtml(t.proceso || 'Otra tarea') + '</span>'
@@ -1546,7 +1546,7 @@ async function guardarRegistro() {
 
     document.getElementById('okCorr').textContent = rCab.data.correlativo || '—';
     document.getElementById('okDet').innerHTML =
-      escHtml(opActual.nombre) + ' · ' + escHtml(fecha)
+      escHtml(opActual.nombre) + ' · ' + escHtml(fmtFechaLetras(fecha))
       + '<br>' + tareas.length + ' tarea(s) · <strong>' + totalPT.toLocaleString() + ' und PT</strong>';
     mostrarPantalla('scrOk');
     window.scrollTo(0, 0);
@@ -1616,6 +1616,27 @@ function setPedAgrupar(m) {
   pedAgrupar = m;
   try { localStorage.setItem('tapas_fichas_agrupar', m); } catch(e) {}
   renderPedidos();
+}
+
+// Fecha para MOSTRAR: día/Mes(letras)/Año (ej. 30/Oct/2026). Evita confundir dd/mm con mm/dd; las fechas internas siguen en ISO.
+// ESPEJO en tapas.html, registro-tapas.html y comandas.html. Acepta 'AAAA-MM-DD…' o Date; lo que no reconoce lo devuelve igual.
+var FECHA_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+function fmtFechaLetras(f, sinAnio) {
+  var y, m, d;
+  if (f instanceof Date) {
+    if (isNaN(f.getTime())) return '—';
+    y = f.getFullYear(); m = f.getMonth() + 1; d = f.getDate();
+  } else {
+    var t = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!t) return f ? String(f) : '—';
+    y = +t[1]; m = +t[2]; d = +t[3];
+  }
+  return String(d).padStart(2, '0') + '/' + FECHA_MESES[m - 1] + (sinAnio ? '' : '/' + y);
+}
+function fmtFechaHoraLetras(ts) {
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return fmtFechaLetras(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
 function pedFechaMov(m) {
@@ -1874,7 +1895,7 @@ function pedLimiteHtml(x) {
   var dias = Math.round((new Date(x.limite + 'T12:00:00') - new Date(fechaGT() + 'T12:00:00')) / 86400000);
   var cls = dias < 0 ? ' venc' : (dias <= 2 ? ' pronto' : '');
   var txt = parseInt(x.limite.slice(8, 10), 10) + '-' + PED_MESES[parseInt(x.limite.slice(5, 7), 10) - 1];
-  return '<span class="ped-lim' + cls + '" title="Fecha límite de entrega: ' + escHtml(x.limite) + '">⏳ ' + txt + '</span>';
+  return '<span class="ped-lim' + cls + '" title="Fecha límite de entrega: ' + escHtml(fmtFechaLetras(x.limite)) + '">⏳ ' + txt + '</span>';
 }
 
 function pedNum(n) { return (n || 0).toLocaleString(); }
@@ -1946,7 +1967,7 @@ function pedParcLecturaHtml(x) {
 function pedRequisLecturaHtml(x) {
   if (!x.ings.length) return '<div class="ped-vacio">Todavía no hay requis de ingreso PT vinculadas a esta ficha.</div>';
   return x.ings.slice().reverse().map(function(g) {
-    return '<div class="ped-pe ok"><b>' + pedNum(g.cantidad) + ' und</b><span>' + escHtml(pedFechaMov(g)) + '</span>'
+    return '<div class="ped-pe ok"><b>' + pedNum(g.cantidad) + ' und</b><span>' + escHtml(fmtFechaLetras(pedFechaMov(g))) + '</span>'
       + '<span class="t">Requi ' + escHtml(g.num_documento || '—') + '</span><span class="e cr">✓ ingresada</span></div>';
   }).join('');
 }
@@ -2152,7 +2173,7 @@ function renderPedidos() {
   orden.sort(function(a, b) { return String(b.ts).localeCompare(String(a.ts)); });
   var filas = orden.slice(0, PED.masComp).map(function(g) {
     var completa = g.acum >= g.x.cant && g.x.cant > 0;
-    return '<div class="ped-comp-r"><span class="f">' + escHtml(g.fecha) + '</span><span class="rq">' + escHtml(g.doc) + '</span>'
+    return '<div class="ped-comp-r"><span class="f">' + escHtml(fmtFechaLetras(g.fecha)) + '</span><span class="rq">' + escHtml(g.doc) + '</span>'
       + '<span class="cl">' + escHtml(g.x.cliente) + '</span><span class="fi lnk" title="Ver el estado de la ficha" onclick="abrirEstadoFicha(\'' + escHtml(String(g.x.id)) + '\')">' + escHtml(g.x.codigo) + '</span>'
       + '<span class="ped-tag ' + (completa ? 'ok' : 'par') + '">' + (completa ? 'Completa' : 'Parcial') + '</span>'
       + '<span class="lt"></span>'

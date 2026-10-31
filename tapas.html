@@ -1604,7 +1604,7 @@ function calcularHoras(cantidad, opsCount, procs) {
 function fechaEst(turnos) {
   const fecha = new Date();
   fecha.setDate(fecha.getDate() + turnos);
-  return fecha.toLocaleDateString('es-GT');
+  return fmtFechaLetras(fecha);
 }
 
 async function generarCodigo(area) {
@@ -1894,7 +1894,7 @@ async function mostrarDetalle(id) {
         <button class="btn btn-del btn-xs" onclick="confirmarBorrar('${s.id}')">🗑</button>`;
 
   const filasIng = ingresos.map(m =>
-    `<tr><td style="font-family:var(--mono)">${escHtml(parseFechaDoc(m.observaciones) || formatFecha(m.created_at))}</td>`
+    `<tr><td style="font-family:var(--mono)">${escHtml(fmtFechaLetras(parseFechaDoc(m.observaciones) || formatFecha(m.created_at)))}</td>`
     + `<td style="font-family:var(--mono);font-weight:700">${escHtml(m.num_documento || '—')}</td>`
     + `<td style="text-align:right;font-family:var(--mono);font-weight:700;color:var(--green)">${(m.cantidad || 0).toLocaleString()}</td></tr>`).join('');
   const bloqueIngresos = ingresos.length ? `
@@ -3799,7 +3799,7 @@ function toggleTermProceso(el) {
 }
 
 function buildRegistroProceso(r) {
-  var d = new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  var d = new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: 'numeric', month: 'short' });
   return '<div class="tp-reg" title="' + escHtml(r.cmd) + '"><span class="tp-reg-f">' + escHtml(d) + '</span>'
     + (r.tapa
         ? '<span class="tp-reg-t" title="' + escHtml(r.tapa) + '">' + escHtml(r.tapa) + '</span>'
@@ -3861,7 +3861,7 @@ function buildTermHistorial(o) {
     var e = ESTADO[c.estado_aprobacion] || ['ok', '✅ Aprobada'];
     var tareas = (c.comanda_tareas || []).filter(function(t) { return t.estado === 'Terminada'; });
     var total = tareas.reduce(function(s, t) { return s + (t.unidades_completadas || t.cantidad || 0); }, 0);
-    var d = new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    var d = new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: 'numeric', month: 'short' });
     var lineas = tareas.map(function(t) {
       var sku = (t.tapa_sku || '').trim(), desc = (t.tapa_desc || '').trim();
       var tapa = sku ? ((desc && desc.indexOf(sku) === -1) ? sku + ' — ' + desc : (desc || sku)) : desc;
@@ -4255,7 +4255,7 @@ function limiteFichaTapas(s) {
   var MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
   var corta = parseInt(f.slice(8, 10), 10) + ' ' + MES[parseInt(f.slice(5, 7), 10) - 1];
   var rel = dias === 0 ? 'vence hoy' : (dias === 1 ? 'mañana' : (dias > 1 ? 'en ' + dias + ' días' : (dias === -1 ? 'venció ayer' : 'venció hace ' + (-dias) + ' días')));
-  return { txt: f, cls: cls, corta: corta, dias: dias, rel: fichaViva(s) ? rel : 'completada' };
+  return { txt: fmtFechaLetras(f), cls: cls, corta: corta, dias: dias, rel: fichaViva(s) ? rel : 'completada' };
 }
 
 function tierFichaTapas(s) { return s.estado === 'lista' ? 2 : (s.estado === 'parcial' ? 1 : 0); }
@@ -4327,7 +4327,7 @@ function bloqueParcialesTapas(s) {
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed #FDE68A">'
       + '<b style="font-family:var(--mono)">' + (e.cantidad || 0).toLocaleString() + ' und</b>'
       + (e.cierra ? '<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;background:#ECFDF5;color:#047857">✅ completó la ficha</span>' : '')
-      + '<span>' + escHtml(String(e.fecha || '')) + '</span>' + fotoBtnTapas(e, false)
+      + '<span>' + escHtml(fmtFechaLetras(e.fecha)) + '</span>' + fotoBtnTapas(e, false)
       + '<span style="flex:1;min-width:100px;color:var(--gray)">' + escHtml(notaEntregaTapas(e)) + '</span>'
       + '<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:10px;background:' + (ok ? '#ECFDF5' : '#FEF3C7') + ';color:' + (ok ? '#047857' : '#92400E') + '">'
       + (ok ? '✓ con requi' : (it.cubierto ? '⏳ faltan ' + (e.cantidad - it.cubierto).toLocaleString() + ' por requi' : '⏳ sin requi')) + '</span>'
@@ -5450,7 +5450,7 @@ function abrirJustifPopoverTapas(codigo, fecha, evt) {
   var x = Math.min(evt.clientX, window.innerWidth - 380);
   var y = Math.min(evt.clientY + 8, window.innerHeight - 280);
   pop.style.left = x + 'px'; pop.style.top = y + 'px';
-  var fechaFmt = fecha.slice(8) + '/' + fecha.slice(5, 7) + '/' + fecha.slice(0, 4);
+  var fechaFmt = fmtFechaLetras(fecha);
   var codEsc = codigo.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   var fotoPreviewHtml = fotoActual
     ? '<div id="justifFotoPreview" style="margin-bottom:8px;position:relative">'
@@ -5681,7 +5681,7 @@ async function exportarAsistGridPDFTapas() {
         var dow = new Date(f + 'T12:00:00').getDay();
         var est = daysByP[f];
         if (!est) return;
-        var lbl = f.slice(8) + '/' + f.slice(5, 7);
+        var lbl = fmtFechaLetras(f, true);
         var justifByCF = justifCacheTapas ? (justifCacheTapas.byCodigoFecha[p.codigo] || {}) : {};
         var justifTxt = justifByCF[f] ? (justifByCF[f].texto || '') : '';
         if (est === 'ausente') fAus.push({ lbl: lbl, justif: justifTxt });
@@ -5695,16 +5695,16 @@ async function exportarAsistGridPDFTapas() {
       if (fVel.length) resVel.push({ nombre: nom, fechas: fVel });
       if (fDom.length) resDom.push({ nombre: nom, fechas: fDom });
       if (p.fecha_inicio && p.fecha_inicio >= dMin && p.fecha_inicio <= dMax)
-        resIni.push({ nombre: nom, fechas: [p.fecha_inicio.slice(8) + '/' + p.fecha_inicio.slice(5, 7)] });
+        resIni.push({ nombre: nom, fechas: [fmtFechaLetras(p.fecha_inicio, true)] });
       if (p.fecha_baja && p.fecha_baja >= dMin && p.fecha_baja <= dMax)
-        resBaj.push({ nombre: nom, fechas: [p.fecha_baja.slice(8) + '/' + p.fecha_baja.slice(5, 7)] });
+        resBaj.push({ nombre: nom, fechas: [fmtFechaLetras(p.fecha_baja, true)] });
     });
     // Bajas de gente ya inactiva (no aparece en `ops`, que solo lista activos)
     (personalData && personalData.tapas ? personalData.tapas : []).forEach(function(p) {
       if (p.activo) return;
       if (p.fecha_baja && p.fecha_baja >= dMin && p.fecha_baja <= dMax) {
         var ya = resBaj.some(function(x) { return x.nombre === (p.nombre || p.codigo); });
-        if (!ya) resBaj.push({ nombre: p.nombre || p.codigo, fechas: [p.fecha_baja.slice(8) + '/' + p.fecha_baja.slice(5, 7)] });
+        if (!ya) resBaj.push({ nombre: p.nombre || p.codigo, fechas: [fmtFechaLetras(p.fecha_baja, true)] });
       }
     });
     return { resAus: resAus, resTard: resTard, resVel: resVel, resDom: resDom, resIni: resIni, resBaj: resBaj };
@@ -5747,7 +5747,7 @@ async function exportarAsistGridPDFTapas() {
     + '<span>✓ = justificado</span>'
   + '</div>';
 
-  var genFecha = new Date().toLocaleDateString('es-GT');
+  var genFecha = fmtFechaLetras(new Date());
 
   function buildSeccionTapas(qTitulo, qLbl, diasQ, anteriorSet) {
     var rowsQ = buildPersonaRowsArrTapas(diasQ, anteriorSet);
@@ -5956,7 +5956,7 @@ function buildRechazoRow(r) {
 
   return '<tr>'
     + '<td><span class="mov-badge-rech">RECHAZO</span></td>'
-    + '<td class="mov-doc" style="font-family:var(--mono);font-size:11px">' + escHtml(fecha) + '</td>'
+    + '<td class="mov-doc" style="font-family:var(--mono);font-size:11px">' + escHtml(fmtFechaLetras(fecha)) + '</td>'
     + '<td><span class="mov-sku">' + escHtml(sku) + '</span><div style="font-size:10px;color:var(--gray)">' + escHtml(desc) + '</div></td>'
     + '<td style="font-size:12px;text-transform:capitalize">' + escHtml(motivo) + '</td>'
     + '<td class="mov-cant" style="color:var(--red)">' + rech.toLocaleString() + '</td>'
@@ -6244,6 +6244,27 @@ function parseObs(obs) {
   return obs.replace(/^FECHA:\d{4}-\d{2}-\d{2}( \| ?)?/, '');
 }
 
+// Fecha para MOSTRAR: día/Mes(letras)/Año (ej. 30/Oct/2026). Evita confundir dd/mm con mm/dd; las fechas internas siguen en ISO.
+// ESPEJO en tapas.html, registro-tapas.html y comandas.html. Acepta 'AAAA-MM-DD…' o Date; lo que no reconoce lo devuelve igual.
+var FECHA_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+function fmtFechaLetras(f, sinAnio) {
+  var y, m, d;
+  if (f instanceof Date) {
+    if (isNaN(f.getTime())) return '—';
+    y = f.getFullYear(); m = f.getMonth() + 1; d = f.getDate();
+  } else {
+    var t = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!t) return f ? String(f) : '—';
+    y = +t[1]; m = +t[2]; d = +t[3];
+  }
+  return String(d).padStart(2, '0') + '/' + FECHA_MESES[m - 1] + (sinAnio ? '' : '/' + y);
+}
+function fmtFechaHoraLetras(ts) {
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return fmtFechaLetras(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
 function formatFecha(isoStr) {
   if (!isoStr) return '—';
   return isoStr.split('T')[0];
@@ -6316,7 +6337,7 @@ function renderMov(tipo) {
   setEl('mkpi-v1', totalUnd.toLocaleString());
   setEl('mkpi-v2', totalDocs);
   setEl('mkpi-v3', totalSkus);
-  setEl('mkpi-v4', ultimo);
+  setEl('mkpi-v4', fmtFechaLetras(ultimo));
   if (cntEl) cntEl.textContent = filtered.length;
 
   if (!tabla) return;
@@ -6339,7 +6360,7 @@ function renderMov(tipo) {
     return '<tr>'
       + '<td><span class="' + badgeClass + '">' + badgeLabel + '</span></td>'
       + '<td class="mov-doc">' + escHtml(m.num_documento || '—') + '</td>'
-      + '<td style="font-family:var(--mono);font-size:11px">' + escHtml(fechaDoc) + '</td>'
+      + '<td style="font-family:var(--mono);font-size:11px">' + escHtml(fmtFechaLetras(fechaDoc)) + '</td>'
       + '<td class="mov-sku">' + escHtml(m.sku_original  || '—') + '</td>'
       + '<td style="font-size:11px;max-width:200px">' + escHtml(desc) + '</td>'
       + '<td class="mov-cant">' + (m.cantidad || 0).toLocaleString() + '</td>'
@@ -6617,7 +6638,7 @@ function buildEntPendHtml(p, mp) {
     + '<td style="font-size:11px;color:var(--gray)"><span style="font-family:var(--mono);font-size:10px;margin-right:4px">' + escHtml(l.sku || '') + '</span>' + escHtml(l.sku ? getSkuDesc(l.sku) : (l.desc || s.desc || '')) + '</td>'
     + '<td class="mov-cant" title="Reportado por Tapas">' + p.falta.toLocaleString()
     + (p.cubierto > 0 ? '<div style="font-size:9px;font-weight:600;color:var(--gray-l)">de ' + (e.cantidad || 0).toLocaleString() + '</div>' : '') + '</td>'
-    + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(String(e.fecha || '—')) + '</td>'
+    + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(fmtFechaLetras(e.fecha)) + '</td>'
     + '<td style="font-size:11px;font-weight:800;font-family:var(--mono);white-space:nowrap">' + escHtml(e.lote || '—') + '</td>'
     + '<td><span class="ent-orig" style="background:#F59E0B;color:#fff">TAPAS</span>'
     + (e.cierra ? ' <span style="font-size:10px;font-weight:800;color:#047857">✅ completó la ficha</span>' : '') + fotoBtnTapas(e, false)
@@ -6663,7 +6684,7 @@ function buildEntGrupoHtml(g, gi, mp) {
       + '<td>' + ped + '</td>'
       + '<td style="font-size:11px;color:var(--gray)"><span style="font-family:var(--mono);font-size:10px;margin-right:4px">' + escHtml(m.sku_original || '') + '</span>' + escHtml(getSkuDesc(m.sku_original)) + '</td>'
       + '<td class="mov-cant">' + (m.cantidad || 0).toLocaleString() + '</td>'
-      + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(g.fecha || '—') + '</td>'
+      + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(fmtFechaLetras(g.fecha)) + '</td>'
       + '<td style="font-size:11px;color:var(--gray-l)">—</td>'
       + '<td><span class="ent-orig">MANUAL</span>' + (primera && g.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(g.nota) + '</span>' : '') + '</td>'
       + '<td style="font-size:11px;font-family:var(--mono);color:var(--gray-l)">' + escHtml(sal) + '</td>'

@@ -467,6 +467,27 @@ async function cargarPendientes() {
   }
 }
 
+// Fecha para MOSTRAR: día/Mes(letras)/Año (ej. 30/Oct/2026). Evita confundir dd/mm con mm/dd; las fechas internas siguen en ISO.
+// ESPEJO en tapas.html, registro-tapas.html y comandas.html. Acepta 'AAAA-MM-DD…' o Date; lo que no reconoce lo devuelve igual.
+var FECHA_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+function fmtFechaLetras(f, sinAnio) {
+  var y, m, d;
+  if (f instanceof Date) {
+    if (isNaN(f.getTime())) return '—';
+    y = f.getFullYear(); m = f.getMonth() + 1; d = f.getDate();
+  } else {
+    var t = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!t) return f ? String(f) : '—';
+    y = +t[1]; m = +t[2]; d = +t[3];
+  }
+  return String(d).padStart(2, '0') + '/' + FECHA_MESES[m - 1] + (sinAnio ? '' : '/' + y);
+}
+function fmtFechaHoraLetras(ts) {
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return fmtFechaLetras(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
 // Contador de pendientes (de cualquier fecha) en el botón "Por aprobar"
 async function refrescarContadorPendientes() {
   try {
@@ -523,7 +544,7 @@ async function insertarComanda(cab) {
 function buildBannerAprob(c) {
   const e = estadoAprob(c);
   const id = escHtml(c.id);
-  const cuando = c.aprobado_en ? new Date(c.aprobado_en).toLocaleString('es-GT') : '';
+  const cuando = c.aprobado_en ? fmtFechaHoraLetras(c.aprobado_en) : '';
   if (e === 'pendiente') {
     return `<div class="ap-banner ap-pendiente" style="background:#FFF8EA"><span>⏳ <strong>Pendiente de aprobación</strong> — todavía no cuenta en termómetros ni Productividad</span>
       <span style="display:flex;gap:8px"><button class="ap-btn ap-btn-ok" onclick="cambiarEstadoComanda('${id}','aprobada')">✅ Aprobar</button><button class="ap-btn ap-btn-no" onclick="cambiarEstadoComanda('${id}','rechazada')">⛔ Rechazar</button></span></div>`;
@@ -629,7 +650,7 @@ function renderLista() {
       <div class="cmd-av" style="background:${escHtml(color)}">${escHtml(ini)}</div>
       <div style="flex:1;min-width:0">
         <div class="cmd-name">${escHtml(c.operario_nombre || '—')}${badgeAprob(c)}</div>
-        <div class="cmd-meta">${modoActual !== 'fecha' ? `📅 ${escHtml(c.fecha || '—')} · ` : ''}${escHtml(c.correlativo || '—')} · ${tareas.length} tareas · Sup: ${escHtml(c.supervisor_nombre || '—')}</div>
+        <div class="cmd-meta">${modoActual !== 'fecha' ? `📅 ${escHtml(fmtFechaLetras(c.fecha))} · ` : ''}${escHtml(c.correlativo || '—')} · ${tareas.length} tareas · Sup: ${escHtml(c.supervisor_nombre || '—')}</div>
       </div>
       <div class="cmd-und">${totalUnd.toLocaleString()}<small>und PT</small></div>
     </div>`;
@@ -688,7 +709,7 @@ function mostrarDetalleComanda(c) {
         <div class="det-avatar" style="background:${escHtml(color)}">${escHtml(op.iniciales || '?')}</div>
         <div>
           <div class="det-name">${escHtml(c.operario_nombre || '—')}</div>
-          <div class="det-meta">📅 ${escHtml(c.fecha || '')} · ${escHtml(c.correlativo || '—')} · Supervisor: ${escHtml(c.supervisor_nombre || '—')}</div>
+          <div class="det-meta">📅 ${escHtml(fmtFechaLetras(c.fecha))} · ${escHtml(c.correlativo || '—')} · Supervisor: ${escHtml(c.supervisor_nombre || '—')}</div>
           <div class="det-meta">🕐 Inicio: ${escHtml(c.hora_inicio || '—')} · Cierre: ${escHtml(c.hora_cierre || '—')}</div>
         </div>
       </div>
