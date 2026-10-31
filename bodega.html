@@ -97,7 +97,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rot-cob.r{background:var(--red-l);color:#B91C1C}
 .rot-cob.a{background:var(--amber-l);color:#B45309}
 .rot-cob.v{background:var(--green-l);color:#047857}
-.rot-aprox{color:var(--amber);font-weight:700;cursor:help}
+.rot-unidos{font-family:var(--mono);font-size:10px;color:var(--gray-l);margin-top:2px;cursor:help}
 .rot-ctrl{display:flex;gap:8px;flex-wrap:wrap}
 .rot-row{cursor:pointer}
 .rot-row.open td{background:var(--bodega-xl)}
@@ -545,10 +545,9 @@ function renderInicio() {
 /* ── Inicio: productos con mayor rotación ──────────────────────
    Dos fuentes (selector "Bodega 2 · ventas" / "Bodega 7 · consumo", rotFuente):
    · B2: tabla `ventas` (facturación SICAF) del período, cruzada con la existencia de
-     inventario B2 (todosLosItems). El SKU de venta se busca exacto y, si no existe,
-     sin su último dígito (SICAF factura con un dígito extra — misma regla que
-     clasificarArea de ventas.html); ese cruce se marca "≈" porque dos SKU de venta
-     pueden caer en el mismo código de inventario. Clic en la fila = base / envase base
+     inventario B2 (todosLosItems). Los códigos SICAF hijo (padre + un dígito según
+     el cliente) se suman en UNA fila con su padre (rotPadreSku) y se listan como
+     "Códigos SICAF unidos". Clic en la fila = base / envase base
      / accesorios de tapa desde el Recetario (sku_recetas + sku_receta_partes), o de la
      ficha de trabajo más reciente con ese SKU si no hay receta con partes.
    · B7: no se factura, así que el consumo sale de las FOTOS DIARIAS de existencia
@@ -644,6 +643,24 @@ function rotCobertura(exist, diaria) {
   return exist == null || diaria <= 0 ? null : exist / diaria;
 }
 
+// Códigos SICAF hijo que NO se suman a su padre (misma lista que el Excel
+// "Consumo aprox mensual por SKU - oct2026"): 206112 es otro producto con stock
+// propio y 2147533/2147534 son combos de American Natural.
+var ROT_HIJOS_EXCLUIR = { '206112': 1, '2147533': 1, '2147534': 1 };
+
+// SICAF factura el mismo producto con un dígito extra según el cliente (100251 y
+// 100253 = 10025). El hijo se suma a su padre de inventario B2 cuando el padre
+// existe con 5+ dígitos (evita 10053 → 1005, una camisa) y el hijo no tiene
+// existencia propia en B2. Devuelve el SKU padre, o el mismo SKU si no aplica.
+function rotPadreSku(sku, inv) {
+  if (ROT_HIJOS_EXCLUIR[sku] || sku.length < 6) return sku;
+  var padre = sku.slice(0, -1);
+  if (!inv[padre]) return sku;
+  var propio = inv[sku];
+  if (propio && (propio.existencia || 0) > 0) return sku;
+  return padre;
+}
+
 function rotModeloB2(filas) {
   var inv = rotMapaInventario();
   var porSku = {};
@@ -655,24 +672,26 @@ function rotModeloB2(filas) {
     var und = v.total_unidades || 0;
     totalUnd += und;
     if (!ultima || v.fecha > ultima) ultima = v.fecha;
-    var g = porSku[sku];
-    if (!g) g = porSku[sku] = { sku: sku, desc: v.descripcion || '', und: 0, docs: {} };
+    var key = rotPadreSku(sku, inv);
+    var g = porSku[key];
+    if (!g) g = porSku[key] = { sku: key, desc: v.descripcion || '', und: 0, docs: {}, codigos: {} };
     g.und += und;
     g.docs[(v.serie || '') + '-' + (v.docu || '')] = 1;
+    g.codigos[sku] = 1;
   });
   var vendidosInv = {};
   var lista = Object.keys(porSku).map(function(k) {
     var g = porSku[k];
     var item = inv[k];
-    var aprox = false;
-    if (!item && k.length > 1) { item = inv[k.slice(0, -1)]; aprox = !!item; }
-    if (item) vendidosInv[rotNorm(item.sku)] = 1;
+    var codigos = Object.keys(g.codigos).sort();
+    vendidosInv[k] = 1;
+    codigos.forEach(function(c) { vendidosInv[c] = 1; });
     var diaria = g.und / rotDias;
     var exist = item ? (item.existencia || 0) : null;
     return {
-      sku: g.sku, desc: g.desc || (item ? item.descripcion : ''), und: g.und,
+      sku: g.sku, desc: item ? item.descripcion : g.desc, und: g.und,
       extra: Object.keys(g.docs).length, diaria: diaria, exist: exist,
-      skuInv: item ? rotNorm(item.sku) : null, aprox: aprox, cobertura: rotCobertura(exist, diaria)
+      skuInv: item ? k : null, codigos: codigos, cobertura: rotCobertura(exist, diaria)
     };
   });
   lista.sort(function(a, b) { return b.und - a.und; });
@@ -701,7 +720,7 @@ function rotModeloB7(filas) {
     totalUnd += und;
     return {
       sku: sku, desc: item ? item.descripcion : '', und: und, ingresos: Number(f.ingresos) || 0,
-      extra: f.dias_baja || 0, diaria: diaria, exist: exist, skuInv: sku, aprox: false,
+      extra: f.dias_baja || 0, diaria: diaria, exist: exist, skuInv: sku, codigos: [sku],
       cobertura: rotCobertura(exist, diaria)
     };
   });
@@ -776,10 +795,11 @@ function rotParte(p, area) {
   return { rol: rol, sku: sku, desc: desc };
 }
 
+// SKU con los que se busca la receta/ficha: el padre y sus códigos SICAF hijo (el
+// Recetario a veces guarda la receta con el código facturado, ej. 101552)
 function rotCandidatos(r) {
   var c = [r.sku];
-  if (r.sku.length > 1) c.push(r.sku.slice(0, -1));
-  if (r.skuInv && c.indexOf(r.skuInv) < 0) c.push(r.skuInv);
+  (r.codigos || []).forEach(function(s) { if (c.indexOf(s) < 0) c.push(s); });
   return c;
 }
 
@@ -919,15 +939,16 @@ function buildRotDetalleB7(r) {
 function buildRotRow(r, idx, maxUnd) {
   var abierto = !!rotAbiertos[rotFuente + '|' + r.sku];
   var pct = maxUnd > 0 ? Math.max(2, Math.round(r.und / maxUnd * 100)) : 0;
-  var aproxHtml = r.aprox
-    ? ' <span class="rot-aprox" title="Cruzado sin el último dígito con el SKU de inventario ' + escHtml(r.skuInv) + ': la existencia puede ser compartida con otro SKU de venta">≈</span>'
-    : '';
   var noEsta = rotFuente === 'B7' ? 'no está en B7' : 'no está en B2';
-  var existHtml = r.exist == null ? '<span style="color:var(--gray-l)">' + noEsta + '</span>' : rotFmt(r.exist) + aproxHtml;
+  var existHtml = r.exist == null ? '<span style="color:var(--gray-l)">' + noEsta + '</span>' : rotFmt(r.exist);
+  var unidos = (r.codigos || []).filter(function(c) { return c !== r.sku; });
+  var unidosHtml = unidos.length
+    ? '<div class="rot-unidos" title="Códigos con los que SICAF factura este producto según el cliente; se suman a su padre">Códigos SICAF unidos: ' + escHtml([r.sku].concat(unidos).join(' · ')) + '</div>'
+    : '';
   var html = '<tr class="rot-row' + (abierto ? ' open' : '') + '" onclick="toggleRotFila(' + idx + ')">'
     + '<td class="rot-rank"><span class="rot-chev">' + (abierto ? '▾' : '▸') + '</span>' + (idx + 1) + '</td>'
     + '<td class="sku-cell">' + escHtml(r.sku) + '</td>'
-    + '<td class="rot-desc">' + escHtml(r.desc || '—') + '<div class="rot-bar"><i style="width:' + pct + '%"></i></div></td>'
+    + '<td class="rot-desc">' + escHtml(r.desc || '—') + unidosHtml + '<div class="rot-bar"><i style="width:' + pct + '%"></i></div></td>'
     + '<td class="num"><strong>' + rotFmt(r.und) + '</strong></td>'
     + '<td class="num">' + rotFmt(r.diaria) + '</td>'
     + '<td class="num">' + existHtml + '</td>'
@@ -1014,7 +1035,7 @@ function renderRotacion() {
     + '<span class="rot-cob r">&lt; ' + ROT_RIESGO_DIAS + ' d</span> '
     + '<span class="rot-cob a">&lt; ' + ROT_ALERTA_DIAS + ' d</span> '
     + '<span class="rot-cob v">' + ROT_ALERTA_DIAS + '+ d</span>'
-    + (esB7 ? '' : ' · ≈ = cruzado sin el último dígito') + '</span>' + verMas;
+    + (esB7 ? '' : ' · los códigos SICAF hijo se suman a su padre') + '</span>' + verMas;
 }
 
 async function cargarRotacion() {
