@@ -260,6 +260,26 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ing-zone-s span{cursor:pointer;text-decoration:underline;color:#6366f1}
 .ing-zone img{display:none;max-width:100%;max-height:100px;border-radius:6px;margin-top:6px;object-fit:contain;cursor:zoom-in}
 .ing-x{background:none;border:1px solid var(--border);border-radius:6px;color:var(--gray-l);font-size:13px;cursor:pointer;padding:5px 0;line-height:1}
+.ing-pend{border:2px solid #F59E0B;border-radius:10px;background:#FFFBEB;margin-bottom:12px;overflow:hidden}
+.ing-pend-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;background:#FDE68A;color:#78350F;font-size:11px;font-weight:800;cursor:pointer;user-select:none}
+.ing-pend-h .t{flex:1;min-width:180px}
+.ing-pend-h input{font-size:11px;padding:3px 8px;border:1px solid #F59E0B;border-radius:6px;background:#fff;width:150px;font-weight:500}
+.ing-pend-ls{max-height:230px;overflow-y:auto}
+.ing-pend-it{display:grid;grid-template-columns:78px minmax(0,1fr) 92px 100px auto;gap:8px;align-items:center;padding:6px 10px;border-top:1px solid #FCD34D;font-size:11px}
+.ing-pend-it.sug{background:#FEF3C7}
+.ing-pend-it.vinc{opacity:.5}
+.ing-pend-cod{font-weight:800;font-family:var(--mono);color:#78350F}
+.ing-pend-pr{min-width:0;color:var(--gray)}
+.ing-pend-pr b{color:var(--text,#1f2937)}
+.ing-pend-pr .sku{font-family:var(--mono);font-size:10px;margin-right:4px}
+.ing-pend-q{text-align:right;font-weight:800;font-size:13px}
+.ing-pend-q small{display:block;font-size:9px;font-weight:600;color:var(--gray-l)}
+.ing-pend-f{font-size:10px;color:var(--gray);white-space:nowrap}
+.ing-pend-f div{font-family:var(--mono);font-weight:800}
+.ing-pend-tag{font-size:9px;font-weight:800;color:#B45309}
+.ing-pend-vb{background:#F59E0B;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap}
+.ing-pend-ok{font-size:10px;font-weight:800;color:#047857;white-space:nowrap}
+@media(max-width:700px){.ing-pend-it{grid-template-columns:minmax(0,1fr) auto;row-gap:3px}.ing-pend-cod{grid-column:1}.ing-pend-pr{grid-column:1/-1;order:3}.ing-pend-q{text-align:right}.ing-pend-f{grid-column:1}.ing-pend-vb,.ing-pend-ok{grid-column:2;justify-self:end}.ing-pend-h input{width:100%}}
 @media(max-width:700px){.ing-lin{grid-template-columns:minmax(0,1fr) 84px 30px}.ing-lin>:first-child{grid-column:1/-1}.ing-hdr{grid-template-columns:1fr !important}}
 
 .sku-code{font-family:var(--mono);font-weight:700;color:var(--teal);font-size:11px;margin-bottom:2px}
@@ -1314,6 +1334,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
           <input class="fi" id="ingFecha" type="date">
         </div>
       </div>
+      <div id="ingPendientes"></div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div class="fl">PRODUCTOS * <span style="font-weight:500;color:var(--gray-l)">(cada línea se vincula a su propio pedido, y de ahí sale su cliente; suma al inventario de PT)</span></div>
         <button class="btn btn-g btn-sm" onclick="ingAgregarLinea()">+ Agregar producto</button>
@@ -6663,6 +6684,127 @@ function entRegistrarDesdeEntrega(entId) {
   renderIngLineas();
 }
 
+// ── Entregas de Tapas pendientes de requi, dentro del formulario "Registrar entregado" ──
+// Ayuda a vincular cada fila de la requi con su ficha: lista lo que la supervisora reportó y aún no tiene ingreso PT.
+// "Vincular" pone la ficha (y su cliente) en la fila del mismo SKU que aún no tiene pedido; si no hay, agrega una fila nueva.
+var ingPendAbierto = true;
+var ingPendBusca = '';
+
+function ingSkusDeFicha(s) {
+  var out = [];
+  (s.lineas || []).forEach(function(l) {
+    if (!l.sku) return;
+    var it = invB2DeTapas(l.sku);
+    out.push(it ? it.sku : String(l.sku));
+  });
+  return out;
+}
+
+// Fila de la requi, aún sin pedido, que corresponde a esa ficha: primero la del mismo SKU, si no una fila totalmente en blanco; -1 si no hay
+function ingLineaDestino(s) {
+  var skus = ingSkusDeFicha(s);
+  var i;
+  for (i = 0; i < ingLineas.length; i++) {
+    if (!ingLineas[i].sol && ingLineas[i].sku && skus.indexOf(ingLineas[i].sku) >= 0) return i;
+  }
+  for (i = 0; i < ingLineas.length; i++) {
+    var l = ingLineas[i];
+    if (!l.sol && !l.solTxt && !l.sku && !l.skuTxt && !(parseInt(l.cant, 10) > 0)) return i;
+  }
+  return -1;
+}
+
+function ingPendLineaDeFicha(solId) {
+  for (var i = 0; i < ingLineas.length; i++) {
+    if (ingLineas[i].sol === solId) return i;
+  }
+  return -1;
+}
+
+function ingPendItemHtml(p) {
+  var s = p.s, e = p.e;
+  var l = (s.lineas && s.lineas[0]) || {};
+  var li = ingPendLineaDeFicha(s.id);
+  var sug = li < 0 ? ingLineaDestino(s) : -1;
+  var cod = escHtml(s.id_display || String(s.id).slice(0, 8));
+  var prod = '<b>' + escHtml(s.cliente || '—') + '</b><br><span class="sku">' + escHtml(l.sku || '') + '</span>'
+    + escHtml(l.sku ? getSkuDesc(l.sku) : (l.desc || s.desc || ''));
+  var cant = p.falta.toLocaleString() + (p.cubierto > 0 ? '<small>de ' + (e.cantidad || 0).toLocaleString() + '</small>' : '<small>und</small>');
+  var fl = escHtml(fmtFechaLetras(e.fecha)) + (e.lote ? '<div>Lote ' + escHtml(e.lote) + '</div>' : '')
+    + (e.cierra ? '<div style="color:#047857;font-family:inherit">✅ completó</div>' : '');
+  var acc = li >= 0
+    ? '<span class="ing-pend-ok">✓ Vinculada · fila ' + (li + 1) + '</span>'
+    : '<button class="ing-pend-vb" title="Poner esta ficha en ' + (sug >= 0 ? 'la fila ' + (sug + 1) : 'una fila nueva') + '" onclick="ingPendVincular(\'' + escHtml(String(e.id)) + '\')">🔗 Vincular'
+      + (sug >= 0 ? ' · fila ' + (sug + 1) : '') + '</button>';
+  return '<div class="ing-pend-it' + (li >= 0 ? ' vinc' : (sug >= 0 ? ' sug' : '')) + '">'
+    + '<div class="ing-pend-cod">' + cod + '</div>'
+    + '<div class="ing-pend-pr">' + prod + '</div>'
+    + '<div class="ing-pend-q">' + cant + '</div>'
+    + '<div class="ing-pend-f">' + fl + '</div>'
+    + '<div>' + acc + '</div></div>';
+}
+
+function ingPendListaHtml() {
+  var toks = normBusqueda(ingPendBusca).split(/[^a-z0-9]+/).filter(Boolean);
+  var lista = entPendientesFiltrados(toks).map(function(p, k) {
+    var li = ingPendLineaDeFicha(p.s.id);
+    return { p: p, k: k, rank: li >= 0 ? 2 : (ingLineaDestino(p.s) >= 0 ? 0 : 1) };
+  });
+  lista.sort(function(a, b) { return a.rank - b.rank || a.k - b.k; });
+  if (!lista.length) return '<div style="padding:10px;font-size:11px;color:var(--gray)">Ninguna entrega coincide con la búsqueda</div>';
+  return lista.map(function(x) { return ingPendItemHtml(x.p); }).join('');
+}
+
+function renderIngPendientes() {
+  var cont = document.getElementById('ingPendientes');
+  if (!cont) return;
+  var todas = ingEdit ? [] : entPendientesSinRequi();
+  if (!todas.length) { cont.innerHTML = ''; return; }
+  var tot = todas.reduce(function(a, p) { return a + p.falta; }, 0);
+  var vinc = todas.filter(function(p) { return ingPendLineaDeFicha(p.s.id) >= 0; }).length;
+  cont.innerHTML = '<div class="ing-pend">'
+    + '<div class="ing-pend-h" onclick="ingPendToggle()">'
+    +   '<span>' + (ingPendAbierto ? '▾' : '▸') + '</span>'
+    +   '<span class="t">⏳ Entregas reportadas por Tapas · pendientes de requi · ' + todas.length + ' entrega' + (todas.length !== 1 ? 's' : '')
+    +   ' · ' + tot.toLocaleString() + ' und' + (vinc ? ' · ' + vinc + ' ya vinculada' + (vinc !== 1 ? 's' : '') + ' aquí' : '') + '</span>'
+    +   (ingPendAbierto ? '<input id="ingPendBuscar" placeholder="🔍 ficha, cliente, SKU…" value="' + escHtml(ingPendBusca) + '" autocomplete="off"'
+    +     ' onclick="event.stopPropagation()" oninput="ingPendFiltrar(this.value)">' : '')
+    + '</div>'
+    + (ingPendAbierto ? '<div class="ing-pend-ls" id="ingPendLista">' + ingPendListaHtml() + '</div>' : '')
+    + '</div>';
+}
+
+function ingPendToggle() {
+  ingPendAbierto = !ingPendAbierto;
+  renderIngPendientes();
+}
+
+function ingPendFiltrar(v) {
+  ingPendBusca = v;
+  var ls = document.getElementById('ingPendLista');
+  if (ls) ls.innerHTML = ingPendListaHtml();
+}
+
+// Pone la ficha en la fila que le toca (mismo SKU, o una en blanco) y la completa; si no hay fila libre agrega una nueva
+function ingPendVincular(entId) {
+  ingSincronizarCant();
+  var p = entPendientesSinRequi().find(function(x) { return String(x.e.id) === String(entId); });
+  if (!p) { showToast('Esa entrega ya tiene requi', '#B83232'); renderIngPendientes(); return; }
+  var s = p.s;
+  var i = ingLineaDestino(s);
+  var nueva = i < 0;
+  if (nueva) { ingLineas.push(ingNuevaLinea()); i = ingLineas.length - 1; }
+  var l = ingLineas[i];
+  l.sol = s.id; l.solTxt = '';
+  if (!l.sku && s.lineas.length === 1 && s.lineas[0].sku) {
+    var it = invB2DeTapas(s.lineas[0].sku);
+    if (it) { l.sku = it.sku; l.desc = it.descripcion || ''; l.skuTxt = ''; }
+  }
+  if (!(parseInt(l.cant, 10) > 0)) l.cant = p.falta;
+  renderIngLineas();
+  showToast('🔗 ' + (s.id_display || '') + ' vinculada a la fila ' + (i + 1) + (nueva ? ' (fila nueva)' : ''));
+}
+
 // Una requi = un grupo de filas: la fecha/origen/acciones salen en la primera, cada producto en su fila
 function buildEntGrupoHtml(g, gi, mp) {
   var bg = gi % 2 === 0 ? '#ffffff' : 'var(--teal-xl)';
@@ -6713,6 +6855,7 @@ function abrirIngPT(rowId) {
     return ingNuevaLinea({ sol: solOk ? m.solicitud_id : '', sku: m.sku_original || '', desc: it ? (it.descripcion || '') : '', cant: m.cantidad || '' });
   }) : [ingNuevaLinea()];
   ingImgReset();
+  ingPendBusca = '';
   document.getElementById('overlayIngPT').classList.add('open');
   renderIngLineas();
   rq.focus();
@@ -6767,6 +6910,7 @@ function renderIngLineas(focusId) {
       + '</div>';
   }).join('');
   ingAjustarCampos();
+  renderIngPendientes();
   if (focusId) {
     var el = document.getElementById(focusId);
     if (el) el.focus();
