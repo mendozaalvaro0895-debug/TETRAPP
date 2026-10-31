@@ -685,9 +685,29 @@ function nombreCorto(nombre) {
   if (!s) return nombre.split(',')[0].trim();
   return s.charAt(0) + s.slice(1).toLowerCase();
 }
+// Fecha para MOSTRAR: día/Mes(letras)/Año (ej. 30/Oct/2026). Evita confundir dd/mm con mm/dd; las fechas internas siguen en ISO.
+// ESPEJO en tapas.html, registro-tapas.html, comandas.html y los demás módulos. Acepta 'AAAA-MM-DD…' o Date; lo que no reconoce lo devuelve igual.
+var FECHA_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+function fmtFechaLetras(f, sinAnio) {
+  var y, m, d;
+  if (f instanceof Date) {
+    if (isNaN(f.getTime())) return '—';
+    y = f.getFullYear(); m = f.getMonth() + 1; d = f.getDate();
+  } else {
+    var t = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!t) return f ? String(f) : '—';
+    y = +t[1]; m = +t[2]; d = +t[3];
+  }
+  return String(d).padStart(2, '0') + '/' + FECHA_MESES[m - 1] + (sinAnio ? '' : '/' + y);
+}
+function fmtFechaHoraLetras(ts) {
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return fmtFechaLetras(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
 function fmtFechaISO(iso) {
-  var p = String(iso || '').slice(0, 10).split('-');
-  return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : '';
+  return iso ? fmtFechaLetras(iso) : '';
 }
 function mesLabel(key) {
   if (key === 'todo') return 'Todo el periodo';
@@ -1618,7 +1638,7 @@ function parseVentasArchivo(wb) {
 
 function buildPreviewRow(r) {
   return '<tr>' +
-    '<td style="white-space:nowrap">' + escHtml(r.fecha) + '</td>' +
+    '<td style="white-space:nowrap">' + escHtml(fmtFechaLetras(r.fecha)) + '</td>' +
     '<td style="font-family:var(--mono);font-weight:700">' + escHtml(r.serie) + '-' + r.docu + '</td>' +
     '<td class="sku-cell">' + escHtml(r.sku) + '</td>' +
     '<td>' + escHtml((r.descripcion || '').slice(0, 30)) + '</td>' +
@@ -1647,7 +1667,7 @@ function mostrarPreview(rows, filename) {
 
   document.getElementById('importBody').innerHTML =
     '<div style="font-size:12px;color:var(--gray);margin-bottom:10px">📄 ' + escHtml(filename) + '</div>' +
-    '<div class="imp-aviso">📅 Rango del archivo: <b>' + fMin + '</b> → <b>' + fMax + '</b>. ' +
+    '<div class="imp-aviso">📅 Rango del archivo: <b>' + fmtFechaLetras(fMin) + '</b> → <b>' + fmtFechaLetras(fMax) + '</b>. ' +
     'Todo lo que ya exista en la base entre esas fechas será <b>reemplazado</b> por el contenido del archivo.</div>' +
     '<div class="imp-summary">' +
     '<div class="imp-stat"><strong>' + Object.keys(fact).length.toLocaleString() + '</strong><span>Facturas</span></div>' +
@@ -1734,7 +1754,7 @@ async function confirmarImport() {
       mostrarResumenImport(rows.length, fMin, fMax, nuevos);
     } else {
       cerrarImport();
-      toast(rows.length.toLocaleString() + ' líneas importadas (' + fMin + ' → ' + fMax + ')', 'ok');
+      toast(rows.length.toLocaleString() + ' líneas importadas (' + fmtFechaLetras(fMin) + ' → ' + fmtFechaLetras(fMax) + ')', 'ok');
     }
   } catch (err) {
     document.getElementById('importProgress').style.display = 'none';
@@ -1755,7 +1775,7 @@ function mostrarResumenImport(nLineas, fMin, fMax, nuevos) {
   var filasHtml = nuevos.map(buildImportNuevoRow).join('');
   var pl = nuevos.length === 1 ? '' : 's';
   document.getElementById('importBody').innerHTML =
-    '<div class="imp-aviso ok">✓ ' + nLineas.toLocaleString() + ' líneas importadas (' + fMin + ' → ' + fMax + ').</div>' +
+    '<div class="imp-aviso ok">✓ ' + nLineas.toLocaleString() + ' líneas importadas (' + fmtFechaLetras(fMin) + ' → ' + fmtFechaLetras(fMax) + ').</div>' +
     '<div class="imp-aviso">🆕 <b>' + nuevos.length + ' producto' + pl + ' nuevo' + pl + '</b> facturado' + pl + ' por primera vez — se agregaron al <b>Recetario de SKUs</b> (pestaña Pendientes) para completar su composición.</div>' +
     '<div class="imp-table-wrap"><table class="imp-table"><thead><tr><th>SKU</th><th>Producto</th></tr></thead><tbody>' + filasHtml + '</tbody></table></div>' +
     '<div style="display:flex;gap:8px;margin-top:14px">' +
@@ -2302,7 +2322,8 @@ async function subirFotoEnvase(sid, inputEl) {
 function fmtFechaHoraGT(iso) {
   if (!iso) return '';
   try {
-    return new Date(iso).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala', day: '2-digit', month: '2-digit', year: 'numeric' });
+    var p = new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' }); // AAAA-MM-DD en hora de Guatemala
+    return fmtFechaLetras(p);
   } catch (e) { return ''; }
 }
 

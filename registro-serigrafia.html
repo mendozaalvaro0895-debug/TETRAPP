@@ -557,6 +557,27 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 <script>
 // SUPA_URL, SUPA_KEY, db y escHtml vienen de shared/auth.js
 
+// Fecha para MOSTRAR: día/Mes(letras)/Año (ej. 30/Oct/2026). Evita confundir dd/mm con mm/dd; las fechas internas siguen en ISO.
+// ESPEJO en tapas.html, registro-tapas.html, comandas.html y los demás módulos. Acepta 'AAAA-MM-DD…' o Date; lo que no reconoce lo devuelve igual.
+var FECHA_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+function fmtFechaLetras(f, sinAnio) {
+  var y, m, d;
+  if (f instanceof Date) {
+    if (isNaN(f.getTime())) return '—';
+    y = f.getFullYear(); m = f.getMonth() + 1; d = f.getDate();
+  } else {
+    var t = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!t) return f ? String(f) : '—';
+    y = +t[1]; m = +t[2]; d = +t[3];
+  }
+  return String(d).padStart(2, '0') + '/' + FECHA_MESES[m - 1] + (sinAnio ? '' : '/' + y);
+}
+function fmtFechaHoraLetras(ts) {
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return fmtFechaLetras(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
 // Fecha local (YYYY-MM-DD) sin desfase UTC — Guatemala es UTC-6.
 // toISOString() devolvería mañana si son >18:00 hora local.
 function fechaHoy() {
@@ -1489,7 +1510,7 @@ async function renderOkChart(lineaActual, periodo) {
 
   // Etiquetas del eje X según periodo (incluye día de la semana)
   var labels = fechas.map(function(f){
-    var fechaCorta = periodo === 'mes' ? String(parseInt(f.slice(8,10), 10)) : (f.slice(8,10) + '/' + f.slice(5,7));
+    var fechaCorta = periodo === 'mes' ? String(parseInt(f.slice(8,10), 10)) : (fmtFechaLetras(f, true));
     return _okDiaSemana(f, true) + ' ' + fechaCorta;
   });
 
@@ -1559,7 +1580,7 @@ async function renderOkChart(lineaActual, periodo) {
           callbacks: {
             title: function(items){
               var f = fechas[items[0].dataIndex];
-              return _okDiaSemana(f, false) + ' ' + f.slice(8,10) + '/' + f.slice(5,7) + '/' + f.slice(0,4);
+              return _okDiaSemana(f, false) + ' ' + fmtFechaLetras(f);
             },
             label: function(ctx) {
               var v = ctx.parsed.y;

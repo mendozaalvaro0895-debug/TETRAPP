@@ -1684,7 +1684,9 @@ $('uTipo').addEventListener('change', function(){
 /* ---------- producto de la tarima (SKU del inventario B2) ---------- */
 var pEdit = null, pHallado = null, pSeq = 0, pTimer = null, iEdit = null;
 function fmtExist(n){ return (n === null || n === undefined) ? '—' : Number(n).toLocaleString('es-GT'); }
-function fmtFechaIso(f){ var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(f || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
+var FECHA_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+// Fechas MOSTRADAS con el mes en letras (30/Oct/2026); las internas siguen en ISO
+function fmtFechaIso(f){ var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(f || ''); return m ? m[3] + '/' + FECHA_MESES[+m[2] - 1] + '/' + m[1] : ''; }
 function buscarSku(sku, cb){
   if (typeof db === 'undefined'){ cb({ error: 'Sin conexión con la base de datos (inicia sesión).' }); return; }
   db.from('inventario').select('sku,descripcion,existencia,existencia_fecha,activo').eq('bodega', 'B2').eq('sku', sku).maybeSingle().then(function(r){
@@ -2929,7 +2931,7 @@ n1DB('get', null, function(buf){ if (buf) n1Cargar(buf, false); });
 
 /* ---------- base de datos (tabla planos + bucket planos) ---------- */
 function dbMsg(t){ $('dbEstado').textContent = t; }
-function dbFecha(iso){ var d = new Date(iso), z = function(n){ return ('0' + n).slice(-2); }; return z(d.getDate()) + '/' + z(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+function dbFecha(iso){ var d = new Date(iso), z = function(n){ return ('0' + n).slice(-2); }; return z(d.getDate()) + '/' + FECHA_MESES[d.getMonth()] + '/' + d.getFullYear() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
 function dbGuardarVersion(intento){
   if (typeof db === 'undefined' || !TETRA || TETRA.rol !== 'master'){ dialogo('Solo el usuario master puede guardar en la base de datos.', 'info'); return; }
   dbMsg('Guardando…');

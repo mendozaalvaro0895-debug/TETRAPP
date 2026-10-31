@@ -1106,7 +1106,7 @@ function buildMovRow(m) {
   var esIng = m.tipo === 'ingreso';
   return '<tr>'
     + '<td><span class="mov-badge ' + (esIng ? 'mov-badge-in' : 'mov-badge-out') + '">' + (esIng ? 'INGRESO' : 'SALIDA') + '</span></td>'
-    + '<td>' + escHtml(m.fecha || '—') + '</td>'
+    + '<td>' + escHtml(fmtFechaLetras(m.fecha)) + '</td>'
     + '<td style="font-family:var(--mono)">' + escHtml(m.num_documento || '—') + '</td>'
     + '<td style="font-family:var(--mono)">' + escHtml(m.sku || '—') + '</td>'
     + '<td>' + escHtml(m.descripcion || '—') + '</td>'
@@ -1283,7 +1283,7 @@ function toggleSoloNuevos() {
   aplicarFiltro();
 }
 function fmtFechaNuevo(ts) {
-  return new Date(ts).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' });
+  return fmtFechaLetras(new Date(ts), true);
 }
 function actualizarChipNuevos() {
   var chip = document.getElementById('chipNuevos');
@@ -1784,7 +1784,7 @@ function fmtLastImport(bodega) {
   var dtDay = new Date(dt); dtDay.setHours(0,0,0,0);
   var prefix = dtDay.getTime() === hoy.getTime()  ? 'Hoy'
              : dtDay.getTime() === ayer.getTime() ? 'Ayer'
-             : dt.toLocaleDateString('es-GT', {day:'2-digit', month:'short', year:'numeric'});
+             : fmtFechaLetras(dt);
   var hora = dt.toLocaleTimeString('es-GT', {hour:'2-digit', minute:'2-digit'});
   return 'Actualizado · ' + prefix + ' ' + hora + (d.rows ? ' · ' + d.rows.toLocaleString() + ' reg.' : '');
 }

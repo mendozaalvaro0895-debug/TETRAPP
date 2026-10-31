@@ -262,6 +262,27 @@ function switchTab(tab) {
   if (tab === 'personal') cargarPersonal();
 }
 
+// Fecha para MOSTRAR: día/Mes(letras)/Año (ej. 30/Oct/2026). Evita confundir dd/mm con mm/dd; las fechas internas siguen en ISO.
+// ESPEJO en tapas.html, registro-tapas.html, comandas.html y los demás módulos. Acepta 'AAAA-MM-DD…' o Date; lo que no reconoce lo devuelve igual.
+var FECHA_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+function fmtFechaLetras(f, sinAnio) {
+  var y, m, d;
+  if (f instanceof Date) {
+    if (isNaN(f.getTime())) return '—';
+    y = f.getFullYear(); m = f.getMonth() + 1; d = f.getDate();
+  } else {
+    var t = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!t) return f ? String(f) : '—';
+    y = +t[1]; m = +t[2]; d = +t[3];
+  }
+  return String(d).padStart(2, '0') + '/' + FECHA_MESES[m - 1] + (sinAnio ? '' : '/' + y);
+}
+function fmtFechaHoraLetras(ts) {
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return fmtFechaLetras(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
 function fechaHoy() {
   var d = new Date(Date.now() - 6 * 60 * 60 * 1000);
   return d.toISOString().slice(0, 10);
@@ -314,7 +335,7 @@ function buildMovRow(m) {
   var esIng = m.tipo === 'ingreso';
   return '<tr>'
     + '<td><span class="mov-badge ' + (esIng ? 'mov-badge-in' : 'mov-badge-out') + '">' + (esIng ? 'INGRESO' : 'SALIDA') + '</span></td>'
-    + '<td>' + escHtml(m.fecha || '—') + '</td>'
+    + '<td>' + escHtml(fmtFechaLetras(m.fecha)) + '</td>'
     + '<td style="font-family:var(--mono)">' + escHtml(m.num_documento || '—') + '</td>'
     + '<td style="font-family:var(--mono)">' + escHtml(m.sku || '—') + '</td>'
     + '<td>' + escHtml(m.descripcion || '—') + '</td>'

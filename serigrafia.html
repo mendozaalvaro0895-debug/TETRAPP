@@ -2515,10 +2515,29 @@ function irDiaEspecifico(val) { if (!val) return; posFecha = val; aplicarDia(); 
 var boardDragId = null;
 var boardDragSolId = null;
 
+// Fecha para MOSTRAR: día/Mes(letras)/Año (ej. 30/Oct/2026). Evita confundir dd/mm con mm/dd; las fechas internas siguen en ISO.
+// ESPEJO en tapas.html, registro-tapas.html, comandas.html y los demás módulos. Acepta 'AAAA-MM-DD…' o Date; lo que no reconoce lo devuelve igual.
+var FECHA_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+function fmtFechaLetras(f, sinAnio) {
+  var y, m, d;
+  if (f instanceof Date) {
+    if (isNaN(f.getTime())) return '—';
+    y = f.getFullYear(); m = f.getMonth() + 1; d = f.getDate();
+  } else {
+    var t = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!t) return f ? String(f) : '—';
+    y = +t[1]; m = +t[2]; d = +t[3];
+  }
+  return String(d).padStart(2, '0') + '/' + FECHA_MESES[m - 1] + (sinAnio ? '' : '/' + y);
+}
+function fmtFechaHoraLetras(ts) {
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return fmtFechaLetras(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
 function fmtFechaCorta(iso) {
-  if (!iso) return '—';
-  var d = iso.slice(0, 10).split('-');
-  return d.length === 3 ? d[2] + '/' + d[1] + '/' + d[0] : iso;
+  return iso ? fmtFechaLetras(iso) : '—';
 }
 
 // Estado del stock (Bodega 2) del envase base de una ficha, comparado contra lo que pide
@@ -2634,7 +2653,7 @@ function boardBuildCard(item) {
         requis.map(function(m) {
           return '<span style="white-space:nowrap">' +
             (m.linea ? '<b>L' + escHtml(m.linea) + '</b> · ' : '') +
-            (m.cant||0).toLocaleString() + ' und · ' + (m.fecha || '—') +
+            (m.cant||0).toLocaleString() + ' und · ' + fmtFechaLetras(m.fecha) +
             (m.requi ? ' <em>(' + escHtml(m.requi) + ')</em>' : '') +
             '</span>';
         }).join('<span style="color:var(--border)"> / </span>') +
@@ -2717,7 +2736,7 @@ function boardBuildCardSinRow(item, solEsc, cliEsc) {
             (r.linea ? '<span style="font-weight:800;color:' + requiAccent + '">L' + escHtml(r.linea) + '</span> · ' : '') +
             (r.requi ? '<span style="font-family:var(--mono);font-weight:700;color:' + requiAccent + '">REQUI ' + escHtml(r.requi) + '</span> · ' : '') +
             (r.cant||0).toLocaleString() + ' und' +
-            (r.fecha ? ' · ' + r.fecha.slice(5) : '') +
+            (r.fecha ? ' · ' + fmtFechaLetras(r.fecha, true) : '') +
           '</span>';
         }).join('') +
       '</div>'
@@ -4886,7 +4905,7 @@ function abrirJustifPopover(codigo, fecha, evt) {
   var x = Math.min(evt.clientX, window.innerWidth - 380);
   var y = Math.min(evt.clientY + 8, window.innerHeight - 280);
   pop.style.left = x + 'px'; pop.style.top = y + 'px';
-  var fechaFmt = fecha.slice(8) + '/' + fecha.slice(5,7) + '/' + fecha.slice(0,4);
+  var fechaFmt = fmtFechaLetras(fecha);
   var codEsc = codigo.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   var fotoPreviewHtml = fotoActual
     ? '<div id="justifFotoPreview" style="margin-bottom:8px;position:relative">' +
@@ -5151,7 +5170,7 @@ async function exportarAsistGridPDF() {
         var dow = new Date(f+'T12:00:00').getDay();
         var est = daysByP[f];
         if (!est || est === 'pendiente') return;
-        var lbl = f.slice(8) + '/' + f.slice(5,7); // 'dd/mm' directo
+        var lbl = fmtFechaLetras(f, true); // 'dd/Mes'
         var justifFD = (justifCache && justifCache.byCodigoFecha[p.codigo] || {})[f];
         var justifTxt = justifFD ? (justifFD.texto || '') : '';
         if (est === 'ausente') fAus.push({lbl: lbl, justif: justifTxt});
@@ -5165,15 +5184,15 @@ async function exportarAsistGridPDF() {
       if (fVel.length)  resVel.push({nombre: nom, fechas: fVel});
       if (fDom.length)  resDom.push({nombre: nom, fechas: fDom});
       if (p.fecha_inicio && p.fecha_inicio >= dMin && p.fecha_inicio <= dMax)
-        resIni.push({nombre: nom, fechas: [p.fecha_inicio.slice(8) + '/' + p.fecha_inicio.slice(5,7)]});
+        resIni.push({nombre: nom, fechas: [fmtFechaLetras(p.fecha_inicio, true)]});
       if (p.fecha_baja && p.fecha_baja >= dMin && p.fecha_baja <= dMax)
-        resBaj.push({nombre: nom, fechas: [p.fecha_baja.slice(8) + '/' + p.fecha_baja.slice(5,7)]});
+        resBaj.push({nombre: nom, fechas: [fmtFechaLetras(p.fecha_baja, true)]});
     });
     (personalData && personalData.serig ? personalData.serig : []).forEach(function(p) {
       if (p.activo) return;
       if (p.fecha_baja && p.fecha_baja >= dMin && p.fecha_baja <= dMax) {
         var ya = resBaj.some(function(x){ return x.nombre === (p.nombre||p.codigo); });
-        if (!ya) resBaj.push({nombre: p.nombre||p.codigo, fechas: [p.fecha_baja.slice(8)+'/'+p.fecha_baja.slice(5,7)]});
+        if (!ya) resBaj.push({nombre: p.nombre||p.codigo, fechas: [fmtFechaLetras(p.fecha_baja, true)]});
       }
     });
     return {resAus: resAus, resTard: resTard, resVel: resVel, resDom: resDom, resIni: resIni, resBaj: resBaj};
@@ -5226,7 +5245,7 @@ async function exportarAsistGridPDF() {
     '</div>';
 
   var hayRoles = Object.keys(matrizByOpDia).length > 0;
-  var genFecha = new Date().toLocaleDateString('es-GT');
+  var genFecha = fmtFechaLetras(new Date());
 
   function buildSeccion(qTitulo, qLbl, diasQ, anteriorSet, diasActQ) {
     var rowsQ = buildPersonaRowsArr(plazaFija, diasQ, anteriorSet, null) +
@@ -6513,7 +6532,7 @@ async function renderConsolidadoEnvases() {
 
   // Fecha = momento de la última recarga (no updated_at del DB)
   var _nowB2 = new Date();
-  var invFechaB2 = 'Inv. B2 · ' + String(_nowB2.getDate()).padStart(2,'0') + '/' + String(_nowB2.getMonth()+1).padStart(2,'0') + '/' + _nowB2.getFullYear();
+  var invFechaB2 = 'Inv. B2 · ' + fmtFechaLetras(_nowB2);
 
   function fmtN(n){ return n == null ? '—' : n.toLocaleString(); }
   function estadoBadge(r) {
@@ -6623,7 +6642,7 @@ async function renderRechazosInicio(forzar) {
   function fmtN(n) { return n.toLocaleString(); }
 
   var ultimos = data.slice(0, 6).map(function(r) {
-    var f = (r.created_at || '').slice(8, 10) + '/' + (r.created_at || '').slice(5, 7);
+    var f = fmtFechaLetras(r.created_at || '', true);
     var badge = r.origen === 'cliente'
       ? '<span class="mov-badge-rech-cli">CLIENTE</span>'
       : '<span class="mov-badge-rech-int">INTERNO</span>';
@@ -6882,7 +6901,7 @@ function buildProduccionHtml(manuales) {
         var requiSalLinea = l.solId ? (salidaRequiMap[l.solId] ? salidaRequiMap[l.solId].join(', ') : '—')
                           : (m.solId ? (salidaRequiMap[m.solId] ? salidaRequiMap[m.solId].join(', ') : '—') : '—');
         // Fecha y Origen: valores del documento (requi), se repiten en cada fila del grupo
-        var fechaCell = '<td style="font-size:11px;color:var(--gray)">' + escHtml(m.fecha || '—') + '</td>';
+        var fechaCell = '<td style="font-size:11px;color:var(--gray)">' + escHtml(fmtFechaLetras(m.fecha)) + '</td>';
         var origenCell = '<td><span style="font-size:9px;background:#FEF3C7;color:#92400e;border-radius:4px;padding:2px 6px;font-weight:700">MANUAL</span>' +
           (isFirst && m.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(m.nota) + '</span>' : '') + '</td>';
         // Requi Salida Bodega: dato PROPIO de cada SKU (su solId) → por línea, no solo la primera
@@ -6953,7 +6972,7 @@ function calcularHoras(cantidad, opsCount, procs, tiros) {
 function fechaEst(turnos) {
   var fecha = new Date();
   fecha.setDate(fecha.getDate() + turnos);
-  return fecha.toLocaleDateString('es-GT');
+  return fmtFechaLetras(fecha);
 }
 
 async function generarCodigo(area) {
@@ -7579,7 +7598,7 @@ function renderArchivoBody(el) {
   }
   var filas = solicitudesArchivadas.map(function(s) {
     var d = new Date(s.deleted_at);
-    var fechaArch = String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+    var fechaArch = fmtFechaLetras(d);
     return '<tr>' +
       '<td style="font-family:var(--mono);font-size:10px;font-weight:700;color:#6d28d9;white-space:nowrap">' + escHtml(s.id_display||s.id.slice(0,8)) + '</td>' +
       '<td style="font-size:11px;font-weight:700">' + escHtml(s.cliente) + '</td>' +
@@ -7978,7 +7997,7 @@ function toggleEnvConsolidado(e) {
 
 function descargarAlertasB7() {
   if (!b7AlertasData.length) return;
-  var fecha = new Date().toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  var fecha = fmtFechaLetras(new Date());
   // Mismo orden que el bloque visual: sin stock → bajo mínimo, luego alfabético
   var sortedB7 = b7AlertasData.slice().sort(function(a, b) {
     var ta = (a.existencia || 0) === 0 ? 0 : 1;
@@ -8882,7 +8901,7 @@ function buildSalidaRow(r) {
     '<td><span class="mov-sku">' + escHtml(r.sku_original || '—') + '</span></td>' +
     '<td style="font-size:11px;color:var(--gray-l)">' + escHtml(invItem ? (invItem.descripcion||'—') : '—') + '</td>' +
     '<td class="mov-cant">' + (r.cantidad||0).toLocaleString() + '</td>' +
-    '<td style="font-size:11px;color:var(--gray)">' + escHtml(fecha) + '</td>' +
+    '<td style="font-size:11px;color:var(--gray)">' + escHtml(fmtFechaLetras(fecha)) + '</td>' +
     '<td><span class="mov-badge-sal">SALIDA</span></td>' +
     '<td>' + (requiPT && r.solicitud_id
       ? '<span onclick="event.stopPropagation();irAResumenFicha(\'' + r.solicitud_id + '\')" style="cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--serig-m);text-decoration:underline dotted">' + escHtml(requiPT) + '</span>'
@@ -8906,7 +8925,7 @@ function buildRechazoRowSerig(r) {
     : '<span class="mov-badge-rech-int">INTERNO</span>';
   return '<tr>' +
     '<td>' + origenBadge + '</td>' +
-    '<td style="font-size:11px;color:var(--gray)">' + escHtml(fecha) + '</td>' +
+    '<td style="font-size:11px;color:var(--gray)">' + escHtml(fmtFechaLetras(fecha)) + '</td>' +
     '<td><span class="mov-sku">' + escHtml(r.sku||'—') + '</span><div style="font-size:10px;color:var(--gray-l)">' + escHtml(r.descripcion||'') + '</div></td>' +
     '<td style="font-size:12px;text-transform:capitalize">' + escHtml(motivo) + '</td>' +
     '<td class="mov-cant" style="color:var(--red)">' + rech.toLocaleString() + '</td>' +
@@ -8984,7 +9003,7 @@ function buildUltimaLecturaRow(l) {
   return '<div style="padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer" ' +
     'onclick="document.getElementById(\'prodMes\').value=\'' + escHtml(f.slice(0,7)) + '\';renderProductividad()" ' +
     'title="Ver este mes en Productividad">' +
-    '<strong>' + escHtml(f) + '</strong> · Línea ' + escHtml(String(l.linea_id || '?')) +
+    '<strong>' + escHtml(fmtFechaLetras(f)) + '</strong> · Línea ' + escHtml(String(l.linea_id || '?')) +
     ' · ' + escHtml(l.operador_nombre || l.operador_codigo || '—') +
     ' · ' + escHtml(l.momento || '') +
     ' · contador ' + (l.contador || 0).toLocaleString() +
@@ -9005,7 +9024,7 @@ async function buildUltimasLecturasHint(fechaBuscada) {
     }
     return '<div style="max-width:560px;margin:0 auto;padding:14px 18px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;font-size:12px;color:#92400E">' +
       '<div style="font-weight:700;margin-bottom:6px">Sí hay lecturas en la base, pero ninguna con fecha ' +
-      escHtml(fechaBuscada) + '. Últimas 10 (clic para ir a esa fecha):</div>' +
+      escHtml(fmtFechaLetras(fechaBuscada)) + '. Últimas 10 (clic para ir a esa fecha):</div>' +
       rx.data.map(buildUltimaLecturaRow).join('') +
       '</div>';
   } catch(e) { return ''; }
@@ -9283,7 +9302,7 @@ async function renderProductividadChart(periodo) {
   // [número/fecha, día abreviado] — se dibujan apiladas (no lado a lado) vía
   // el plugin prodTwoLineXPlugin para no ensanchar el eje X.
   var labels = todasFechas.map(function(f) {
-    var fechaCorta = periodo === 'mes' ? String(parseInt(f.slice(8,10), 10)) : (f.slice(8,10) + '/' + f.slice(5,7));
+    var fechaCorta = periodo === 'mes' ? String(parseInt(f.slice(8,10), 10)) : fmtFechaLetras(f, true);
     return [fechaCorta, prodDiaSemana(f, true)];
   });
 
@@ -9454,7 +9473,7 @@ async function renderProductividadChart(periodo) {
           callbacks: {
             title: function(items) {
               var f = todasFechas[items[0].dataIndex];
-              return prodDiaSemana(f, false) + ' ' + f.slice(8,10) + '/' + f.slice(5,7) + '/' + f.slice(0,4);
+              return prodDiaSemana(f, false) + ' ' + fmtFechaLetras(f);
             },
             label: function(ctx) {
               var ds = ctx.dataset || {};
@@ -9658,7 +9677,7 @@ async function renderFlamLineaChart(periodo) {
   });
 
   var labels = todasFechas.map(function(f) {
-    return periodo === 'mes' ? String(parseInt(f.slice(8,10),10)) : (f.slice(8,10)+'/'+f.slice(5,7));
+    return periodo === 'mes' ? String(parseInt(f.slice(8,10),10)) : (fmtFechaLetras(f, true));
   });
   var COLS4 = ['#2A8B75','#D97706','#1D4ED8','#16A34A'];
   var datasets = LINEAS_PRODUCCION.map(function(ln, i) {
@@ -9734,7 +9753,7 @@ function renderFlamMetasChart(rows) {
   });
 
   var labels = todasFechas.map(function(f){
-    return periodo === 'mes' ? String(parseInt(f.slice(8,10),10)) : (f.slice(8,10)+'/'+f.slice(5,7));
+    return periodo === 'mes' ? String(parseInt(f.slice(8,10),10)) : (fmtFechaLetras(f, true));
   });
 
   var datasets = opOrder.map(function(k, i) {
@@ -9806,7 +9825,7 @@ function renderFlamMetasChart(rows) {
 // ── Cards Por línea (fecha × linea) ──
 function buildFlamLineaCard(fecha, datos) {
   var total = datos.registros.reduce(function(s,r){ return s+(r.cantidad||0); }, 0);
-  var fechaFmt = fecha.slice(8,10)+'/'+fecha.slice(5,7);
+  var fechaFmt = fmtFechaLetras(fecha, true);
   var html = '<div class="pfc"><div class="pfc-hdr">📅 '+escHtml(fechaFmt)+
     '<span style="float:right;font-weight:400">'+total.toLocaleString()+' und</span></div>';
   var prevFlam = '', prevEnvase = '';
@@ -10080,7 +10099,7 @@ function buildFlamHistRow(r) {
   var trStyle = r.estado === 'rechazado' ? 'background:#FFF5F5' : r.estado === 'aprobado' ? 'background:#F0FDF4' : '';
 
   return '<tr style="border-top:1px solid var(--border);'+trStyle+'">'
-    + '<td style="padding:8px 10px;white-space:nowrap;color:#475569;font-size:12px">'+escHtml(r.fecha||'')+'<br><span style="color:#94a3b8">'+escHtml((r.hora||'').slice(0,5))+'</span></td>'
+    + '<td style="padding:8px 10px;white-space:nowrap;color:#475569;font-size:12px">'+escHtml(fmtFechaLetras(r.fecha||''))+'<br><span style="color:#94a3b8">'+escHtml((r.hora||'').slice(0,5))+'</span></td>'
     + '<td style="padding:8px 10px">'+escHtml(r.flameador_nombre||r.flameador_codigo||'—')+'</td>'
     + '<td style="padding:8px 10px;font-size:12px;max-width:200px">'+desc+'</td>'
     + '<td style="padding:8px 10px;text-align:center;font-weight:700">'+escHtml(String(r.cantidad||0))+'</td>'
@@ -10271,7 +10290,7 @@ async function renderEmpChart(periodo) {
   var opKeysE2 = Object.keys(opMapE2).sort(function(a,b){ return (totPorOpE2[b]||0)-(totPorOpE2[a]||0); });
 
   var labelsE = todasFechas.map(function(f) {
-    return periodo === 'mes' ? String(parseInt(f.slice(8,10),10)) : (f.slice(8,10)+'/'+f.slice(5,7));
+    return periodo === 'mes' ? String(parseInt(f.slice(8,10),10)) : (fmtFechaLetras(f, true));
   });
   var datasetsE = opKeysE2.map(function(k, i) {
     return {
@@ -10293,7 +10312,7 @@ async function renderEmpChart(periodo) {
         legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 14, boxHeight: 14 } },
         tooltip: {
           callbacks: {
-            title: function(items) { return todasFechas[items[0].dataIndex].slice(8,10)+'/'+todasFechas[items[0].dataIndex].slice(5,7); },
+            title: function(items) { return fmtFechaLetras(todasFechas[items[0].dataIndex], true); },
             label: function(item) { return '  ' + item.dataset.label + ': ' + (item.raw||0).toLocaleString() + ' und'; }
           }
         }
@@ -10308,7 +10327,7 @@ async function renderEmpChart(periodo) {
 
 function buildEmpCard(fecha, datos) {
   var total = datos.registros.reduce(function(s,r){ return s+(r.cantidad||0); }, 0);
-  var fechaFmt = fecha.slice(8,10)+'/'+fecha.slice(5,7);
+  var fechaFmt = fmtFechaLetras(fecha, true);
   var html = '<div class="pfc"><div class="pfc-hdr">📅 ' + escHtml(fechaFmt) +
     '<span style="float:right;font-weight:400">' + total.toLocaleString() + ' und</span></div>';
   var prevSku = '';

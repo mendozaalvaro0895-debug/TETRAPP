@@ -1071,9 +1071,35 @@ function actualizarEdadCalculada() {
   el.innerHTML = edad != null ? ('→ ' + edad + ' años') : '&nbsp;';
 }
 
+// Fecha para MOSTRAR: día/Mes(letras)/Año (ej. 30/Oct/2026). Evita confundir dd/mm con mm/dd; las fechas internas siguen en ISO.
+// ESPEJO en tapas.html, registro-tapas.html, comandas.html y los demás módulos. Acepta 'AAAA-MM-DD…' o Date; lo que no reconoce lo devuelve igual.
+var FECHA_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+function fmtFechaLetras(f, sinAnio) {
+  var y, m, d;
+  if (f instanceof Date) {
+    if (isNaN(f.getTime())) return '—';
+    y = f.getFullYear(); m = f.getMonth() + 1; d = f.getDate();
+  } else {
+    var t = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!t) return f ? String(f) : '—';
+    y = +t[1]; m = +t[2]; d = +t[3];
+  }
+  return String(d).padStart(2, '0') + '/' + FECHA_MESES[m - 1] + (sinAnio ? '' : '/' + y);
+}
+function fmtFechaHoraLetras(ts) {
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return fmtFechaLetras(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
 function formatFechaCorta(iso) {
-  var p = iso.split('-');
-  return p[2] + '/' + p[1];
+  return fmtFechaLetras(iso, true);
+}
+
+// Período de un bono: 'AAAA-MM' (mensual) → Oct/2026; 'AAAA-MM-DD' (diario) → 30/Oct/2026
+function fmtPeriodoLetras(p) {
+  var t = String(p || '').match(/^(\d{4})-(\d{2})$/);
+  return t ? FECHA_MESES[+t[2] - 1] + '/' + t[1] : fmtFechaLetras(p);
 }
 
 function tick() {
@@ -1474,7 +1500,7 @@ function asExportarPDF() {
     (q ? ' · búsqueda: "' + q + '"' : '');
   // En el papel no hay perfil que abrir
   var tabla = asBuildTabla(lista, ym, ultimo, hoy).replace(/ onclick="abrirPerfil\('[^']*'\)"/g, '');
-  var generado = new Date().toLocaleString('es-GT');
+  var generado = fmtFechaHoraLetras(new Date());
 
   // asBuildKpis colorea con var(--red)/var(--gray…): en la ventana nueva hay que definirlas
   var css = ':root{--red:#B83232;--amber:#B87200;--gray:#6B6B6A;--gray-l:#A8A6A0}'
@@ -2281,7 +2307,7 @@ function rolCeldaHtml(p) {
 
 function buildFilaVacante(p, rolHtml, turnoTxt) {
   var guion = '<span class="falta-none">—</span>';
-  var antes = 'Antes: ' + (p.nombre || 'sin nombre') + (p.fecha_baja ? ' · baja ' + p.fecha_baja : '');
+  var antes = 'Antes: ' + (p.nombre || 'sin nombre') + (p.fecha_baja ? ' · baja ' + fmtFechaLetras(p.fecha_baja) : '');
   return '<tr class="p-row vacante" onclick="cubrirVacante(\'' + p.id + '\')" title="Clic para cubrir esta plaza con una persona nueva">' +
     '<td><span class="p-row-avatar">＋</span>VACANTE' +
       '<span class="vac-cerrar" onclick="event.stopPropagation();cerrarVacante(\'' + p.id + '\')" title="Cerrar la vacante (la plaza ya no se necesita)">✕ cerrar</span>' +
@@ -2324,7 +2350,7 @@ function buildPersonalRow(p, anonVac) {
     '<td style="font-family:var(--mono);font-size:11px">' + escHtml(p.codigo) + '</td>' +
     '<td>' + (edadDePersona(p) != null ? escHtml(edadDePersona(p)) : '—') + '</td>' +
     '<td>' + (p.telefono ? escHtml(p.telefono) : '—') + '</td>' +
-    '<td>' + (p.fecha_inicio ? escHtml(p.fecha_inicio) : '—') + '</td>' +
+    '<td>' + escHtml(fmtFechaLetras(p.fecha_inicio)) + '</td>' +
     '<td>' + (p.talla_uniforme ? escHtml(p.talla_uniforme) : '—') + '</td>' +
     '<td>' + rolHtml + '</td>' +
     '<td>' + escHtml(turnoTxt) + '</td>' +
@@ -2668,7 +2694,7 @@ function buildCapacitacionItem(c) {
   return '<div class="rec-item">' +
     '<div class="rec-top">' +
       '<div><div class="rec-tipo">' + escHtml(c.habilidad) + ' ' + estadoBadge + '</div>' +
-      '<div class="rec-fecha">' + escHtml(areaLbl) + ' · ' + c.fecha + (c.supervisor ? ' · Valida: ' + escHtml(c.supervisor) : '') + '</div></div>' +
+      '<div class="rec-fecha">' + escHtml(areaLbl) + ' · ' + fmtFechaLetras(c.fecha) + (c.supervisor ? ' · Valida: ' + escHtml(c.supervisor) : '') + '</div></div>' +
       '<button class="rec-del" onclick="eliminarCapacitacion(' + c.id + ')" title="Eliminar">🗑</button>' +
     '</div>' +
     (c.comentario ? '<div class="rec-txt">' + escHtml(c.comentario) + '</div>' : '') +
@@ -2774,7 +2800,7 @@ async function cargarPermisos(personalId) {
 }
 
 function buildPermisoItem(r) {
-  var rango = r.fecha_fin && r.fecha_fin !== r.fecha_inicio ? (r.fecha_inicio + ' → ' + r.fecha_fin) : r.fecha_inicio;
+  var rango = r.fecha_fin && r.fecha_fin !== r.fecha_inicio ? (fmtFechaLetras(r.fecha_inicio) + ' → ' + fmtFechaLetras(r.fecha_fin)) : fmtFechaLetras(r.fecha_inicio);
   return '<div class="rec-item">' +
     '<div class="rec-top">' +
       '<div><div class="rec-tipo">' + (PERMISO_LBL[r.tipo] || r.tipo) + ' <span class="pill pill-' + r.estado + '">' + r.estado + '</span></div>' +
@@ -2858,7 +2884,7 @@ function buildIncidenteItem(r) {
   return '<div class="rec-item">' +
     '<div class="rec-top">' +
       '<div><div class="rec-tipo">' + (INCIDENTE_ICO[r.tipo] || '') + ' ' + (INCIDENTE_LBL[r.tipo] || r.tipo) + '</div>' +
-      '<div class="rec-fecha">' + r.fecha + '</div></div>' +
+      '<div class="rec-fecha">' + fmtFechaLetras(r.fecha) + '</div></div>' +
       '<button class="rec-del" onclick="eliminarIncidente(' + r.id + ')" title="Eliminar">🗑</button>' +
     '</div>' +
     (r.descripcion ? '<div class="rec-txt">' + escHtml(r.descripcion) + '</div>' : '') +
@@ -2946,7 +2972,7 @@ function buildBonoItem(b) {
   return '<div class="rec-item">' +
     '<div class="rec-top">' +
       '<div><div class="rec-tipo">' + escHtml(rolLbl) + ' ' + estadoBadge + '</div>' +
-      '<div class="rec-fecha">' + escHtml(b.periodo) + (b.supervisor ? ' · Valida: ' + escHtml(b.supervisor) : '') + '</div></div>' +
+      '<div class="rec-fecha">' + escHtml(fmtPeriodoLetras(b.periodo)) + (b.supervisor ? ' · Valida: ' + escHtml(b.supervisor) : '') + '</div></div>' +
       '<button class="rec-del" onclick="eliminarBono(' + b.id + ')" title="Eliminar">🗑</button>' +
     '</div>' +
     (detalles.length ? '<div class="rec-txt">' + escHtml(detalles.join(' · ')) + '</div>' : '') +
@@ -3220,7 +3246,7 @@ function buildFaltaItem(f) {
   }
   return '<div class="rec-item">' +
     '<div class="rec-top">' +
-      '<div><div class="rec-tipo">Falta ' + estadoBadge + origenBadge + '</div><div class="rec-fecha">' + f.fecha + '</div></div>' +
+      '<div><div class="rec-tipo">Falta ' + estadoBadge + origenBadge + '</div><div class="rec-fecha">' + fmtFechaLetras(f.fecha) + '</div></div>' +
       '<button class="rec-del" onclick="eliminarFalta(' + f.id + ')" title="Eliminar">🗑</button>' +
     '</div>' +
     (f.notas ? '<div class="rec-txt">' + escHtml(f.notas) + '</div>' : '') +
@@ -3376,9 +3402,9 @@ function renderMejoras() {
 function buildMejoraCard(m) {
   var badge = '<span class="' + (MEJORA_ESTADO_CLASS[m.estado] || 'badge-pend') + '">' + (MEJORA_ESTADO_LBL[m.estado] || m.estado) + '</span>';
   var fechas = [];
-  if (m.fecha_inicio) fechas.push('Inicio: ' + m.fecha_inicio);
-  if (m.fecha_objetivo) fechas.push('Objetivo: ' + m.fecha_objetivo);
-  if (m.fecha_cierre) fechas.push('Cierre: ' + m.fecha_cierre);
+  if (m.fecha_inicio) fechas.push('Inicio: ' + fmtFechaLetras(m.fecha_inicio));
+  if (m.fecha_objetivo) fechas.push('Objetivo: ' + fmtFechaLetras(m.fecha_objetivo));
+  if (m.fecha_cierre) fechas.push('Cierre: ' + fmtFechaLetras(m.fecha_cierre));
   return '<div class="rec-item clickable" onclick="abrirMejora(' + m.id + ')">' +
     '<div class="rec-top">' +
       '<div><div class="rec-tipo">' + escHtml(m.titulo) + ' ' + badge + '</div>' +

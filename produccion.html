@@ -815,17 +815,36 @@ function lunesDe(iso) {
   d.setDate(d.getDate() + delta);
   return isoDe(d);
 }
+// Fecha para MOSTRAR: día/Mes(letras)/Año (ej. 30/Oct/2026). Evita confundir dd/mm con mm/dd; las fechas internas siguen en ISO.
+// ESPEJO en tapas.html, registro-tapas.html, comandas.html y los demás módulos. Acepta 'AAAA-MM-DD…' o Date; lo que no reconoce lo devuelve igual.
+var FECHA_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+function fmtFechaLetras(f, sinAnio) {
+  var y, m, d;
+  if (f instanceof Date) {
+    if (isNaN(f.getTime())) return '—';
+    y = f.getFullYear(); m = f.getMonth() + 1; d = f.getDate();
+  } else {
+    var t = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!t) return f ? String(f) : '—';
+    y = +t[1]; m = +t[2]; d = +t[3];
+  }
+  return String(d).padStart(2, '0') + '/' + FECHA_MESES[m - 1] + (sinAnio ? '' : '/' + y);
+}
+function fmtFechaHoraLetras(ts) {
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return fmtFechaLetras(d) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
 function fechaCorta(iso) {
-  var d = dObj(iso);
-  return ('0' + d.getDate()).slice(-2) + ' ' + MESES_C[d.getMonth()];
+  return fmtFechaLetras(iso, true);
 }
 function diaCorta(iso) {
   var d = dObj(iso);
   return DIAS_CORTO[d.getDay()] + ' ' + ('0' + d.getDate()).slice(-2);
 }
 function fechaLarga(iso) {
-  var d = dObj(iso);
-  return ('0' + d.getDate()).slice(-2) + ' ' + MESES_C[d.getMonth()] + ' ' + d.getFullYear();
+  return fmtFechaLetras(iso);
 }
 function mesesAtras(n) {
   var d = new Date(); d.setMonth(d.getMonth() - n);
@@ -1710,7 +1729,7 @@ async function guardarPreview() {
     var n = await guardarTurno(prevMeta.fecha, prevMeta.turno, prevRows, 'pdf', prevMeta.documento);
     await recordarMaquinas(prevRows);
     toast('✅ ' + n + ' líneas guardadas · requi ' + prevMeta.documento + ' · ' +
-      prevMeta.fecha + ' ' + prevMeta.turno, 'ok');
+      fmtFechaLetras(prevMeta.fecha) + ' ' + prevMeta.turno, 'ok');
     cerrarPrev();
     await cargarUltimos();
   } catch (err) {
@@ -1871,7 +1890,7 @@ async function guardarManual() {
   try {
     var n = await guardarTurno(fecha, turno, filas, 'manual', 'MANUAL');
     await recordarMaquinas(filas);
-    toast('✅ ' + n + ' líneas guardadas · ' + fecha + ' ' + turno +
+    toast('✅ ' + n + ' líneas guardadas · ' + fmtFechaLetras(fecha) + ' ' + turno +
       '\n(reemplazan solo lo capturado a mano; lo que venga de requis PDF se conserva)', 'ok');
     document.getElementById('manRows').innerHTML = '';
     addManRow(); addManRow(); addManRow();
@@ -1953,7 +1972,7 @@ var maqRows = [];
 
 async function abrirModalMaq(fecha, turno) {
   document.getElementById('maqTit').textContent =
-    '✏️ Máquinas / Operarios · ' + fecha + ' · ' + (turno === 'dia' ? '☀️ Día' : '🌙 Noche');
+    '✏️ Máquinas / Operarios · ' + fmtFechaLetras(fecha) + ' · ' + (turno === 'dia' ? '☀️ Día' : '🌙 Noche');
   document.getElementById('maqBody').innerHTML = '<div style="padding:24px;text-align:center;color:var(--gray)">Cargando…</div>';
   document.getElementById('modalMaq').classList.add('open');
 
@@ -2517,7 +2536,7 @@ function safeSku(s) { return String(s).replace(/[^a-zA-Z0-9]/g, '_'); }
 function fmtFechaHoraGT(iso) {
   if (!iso) return '';
   try {
-    return new Date(iso).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala', day: '2-digit', month: '2-digit', year: 'numeric' });
+    return fmtFechaLetras(new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' })); // AAAA-MM-DD en hora de Guatemala
   } catch (e) { return ''; }
 }
 
