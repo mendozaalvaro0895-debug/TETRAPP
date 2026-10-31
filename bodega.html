@@ -98,6 +98,27 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .rot-cob.a{background:var(--amber-l);color:#B45309}
 .rot-cob.v{background:var(--green-l);color:#047857}
 .rot-aprox{color:var(--amber);font-weight:700;cursor:help}
+.rot-ctrl{display:flex;gap:8px;flex-wrap:wrap}
+.rot-row{cursor:pointer}
+.rot-row.open td{background:var(--bodega-xl)}
+.rot-chev{display:inline-block;width:12px;color:var(--bodega);font-size:10px}
+.rot-det td{background:var(--bg);padding:12px 16px 14px 38px;border-bottom:1.5px solid var(--border)}
+.rot-det:hover td{background:var(--bg)!important}
+.rot-det-tit{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray);margin-bottom:6px}
+.rot-det-msg{font-size:12px;color:var(--gray)}
+.rot-comp{width:100%;border-collapse:collapse;font-size:12px;background:var(--card);border:1.5px solid var(--border);border-radius:8px}
+.rot-comp th{text-align:left;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-l);padding:6px 10px;border-bottom:1px solid var(--border)}
+.rot-comp td{padding:6px 10px;border-bottom:1px solid var(--border)}
+.rot-comp tr:last-child td{border-bottom:0}
+.rot-comp .num{text-align:right;font-family:var(--mono)}
+.rot-rol{display:inline-block;padding:2px 8px;border-radius:6px;background:var(--bodega-xl);color:var(--bodega-dark);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.rot-bod{font-size:9.5px;color:var(--gray-l);font-family:var(--font)}
+.rot-fotos,.rot-usos{display:flex;flex-wrap:wrap;gap:6px}
+.rot-foto{font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:6px;background:var(--card);border:1px solid var(--border)}
+.rot-foto .neg{color:#B91C1C}
+.rot-foto .pos{color:#047857}
+.rot-uso{font-size:11px;padding:3px 8px;border-radius:6px;background:var(--card);border:1px solid var(--border)}
+.rot-uso b{font-family:var(--mono);color:var(--bodega)}
 .rot-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 16px;font-size:11px;color:var(--gray-l);border-top:1.5px solid var(--border)}
 @media(max-width:700px){.rot-desc{max-width:none}.rot-head{padding:12px}}
 .mov-badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
@@ -280,19 +301,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   <!-- ═══ INICIO ═══ -->
   <div class="view" id="view-inicio">
     <div class="kpi-strip">
-      <div class="kpi"><div class="kpi-l">SKU con venta</div><div class="kpi-v" id="kpi-rot-skus">—</div><div class="kpi-s" id="kpi-rot-skus-s">—</div></div>
-      <div class="kpi"><div class="kpi-l">Unidades vendidas</div><div class="kpi-v" id="kpi-rot-und">—</div><div class="kpi-s" id="kpi-rot-und-s">—</div></div>
-      <div class="kpi"><div class="kpi-l">Top en riesgo de quiebre</div><div class="kpi-v" id="kpi-rot-riesgo" style="color:var(--red)">—</div><div class="kpi-s" id="kpi-rot-riesgo-s">—</div></div>
-      <div class="kpi"><div class="kpi-l">Con existencia y sin venta</div><div class="kpi-v" id="kpi-rot-muertos">—</div><div class="kpi-s" id="kpi-rot-muertos-s">—</div></div>
+      <div class="kpi"><div class="kpi-l" id="kpi-rot-skus-l">SKU con venta</div><div class="kpi-v" id="kpi-rot-skus">—</div><div class="kpi-s" id="kpi-rot-skus-s">—</div></div>
+      <div class="kpi"><div class="kpi-l" id="kpi-rot-und-l">Unidades vendidas</div><div class="kpi-v" id="kpi-rot-und">—</div><div class="kpi-s" id="kpi-rot-und-s">—</div></div>
+      <div class="kpi"><div class="kpi-l" id="kpi-rot-riesgo-l">Top en riesgo de quiebre</div><div class="kpi-v" id="kpi-rot-riesgo" style="color:var(--red)">—</div><div class="kpi-s" id="kpi-rot-riesgo-s">—</div></div>
+      <div class="kpi"><div class="kpi-l" id="kpi-rot-muertos-l">Con existencia y sin venta</div><div class="kpi-v" id="kpi-rot-muertos">—</div><div class="kpi-s" id="kpi-rot-muertos-s">—</div></div>
     </div>
     <div class="tbl-wrap">
       <div class="rot-head">
         <div>
-          <div class="rot-title">🔁 Productos con mayor rotación</div>
+          <div class="rot-title" id="rotTitle">🔁 Productos con mayor rotación</div>
           <div class="rot-sub" id="rotSub">Unidades facturadas frente a la existencia de Bodega 2</div>
         </div>
         <div class="rot-ctrl">
-          <div class="rot-seg">
+          <div class="rot-seg" id="rotSegFuente">
+            <button type="button" data-fuente="B2" onclick="setRotFuente('B2')">📦 Bodega 2 · ventas</button>
+            <button type="button" data-fuente="B7" onclick="setRotFuente('B7')">🧪 Bodega 7 · consumo</button>
+          </div>
+          <div class="rot-seg" id="rotSegDias">
             <button type="button" data-dias="30" onclick="setRotDias(30)">30 días</button>
             <button type="button" data-dias="90" onclick="setRotDias(90)">90 días</button>
           </div>
@@ -518,25 +543,56 @@ function renderInicio() {
 }
 
 /* ── Inicio: productos con mayor rotación ──────────────────────
-   Fuente: tabla `ventas` (facturación SICAF) del período elegido, cruzada con la
-   existencia de inventario B2 (todosLosItems, ya cargado por cargarTodo). El SKU de
-   venta se busca exacto y, si no existe, sin su último dígito (SICAF factura con un
-   dígito extra — misma regla que clasificarArea de ventas.html); ese cruce se marca
-   "≈" porque dos SKU de venta pueden caer en el mismo código de inventario.
-   Cobertura = existencia ÷ venta diaria promedio (días calendario del período). */
+   Dos fuentes (selector "Bodega 2 · ventas" / "Bodega 7 · consumo", rotFuente):
+   · B2: tabla `ventas` (facturación SICAF) del período, cruzada con la existencia de
+     inventario B2 (todosLosItems). El SKU de venta se busca exacto y, si no existe,
+     sin su último dígito (SICAF factura con un dígito extra — misma regla que
+     clasificarArea de ventas.html); ese cruce se marca "≈" porque dos SKU de venta
+     pueden caer en el mismo código de inventario. Clic en la fila = base / envase base
+     / accesorios de tapa desde el Recetario (sku_recetas + sku_receta_partes), o de la
+     ficha de trabajo más reciente con ese SKU si no hay receta con partes.
+   · B7: no se factura, así que el consumo sale de las FOTOS DIARIAS de existencia
+     (existencias_hist, la guarda guardarFotoExistencias al importar) vía la RPC
+     consumo_existencias: bajadas entre fotos = consumo, subidas = ingresos. Clic en la
+     fila = fotos del período y qué productos lo llevan en su receta.
+   Cobertura = existencia ÷ consumo diario promedio (días calendario). */
 var ROT_TOP = 15;
 var ROT_TOP_MAX = 50;
 var ROT_RIESGO_DIAS = 15;
 var ROT_ALERTA_DIAS = 30;
+var ROT_MIN_DIAS_HIST = 7;
 var rotDias = 90;
+var rotFuente = 'B2';
 var rotVerTodos = false;
-var rotVentasCache = {};   // dias → filas de ventas del período
-var rotUltimaFactura = null;
+var rotVentasCache = {};    // dias → filas de ventas del período
+var rotHistCache = {};      // bodega → { dias → filas de consumo_existencias }
+var rotAbiertos = {};       // 'B2|sku' / 'B7|sku' → true
+var rotListaActual = [];
+var rotRecetas = null;      // SKU → [{ area, directo, partes:[{rol,sku,desc}] }]
+var rotRecetasCargando = false;
+var rotFichaCache = {};     // sku → { codigo, partes } | null
+var rotHistSkuCache = {};   // dias|sku → fotos de existencias_hist
+
+var FECHA_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+// Fechas MOSTRADAS con el mes en letras (30/Oct/2026) — espejo de tapas/comandas
+function fmtFechaLetras(f, sinAnio) {
+  var t = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!t) return f ? String(f) : '—';
+  return String(+t[3]).padStart(2, '0') + '/' + FECHA_MESES[+t[2] - 1] + (sinAnio ? '' : '/' + t[1]);
+}
 
 function rotDesde(dias) {
   var d = new Date(fechaHoy() + 'T12:00:00');
   d.setDate(d.getDate() - dias + 1);
   return d.toISOString().slice(0, 10);
+}
+
+function rotDiasEntre(a, b) {
+  return Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
+}
+
+function rotNorm(sku) {
+  return String(sku || '').trim().toUpperCase();
 }
 
 async function cargarVentasRotacion(dias) {
@@ -560,30 +616,47 @@ async function cargarVentasRotacion(dias) {
   return filas;
 }
 
+async function cargarConsumoB7(dias) {
+  if (!rotHistCache.B7) rotHistCache.B7 = {};
+  if (rotHistCache.B7[dias]) return rotHistCache.B7[dias];
+  var r = await db.rpc('consumo_existencias', { p_bodega: 'B7', p_desde: rotDesde(dias) });
+  if (r.error) throw r.error;
+  rotHistCache.B7[dias] = r.data || [];
+  return rotHistCache.B7[dias];
+}
+
 function rotMapaInventario() {
   var mapa = {};
   todosLosItems.forEach(function(i) {
     if ((i.bodega || 'B2') !== 'B2') return;
-    mapa[String(i.sku || '').trim().toUpperCase()] = i;
+    mapa[rotNorm(i.sku)] = i;
   });
   return mapa;
 }
 
-function rotModelo(filas) {
+function rotMapaB7() {
+  var mapa = {};
+  todosLosInsumosB7.forEach(function(i) { mapa[rotNorm(i.sku)] = i; });
+  return mapa;
+}
+
+function rotCobertura(exist, diaria) {
+  return exist == null || diaria <= 0 ? null : exist / diaria;
+}
+
+function rotModeloB2(filas) {
   var inv = rotMapaInventario();
   var porSku = {};
   var totalUnd = 0;
   var ultima = null;
   filas.forEach(function(v) {
-    var sku = String(v.sku || '').trim().toUpperCase();
+    var sku = rotNorm(v.sku);
     if (!sku) return;
     var und = v.total_unidades || 0;
     totalUnd += und;
     if (!ultima || v.fecha > ultima) ultima = v.fecha;
     var g = porSku[sku];
-    if (!g) {
-      g = porSku[sku] = { sku: sku, desc: v.descripcion || '', und: 0, docs: {} };
-    }
+    if (!g) g = porSku[sku] = { sku: sku, desc: v.descripcion || '', und: 0, docs: {} };
     g.und += und;
     g.docs[(v.serie || '') + '-' + (v.docu || '')] = 1;
   });
@@ -593,19 +666,13 @@ function rotModelo(filas) {
     var item = inv[k];
     var aprox = false;
     if (!item && k.length > 1) { item = inv[k.slice(0, -1)]; aprox = !!item; }
-    if (item) vendidosInv[String(item.sku).trim().toUpperCase()] = 1;
+    if (item) vendidosInv[rotNorm(item.sku)] = 1;
     var diaria = g.und / rotDias;
     var exist = item ? (item.existencia || 0) : null;
     return {
-      sku: g.sku,
-      desc: g.desc || (item ? item.descripcion : ''),
-      und: g.und,
-      facturas: Object.keys(g.docs).length,
-      diaria: diaria,
-      exist: exist,
-      skuInv: item ? item.sku : null,
-      aprox: aprox,
-      cobertura: exist == null || diaria <= 0 ? null : exist / diaria
+      sku: g.sku, desc: g.desc || (item ? item.descripcion : ''), und: g.und,
+      extra: Object.keys(g.docs).length, diaria: diaria, exist: exist,
+      skuInv: item ? rotNorm(item.sku) : null, aprox: aprox, cobertura: rotCobertura(exist, diaria)
     };
   });
   lista.sort(function(a, b) { return b.und - a.und; });
@@ -613,14 +680,45 @@ function rotModelo(filas) {
     if ((i.bodega || 'B2') !== 'B2') return false;
     if (!i.activo || i.facturable === false) return false;
     if ((i.existencia || 0) <= 0) return false;
-    return !vendidosInv[String(i.sku || '').trim().toUpperCase()];
+    return !vendidosInv[rotNorm(i.sku)];
   });
-  return { lista: lista, totalUnd: totalUnd, ultima: ultima, muertos: muertos };
+  return { lista: lista, totalUnd: totalUnd, ultima: ultima, muertos: muertos.length };
+}
+
+function rotModeloB7(filas) {
+  var b7 = rotMapaB7();
+  var info = filas.filter(function(f) { return f.sku == null; })[0] || { fotos: 0 };
+  var span = info.primera && info.ultima ? rotDiasEntre(info.primera, info.ultima) : 0;
+  var conConsumo = {};
+  var totalUnd = 0;
+  var lista = filas.filter(function(f) { return f.sku != null && Number(f.consumo) > 0; }).map(function(f) {
+    var sku = rotNorm(f.sku);
+    var item = b7[sku];
+    var und = Number(f.consumo) || 0;
+    var diaria = span > 0 ? und / span : 0;
+    var exist = item ? (item.existencia || 0) : null;
+    conConsumo[sku] = 1;
+    totalUnd += und;
+    return {
+      sku: sku, desc: item ? item.descripcion : '', und: und, ingresos: Number(f.ingresos) || 0,
+      extra: f.dias_baja || 0, diaria: diaria, exist: exist, skuInv: sku, aprox: false,
+      cobertura: rotCobertura(exist, diaria)
+    };
+  });
+  lista.sort(function(a, b) { return b.und - a.und; });
+  var muertos = todosLosInsumosB7.filter(function(i) {
+    return i.activo !== false && (i.existencia || 0) > 0 && !conConsumo[rotNorm(i.sku)];
+  }).length;
+  return {
+    lista: lista, totalUnd: totalUnd, muertos: muertos, span: span,
+    fotos: info.fotos || 0, primera: info.primera, ultima: info.ultima
+  };
 }
 
 function rotClaseCobertura(r) {
   if (r.exist == null) return '';
-  if (r.exist <= 0 || r.cobertura < ROT_RIESGO_DIAS) return 'r';
+  if (r.exist <= 0 || (r.cobertura != null && r.cobertura < ROT_RIESGO_DIAS)) return 'r';
+  if (r.cobertura == null) return '';
   if (r.cobertura < ROT_ALERTA_DIAS) return 'a';
   return 'v';
 }
@@ -628,6 +726,7 @@ function rotClaseCobertura(r) {
 function rotTextoCobertura(r) {
   if (r.exist == null) return '—';
   if (r.exist <= 0) return 'Sin stock';
+  if (r.cobertura == null) return '—';
   if (r.cobertura >= 365) return '+1 año';
   return Math.round(r.cobertura) + ' d';
 }
@@ -636,82 +735,301 @@ function rotFmt(n) {
   return Math.round(n || 0).toLocaleString();
 }
 
+/* ── Recetario: base / envase base / accesorios por SKU ── */
+async function rotCargarRecetas() {
+  if (rotRecetas || rotRecetasCargando) return;
+  rotRecetasCargando = true;
+  try {
+    var rr = await db.from('sku_recetas').select('id,sku_fact,area,es_directo').range(0, 4999);
+    if (rr.error) throw rr.error;
+    var rp = await db.from('sku_receta_partes').select('receta_id,tipo,codigo,nota,orden')
+      .in('tipo', ['base', 'accesorio']).order('orden', { ascending: true }).range(0, 9999);
+    if (rp.error) throw rp.error;
+    var porReceta = {};
+    (rp.data || []).forEach(function(p) {
+      (porReceta[p.receta_id] = porReceta[p.receta_id] || []).push(p);
+    });
+    var mapa = {};
+    (rr.data || []).forEach(function(r) {
+      var sku = rotNorm(r.sku_fact);
+      if (!sku) return;
+      var partes = (porReceta[r.id] || []).map(function(p) { return rotParte(p, r.area); });
+      (mapa[sku] = mapa[sku] || []).push({ area: r.area, directo: !!r.es_directo, partes: partes });
+    });
+    rotRecetas = mapa;
+  } catch (e) {
+    rotRecetas = {};
+    toast('No se pudo leer el Recetario: ' + e.message, 'err');
+  }
+  rotRecetasCargando = false;
+}
+
+// codigo del Recetario = "10033 - ENVASE LITRO…" → { sku, desc }
+function rotParte(p, area) {
+  var txt = String(p.codigo || '');
+  var i = txt.indexOf(' - ');
+  var sku = rotNorm(i >= 0 ? txt.slice(0, i) : txt);
+  var desc = i >= 0 ? txt.slice(i + 3).trim() : '';
+  var rol;
+  if (p.tipo === 'base') rol = area === 'serigrafia' ? 'Envase base' : 'Base';
+  else rol = p.nota ? String(p.nota).trim() : 'Accesorio';
+  return { rol: rol, sku: sku, desc: desc };
+}
+
+function rotCandidatos(r) {
+  var c = [r.sku];
+  if (r.sku.length > 1) c.push(r.sku.slice(0, -1));
+  if (r.skuInv && c.indexOf(r.skuInv) < 0) c.push(r.skuInv);
+  return c;
+}
+
+async function rotCargarFicha(r) {
+  if (rotFichaCache[r.sku] !== undefined) return;
+  rotFichaCache[r.sku] = 'cargando';
+  try {
+    var q = await db.from('solicitud_lineas')
+      .select('sku,sku_base,sku_contratapa,sku_liner,sku_banda,created_at')
+      .in('sku', rotCandidatos(r)).is('deleted_at', null)
+      .order('created_at', { ascending: false }).limit(30);
+    if (q.error) throw q.error;
+    var l = (q.data || []).filter(function(x) {
+      return x.sku_base || x.sku_contratapa || x.sku_liner || x.sku_banda;
+    })[0];
+    if (!l) { rotFichaCache[r.sku] = null; return; }
+    var esTapa = !!(l.sku_contratapa || l.sku_liner || l.sku_banda);
+    var partes = [];
+    if (l.sku_base) partes.push({ rol: esTapa ? 'Base' : 'Envase base', sku: rotNorm(l.sku_base), desc: '' });
+    if (l.sku_contratapa) partes.push({ rol: 'Contratapa', sku: rotNorm(l.sku_contratapa), desc: '' });
+    if (l.sku_liner) partes.push({ rol: 'Liner', sku: rotNorm(l.sku_liner), desc: '' });
+    if (l.sku_banda) partes.push({ rol: 'Banda', sku: rotNorm(l.sku_banda), desc: '' });
+    rotFichaCache[r.sku] = { fecha: String(l.created_at || '').slice(0, 10), partes: partes };
+  } catch (e) {
+    rotFichaCache[r.sku] = null;
+  }
+}
+
+// → { estado: 'cargando'|'partes'|'directo'|'nada', fuente, partes }
+function rotComponentes(r) {
+  if (!rotRecetas) return { estado: 'cargando' };
+  var cands = rotCandidatos(r);
+  var directo = false;
+  for (var i = 0; i < cands.length; i++) {
+    var lista = rotRecetas[cands[i]] || [];
+    for (var j = 0; j < lista.length; j++) {
+      if (lista[j].partes.length) return { estado: 'partes', fuente: 'Recetario', partes: lista[j].partes };
+      if (lista[j].directo) directo = true;
+    }
+  }
+  if (directo) return { estado: 'directo' };
+  var f = rotFichaCache[r.sku];
+  if (f === undefined || f === 'cargando') return { estado: 'cargando' };
+  if (!f) return { estado: 'nada' };
+  return { estado: 'partes', fuente: 'ficha de trabajo del ' + fmtFechaLetras(f.fecha), partes: f.partes };
+}
+
+function buildRotCompRow(p, diaria, inv, b7) {
+  var item = inv[p.sku];
+  var bod = 'B2';
+  if (!item) { item = b7[p.sku]; bod = 'B7'; }
+  var desc = p.desc || (item ? item.descripcion : '');
+  var exist = item ? (item.existencia || 0) : null;
+  var c = { exist: exist, cobertura: rotCobertura(exist, diaria) };
+  var existHtml = item
+    ? rotFmt(exist) + ' <span class="rot-bod">' + bod + '</span>'
+    : '<span style="color:var(--gray-l)">no está en B2 ni B7</span>';
+  return '<tr>'
+    + '<td><span class="rot-rol">' + escHtml(p.rol) + '</span></td>'
+    + '<td class="sku-cell">' + escHtml(p.sku) + '</td>'
+    + '<td>' + escHtml(desc || '—') + '</td>'
+    + '<td class="num">' + existHtml + '</td>'
+    + '<td class="num">' + rotFmt(diaria) + '</td>'
+    + '<td style="text-align:right"><span class="rot-cob ' + rotClaseCobertura(c) + '">' + rotTextoCobertura(c) + '</span></td>'
+    + '</tr>';
+}
+
+function buildRotDetalleB2(r) {
+  var c = rotComponentes(r);
+  if (c.estado === 'cargando') return '<div class="rot-det-msg">Buscando componentes…</div>';
+  if (c.estado === 'directo') return '<div class="rot-det-msg">🏭 Producto directo de Producción: se sopla/inyecta terminado, no lleva envase base ni accesorios.</div>';
+  if (c.estado === 'nada') return '<div class="rot-det-msg">Sin receta en el Recetario ni ficha de trabajo con componentes para este SKU.</div>';
+  var inv = rotMapaInventario();
+  var b7 = rotMapaB7();
+  return '<div class="rot-det-tit">Componentes · según ' + escHtml(c.fuente) + ' · consumo a 1 por unidad vendida</div>'
+    + '<table class="rot-comp"><thead><tr><th>Componente</th><th>SKU</th><th>Descripción</th>'
+    + '<th style="text-align:right">Existencia</th><th style="text-align:right">Und / día</th><th style="text-align:right">Cobertura</th>'
+    + '</tr></thead><tbody>'
+    + c.partes.map(function(p) { return buildRotCompRow(p, r.diaria, inv, b7); }).join('')
+    + '</tbody></table>';
+}
+
+/* ── Bodega 7: fotos del insumo y productos que lo llevan ── */
+async function rotCargarHistSku(r) {
+  var key = rotDias + '|' + r.sku;
+  if (rotHistSkuCache[key] !== undefined) return;
+  rotHistSkuCache[key] = 'cargando';
+  var q = await db.from('existencias_hist').select('fecha,existencia')
+    .eq('bodega', 'B7').eq('sku', r.sku).gte('fecha', rotDesde(rotDias))
+    .order('fecha', { ascending: true }).limit(400);
+  rotHistSkuCache[key] = q.error ? [] : (q.data || []);
+}
+
+function rotUsadoEn(sku) {
+  var out = [];
+  if (!rotRecetas) return out;
+  Object.keys(rotRecetas).forEach(function(prod) {
+    rotRecetas[prod].forEach(function(rec) {
+      rec.partes.forEach(function(p) {
+        if (p.sku === sku && out.indexOf(prod) < 0) out.push(prod);
+      });
+    });
+  });
+  return out.sort();
+}
+
+function buildRotHistChip(f, prev) {
+  var delta = prev == null ? null : Number(f.existencia) - Number(prev);
+  var dHtml = '';
+  if (delta != null && delta !== 0) {
+    dHtml = ' <b class="' + (delta < 0 ? 'neg' : 'pos') + '">' + (delta > 0 ? '+' : '') + rotFmt(delta) + '</b>';
+  }
+  return '<span class="rot-foto">' + fmtFechaLetras(f.fecha, true) + ' · ' + rotFmt(f.existencia) + dHtml + '</span>';
+}
+
+function buildRotDetalleB7(r) {
+  var h = rotHistSkuCache[rotDias + '|' + r.sku];
+  var fotos;
+  if (h === undefined || h === 'cargando') fotos = '<div class="rot-det-msg">Cargando fotos…</div>';
+  else {
+    var chips = h.map(function(f, i) { return buildRotHistChip(f, i ? h[i - 1].existencia : null); });
+    fotos = '<div class="rot-fotos">' + chips.reverse().join('') + '</div>';
+  }
+  var usos = rotUsadoEn(r.sku);
+  var inv = rotMapaInventario();
+  var usosHtml = !rotRecetas ? 'Cargando…'
+    : (usos.length ? usos.map(function(s) {
+        var it = inv[s];
+        return '<span class="rot-uso"><b>' + escHtml(s) + '</b> ' + escHtml(it ? it.descripcion : '') + '</span>';
+      }).join('') : '<span style="color:var(--gray-l)">Ningún producto del Recetario lo tiene como componente.</span>');
+  return '<div class="rot-det-tit">Existencia en cada importación (más reciente primero) · '
+    + rotFmt(r.und) + ' consumidas · ' + rotFmt(r.ingresos) + ' ingresadas</div>' + fotos
+    + '<div class="rot-det-tit" style="margin-top:10px">Lo llevan en su receta</div><div class="rot-usos">' + usosHtml + '</div>';
+}
+
+/* ── Tabla ── */
 function buildRotRow(r, idx, maxUnd) {
+  var abierto = !!rotAbiertos[rotFuente + '|' + r.sku];
   var pct = maxUnd > 0 ? Math.max(2, Math.round(r.und / maxUnd * 100)) : 0;
-  var cls = rotClaseCobertura(r);
   var aproxHtml = r.aprox
     ? ' <span class="rot-aprox" title="Cruzado sin el último dígito con el SKU de inventario ' + escHtml(r.skuInv) + ': la existencia puede ser compartida con otro SKU de venta">≈</span>'
     : '';
-  var existHtml = r.exist == null ? '<span style="color:var(--gray-l)">no está en B2</span>' : rotFmt(r.exist) + aproxHtml;
-  return '<tr>'
-    + '<td class="rot-rank">' + (idx + 1) + '</td>'
+  var noEsta = rotFuente === 'B7' ? 'no está en B7' : 'no está en B2';
+  var existHtml = r.exist == null ? '<span style="color:var(--gray-l)">' + noEsta + '</span>' : rotFmt(r.exist) + aproxHtml;
+  var html = '<tr class="rot-row' + (abierto ? ' open' : '') + '" onclick="toggleRotFila(' + idx + ')">'
+    + '<td class="rot-rank"><span class="rot-chev">' + (abierto ? '▾' : '▸') + '</span>' + (idx + 1) + '</td>'
     + '<td class="sku-cell">' + escHtml(r.sku) + '</td>'
     + '<td class="rot-desc">' + escHtml(r.desc || '—') + '<div class="rot-bar"><i style="width:' + pct + '%"></i></div></td>'
     + '<td class="num"><strong>' + rotFmt(r.und) + '</strong></td>'
     + '<td class="num">' + rotFmt(r.diaria) + '</td>'
     + '<td class="num">' + existHtml + '</td>'
-    + '<td style="text-align:right"><span class="rot-cob ' + cls + '">' + rotTextoCobertura(r) + '</span></td>'
-    + '<td class="num">' + r.facturas + '</td>'
+    + '<td style="text-align:right"><span class="rot-cob ' + rotClaseCobertura(r) + '">' + rotTextoCobertura(r) + '</span></td>'
+    + '<td class="num">' + r.extra + '</td>'
     + '</tr>';
+  if (abierto) {
+    var det = rotFuente === 'B7' ? buildRotDetalleB7(r) : buildRotDetalleB2(r);
+    html += '<tr class="rot-det"><td colspan="8">' + det + '</td></tr>';
+  }
+  return html;
 }
 
-function buildRotTabla(lista) {
-  if (!lista.length) return '<div class="empty">📭 No hay ventas cargadas en este período</div>';
+function buildRotTabla(lista, vacio) {
+  if (!lista.length) return '<div class="empty">' + vacio + '</div>';
+  var esB7 = rotFuente === 'B7';
   var maxUnd = lista[0].und;
   return '<table class="tbl"><thead><tr>'
-    + '<th>#</th><th>SKU</th><th>Producto</th>'
-    + '<th style="text-align:right">Und vendidas</th><th style="text-align:right">Und / día</th>'
-    + '<th style="text-align:right">Existencia B2</th><th style="text-align:right">Cobertura</th>'
-    + '<th style="text-align:right">Facturas</th>'
+    + '<th>#</th><th>SKU</th><th>' + (esB7 ? 'Insumo' : 'Producto') + '</th>'
+    + '<th style="text-align:right">' + (esB7 ? 'Und consumidas' : 'Und vendidas') + '</th><th style="text-align:right">Und / día</th>'
+    + '<th style="text-align:right">Existencia ' + rotFuente + '</th><th style="text-align:right">Cobertura</th>'
+    + '<th style="text-align:right">' + (esB7 ? 'Días con baja' : 'Facturas') + '</th>'
     + '</tr></thead><tbody>'
     + lista.map(function(r, i) { return buildRotRow(r, i, maxUnd); }).join('')
     + '</tbody></table>';
 }
 
+function rotSetKpi(n, label, valor, sub) {
+  document.getElementById('kpi-rot-' + n + '-l').textContent = label;
+  document.getElementById('kpi-rot-' + n).textContent = valor;
+  document.getElementById('kpi-rot-' + n + '-s').textContent = sub;
+}
+
 function renderRotacion() {
-  document.querySelectorAll('.rot-seg button').forEach(function(b) {
+  document.querySelectorAll('#rotSegDias button').forEach(function(b) {
     b.classList.toggle('active', Number(b.getAttribute('data-dias')) === rotDias);
   });
-  var filas = rotVentasCache[rotDias];
+  document.querySelectorAll('#rotSegFuente button').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-fuente') === rotFuente);
+  });
+  var esB7 = rotFuente === 'B7';
+  var filas = esB7 ? (rotHistCache.B7 || {})[rotDias] : rotVentasCache[rotDias];
   if (!filas) return;
-  var m = rotModelo(filas);
+  var m = esB7 ? rotModeloB7(filas) : rotModeloB2(filas);
   var limite = rotVerTodos ? ROT_TOP_MAX : ROT_TOP;
-  var top = m.lista.slice(0, limite);
+  rotListaActual = m.lista.slice(0, limite);
   var topRiesgo = m.lista.slice(0, ROT_TOP).filter(function(r) { return rotClaseCobertura(r) === 'r'; });
   var periodo = 'últimos ' + rotDias + ' días';
+  var vacio, sub;
 
-  document.getElementById('kpi-rot-skus').textContent = m.lista.length.toLocaleString();
-  document.getElementById('kpi-rot-skus-s').textContent = periodo;
-  document.getElementById('kpi-rot-und').textContent = rotFmt(m.totalUnd);
-  document.getElementById('kpi-rot-und-s').textContent = rotFmt(m.totalUnd / rotDias) + ' und/día promedio';
-  document.getElementById('kpi-rot-riesgo').textContent = topRiesgo.length;
-  document.getElementById('kpi-rot-riesgo-s').textContent = 'del top ' + ROT_TOP + ' con menos de ' + ROT_RIESGO_DIAS + ' días';
-  document.getElementById('kpi-rot-muertos').textContent = m.muertos.length.toLocaleString();
-  document.getElementById('kpi-rot-muertos-s').textContent = 'SKU facturables B2 sin venta en ' + rotDias + ' días';
+  if (esB7) {
+    var poco = m.fotos < 2;
+    var corto = !poco && m.span < ROT_MIN_DIAS_HIST;
+    var tramo = poco ? '' : 'del ' + fmtFechaLetras(m.primera) + ' al ' + fmtFechaLetras(m.ultima);
+    rotSetKpi('skus', 'Insumos con consumo', poco ? '—' : m.lista.length.toLocaleString(), poco ? 'acumulando historial' : tramo);
+    rotSetKpi('und', 'Unidades consumidas', poco ? '—' : rotFmt(m.totalUnd), poco ? '—' : rotFmt(m.span > 0 ? m.totalUnd / m.span : 0) + ' und/día promedio');
+    rotSetKpi('riesgo', 'Top en riesgo de quiebre', poco ? '—' : topRiesgo.length, 'del top ' + ROT_TOP + ' con menos de ' + ROT_RIESGO_DIAS + ' días');
+    rotSetKpi('muertos', 'Con existencia y sin consumo', poco || corto ? '—' : m.muertos.toLocaleString(),
+      poco || corto ? 'necesita ' + ROT_MIN_DIAS_HIST + '+ días de historial' : 'insumos B7 sin bajada ' + tramo);
+    sub = 'Consumo = bajadas de existencia entre importaciones diarias de Bodega 7'
+      + (poco ? '' : ' · ' + m.fotos + ' fotos ' + tramo)
+      + (corto ? ' · ⚠ menos de ' + ROT_MIN_DIAS_HIST + ' días de historial: cifras preliminares' : '');
+    vacio = poco
+      ? '⏳ Acumulando historial: ' + m.fotos + ' foto' + (m.fotos === 1 ? ' (' + fmtFechaLetras(m.primera) + ')' : '') + '. El consumo se ve desde la próxima importación de Bodega 7.'
+      : '📭 Ningún insumo bajó de existencia en este período';
+  } else {
+    rotSetKpi('skus', 'SKU con venta', m.lista.length.toLocaleString(), periodo);
+    rotSetKpi('und', 'Unidades vendidas', rotFmt(m.totalUnd), rotFmt(m.totalUnd / rotDias) + ' und/día promedio');
+    rotSetKpi('riesgo', 'Top en riesgo de quiebre', topRiesgo.length, 'del top ' + ROT_TOP + ' con menos de ' + ROT_RIESGO_DIAS + ' días');
+    rotSetKpi('muertos', 'Con existencia y sin venta', m.muertos.toLocaleString(), 'SKU facturables B2 sin venta en ' + rotDias + ' días');
+    sub = 'Unidades facturadas en los ' + periodo + ' frente a la existencia de Bodega 2'
+      + (m.ultima ? ' · última factura cargada: ' + fmtFechaLetras(m.ultima) : '');
+    vacio = '📭 No hay ventas cargadas en este período';
+  }
 
-  document.getElementById('rotSub').textContent = 'Unidades facturadas en los ' + periodo + ' frente a la existencia de Bodega 2'
-    + (m.ultima ? ' · última factura cargada: ' + m.ultima : '');
-  document.getElementById('tblRotacion').innerHTML = buildRotTabla(top);
+  document.getElementById('rotTitle').textContent = esB7 ? '🔁 Insumos con mayor consumo' : '🔁 Productos con mayor rotación';
+  document.getElementById('rotSub').textContent = sub;
+  document.getElementById('tblRotacion').innerHTML = buildRotTabla(rotListaActual, vacio);
 
   var verMas = m.lista.length > ROT_TOP
     ? '<button class="btn btn-ghost btn-sm" onclick="toggleRotVerTodos()">' + (rotVerTodos ? 'Ver top ' + ROT_TOP : 'Ver top ' + Math.min(ROT_TOP_MAX, m.lista.length)) + '</button>'
     : '';
-  document.getElementById('rotFoot').innerHTML = '<span>Cobertura = existencia ÷ und por día. '
+  document.getElementById('rotFoot').innerHTML = '<span>Clic en una fila = ' + (esB7 ? 'fotos de existencia y productos que lo llevan' : 'base / accesorios') + ' · Cobertura = existencia ÷ und por día. '
     + '<span class="rot-cob r">&lt; ' + ROT_RIESGO_DIAS + ' d</span> '
     + '<span class="rot-cob a">&lt; ' + ROT_ALERTA_DIAS + ' d</span> '
-    + '<span class="rot-cob v">' + ROT_ALERTA_DIAS + '+ d</span> · ≈ = cruzado sin el último dígito</span>' + verMas;
+    + '<span class="rot-cob v">' + ROT_ALERTA_DIAS + '+ d</span>'
+    + (esB7 ? '' : ' · ≈ = cruzado sin el último dígito') + '</span>' + verMas;
 }
 
 async function cargarRotacion() {
   var dias = rotDias;
-  if (!rotVentasCache[dias]) {
-    document.getElementById('tblRotacion').innerHTML = '<div class="empty">Cargando ventas…</div>';
-  }
+  var fuente = rotFuente;
+  var cargado = fuente === 'B7' ? (rotHistCache.B7 || {})[dias] : rotVentasCache[dias];
+  if (!cargado) document.getElementById('tblRotacion').innerHTML = '<div class="empty">Cargando…</div>';
   try {
-    await cargarVentasRotacion(dias);
-    if (dias === rotDias) renderRotacion();
+    if (fuente === 'B7') await cargarConsumoB7(dias);
+    else await cargarVentasRotacion(dias);
+    if (dias === rotDias && fuente === rotFuente) renderRotacion();
   } catch (e) {
-    document.getElementById('tblRotacion').innerHTML = '<div class="empty">Error al cargar ventas: ' + escHtml(e.message) + '</div>';
+    var falta = fuente === 'B7' && /consumo_existencias|existencias_hist/.test(e.message || '')
+      ? ' — falta correr sql/existencias_hist_v1.sql' : '';
+    document.getElementById('tblRotacion').innerHTML = '<div class="empty">Error al cargar: ' + escHtml(e.message) + falta + '</div>';
   }
 }
 
@@ -721,8 +1039,27 @@ function setRotDias(dias) {
   cargarRotacion();
 }
 
+function setRotFuente(fuente) {
+  rotFuente = fuente;
+  renderRotacion();
+  cargarRotacion();
+}
+
 function toggleRotVerTodos() {
   rotVerTodos = !rotVerTodos;
+  renderRotacion();
+}
+
+async function toggleRotFila(idx) {
+  var r = rotListaActual[idx];
+  if (!r) return;
+  var key = rotFuente + '|' + r.sku;
+  if (rotAbiertos[key]) { delete rotAbiertos[key]; renderRotacion(); return; }
+  rotAbiertos[key] = true;
+  renderRotacion();
+  await rotCargarRecetas();
+  if (rotFuente === 'B7') await rotCargarHistSku(r);
+  else if (rotComponentes(r).estado === 'cargando') await rotCargarFicha(r);
   renderRotacion();
 }
 
@@ -1629,6 +1966,36 @@ function cerrarSiOverlayImport(e) {
   if (e.target === document.getElementById('modalImport')) cerrarImport();
 }
 
+/* Foto diaria de existencias (tabla existencias_hist, sql/existencias_hist_v1.sql):
+   tras cada importación de B2/B7 se guarda la existencia de TODO el catálogo de esa
+   bodega con la fecha de hoy (la última carga del día gana). De ahí sale el consumo
+   de Bodega 7 en el Inicio. Best-effort: si falla, la importación ya quedó hecha. */
+async function guardarFotoExistencias(bodega) {
+  var fuente = bodega === 'B7'
+    ? todosLosInsumosB7
+    : todosLosItems.filter(function(i) { return (i.bodega || 'B2') === 'B2'; });
+  var hoy = fechaHoy();
+  var vistos = {};
+  var filas = [];
+  fuente.forEach(function(i) {
+    var sku = String(i.sku || '').trim();
+    if (!sku || vistos[sku]) return;
+    vistos[sku] = 1;
+    filas.push({ fecha: hoy, bodega: bodega, sku: sku, existencia: i.existencia || 0 });
+  });
+  try {
+    for (var k = 0; k < filas.length; k += 500) {
+      var r = await db.from('existencias_hist').upsert(filas.slice(k, k + 500), { onConflict: 'fecha,bodega,sku' });
+      if (r.error) throw r.error;
+    }
+    delete rotHistCache[bodega];
+    if (rotFuente === 'B7' && bodega === 'B7') cargarRotacion();
+  } catch (e) {
+    console.warn('existencias_hist:', e.message);
+    toast('No se guardó el historial de existencias: ' + e.message, 'err');
+  }
+}
+
 async function confirmarImportB7() {
   if (importPendiente.length === 0) return;
   var btn = document.getElementById('btnConfirmImport');
@@ -1690,6 +2057,7 @@ async function confirmarImportB7() {
       saveLastImport(importBodega, total);
     }
     await cargarTodo();
+    guardarFotoExistencias('B7');
   } catch(err) {
     document.getElementById('importStatus').textContent = 'Error: ' + err.message;
     btn.disabled = false;
@@ -1767,6 +2135,7 @@ async function confirmarImport() {
       saveLastImport(importBodega, total);
     }
     await cargarTodo();
+    if (bodeganKey === 'B2') guardarFotoExistencias('B2');
 
   } catch(err) {
     document.getElementById('importStatus').textContent = 'Error: ' + err.message;
