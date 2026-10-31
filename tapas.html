@@ -4110,7 +4110,7 @@ function buildAlertaComponenteTapas(comp, rows) {
   var totNeto = vis.reduce(function(s, r) { return s + r.neto; }, 0);
   var critico = rows.some(function(r) { return r.stock === 0 && r.faltante > 0; });
   var ahora = new Date();
-  var fechaInv = 'Inv. B2 · ' + String(ahora.getDate()).padStart(2, '0') + '/' + String(ahora.getMonth() + 1).padStart(2, '0') + '/' + ahora.getFullYear();
+  var fechaInv = 'Inv. B2 · ' + fmtFechaLetras(ahora);
 
   var tools = '<div class="env-tools"><span>Ordenar:</span>'
     + '<button class="env-tb' + (vista === 'faltante' ? ' act' : '') + '" onclick="setAlertaVistaTapas(\'' + comp.tipo + '\',\'faltante\')">Por faltante</button>'

@@ -7804,7 +7804,7 @@ async function cargarAlertasB7() {
     var fechaEl = document.getElementById('b7AlertFecha');
     if (fechaEl) {
       var _now = new Date();
-      fechaEl.textContent = 'Inv. B7 · ' + String(_now.getDate()).padStart(2,'0') + '/' + String(_now.getMonth()+1).padStart(2,'0') + '/' + _now.getFullYear();
+      fechaEl.textContent = 'Inv. B7 · ' + fmtFechaLetras(_now);
     }
 
     b7TodosData   = r.data;
@@ -12074,8 +12074,8 @@ function buildPersonalCard(p) {
     : '<span style="font-size:10px;color:var(--gray-l)">Sin rol</span>';
   var estadoBadge = '<span class="pill ' + (p.activo ? 'pill-lista' : 'pill-entregada') + '">' + (p.activo ? 'Activo' : 'Inactivo') + '</span>';
   var fechasTxt = '';
-  if (p.fecha_inicio) fechasTxt += 'Desde ' + p.fecha_inicio;
-  if (p.fecha_baja)   fechasTxt += (fechasTxt ? ' · ' : '') + 'Baja ' + p.fecha_baja;
+  if (p.fecha_inicio) fechasTxt += 'Desde ' + fmtFechaLetras(p.fecha_inicio);
+  if (p.fecha_baja)   fechasTxt += (fechasTxt ? ' · ' : '') + 'Baja ' + fmtFechaLetras(p.fecha_baja);
   var fechasRow = fechasTxt ? '<div style="font-size:10px;color:var(--gray-l);margin-top:4px">' + fechasTxt + '</div>' : '';
   var codEsc = String(p.codigo).replace(/'/g, "\\'");
   var roleSelect = '<select onchange="cambiarRolOperador(\'' + codEsc + '\',this.value)" ' +
