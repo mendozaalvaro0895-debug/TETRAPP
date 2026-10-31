@@ -6556,11 +6556,11 @@ function renderEntTabla() {
     return;
   }
   var filas = buildEntPendSeccionHtml(pend, mp)
-    + (pend.length && grupos.length ? '<tr><td colspan="9" class="ent-sec ent-sec-ok">📦 Requis registradas</td></tr>' : '')
+    + (pend.length && grupos.length ? '<tr><td colspan="10" class="ent-sec ent-sec-ok">📦 Requis registradas</td></tr>' : '')
     + grupos.slice(0, entVisibles).map(function(g, gi) { return buildEntGrupoHtml(g, gi, mp); }).join('');
   cont.innerHTML = '<div class="ent-scroll"><table class="mov-table ent-tabla"><thead><tr>'
     + '<th>No. Requi</th><th>Cliente</th><th>Pedido</th><th>Producto</th><th style="text-align:right">Unidades</th>'
-    + '<th>Fecha</th><th>Origen</th><th>Requi Salida Bodega</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+    + '<th>Fecha</th><th>Lote</th><th>Origen</th><th>Requi Salida Bodega</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>'
     + (grupos.length > entVisibles
         ? '<button class="btn btn-g btn-sm ent-mas" onclick="entMasGrupos()">Mostrar más (' + (grupos.length - entVisibles) + ' requis restantes)</button>'
         : '');
@@ -6599,7 +6599,7 @@ function entPendientesFiltrados(toks) {
 function buildEntPendSeccionHtml(pend, mp) {
   if (!pend.length) return '';
   var tot = pend.reduce(function(a, p) { return a + p.falta; }, 0);
-  return '<tr><td colspan="9" class="ent-sec ent-sec-pend">⏳ Entregas reportadas por Tapas · pendientes de requi de ingreso · '
+  return '<tr><td colspan="10" class="ent-sec ent-sec-pend">⏳ Entregas reportadas por Tapas · pendientes de requi de ingreso · '
     + pend.length + ' entrega' + (pend.length !== 1 ? 's' : '') + ' · ' + tot.toLocaleString() + ' und</td></tr>'
     + pend.map(function(p) { return buildEntPendHtml(p, mp); }).join('');
 }
@@ -6609,6 +6609,7 @@ function buildEntPendHtml(p, mp) {
   var l = (s.lineas && s.lineas[0]) || {};
   var sal = mp.sal[s.id] ? mp.sal[s.id].join(', ') : '—';
   var quien = e.registrado_por || '';
+  var notaPend = [e.nota, quien].filter(Boolean).join(' · ');
   return '<tr class="ent-pend">'
     + '<td><span class="ent-pend-tag">⏳ SIN REQUI</span></td>'
     + '<td style="font-weight:600;font-size:11px">' + escHtml(s.cliente || '—') + '</td>'
@@ -6617,9 +6618,10 @@ function buildEntPendHtml(p, mp) {
     + '<td class="mov-cant" title="Reportado por Tapas">' + p.falta.toLocaleString()
     + (p.cubierto > 0 ? '<div style="font-size:9px;font-weight:600;color:var(--gray-l)">de ' + (e.cantidad || 0).toLocaleString() + '</div>' : '') + '</td>'
     + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(String(e.fecha || '—')) + '</td>'
+    + '<td style="font-size:11px;font-weight:800;font-family:var(--mono);white-space:nowrap">' + escHtml(e.lote || '—') + '</td>'
     + '<td><span class="ent-orig" style="background:#F59E0B;color:#fff">TAPAS</span>'
     + (e.cierra ? ' <span style="font-size:10px;font-weight:800;color:#047857">✅ completó la ficha</span>' : '') + fotoBtnTapas(e, false)
-    + (quien || e.nota || e.lote ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(notaEntregaTapas(e)) + '</span>' : '') + '</td>'
+    + (notaPend ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(notaPend) + '</span>' : '') + '</td>'
     + '<td style="font-size:11px;font-family:var(--mono);color:var(--gray-l)">' + escHtml(sal) + '</td>'
     + '<td class="ent-act" style="white-space:nowrap"><button class="ent-pend-act" title="Abrir el registro de entregado con esta ficha y cantidad" onclick="entRegistrarDesdeEntrega(\'' + escHtml(String(e.id)) + '\')">📝 Registrar requi</button></td>'
     + '</tr>';
@@ -6662,6 +6664,7 @@ function buildEntGrupoHtml(g, gi, mp) {
       + '<td style="font-size:11px;color:var(--gray)"><span style="font-family:var(--mono);font-size:10px;margin-right:4px">' + escHtml(m.sku_original || '') + '</span>' + escHtml(getSkuDesc(m.sku_original)) + '</td>'
       + '<td class="mov-cant">' + (m.cantidad || 0).toLocaleString() + '</td>'
       + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(g.fecha || '—') + '</td>'
+      + '<td style="font-size:11px;color:var(--gray-l)">—</td>'
       + '<td><span class="ent-orig">MANUAL</span>' + (primera && g.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(g.nota) + '</span>' : '') + '</td>'
       + '<td style="font-size:11px;font-family:var(--mono);color:var(--gray-l)">' + escHtml(sal) + '</td>'
       + acc + '</tr>';

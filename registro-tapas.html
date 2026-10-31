@@ -262,16 +262,17 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-chip.proc .ped-chip-s{color:#1E3A8A;font-weight:700}
 .ped-vacio{font-size:12px;color:#9A9A98;font-style:italic;padding:14px;text-align:center}
 .ped-comp{background:#fff;border:1.5px solid #E0DED8;border-radius:10px;overflow:hidden}
-.ped-comp-r{display:grid;grid-template-columns:78px 96px 88px 54px 74px minmax(0,1fr) 84px;gap:8px;align-items:baseline;font-size:11px;padding:5px 10px;border-bottom:1px solid #F0EDE8}
+.ped-comp-r{display:grid;grid-template-columns:78px 96px 88px 54px 74px 78px minmax(0,1fr) 84px;gap:8px;align-items:baseline;font-size:11px;padding:5px 10px;border-bottom:1px solid #F0EDE8}
 .ped-comp-r:last-child{border-bottom:none}
 .ped-comp-h{background:#EBF7F4;border-bottom:2px solid #1A6B5B !important;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#1A6B5B}
-.ped-comp-h span,.ped-comp-h .f,.ped-comp-h .rq,.ped-comp-h .fi,.ped-comp-h .pr{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:800;color:#1A6B5B}
+.ped-comp-h span,.ped-comp-h .f,.ped-comp-h .rq,.ped-comp-h .fi,.ped-comp-h .pr,.ped-comp-r.ped-comp-h .lt{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:800;color:#1A6B5B}
 .ped-comp-r .f{font-family:'DM Mono',monospace;font-size:10px;color:#6B6B6A}
 .ped-comp-r .rq{font-family:'DM Mono',monospace;font-weight:800;color:#1A6B5B}
 .ped-comp-r .cl{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ped-comp-r .fi{font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:#1A6B5B}
 .ped-comp-r .pr{color:#6B6B6A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ped-comp-r .u{font-family:'DM Mono',monospace;font-weight:800;text-align:right}
+.ped-comp-r .lt{font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ped-tag{font-size:9px;font-weight:800;border-radius:10px;padding:1px 7px;white-space:nowrap}
 .ped-comp-r .ped-tag{justify-self:start;align-self:center}
 .ped-comp-r .fi.lnk{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
@@ -296,9 +297,10 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 /* Celular: cada fila de Entregados es una tarjeta de 3 líneas — fecha · requi · cantidad / cliente · ficha · estado / SKU + descripción completa */
 @media(max-width:700px){
   .ped-comp-h{display:none !important}
-  .ped-comp-r{grid-template-columns:88px 1fr auto;grid-template-areas:"f rq u" "cl fi tag" "pr pr pr";gap:3px 8px;align-items:center;padding:8px 10px}
+  .ped-comp-r{grid-template-columns:88px 1fr auto;grid-template-areas:"f rq u" "cl fi tag" "lt lt lt" "pr pr pr";gap:3px 8px;align-items:center;padding:8px 10px}
   .ped-comp-r .f{grid-area:f}.ped-comp-r .rq{grid-area:rq}.ped-comp-r .u{grid-area:u;font-size:13px}
   .ped-comp-r .cl{grid-area:cl}.ped-comp-r .fi{grid-area:fi;justify-self:start}.ped-comp-r .ped-tag{grid-area:tag;justify-self:end}
+  .ped-comp-r .lt{grid-area:lt}.ped-comp-r .lt:empty{display:none}.ped-comp-r .lt:not(:empty)::before{content:'Lote ';font-weight:400;color:#6B6B6A}
   .ped-comp-r .pr{grid-area:pr;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.3}
   .ped-comp-r.pend{padding-left:14px}}
 .ped-ov{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(12,12,11,.72);z-index:9000;align-items:center;justify-content:center;padding:14px}
@@ -1973,7 +1975,7 @@ function pintarEstadoFicha() {
 // Encabezado de las columnas del bloque Entregados (las filas normales y las ámbar "sin requi" comparten las mismas columnas)
 function pedCompHeadHtml() {
   return '<div class="ped-comp-r ped-comp-h"><span class="f">Fecha</span><span class="rq">No. de requi</span><span class="cl">Cliente</span><span class="fi">Ficha</span>'
-    + '<span>Estado</span><span class="pr">SKU · Descripción</span><span class="u">Cantidad</span></div>';
+    + '<span>Estado</span><span class="lt">Lote</span><span class="pr">SKU · Descripción</span><span class="u">Cantidad</span></div>';
 }
 
 // Entregas que reportó la supervisora y aún no tienen requi de ingreso PT (misma regla que Entregados de tapas.html: e.cubierto lo calcula pedModelo)
@@ -1997,6 +1999,7 @@ function pedPendRowHtml(p) {
     + '<span class="f">' + escHtml(pedFechaCorta(e.fecha)) + '</span><span class="rq">⏳ SIN REQUI</span>'
     + '<span class="cl">' + escHtml(x.cliente) + '</span><span class="fi">' + escHtml(x.codigo) + '</span>'
     + '<span class="ped-tag sr"' + (e.cierra ? ' title="Esta entrega completó la ficha"' : '') + '>' + (e.cierra ? 'TAPAS ✓' : 'TAPAS') + '</span>'
+    + '<span class="lt">' + escHtml(e.lote || '') + '</span>'
     + '<span class="pr">' + escHtml((x.sku ? x.sku + ' · ' : '') + x.desc) + '</span>'
     + '<span class="u">' + pedNum(p.falta) + '</span></div>';
 }
@@ -2152,6 +2155,7 @@ function renderPedidos() {
     return '<div class="ped-comp-r"><span class="f">' + escHtml(g.fecha) + '</span><span class="rq">' + escHtml(g.doc) + '</span>'
       + '<span class="cl">' + escHtml(g.x.cliente) + '</span><span class="fi lnk" title="Ver el estado de la ficha" onclick="abrirEstadoFicha(\'' + escHtml(String(g.x.id)) + '\')">' + escHtml(g.x.codigo) + '</span>'
       + '<span class="ped-tag ' + (completa ? 'ok' : 'par') + '">' + (completa ? 'Completa' : 'Parcial') + '</span>'
+      + '<span class="lt"></span>'
       + '<span class="pr">' + escHtml((g.x.sku ? g.x.sku + ' · ' : '') + g.x.desc) + '</span>'
       + '<span class="u">' + pedNum(g.und) + '</span></div>';
   }).join('');
