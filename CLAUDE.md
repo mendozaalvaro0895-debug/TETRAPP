@@ -699,105 +699,104 @@ Notas críticas:
 
 ---
 
-## SQL pendiente de correr en Supabase (dashboard → SQL Editor)
+## SQL de Supabase (dashboard → SQL Editor)
+Estado al 31-oct-2026: TODOS corridos y verificados contra la base (tablas, columnas, funciones, políticas, CHECK). Opcional: reactivar a una ficha de Karen Hernández y de Blandina Solares si siguen trabajando (las 4 fichas del #20 están inactivas) y revisar la cuenta de Yenifer (#18: ningún perfil tiene aún el rol `supervisor_tapas`; la app acepta también `operativo`).
 1. ~~`sql/rechazos_rls_fix.sql`~~ — YA CORRIDO (verificado 2026-10-09: RLS activo, 4 políticas)
-2. `sql/operativo_tapas_v1.sql` — rol `operativo` + usuario tapas@tetrapp.app + políticas INSERT + trigger CMD-###
-3. `sql/registro_procesos_serig_v1.sql` — crea registro_flameado_serig + registro_empaque_serig con RLS
-4. `sql/ventas_financiero_v1.sql` — prepara tabla `ventas`: familia/codigo_cliente, fecha→DATE, RLS master
-5. `sql/produccion_v1.sql` — crea `produccion_diaria` + cols meta_12hrs/maquina_default/precio_ponderado_manual
-6. `sql/produccion_seed_historico.sql` — histórico Sheets (831 líneas, 5-may→6-jun, documento='SHEETS').
+2. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/operativo_tapas_v1.sql` — rol `operativo` + usuario tapas@tetrapp.app + políticas INSERT + trigger CMD-###
+3. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/registro_procesos_serig_v1.sql` — crea registro_flameado_serig + registro_empaque_serig con RLS
+4. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/ventas_financiero_v1.sql` — prepara tabla `ventas`: familia/codigo_cliente, fecha→DATE, RLS master
+5. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/produccion_v1.sql` — crea `produccion_diaria` + cols meta_12hrs/maquina_default/precio_ponderado_manual
+6. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/produccion_seed_historico.sql` — histórico Sheets (831 líneas, 5-may→6-jun, documento='SHEETS').
    Correr DESPUÉS del 5. ⚠️ Si luego subes PDF de un turno ya sembrado, borra primero sus líneas con documento='SHEETS'
-7. `sql/sku_especificaciones_v1.sql` — tabla `sku_especificaciones` (ficha técnica extensible por
+7. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/sku_especificaciones_v1.sql` — tabla `sku_especificaciones` (ficha técnica extensible por
    SKU+área: Fase 2 del Recetario unificado — peso/material/colorante en Producción, tiros/colores/
    fórmula de tinta en Serigrafía, familia/accesorios en Tapas). RLS igual a `sku_recetas` (master).
-8. `sql/operativo_produccion_v1.sql` — rol `operativo_prod` + usuario produccion@tetrapp.app +
+8. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/operativo_produccion_v1.sql` — rol `operativo_prod` + usuario produccion@tetrapp.app +
    políticas insert/update/delete en produccion_diaria. Correr DESPUÉS del 5 (necesita la tabla).
-9. `sql/personal_area_moldes_v1.sql` — agrega 'moldes' al CHECK constraint `personal_area_check`.
-10. `sql/rrhh_capacitaciones_v1.sql` — tabla `rrhh_capacitaciones` (habilidades/certificaciones,
+9. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/personal_area_moldes_v1.sql` — agrega 'moldes' al CHECK constraint `personal_area_check`.
+10. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/rrhh_capacitaciones_v1.sql` — tabla `rrhh_capacitaciones` (habilidades/certificaciones,
     columna Habilidades en gestion.html → Personal) + pestaña Capacitaciones del modal. Reusa
     el bucket Storage `justificaciones` (ya creado) para la foto de respaldo — sin bucket nuevo.
-11. `sql/v_solicitudes_security_invoker_v1.sql` — ⚠️ parcial: `v_solicitudes` confirmado con
-    `security_invoker=true`; falta correr la línea de `v_capacidad_hoy` (queda comentada en el
-    archivo) si el Security Advisor también la marcó.
-12. `sql/produccion_operario_v1.sql` — columna `operador_codigo` en `produccion_diaria` +
+11. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/v_solicitudes_security_invoker_v1.sql` — `v_solicitudes` con `security_invoker=true`; `v_capacidad_hoy` quedó cubierta por el #52.
+12. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/produccion_operario_v1.sql` — columna `operador_codigo` en `produccion_diaria` +
     reemplaza el índice único para incluirla. Sin esto, asignar operario en produccion.html
     falla (columna no existe) y "✏️ Máquinas / Operarios" no carga esa columna.
-13. `sql/rrhh_bonos_v1.sql` — tabla `rrhh_bonos` (Sueldos y Bonos en gestion.html → Personal).
-14. `sql/movimientos_insumos_v1.sql` — tabla `movimientos_insumos` (destino de bodega.html/molino.html).
+13. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/rrhh_bonos_v1.sql` — tabla `rrhh_bonos` (Sueldos y Bonos en gestion.html → Personal).
+14. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/movimientos_insumos_v1.sql` — tabla `movimientos_insumos` (destino de bodega.html/molino.html).
     Sin esto, ambos módulos cargan pero no pueden registrar ni ver movimientos.
-15. `sql/bot_buscar_sku_v2.sql` — arregla `bot_buscar_sku` (nunca se había creado en producción,
+15. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/bot_buscar_sku_v2.sql` — arregla `bot_buscar_sku` (nunca se había creado en producción,
     ver § Funciones serverless) + tildes/plural + filtro facturable/Bodega 2. Correr ANTES del 16.
-16. `sql/bot_sku_palabras_clave_v1.sql` — tabla `sku_palabras_clave` (apodos entrenables por SKU)
+16. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/bot_sku_palabras_clave_v1.sql` — tabla `sku_palabras_clave` (apodos entrenables por SKU)
     + reemplaza `bot_buscar_sku` sumando esos alias a la búsqueda. Autocontenido (no depende del 15).
-17. `sql/bot_tapas_v1.sql` — RPCs `bot_buscar_operario` y `bot_insertar_comanda_tapas` para que
+17. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/bot_tapas_v1.sql` — RPCs `bot_buscar_operario` y `bot_insertar_comanda_tapas` para que
     api/whatsapp.js registre producción de Tapas (comandas+comanda_tareas) por WhatsApp.
-18. `sql/supervisor_tapas_v1.sql` (v1.1) — rol `supervisor_tapas` + política INSERT en
+18. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/supervisor_tapas_v1.sql` (v1.1) — rol `supervisor_tapas` + política INSERT en
     comandas/comanda_tareas. REPROPÓSITA `tapas@tetrapp.app` (rol pasa de `operativo` a
     `supervisor_tapas`) — no crea cuenta nueva. Antes de correrlo, restablecer la contraseña
     de esa cuenta en Authentication → Users y dársela solo a Yenifer.
-19. `sql/asistencia_area_tapas_v1.sql` — permite area='tapas' en `asistencia_diaria` (fix
+19. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/asistencia_area_tapas_v1.sql` — permite area='tapas' en `asistencia_diaria` (fix
     defensivo del CHECK constraint, igual patrón que personal_area_*). Sin esto, la Asistencia
     Mensual de Tapas (view-inicio) puede fallar al guardar con "violates check constraint".
-20. `sql/fix_duplicados_karen_blandina_v1.sql` — desactiva las filas duplicadas de Karen
+20. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/fix_duplicados_karen_blandina_v1.sql` — desactiva las filas duplicadas de Karen
     Hernández y Blandina Solares en `personal` (quedaron con 2 filas cada una, codigo distinto,
     probablemente por crear "+ Nueva persona" desde un locker vacío en vez de encontrarlas con
     el buscador — ver nota abajo). Traslada el Locker L-13 a la ficha correcta de Blandina.
-21. `sql/sku_recetario_operativo_prod_v1.sql` — abre escritura del Recetario
+21. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/sku_recetario_operativo_prod_v1.sql` — abre escritura del Recetario
     (`sku_recetas`/`sku_receta_partes`/`sku_especificaciones`) al rol `operativo_prod`, además de
     master (antes solo master). Sin correr este SQL, el Recetario sigue bloqueado para Producción
     aunque el código cliente ya lo permita — RLS lo rechaza.
-22. `sql/realtime_produccion_v1.sql` — agrega `produccion_diaria` a la publicación
+22. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/realtime_produccion_v1.sql` — agrega `produccion_diaria` a la publicación
     `supabase_realtime` (mismo patrón que `sql/realtime_serig.sql`). Sin correr esto, Inicio e
     Ingreso de produccion.html siguen funcionando pero sin refresco en vivo entre usuarios/equipos
     (hay que recargar). ⚠️ produccion.html NO refresca al volver a la pestaña/ventana (se quitó
     oct/2026: quien copia de un Excel y regresa perdía lo que llenaba); Recetario nunca se refresca solo.
-23. `sql/moldes_v1.sql` — tabla nueva `moldes` (catálogo de moldes de Producción: nombre,
+23. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/moldes_v1.sql` — tabla nueva `moldes` (catálogo de moldes de Producción: nombre,
     cavidades, ciclo_seg) + RLS + 88 moldes importados de "MOLDES Y CICLOS - SEP 2026.xlsx".
     Alimenta el autocompletado de Molde/Cavidades en el Recetario (produccion.html). Sin correr
     esto, esos dos campos nuevos quedan como texto libre sin sugerencias ni alta automática.
-24. `sql/personal_nacimiento_botas_v1.sql` — columnas `fecha_nacimiento` (reemplaza a `edad`,
+24. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/personal_nacimiento_botas_v1.sql` — columnas `fecha_nacimiento` (reemplaza a `edad`,
     que ahora se calcula en vivo) y `talla_botas` en `personal`. Sin correr esto,
     gestion.html → Personal falla al guardar esos dos campos nuevos.
-25. `sql/personal_area_mantenimiento_torno_v1.sql` — agrega 'mantenimiento'/'torno' al CHECK
+25. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/personal_area_mantenimiento_torno_v1.sql` — agrega 'mantenimiento'/'torno' al CHECK
     constraint `personal_area_check`. Correr ANTES del 26 (lo necesita).
-26. `sql/reconciliacion_hoja_asistencia_v1.sql` (oct/2026) — reconciliación puntual de
+26. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/reconciliacion_hoja_asistencia_v1.sql` (oct/2026) — reconciliación puntual de
     `personal` contra la hoja "ASISTENCIA DE PLANTA" (Google Sheets, ver nota abajo):
     recodifica el choque p-57/P-57, da de baja a Holger Baleu y Miriam Cano, reactiva a
     Karen Hernández en Tapas (quedó mal desactivada), reclasifica a Gerardo González y
     Josué Gamaliel Choc a Mantenimiento y a Ludwin Alvarez Pérez a Torno, y corrige
     `fecha_inicio` de ~60 personas con la fecha de ingreso real de la hoja.
-27. `sql/personal_area_oficina_v1.sql` — agrega 'oficina' al CHECK constraint
+27. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/personal_area_oficina_v1.sql` — agrega 'oficina' al CHECK constraint
     `personal_area_check`. Correr ANTES del 28 (lo necesita).
-28. `sql/reconciliacion_hoja_asistencia_v2.sql` (oct/2026) — segunda parte de la
+28. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/reconciliacion_hoja_asistencia_v2.sql` (oct/2026) — segunda parte de la
     reconciliación: código `T3` pasa de la ficha vieja de Elsa Tul (se BORRA, a pedido
     explícito de Álvaro) a Glenda Sequen; agrega 8 personas que estaban en la hoja y no
     en `personal` (Henry Mejía en Moldes, Luis González en Mantenimiento, Fox en Torno,
     y 5 personas de Oficina/Administración — incluido el propio Álvaro).
 
-29. `sql/solicitud_lineas_componentes_tapas_v1.sql` (oct/2026) — columnas `sku_contratapa`, `sku_liner`, `sku_banda` (y `sku_base` por si faltara) en `solicitud_lineas`. Sin correrlo, el formulario de Tapas no puede guardar una ficha que lleve Contratapa, Liner o Banda.
+29. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/solicitud_lineas_componentes_tapas_v1.sql` (oct/2026) — columnas `sku_contratapa`, `sku_liner`, `sku_banda` (y `sku_base` por si faltara) en `solicitud_lineas`. Sin correrlo, el formulario de Tapas no puede guardar una ficha que lleve Contratapa, Liner o Banda.
 
-30. `sql/comandas_aprobacion_v1.sql` (oct/2026) — columnas de aprobación en `comandas` (estado_aprobacion/aprobado_por/aprobado_en/motivo_rechazo). Sin correrlo: no se puede aprobar/rechazar (el botón avisa) y todo cuenta como aprobado.
+30. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/comandas_aprobacion_v1.sql` (oct/2026) — columnas de aprobación en `comandas` (estado_aprobacion/aprobado_por/aprobado_en/motivo_rechazo). Sin correrlo: no se puede aprobar/rechazar (el botón avisa) y todo cuenta como aprobado.
 
 31. ✅ YA CORRIDO (confirmado 9-oct-2026: Elizabeth Oliva P-41 y Lesly Rojas t-18 salen marcadas) —
     `sql/personal_plaza_vacante_v1.sql` (oct/2026) — columna `plaza_vacante` en `personal` +
     deja marcada como vacante la plaza de Lesly Rojas (Serigrafía, `t-18`, dada de baja). Sin
     correrlo, la casilla "Dejar la plaza vacante" avisa que falta el SQL y no guarda.
 
-32. `sql/tareas_diarias_v1.sql` (oct/2026) — tabla `tareas_diarias` (inventario AM/PM que escribe bodega.html al importar + omisiones de la guía). Sin correrlo la guía cae al `localStorage` del equipo para el inventario y "Omitir hoy" avisa que falta el SQL.
+32. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/tareas_diarias_v1.sql` (oct/2026) — tabla `tareas_diarias` (inventario AM/PM que escribe bodega.html al importar + omisiones de la guía). Sin correrlo la guía cae al `localStorage` del equipo para el inventario y "Omitir hoy" avisa que falta el SQL.
 
 33. ✅ CHECK YA CORRIDO (verificado 10-oct-2026: `asistencia_diaria_area_check` admite las 9 áreas; la columna `personal.nombre_hoja` NO se verificó) — `sql/asistencia_drive_v1.sql` (oct/2026) — amplía el CHECK de `asistencia_diaria.area` a todas las áreas + columna `personal.nombre_hoja`. Además requiere la variable de Vercel `ASISTENCIA_SHEET_ID` (id de la hoja; la hoja debe estar compartida como LECTOR por enlace). Sin el SQL, Tapas/Serig sincronizan y las demás áreas avisan del error.
 
 34. ✅ YA CORRIDO (verificado 13-oct-2026: ambos CHECK admiten 'limpieza') — `sql/personal_area_limpieza_v1.sql` (oct/2026) — agrega 'limpieza' a los DOS CHECK (`personal_area_check` y `asistencia_diaria_area_check`). Sin esto no se puede dar de alta a Irma Azucena Ulicia Arias (única colaboradora de Limpieza) en Gestión y la sincronización con el Drive falla al guardar la asistencia de esa área. Orden: correr el SQL → Gestión → "+ Nueva persona" (Área Limpieza, código sugerido LI-01, nombre igual al de la hoja) → Inicio → "Sincronizar ahora".
 
-35. `sql/tapas_lotes_v1.sql` (oct/2026) — tabla `tapas_lotes` (solicitud_id, cantidad, marcado_por, marcado_en) + RLS: lectura con perfil; insert/update/delete para master, supervisor_tapas y operativo (primera escritura de esos roles fuera de comandas). Sin correrlo, la pestaña Pedidos de registro-tapas.html se ve pero no deja marcar pedidos en proceso.
+35. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/tapas_lotes_v1.sql` (oct/2026) — tabla `tapas_lotes` (solicitud_id, cantidad, marcado_por, marcado_en) + RLS: lectura con perfil; insert/update/delete para master, supervisor_tapas y operativo (primera escritura de esos roles fuera de comandas). Sin correrlo, la pestaña Pedidos de registro-tapas.html se ve pero no deja marcar pedidos en proceso.
 
-36. `sql/tapas_lote_tareas_v1.sql` (oct/2026) — tabla `tapas_lote_tareas` (lote_id → tapas_lotes, proceso, operario_codigo/nombre, iniciado_en) + RLS igual que `tapas_lotes`. Correr DESPUÉS del 35. Sin correrlo, la pestaña Pedidos marca lotes pero no registra qué operario inicia qué proceso.
+36. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/tapas_lote_tareas_v1.sql` (oct/2026) — tabla `tapas_lote_tareas` (lote_id → tapas_lotes, proceso, operario_codigo/nombre, iniciado_en) + RLS igual que `tapas_lotes`. Correr DESPUÉS del 35. Sin correrlo, la pestaña Pedidos marca lotes pero no registra qué operario inicia qué proceso.
 
-37. `sql/solicitudes_plazo_tipo_v1.sql` (oct/2026) — columna `solicitudes.plazo_tipo` ('fecha'|'parciales'|'pendiente', default 'fecha') + quita el NOT NULL de `fecha_limite`. Sin correrlo, elegir "Entregas parciales"/"Pendiente" en el formulario o en el popup de plazo falla y avisa qué SQL falta; las fichas con fecha siguen funcionando igual.
+37. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/solicitudes_plazo_tipo_v1.sql` (oct/2026) — columna `solicitudes.plazo_tipo` ('fecha'|'parciales'|'pendiente', default 'fecha') + quita el NOT NULL de `fecha_limite`. Sin correrlo, elegir "Entregas parciales"/"Pendiente" en el formulario o en el popup de plazo falla y avisa qué SQL falta; las fichas con fecha siguen funcionando igual.
 
-38. `sql/sku_recetas_cliente_v1.sql` (oct/2026) — tabla `sku_recetas_cliente` (sku, cliente, area, partes jsonb) con RLS igual que `sku_recetas` (lectura con perfil; master u operativo_prod escriben). Sin correrlo, no se puede guardar una receta distinta por cliente (el botón "Guardar solo para <CLIENTE>" avisa) y el autorrelleno sigue usando solo la receta general.
+38. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/sku_recetas_cliente_v1.sql` (oct/2026) — tabla `sku_recetas_cliente` (sku, cliente, area, partes jsonb) con RLS igual que `sku_recetas` (lectura con perfil; master u operativo_prod escriben). Sin correrlo, no se puede guardar una receta distinta por cliente (el botón "Guardar solo para <CLIENTE>" avisa) y el autorrelleno sigue usando solo la receta general.
 
-40. `sql/sku_codigo_cliente_v1.sql` (oct/2026) — tabla `sku_codigo_cliente` (cliente, codigo_cliente, codigo_norm, sku, area; único por cliente+código) con RLS igual que `sku_recetas` + columna `solicitud_lineas.codigo_cliente`. Sin correrlo, el campo "Cód. cliente" funciona pero no se guardan ni se buscan los vínculos (avisa qué archivo falta) y la ficha se guarda sin el código.
+40. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/sku_codigo_cliente_v1.sql` (oct/2026) — tabla `sku_codigo_cliente` (cliente, codigo_cliente, codigo_norm, sku, area; único por cliente+código) con RLS igual que `sku_recetas` + columna `solicitud_lineas.codigo_cliente`. Sin correrlo, el campo "Cód. cliente" funciona pero no se guardan ni se buscan los vínculos (avisa qué archivo falta) y la ficha se guarda sin el código.
 
 41. ✅ YA CORRIDO (28-oct-2026, vía MCP de Supabase) — `sql/envase_certificados_v1.sql` — tabla `envase_certificados`: 31 certificados de calidad de envases del archivo "CERTIFICADOS PRO..xlsx" (Drive de servicioalcliente@tetraplastic.com). UNA fila por MODELO de envase (no por SKU): peso/altura/cuello/Ø boquilla int. y ext./ancho con resultado + mín + máx, capacidad, material (HDPE 100% virgen; Barrilito HDPE/LDPE 50-50; Pastillero verde PVC), color, unidades por bolsa, bolsas por tarima y `unidades_tarima` (columna calculada), pruebas de fuga/impacto. `skus` (text[], índice GIN) vincula cada modelo a los SKU de `inventario` B2 (186 SKU en 29 modelos) pero SUGERIDO: `skus_confirmado=false` hasta que alguien lo revise; sin vínculo: `luna-750` (¿SKU 10435 "LUNA 780"?) y `nutri-milk-200`. Lectura con perfil, escritura master (RLS). Ninguna pantalla la lee todavía. ⚠️ Anomalías del Excel guardadas en `notas_datos`: 2 celdas con error de dedo quedaron en NULL (ancho mín. de SALOE 750 "11.80"; Ø ext. máx. de BABY SHAMPOO "24.70"); el único certificado con lote/correlativo/fecha es NUTRIDERM 12 OZ y su código 214325 no existe en inventario (parece 214825); CILINDRICO BALA "350" certifica 320 ml. Las imágenes del producto del Excel NO se guardaron.
 
@@ -822,6 +821,8 @@ Notas críticas:
 49. ✅ YA CORRIDO (29-oct-2026, vía MCP de Supabase) — `sql/tapas_entrega_editar_v2.sql` — `tapas_editar_entrega(p_id, p_cantidad, p_completa, p_por)` (SECURITY DEFINER; master/supervisor_tapas/operativo; 24 h para no-master; edita también la entrega que cerró la ficha y, según `p_completa`, devuelve la ficha a 'parcial' o la pasa a 'lista'; deja rastro en la nota). Borra la firma de 2 parámetros del #47. Correr DESPUÉS del 44.
 50. ✅ YA CORRIDO (confirmado por Alvaro, 31-oct-2026) — `sql/tapas_entrega_lote_v1.sql` (oct/2026) — columna `tapas_entregas_parciales.lote` + recrea `tapas_registrar_entrega` con `p_lote` (8 parámetros; borra la de 7). Correr DESPUÉS del 44 y 46. Sin correrlo, escribir un No. de LOTE al registrar una entrega avisa qué archivo falta; sin lote todo sigue igual.
 51. ✅ YA CORRIDO (31-oct-2026, vía MCP de Supabase) — `sql/existencias_hist_v1.sql` — tabla `existencias_hist` (fecha, bodega 'B2'|'B7', sku, existencia; PK fecha+bodega+sku; lectura con perfil, escritura master) sembrada con la foto del 31-oct-2026 (2,634 SKU de B7 y 2,674 de B2) + RPC `consumo_existencias(p_bodega, p_desde)` (SECURITY INVOKER: por SKU suma bajadas = consumo y subidas = ingresos entre fotos consecutivas, tomando como punto de partida la última foto anterior a `p_desde`; trae una fila con sku NULL con fotos/primera/última de la bodega). La alimenta `guardarFotoExistencias` de bodega.html tras cada importación de B2/B7. HISTÓRICO B7 CARGADO (31-oct-2026) desde "INVENTARIO B7 REGISTRO AGO-SEP-OCT.xlsx" (Documents de Alvaro; reportes SICAF "Inventario valorizado", una hoja por día): 39 fechas del 27-jul al 29-oct-2026, 2,062 filas — primer valor de cada insumo con existencia y luego SOLO los días en que cambió (la RPC compara foto contra foto anterior del mismo SKU, así que da el mismo consumo que guardar todo). Las hojas 27-jul y 14-ago solo traen códigos con existencia (lo ausente = 0). Se EXCLUYÓ la hoja "12 SEPTIEMBRE": es inventario de Bodega 2 (canicas, contratapas), no de B7. La hoja 31-oct no se cargó (ya estaba la foto de TETRAPP; se verificó que coinciden).
+
+52. ✅ YA CORRIDO (31-oct-2026, vía MCP de Supabase) — `sql/seguridad_funciones_v1.sql` — endurecimiento tras el Security Advisor: las RPC `bot_*` y `get_area_ventas_overrides` ya NO son ejecutables por `anon` (antes cualquiera con la clave pública podía escribir tiros/flameado/empaque/comandas por /rest/v1/rpc); `bot_insertar_*` solo para `service_role` (api/whatsapp.js); `bot_buscar_sku`/`bot_buscar_operario` para `authenticated` (comandas.html) y `service_role`; `search_path=public` fijo en 8 funciones; `security_invoker=true` en `v_capacidad_hoy` y `v_solicitudes`. ⚠️ Un `revoke ... from public` también quita el acceso a `authenticated` si lo tenía solo vía PUBLIC: al crear una RPC nueva que use el front con sesión, dar `grant execute ... to authenticated` explícito. El Advisor aún lista como WARN las RPC `tapas_*`, `es_master` y `rol_actual` para `authenticated`: es intencional (las usa la app y cada `tapas_*` verifica el rol adentro). Pendiente manual: activar "Leaked password protection" en Supabase → Authentication → Password security.
 
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
