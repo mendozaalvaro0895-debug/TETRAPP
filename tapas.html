@@ -3493,15 +3493,21 @@ function agruparComandasPorOperario(comandas) {
   var map = {};
   comandas.forEach(function(c) {
     var k = c.operario_id || '—';
-    if (!map[k]) map[k] = { codigo: k, nombre: c.operario_nombre || k, dias: 0, tareas: 0, und: 0, hTurno: 0, hMeta: 0 };
+    if (!map[k]) map[k] = { codigo: k, nombre: c.operario_nombre || k, dias: 0, tareas: 0, und: 0, hTurno: 0, hMeta: 0, cTot: 0, cHoras: 0, undMed: 0, hMetaMed: 0 };
     var o = map[k];
+    var ht = horasTurno(c);
     o.dias++;
-    o.hTurno += horasTurno(c);
+    o.cTot++;
+    o.hTurno += ht;
+    if (ht > 0) o.cHoras++;
     (c.comanda_tareas || []).forEach(function(t) {
       if (t.estado !== 'Terminada') return;
+      var u = (t.unidades_completadas || t.cantidad || 0);
       o.tareas++;
-      o.und   += (t.unidades_completadas || t.cantidad || 0);
+      o.und   += u;
       o.hMeta += (t.horas_efectivas || 0);
+      // solo las comandas con hora de inicio y cierre entran a la eficiencia medida
+      if (ht > 0) { o.undMed += u; o.hMetaMed += (t.horas_efectivas || 0); }
     });
   });
   return Object.keys(map).map(function(k) { return map[k]; })
@@ -8038,9 +8044,16 @@ function prodPorProceso() {
     .sort(function(a, b) { return b.und - a.und; });
 }
 
+// La eficiencia medida solo tiene sentido si al menos la mitad de las comandas traen hora de inicio y cierre
+// (registro-tapas.html guarda solo la fecha; las horas vienen de comandas cargadas a mano o de meses viejos)
+function eficienciaMedible(cHoras, cTot) {
+  return cTot > 0 && cHoras * 2 >= cTot;
+}
+
 function buildProdOperarioRow(o) {
-  var uh   = o.hTurno > 0 ? Math.round(o.und / o.hTurno) : 0;
-  var cump = o.hTurno > 0 ? Math.round((o.hMeta / o.hTurno) * 100) : 0;
+  var medible = o.hTurno > 0 && eficienciaMedible(o.cHoras, o.cTot);
+  var uh   = medible ? Math.round(o.undMed / o.hTurno) : 0;
+  var cump = medible ? Math.round((o.hMetaMed / o.hTurno) * 100) : 0;
   var col  = colorCumplimiento(cump);
   return '<tr>'
     + '<td><strong>' + escHtml(o.nombre) + '</strong>'
@@ -8048,10 +8061,10 @@ function buildProdOperarioRow(o) {
     + '<td style="text-align:right">' + o.dias + '</td>'
     + '<td style="text-align:right">' + o.tareas + '</td>'
     + '<td class="mov-cant">' + o.und.toLocaleString() + '</td>'
-    + '<td style="text-align:right;font-family:var(--mono)">' + o.hTurno.toFixed(1) + ' h</td>'
-    + '<td style="text-align:right;font-family:var(--mono);font-weight:700">' + (o.hTurno > 0 ? uh.toLocaleString() : '—') + '</td>'
-    + '<td style="text-align:right;font-family:var(--mono);color:var(--gray)">' + o.hMeta.toFixed(1) + ' h</td>'
-    + '<td style="text-align:right;font-weight:700;color:' + col + '">' + (o.hTurno > 0 ? cump + '%' : '—') + '</td>'
+    + '<td style="text-align:right;font-family:var(--mono)">' + (o.hTurno > 0 ? o.hTurno.toFixed(1) + ' h' : '—') + '</td>'
+    + '<td style="text-align:right;font-family:var(--mono);font-weight:700">' + (medible ? uh.toLocaleString() : '—') + '</td>'
+    + '<td style="text-align:right;font-family:var(--mono);color:var(--gray)">' + (medible ? o.hMetaMed.toFixed(1) + ' h' : '—') + '</td>'
+    + '<td style="text-align:right;font-weight:700;color:' + col + '">' + (medible ? cump + '%' : '—') + '</td>'
     + '</tr>';
 }
 
@@ -8075,14 +8088,18 @@ function renderProductividad() {
   var ops      = prodPorOperario();
   var totalUnd = ops.reduce(function(s, o) { return s + o.und;    }, 0);
   var tTurno   = ops.reduce(function(s, o) { return s + o.hTurno; }, 0);
-  var tMeta    = ops.reduce(function(s, o) { return s + o.hMeta;  }, 0);
-  var uhProm   = tTurno > 0 ? Math.round(totalUnd / tTurno) : 0;
-  var cumpGlob = tTurno > 0 ? Math.round((tMeta / tTurno) * 100) : 0;
+  var tMeta    = ops.reduce(function(s, o) { return s + o.hMetaMed; }, 0);
+  var tUndMed  = ops.reduce(function(s, o) { return s + o.undMed; }, 0);
+  var tCHoras  = ops.reduce(function(s, o) { return s + o.cHoras; }, 0);
+  var tCTot    = ops.reduce(function(s, o) { return s + o.cTot; }, 0);
+  var medible  = tTurno > 0 && eficienciaMedible(tCHoras, tCTot);
+  var uhProm   = medible ? Math.round(tUndMed / tTurno) : 0;
+  var cumpGlob = medible ? Math.round((tMeta / tTurno) * 100) : 0;
 
   setTxt('pkpi-und',  totalUnd.toLocaleString());
   setTxt('pkpi-ops',  String(ops.length));
-  setTxt('pkpi-uh',   tTurno > 0 ? uhProm.toLocaleString() : '—');
-  setTxt('pkpi-cump', tTurno > 0 ? cumpGlob + '%' : '—', tTurno > 0 ? colorCumplimiento(cumpGlob) : '');
+  setTxt('pkpi-uh',   medible ? uhProm.toLocaleString() : '—');
+  setTxt('pkpi-cump', medible ? cumpGlob + '%' : '—', medible ? colorCumplimiento(cumpGlob) : '');
 
   if (!prodComandas.length) {
     tabla.innerHTML = '<div class="empty">📭 No hay comandas registradas en este mes</div>';
@@ -8098,7 +8115,8 @@ function renderProductividad() {
       + '</tr></thead><tbody>' + ops.map(buildProdOperarioRow).join('') + '</tbody></table>'
       + '<div style="font-size:11px;color:var(--gray);padding:10px 2px;line-height:1.6">'
       + 'Horas turno = hora de cierre − hora de inicio de cada comanda. Horas meta = lo que esas unidades '
-      + 'debían tomar según la meta oficial del proceso. Cumplimiento = horas meta ÷ horas turno.</div>';
+      + 'debían tomar según la meta oficial del proceso. Cumplimiento = horas meta ÷ horas turno. '
+      + 'Se muestra "—" cuando menos de la mitad de las comandas traen hora de inicio y cierre (el registro del día guarda solo la fecha).</div>';
   } else {
     var procs = prodPorProceso();
     tabla.innerHTML = '<table class="mov-table">'
