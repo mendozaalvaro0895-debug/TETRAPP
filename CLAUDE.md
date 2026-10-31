@@ -700,7 +700,7 @@ Notas críticas:
 ---
 
 ## SQL de Supabase (dashboard → SQL Editor)
-Estado al 31-oct-2026: TODOS corridos y verificados contra la base (tablas, columnas, funciones, políticas, CHECK). Opcional: reactivar a una ficha de Karen Hernández y de Blandina Solares si siguen trabajando (las 4 fichas del #20 están inactivas) y revisar la cuenta de Yenifer (#18: ningún perfil tiene aún el rol `supervisor_tapas`; la app acepta también `operativo`).
+Estado al 31-oct-2026: TODOS corridos y verificados contra la base (tablas, columnas, funciones, políticas, CHECK). Karen Hernández y Blandina Solares ya no existen (sus fichas inactivas del #20 son históricas). La cuenta `tapas@tetrapp.app` (Yenifer) sigue con rol `operativo` en `perfiles` — nadie tiene aún `supervisor_tapas`; la app acepta ambos y lo que la distingue de otros usuarios de Tapas es la CLAVE de la pestaña Pedidos (#45), que solo ella conoce.
 1. ~~`sql/rechazos_rls_fix.sql`~~ — YA CORRIDO (verificado 2026-10-09: RLS activo, 4 políticas)
 2. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/operativo_tapas_v1.sql` — rol `operativo` + usuario tapas@tetrapp.app + políticas INSERT + trigger CMD-###
 3. ✅ YA CORRIDO (verificado en la base, 31-oct-2026) — `sql/registro_procesos_serig_v1.sql` — crea registro_flameado_serig + registro_empaque_serig con RLS
