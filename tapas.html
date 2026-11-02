@@ -4320,9 +4320,10 @@ async function cargarComentariosTapas() {
 // (mismo reparto por fecha que los lotes: modeloFichasCompactas / pedModelo de registro-tapas.html).
 var parcialesTapas = [];
 function parcialesDeFicha(s) {
+  // m.lotesEnt = lotes de las entregas reportadas que cada ingreso PT cubre (el ingreso no guarda lote propio; se muestra en Entregados)
   var ings = ingresoMovs.filter(function(m) { return m.solicitud_id === s.id && m.area !== 'serig'; })
     .sort(function(a, b) { return String(a.created_at).localeCompare(String(b.created_at)); })
-    .map(function(m) { return { ts: new Date(m.created_at).getTime(), rem: m.cantidad || 0 }; });
+    .map(function(m) { m.lotesEnt = []; return { ts: new Date(m.created_at).getTime(), rem: m.cantidad || 0, m: m }; });
   var total = 0, sin = 0;
   var lista = parcialesTapas.filter(function(e) { return e.solicitud_id === s.id; }).map(function(e) {
     var t0 = new Date(e.created_at).getTime() - 1000, falta = e.cantidad, cub = 0;
@@ -4330,6 +4331,7 @@ function parcialesDeFicha(s) {
       if (falta <= 0 || it.rem <= 0 || it.ts < t0) return;
       var tk = Math.min(it.rem, falta);
       it.rem -= tk; falta -= tk; cub += tk;
+      if (e.lote && it.m.lotesEnt.indexOf(e.lote) < 0) it.m.lotesEnt.push(e.lote);
     });
     total += e.cantidad; sin += e.cantidad - cub;
     return { e: e, cubierto: cub };
@@ -6595,6 +6597,14 @@ function renderEntTabla() {
     });
   }
   var pend = entPendientesFiltrados(toks);
+  // Calcula m.lotesEnt de cada ingreso (lote de la entrega reportada que cubre) antes de pintar la columna Lote
+  var lotesCalc = {};
+  ingresoMovs.forEach(function(m) {
+    if (m.area === 'serig' || !m.solicitud_id || lotesCalc[m.solicitud_id]) return;
+    lotesCalc[m.solicitud_id] = true;
+    var sf = solicitudes.find(function(x) { return x.id === m.solicitud_id; });
+    if (sf) parcialesDeFicha(sf);
+  });
   var cu = document.getElementById('entCuenta');
   if (cu) cu.textContent = grupos.length + ' requi' + (grupos.length !== 1 ? 's' : '') + (toks.length ? ' (filtradas)' : '')
     + (pend.length ? ' · ⏳ ' + entPendTotales(pend).entregas + ' entrega' + (entPendTotales(pend).entregas !== 1 ? 's' : '') + ' de Tapas sin requi' : '') + ' · historial de ingresos a PT';
@@ -6890,7 +6900,9 @@ function buildEntGrupoHtml(g, gi, mp) {
       + '<td style="font-size:11px;color:var(--gray)"><span style="font-family:var(--mono);font-size:10px;margin-right:4px">' + escHtml(m.sku_original || '') + '</span>' + escHtml(getSkuDesc(m.sku_original)) + '</td>'
       + '<td class="mov-cant">' + (m.cantidad || 0).toLocaleString() + '</td>'
       + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(fmtFechaLetras(g.fecha)) + '</td>'
-      + '<td style="font-size:11px;color:var(--gray-l)">—</td>'
+      + (m.lotesEnt && m.lotesEnt.length
+          ? '<td style="font-size:11px;font-weight:700;font-family:var(--mono);color:#334155;white-space:nowrap">' + escHtml(m.lotesEnt.join(' · ')) + '</td>'
+          : '<td style="font-size:11px;color:var(--gray-l)">—</td>')
       + '<td><span class="ent-orig">MANUAL</span>' + (primera && g.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(g.nota) + '</span>' : '') + '</td>'
       + '<td style="font-size:11px;font-family:var(--mono);color:var(--gray-l)">' + escHtml(sal) + '</td>'
       + acc + '</tr>';

@@ -1860,7 +1860,9 @@ function pedModelo() {
     var saldo = Math.max(0, cant - entregado);
     // Entregas parciales reportadas: cada una queda "con requi" cuando hay ingresos PT POSTERIORES a su registro que la cubren
     // (mismo reparto por fecha que los lotes); mientras tanto es solo informativa y NO resta del saldo.
-    var ppool = ings.map(function(m) { return { ts: new Date(m.created_at).getTime(), rem: m.cantidad || 0 }; });
+    // m.lotesEnt = lotes de las entregas reportadas que cada ingreso PT cubre (el ingreso no guarda lote propio; se muestra en Entregados)
+    ings.forEach(function(m) { m.lotesEnt = []; });
+    var ppool = ings.map(function(m) { return { ts: new Date(m.created_at).getTime(), rem: m.cantidad || 0, m: m }; });
     var parcLista = PED.parc.filter(function(e) { return e.solicitud_id === s.id; }), parcTotal = 0, parcSin = 0;
     parcLista.forEach(function(e) {
       var t0p = new Date(e.created_at).getTime() - 1000, faltaP = e.cantidad, cub = 0;
@@ -1868,6 +1870,7 @@ function pedModelo() {
         if (faltaP <= 0 || it.rem <= 0 || it.ts < t0p) return;
         var tk = Math.min(it.rem, faltaP);
         it.rem -= tk; faltaP -= tk; cub += tk;
+        if (e.lote && it.m.lotesEnt.indexOf(e.lote) < 0) it.m.lotesEnt.push(e.lote);
       });
       e.cubierto = cub;
       parcTotal += e.cantidad; parcSin += e.cantidad - cub;
@@ -2206,8 +2209,9 @@ function renderPedidos() {
     var acum = 0;
     x.ings.forEach(function(g) {
       var k = (g.num_documento || ('i' + g.id)) + '|' + x.id;
-      if (!grupos[k]) { grupos[k] = { x: x, doc: g.num_documento || '—', fecha: pedFechaMov(g), und: 0, ts: g.created_at }; orden.push(grupos[k]); }
+      if (!grupos[k]) { grupos[k] = { x: x, doc: g.num_documento || '—', fecha: pedFechaMov(g), und: 0, ts: g.created_at, lotes: [] }; orden.push(grupos[k]); }
       grupos[k].und += g.cantidad || 0;
+      (g.lotesEnt || []).forEach(function(lt) { if (grupos[k].lotes.indexOf(lt) < 0) grupos[k].lotes.push(lt); });
       acum += g.cantidad || 0;
       grupos[k].acum = acum;
       grupos[k].fecha = pedFechaMov(g);
@@ -2219,7 +2223,7 @@ function renderPedidos() {
     return '<div class="ped-comp-r"><span class="f">' + escHtml(fmtFechaLetras(g.fecha)) + '</span><span class="rq">' + escHtml(g.doc) + '</span>'
       + '<span class="cl">' + escHtml(g.x.cliente) + '</span><span class="fi lnk" title="Ver el estado de la ficha" onclick="abrirEstadoFicha(\'' + escHtml(String(g.x.id)) + '\')">' + escHtml(g.x.codigo) + '</span>'
       + '<span class="ped-tag ' + (completa ? 'ok' : 'par') + '">' + (completa ? 'Completa' : 'Parcial') + '</span>'
-      + '<span class="lt"></span>'
+      + '<span class="lt">' + escHtml(g.lotes.join(' · ')) + '</span>'
       + '<span class="pr">' + escHtml((g.x.sku ? g.x.sku + ' · ' : '') + g.x.desc) + '</span>'
       + '<span class="u">' + pedNum(g.und) + '</span></div>';
   }).join('');
