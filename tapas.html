@@ -6597,7 +6597,7 @@ function renderEntTabla() {
   var pend = entPendientesFiltrados(toks);
   var cu = document.getElementById('entCuenta');
   if (cu) cu.textContent = grupos.length + ' requi' + (grupos.length !== 1 ? 's' : '') + (toks.length ? ' (filtradas)' : '')
-    + (pend.length ? ' · ⏳ ' + pend.length + ' entrega' + (pend.length !== 1 ? 's' : '') + ' de Tapas sin requi' : '') + ' · historial de ingresos a PT';
+    + (pend.length ? ' · ⏳ ' + entPendTotales(pend).entregas + ' entrega' + (entPendTotales(pend).entregas !== 1 ? 's' : '') + ' de Tapas sin requi' : '') + ' · historial de ingresos a PT';
   if (!grupos.length && !pend.length) {
     cont.innerHTML = '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">'
       + (toks.length ? '🔍 Ninguna requi coincide con la búsqueda' : '📭 No hay entregados registrados aún') + '</div>';
@@ -6634,54 +6634,106 @@ function entPendientesSinRequi() {
   return out;
 }
 
+// Varias entregas de la MISMA ficha se fusionan en una sola línea para hacer una requi por el total;
+// el detalle de cada entrega (fecha, cantidad, lote) queda a la vista dentro de la línea.
+function entPendientesPorFicha() {
+  var map = {}, out = [];
+  entPendientesSinRequi().forEach(function(p) {
+    var k = String(p.s.id);
+    if (!map[k]) { map[k] = { s: p.s, items: [], falta: 0, cubierto: 0, reportado: 0 }; out.push(map[k]); }
+    var g = map[k];
+    g.items.push(p);
+    g.falta += p.falta;
+    g.cubierto += p.cubierto;
+    g.reportado += (p.e.cantidad || 0);
+  });
+  out.forEach(function(g) {
+    g.items.sort(function(a, b) {
+      return String(a.e.fecha || '').localeCompare(String(b.e.fecha || '')) || String(a.e.created_at || '').localeCompare(String(b.e.created_at || ''));
+    });
+  });
+  return out;
+}
+
+function entPendGrupoPorFicha(solId) {
+  return entPendientesPorFicha().find(function(g) { return String(g.s.id) === String(solId); });
+}
+
 function entPendientesFiltrados(toks) {
-  var lista = entPendientesSinRequi();
+  var lista = entPendientesPorFicha();
   if (!toks.length) return lista;
-  return lista.filter(function(p) {
-    var l = (p.s.lineas && p.s.lineas[0]) || {};
-    var n = normBusqueda('sin requi tapas ' + (p.s.cliente || '') + ' ' + (p.s.id_display || '') + ' ' + (l.sku || '') + ' ' + getSkuDesc(l.sku) + ' ' + (p.e.nota || '') + ' ' + (p.e.lote || '') + ' ' + (p.e.registrado_por || ''));
+  return lista.filter(function(g) {
+    var l = (g.s.lineas && g.s.lineas[0]) || {};
+    var extra = g.items.map(function(p) { return (p.e.nota || '') + ' ' + (p.e.lote || '') + ' ' + (p.e.registrado_por || ''); }).join(' ');
+    var n = normBusqueda('sin requi tapas ' + (g.s.cliente || '') + ' ' + (g.s.id_display || '') + ' ' + (l.sku || '') + ' ' + getSkuDesc(l.sku) + ' ' + extra);
     return toks.every(function(t) { return n.indexOf(t) !== -1; });
   });
 }
 
-function buildEntPendSeccionHtml(pend, mp) {
-  if (!pend.length) return '';
-  var tot = pend.reduce(function(a, p) { return a + p.falta; }, 0);
-  return '<tr><td colspan="10" class="ent-sec ent-sec-pend">⏳ Entregas reportadas por Tapas · pendientes de requi de ingreso · '
-    + pend.length + ' entrega' + (pend.length !== 1 ? 's' : '') + ' · ' + tot.toLocaleString() + ' und</td></tr>'
-    + pend.map(function(p) { return buildEntPendHtml(p, mp); }).join('');
+function entPendTotales(grupos) {
+  var ent = 0, und = 0;
+  grupos.forEach(function(g) { ent += g.items.length; und += g.falta; });
+  return { fichas: grupos.length, entregas: ent, und: und };
 }
 
-function buildEntPendHtml(p, mp) {
-  var s = p.s, e = p.e;
+// Una línea de detalle por entrega: "02/Nov/2026 · 6,000" (con una sola entrega, solo la fecha, como siempre)
+function entPendFechaLineas(g) {
+  var multi = g.items.length > 1;
+  return g.items.map(function(p) {
+    return escHtml(fmtFechaLetras(p.e.fecha)) + (multi ? ' · <b style="color:var(--ink)">' + p.falta.toLocaleString() + '</b>' : '');
+  }).join('<br>');
+}
+
+function entPendLoteLineas(g) {
+  return g.items.map(function(p) { return escHtml(p.e.lote || '—'); }).join('<br>');
+}
+
+function buildEntPendSeccionHtml(pend, mp) {
+  if (!pend.length) return '';
+  var t = entPendTotales(pend);
+  return '<tr><td colspan="10" class="ent-sec ent-sec-pend">⏳ Entregas reportadas por Tapas · pendientes de requi de ingreso · '
+    + t.fichas + ' ficha' + (t.fichas !== 1 ? 's' : '') + (t.entregas !== t.fichas ? ' (' + t.entregas + ' entregas)' : '') + ' · ' + t.und.toLocaleString() + ' und</td></tr>'
+    + pend.map(function(g) { return buildEntPendHtml(g, mp); }).join('');
+}
+
+function buildEntPendHtml(g, mp) {
+  var s = g.s;
   var l = (s.lineas && s.lineas[0]) || {};
   var sal = mp.sal[s.id] ? mp.sal[s.id].join(', ') : '—';
-  var quien = e.registrado_por || '';
-  var notaPend = [e.nota, quien].filter(Boolean).join(' · ');
+  var quienes = [], notas = [], fotos = '', cierra = false;
+  g.items.forEach(function(p) {
+    var e = p.e;
+    if (e.registrado_por && quienes.indexOf(e.registrado_por) < 0) quienes.push(e.registrado_por);
+    if (e.nota && notas.indexOf(e.nota) < 0) notas.push(e.nota);
+    if (e.cierra) cierra = true;
+    fotos += fotoBtnTapas(e, false);
+  });
+  var notaPend = notas.concat(quienes).join(' · ');
+  var multi = g.items.length > 1;
   return '<tr class="ent-pend">'
-    + '<td><span class="ent-pend-tag">⏳ SIN REQUI</span></td>'
+    + '<td><span class="ent-pend-tag">⏳ SIN REQUI</span>' + (multi ? '<div style="font-size:9px;font-weight:700;color:#B45309;margin-top:3px">' + g.items.length + ' entregas</div>' : '') + '</td>'
     + '<td style="font-weight:600;font-size:11px">' + escHtml(s.cliente || '—') + '</td>'
     + '<td><span class="ent-ped">' + escHtml(s.id_display || String(s.id).slice(0, 8)) + '</span></td>'
     + '<td style="font-size:11px;color:var(--gray)"><span style="font-family:var(--mono);font-size:10px;margin-right:4px">' + escHtml(l.sku || '') + '</span>' + escHtml(l.sku ? getSkuDesc(l.sku) : (l.desc || s.desc || '')) + '</td>'
-    + '<td class="mov-cant" title="Reportado por Tapas">' + p.falta.toLocaleString()
-    + (p.cubierto > 0 ? '<div style="font-size:9px;font-weight:600;color:var(--gray-l)">de ' + (e.cantidad || 0).toLocaleString() + '</div>' : '') + '</td>'
-    + '<td style="font-size:11px;color:var(--gray);white-space:nowrap">' + escHtml(fmtFechaLetras(e.fecha)) + '</td>'
-    + '<td style="font-size:11px;font-weight:800;font-family:var(--mono);white-space:nowrap">' + escHtml(e.lote || '—') + '</td>'
+    + '<td class="mov-cant" title="' + (multi ? 'Total de ' + g.items.length + ' entregas reportadas por Tapas' : 'Reportado por Tapas') + '">' + g.falta.toLocaleString()
+    + (g.cubierto > 0 ? '<div style="font-size:9px;font-weight:600;color:var(--gray-l)">de ' + g.reportado.toLocaleString() + '</div>' : '') + '</td>'
+    + '<td style="font-size:11px;color:var(--gray);white-space:nowrap;line-height:1.55">' + entPendFechaLineas(g) + '</td>'
+    + '<td style="font-size:11px;font-weight:800;font-family:var(--mono);white-space:nowrap;line-height:1.55">' + entPendLoteLineas(g) + '</td>'
     + '<td><span class="ent-orig" style="background:#F59E0B;color:#fff">TAPAS</span>'
-    + (e.cierra ? ' <span style="font-size:10px;font-weight:800;color:#047857">✅ completó la ficha</span>' : '') + fotoBtnTapas(e, false)
+    + (cierra ? ' <span style="font-size:10px;font-weight:800;color:#047857">✅ completó la ficha</span>' : '') + fotos
     + (notaPend ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(notaPend) + '</span>' : '') + '</td>'
     + '<td style="font-size:11px;font-family:var(--mono);color:var(--gray-l)">' + escHtml(sal) + '</td>'
-    + '<td class="ent-act" style="white-space:nowrap"><button class="ent-pend-act" title="Abrir el registro de entregado con esta ficha y cantidad" onclick="entRegistrarDesdeEntrega(\'' + escHtml(String(e.id)) + '\')">📝 Registrar requi</button></td>'
+    + '<td class="ent-act" style="white-space:nowrap"><button class="ent-pend-act" title="Abrir el registro de entregado con esta ficha y el total pendiente" onclick="entRegistrarDesdeEntrega(\'' + escHtml(String(s.id)) + '\')">📝 Registrar requi</button></td>'
     + '</tr>';
 }
 
-// "Registrar requi" desde una entrega pendiente: abre el formulario ya con el pedido, el SKU (si la ficha tiene uno solo), el cliente y lo que falta
-function entRegistrarDesdeEntrega(entId) {
-  var p = entPendientesSinRequi().find(function(x) { return String(x.e.id) === String(entId); });
-  if (!p) { showToast('Esa entrega ya tiene requi', '#B83232'); renderEntTabla(); return; }
+// "Registrar requi" desde una ficha con entregas pendientes: abre el formulario ya con el pedido, el SKU (si la ficha tiene uno solo), el cliente y el TOTAL pendiente
+function entRegistrarDesdeEntrega(solId) {
+  var g = entPendGrupoPorFicha(solId);
+  if (!g) { showToast('Esa entrega ya tiene requi', '#B83232'); renderEntTabla(); return; }
   abrirIngPT();
-  var s = p.s;
-  var d = { sol: s.id, cant: p.falta };
+  var s = g.s;
+  var d = { sol: s.id, cant: g.falta };
   if (s.lineas.length === 1 && s.lineas[0].sku) {
     var it = invB2DeTapas(s.lineas[0].sku);
     if (it) { d.sku = it.sku; d.desc = it.descripcion || ''; }
@@ -6727,20 +6779,24 @@ function ingPendLineaDeFicha(solId) {
   return -1;
 }
 
-function ingPendItemHtml(p) {
-  var s = p.s, e = p.e;
+function ingPendItemHtml(g) {
+  var s = g.s;
   var l = (s.lineas && s.lineas[0]) || {};
   var li = ingPendLineaDeFicha(s.id);
   var sug = li < 0 ? ingLineaDestino(s) : -1;
   var cod = escHtml(s.id_display || String(s.id).slice(0, 8));
   var prod = '<b>' + escHtml(s.cliente || '—') + '</b><br><span class="sku">' + escHtml(l.sku || '') + '</span>'
     + escHtml(l.sku ? getSkuDesc(l.sku) : (l.desc || s.desc || ''));
-  var cant = p.falta.toLocaleString() + (p.cubierto > 0 ? '<small>de ' + (e.cantidad || 0).toLocaleString() + '</small>' : '<small>und</small>');
-  var fl = escHtml(fmtFechaLetras(e.fecha)) + (e.lote ? '<div>Lote ' + escHtml(e.lote) + '</div>' : '')
-    + (e.cierra ? '<div style="color:#047857;font-family:inherit">✅ completó</div>' : '');
+  var multi = g.items.length > 1;
+  var cant = g.falta.toLocaleString() + (g.cubierto > 0 ? '<small>de ' + g.reportado.toLocaleString() + '</small>' : '<small>' + (multi ? g.items.length + ' entregas' : 'und') + '</small>');
+  var cierra = g.items.some(function(p) { return p.e.cierra; });
+  var fl = g.items.map(function(p) {
+    return '<span>' + escHtml(fmtFechaLetras(p.e.fecha)) + (multi ? ' · <b>' + p.falta.toLocaleString() + '</b>' : '') + '</span>'
+      + (p.e.lote ? '<div>Lote ' + escHtml(p.e.lote) + '</div>' : '');
+  }).join('') + (cierra ? '<div style="color:#047857;font-family:inherit">✅ completó</div>' : '');
   var acc = li >= 0
     ? '<span class="ing-pend-ok">✓ Vinculada · fila ' + (li + 1) + '</span>'
-    : '<button class="ing-pend-vb" title="Poner esta ficha en ' + (sug >= 0 ? 'la fila ' + (sug + 1) : 'una fila nueva') + '" onclick="ingPendVincular(\'' + escHtml(String(e.id)) + '\')">🔗 Vincular'
+    : '<button class="ing-pend-vb" title="Poner esta ficha (total pendiente) en ' + (sug >= 0 ? 'la fila ' + (sug + 1) : 'una fila nueva') + '" onclick="ingPendVincular(\'' + escHtml(String(s.id)) + '\')">🔗 Vincular'
       + (sug >= 0 ? ' · fila ' + (sug + 1) : '') + '</button>';
   return '<div class="ing-pend-it' + (li >= 0 ? ' vinc' : (sug >= 0 ? ' sug' : '')) + '">'
     + '<div class="ing-pend-cod">' + cod + '</div>'
@@ -6764,15 +6820,16 @@ function ingPendListaHtml() {
 function renderIngPendientes() {
   var cont = document.getElementById('ingPendientes');
   if (!cont) return;
-  var todas = ingEdit ? [] : entPendientesSinRequi();
+  var todas = ingEdit ? [] : entPendientesPorFicha();
   if (!todas.length) { cont.innerHTML = ''; return; }
-  var tot = todas.reduce(function(a, p) { return a + p.falta; }, 0);
-  var vinc = todas.filter(function(p) { return ingPendLineaDeFicha(p.s.id) >= 0; }).length;
+  var tt = entPendTotales(todas);
+  var tot = tt.und;
+  var vinc = todas.filter(function(g) { return ingPendLineaDeFicha(g.s.id) >= 0; }).length;
   cont.innerHTML = '<div class="ing-pend">'
     + '<div class="ing-pend-h" onclick="ingPendToggle()">'
     +   '<span>' + (ingPendAbierto ? '▾' : '▸') + '</span>'
-    +   '<span class="t">⏳ Entregas reportadas por Tapas · pendientes de requi · ' + todas.length + ' entrega' + (todas.length !== 1 ? 's' : '')
-    +   ' · ' + tot.toLocaleString() + ' und' + (vinc ? ' · ' + vinc + ' ya vinculada' + (vinc !== 1 ? 's' : '') + ' aquí' : '') + '</span>'
+    +   '<span class="t">⏳ Entregas reportadas por Tapas · pendientes de requi · ' + tt.fichas + ' ficha' + (tt.fichas !== 1 ? 's' : '')
+    +   (tt.entregas !== tt.fichas ? ' (' + tt.entregas + ' entregas)' : '') + ' · ' + tot.toLocaleString() + ' und' + (vinc ? ' · ' + vinc + ' ya vinculada' + (vinc !== 1 ? 's' : '') + ' aquí' : '') + '</span>'
     +   (ingPendAbierto ? '<input id="ingPendBuscar" placeholder="🔍 ficha, cliente, SKU…" value="' + escHtml(ingPendBusca) + '" autocomplete="off"'
     +     ' onclick="event.stopPropagation()" oninput="ingPendFiltrar(this.value)">' : '')
     + '</div>'
@@ -6792,9 +6849,9 @@ function ingPendFiltrar(v) {
 }
 
 // Pone la ficha en la fila que le toca (mismo SKU, o una en blanco) y la completa; si no hay fila libre agrega una nueva
-function ingPendVincular(entId) {
+function ingPendVincular(solId) {
   ingSincronizarCant();
-  var p = entPendientesSinRequi().find(function(x) { return String(x.e.id) === String(entId); });
+  var p = entPendGrupoPorFicha(solId);
   if (!p) { showToast('Esa entrega ya tiene requi', '#B83232'); renderIngPendientes(); return; }
   var s = p.s;
   var i = ingLineaDestino(s);
