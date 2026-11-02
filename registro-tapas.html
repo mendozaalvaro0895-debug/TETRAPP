@@ -262,7 +262,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-chip.proc .ped-chip-s{color:#1E3A8A;font-weight:700}
 .ped-vacio{font-size:12px;color:#9A9A98;font-style:italic;padding:14px;text-align:center}
 .ped-comp{background:#fff;border:1.5px solid #E0DED8;border-radius:10px;overflow:hidden}
-.ped-comp-r{display:grid;grid-template-columns:78px 96px 88px 54px 74px 78px minmax(0,1fr) 84px;gap:8px;align-items:baseline;font-size:11px;padding:5px 10px;border-bottom:1px solid #F0EDE8}
+.ped-comp-r{display:grid;grid-template-columns:100px 96px 88px 54px 74px 78px minmax(0,1fr) 84px;gap:8px;align-items:baseline;font-size:11px;padding:5px 10px;border-bottom:1px solid #F0EDE8}
 .ped-comp-r:last-child{border-bottom:none}
 .ped-comp-h{background:#EBF7F4;border-bottom:2px solid #1A6B5B !important;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#1A6B5B}
 .ped-comp-h span,.ped-comp-h .f,.ped-comp-h .rq,.ped-comp-h .fi,.ped-comp-h .pr,.ped-comp-r.ped-comp-h .lt{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:800;color:#1A6B5B}
@@ -293,11 +293,14 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-comp-sec.ok{background:#EBF7F4;color:#1A6B5B;border-top:2px solid #E0DED8}
 .ped-comp-r.pend{background:#FFFBEB;box-shadow:inset 5px 0 0 #F59E0B;cursor:pointer}
 .ped-comp-r.pend .rq{color:#B45309}
+.ped-comp-r.pend .f,.ped-comp-r.pend .lt{white-space:nowrap;line-height:1.5;align-self:start}
+.ped-comp-r.pend .f b{color:#334155}
+.ped-comp-r.pend .rq small{display:block;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;color:#92400E}
 .ped-mas{display:block;margin:8px auto 0;background:#fff;border:1.5px solid #E0DED8;border-radius:8px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;color:#1A6B5B}
 /* Celular: cada fila de Entregados es una tarjeta de 3 líneas — fecha · requi · cantidad / cliente · ficha · estado / SKU + descripción completa */
 @media(max-width:700px){
   .ped-comp-h{display:none !important}
-  .ped-comp-r{grid-template-columns:88px 1fr auto;grid-template-areas:"f rq u" "cl fi tag" "lt lt lt" "pr pr pr";gap:3px 8px;align-items:center;padding:8px 10px}
+  .ped-comp-r{grid-template-columns:104px 1fr auto;grid-template-areas:"f rq u" "cl fi tag" "lt lt lt" "pr pr pr";gap:3px 8px;align-items:center;padding:8px 10px}
   .ped-comp-r .f{grid-area:f}.ped-comp-r .rq{grid-area:rq}.ped-comp-r .u{grid-area:u;font-size:13px}
   .ped-comp-r .cl{grid-area:cl}.ped-comp-r .fi{grid-area:fi;justify-self:start}.ped-comp-r .ped-tag{grid-area:tag;justify-self:end}
   .ped-comp-r .lt{grid-area:lt}.ped-comp-r .lt:empty{display:none}.ped-comp-r .lt:not(:empty)::before{content:'Lote ';font-weight:400;color:#6B6B6A}
@@ -2014,15 +2017,55 @@ function pedPendientesSinRequi(m) {
   return out;
 }
 
-function pedPendRowHtml(p) {
-  var x = p.x, e = p.e, idq = escHtml(String(x.id));
-  return '<div class="ped-comp-r pend" title="Entrega reportada por Tapas: falta la requi de ingreso" onclick="abrirEstadoFicha(\'' + idq + '\')">'
-    + '<span class="f">' + escHtml(pedFechaCorta(e.fecha)) + '</span><span class="rq">⏳ SIN REQUI</span>'
+// Varias entregas pendientes de la MISMA ficha se funden en UNA fila con el total a ingresar (la requi se hace por el total);
+// el detalle de cuánto se entregó y cuándo queda en la columna Fecha. ESPEJO de entPendientesPorFicha de tapas.html.
+function pedPendientesPorFicha(m) {
+  var por = {}, out = [];
+  pedPendientesSinRequi(m).forEach(function(p) {
+    var k = String(p.x.id);
+    if (!por[k]) { por[k] = { x: p.x, falta: 0, cubierto: 0, items: [] }; out.push(por[k]); }
+    por[k].falta += p.falta;
+    por[k].cubierto += p.e.cubierto || 0;
+    por[k].items.push(p);
+  });
+  out.forEach(function(g) {
+    g.items.sort(function(a, b) {
+      return String(a.e.fecha || '').localeCompare(String(b.e.fecha || '')) || String(a.e.created_at || '').localeCompare(String(b.e.created_at || ''));
+    });
+    g.ultima = g.items[g.items.length - 1].e;
+  });
+  out.sort(function(a, b) {
+    return String(b.ultima.fecha || '').localeCompare(String(a.ultima.fecha || '')) || String(b.ultima.created_at || '').localeCompare(String(a.ultima.created_at || ''));
+  });
+  return out;
+}
+
+// Una línea por entrega: "30-oct · 6,500" = lo que falta ingresar de esa entrega ("de N" si ya tiene requi parcial); solo la fecha si la ficha tiene una sola
+function pedPendFechaLineas(g) {
+  var uno = g.items.length === 1;
+  return g.items.map(function(p) {
+    return escHtml(pedFechaCorta(p.e.fecha)) + (uno ? '' : ' · <b>' + pedNum(p.falta) + '</b>' + (p.e.cubierto ? ' <i title="Reportó ' + pedNum(p.e.cantidad) + '; ' + pedNum(p.e.cubierto) + ' ya tienen requi" style="font-weight:400">de ' + pedNum(p.e.cantidad) + '</i>' : ''));
+  }).join('<br>');
+}
+
+// Lotes distintos de las entregas de la ficha, sin repetir
+function pedPendLotes(g) {
+  var vistos = [];
+  g.items.forEach(function(p) { if (p.e.lote && vistos.indexOf(p.e.lote) < 0) vistos.push(p.e.lote); });
+  return vistos.join(' · ');
+}
+
+function pedPendRowHtml(g) {
+  var x = g.x, idq = escHtml(String(x.id)), n = g.items.length;
+  var cierra = g.items.some(function(p) { return p.e.cierra; });
+  return '<div class="ped-comp-r pend" title="Entregas reportadas por Tapas: falta la requi de ingreso" onclick="abrirEstadoFicha(\'' + idq + '\')">'
+    + '<span class="f">' + pedPendFechaLineas(g) + '</span>'
+    + '<span class="rq">⏳ SIN REQUI' + (n > 1 ? '<small>' + n + ' entregas</small>' : '') + '</span>'
     + '<span class="cl">' + escHtml(x.cliente) + '</span><span class="fi">' + escHtml(x.codigo) + '</span>'
-    + '<span class="ped-tag sr"' + (e.cierra ? ' title="Esta entrega completó la ficha"' : '') + '>' + (e.cierra ? 'TAPAS ✓' : 'TAPAS') + '</span>'
-    + '<span class="lt">' + escHtml(e.lote || '') + '</span>'
+    + '<span class="ped-tag sr"' + (cierra ? ' title="Una de estas entregas completó la ficha"' : '') + '>' + (cierra ? 'TAPAS ✓' : 'TAPAS') + '</span>'
+    + '<span class="lt">' + escHtml(pedPendLotes(g)) + '</span>'
     + '<span class="pr">' + escHtml((x.sku ? x.sku + ' · ' : '') + x.desc) + '</span>'
-    + '<span class="u">' + pedNum(p.falta) + '</span></div>';
+    + '<span class="u">' + pedNum(g.falta) + '</span></div>';
 }
 
 function renderPedidos() {
@@ -2180,10 +2223,11 @@ function renderPedidos() {
       + '<span class="pr">' + escHtml((g.x.sku ? g.x.sku + ' · ' : '') + g.x.desc) + '</span>'
       + '<span class="u">' + pedNum(g.und) + '</span></div>';
   }).join('');
-  var pend = pedPendientesSinRequi(m);
-  var pendTot = pend.reduce(function(a, p) { return a + p.falta; }, 0);
+  var pend = pedPendientesPorFicha(m);
+  var pendTot = pend.reduce(function(a, g) { return a + g.falta; }, 0);
+  var pendEnt = pend.reduce(function(a, g) { return a + g.items.length; }, 0);
   var htmlPend = pend.length
-    ? '<div class="ped-comp-sec pend">⏳ Entregas que reportaste · pendientes de requi · ' + pend.length + ' · ' + pedNum(pendTot) + ' und</div>' + pend.map(pedPendRowHtml).join('')
+    ? '<div class="ped-comp-sec pend">⏳ Entregas que reportaste · pendientes de requi · ' + pend.length + ' ficha' + (pend.length !== 1 ? 's' : '') + (pendEnt !== pend.length ? ' (' + pendEnt + ' entregas)' : '') + ' · ' + pedNum(pendTot) + ' und</div>' + pend.map(pedPendRowHtml).join('')
     : '';
   var htmlComp = (orden.length || pend.length)
     ? '<div class="ped-comp">' + pedCompHeadHtml() + htmlPend + (pend.length && orden.length ? '<div class="ped-comp-sec ok">📦 Requis registradas</div>' : '') + filas + '</div>' + (orden.length > PED.masComp ? '<button class="ped-mas" onclick="PED.masComp+=40;renderPedidos()">Mostrar más (' + (orden.length - PED.masComp) + ')</button>' : '')
