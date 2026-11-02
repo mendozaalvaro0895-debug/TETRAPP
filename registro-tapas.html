@@ -177,6 +177,12 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .exito-ico{font-size:56px;margin-bottom:12px}
 .exito-corr{font-family:'DM Mono',monospace;font-size:26px;font-weight:700;color:#1A6B5B;margin:10px 0}
 .exito-det{font-size:13px;color:#6B6B6A;margin-bottom:24px;line-height:1.7}
+.ok-meta{display:none;margin:0 0 22px;padding:18px 16px;border-radius:14px;background:linear-gradient(135deg,#FEF3C7,#D1FAE5);border:2px solid #D4A017;animation:ds-slideUp .5s ease both}
+.ok-meta.on{display:block}
+.ok-meta .om-ico{font-size:44px;line-height:1.1}
+.ok-meta .om-tit{font-size:19px;font-weight:800;color:#14532D;margin:6px 0 4px;line-height:1.25}
+.ok-meta .om-sub{font-size:15px;font-weight:700;color:#92400E}
+.ok-meta .om-dato{font-size:12px;color:#475569;margin-top:8px}
 
 .toast-msg{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1A6B5B;color:#fff;padding:12px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25)}
 .cargando{text-align:center;padding:50px 20px;color:#6B6B6A;font-size:13px}
@@ -634,6 +640,7 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
       <div class="titulo">¡Producción registrada!</div>
       <div class="exito-corr" id="okCorr">CMD-—</div>
       <div class="exito-det" id="okDet">—</div>
+      <div class="ok-meta" id="okMeta"></div>
       <button class="btn-guardar" onclick="volverSeleccion()">👤 Registrar otro operario</button>
     </div>
   </div>
@@ -1473,6 +1480,37 @@ function recopilarTareas() {
   return tareas;
 }
 
+// Felicitación si con lo cargado el operario llega a la meta diaria. El total del día suma TODAS sus comandas de esa
+// fecha (no rechazadas, tareas Terminadas) porque puede cargar su producción en varias veces; si la consulta falla
+// se usa solo lo que acaba de guardar. Se pinta en la pantalla de éxito (#okMeta).
+async function pintarFelicitacionMeta(fecha, totalPT) {
+  var box = document.getElementById('okMeta');
+  if (!box) return;
+  box.className = 'ok-meta';
+  box.innerHTML = '';
+  var meta = metaDiaTapas(fecha);
+  var totalDia = totalPT;
+  try {
+    var r = await db.from('comandas')
+      .select('id, estado_aprobacion, comanda_tareas(estado, cantidad, unidades_completadas)')
+      .eq('operario_id', opActual.codigo).eq('fecha', fecha);
+    if (!r.error && r.data) {
+      var suma = 0;
+      r.data.forEach(function(c) {
+        if (c.estado_aprobacion === 'rechazada') return;
+        (c.comanda_tareas || []).forEach(function(t) { if (t.estado === 'Terminada') suma += undDeTarea(t); });
+      });
+      if (suma > totalDia) totalDia = suma;
+    }
+  } catch(e) { console.warn('pintarFelicitacionMeta:', e); }
+  if (totalDia < meta) return;
+  box.innerHTML = '<div class="om-ico">🏆🎉</div>'
+    + '<div class="om-tit">¡Felicidades! Cumpliste tu meta del día.</div>'
+    + '<div class="om-sub">¡Sigue así!</div>'
+    + '<div class="om-dato">' + totalDia.toLocaleString('en-US') + ' und hoy · meta ' + meta.toLocaleString('en-US') + '</div>';
+  box.className = 'ok-meta on';
+}
+
 async function guardarRegistro() {
   if (!opActual) { volverSeleccion(); return; }
 
@@ -1551,6 +1589,7 @@ async function guardarRegistro() {
     document.getElementById('okDet').innerHTML =
       escHtml(opActual.nombre) + ' · ' + escHtml(fmtFechaLetras(fecha))
       + '<br>' + tareas.length + ' tarea(s) · <strong>' + totalPT.toLocaleString() + ' und PT</strong>';
+    pintarFelicitacionMeta(fecha, totalPT);
     mostrarPantalla('scrOk');
     window.scrollTo(0, 0);
   } catch(e) {
