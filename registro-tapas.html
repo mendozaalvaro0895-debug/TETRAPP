@@ -183,6 +183,9 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ok-meta .om-tit{font-size:19px;font-weight:800;color:#14532D;margin:6px 0 4px;line-height:1.25}
 .ok-meta .om-sub{font-size:15px;font-weight:700;color:#92400E}
 .ok-meta .om-dato{font-size:12px;color:#475569;margin-top:8px}
+.ok-meta.no{background:linear-gradient(135deg,#FFF7ED,#FEE2E2);border-color:#EA580C}
+.ok-meta.no .om-tit{color:#9A3412}
+.ok-meta.no .om-sub{color:#B45309}
 
 .toast-msg{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1A6B5B;color:#fff;padding:12px 22px;border-radius:10px;font-size:13px;font-weight:700;z-index:9999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25)}
 .cargando{text-align:center;padding:50px 20px;color:#6B6B6A;font-size:13px}
@@ -1480,7 +1483,7 @@ function recopilarTareas() {
   return tareas;
 }
 
-// Felicitación si con lo cargado el operario llega a la meta diaria. El total del día suma TODAS sus comandas de esa
+// Anuncio de meta diaria: felicitación si con lo cargado el operario llega a la meta, o aviso de cuánto le faltó si no. El total del día suma TODAS sus comandas de esa
 // fecha (no rechazadas, tareas Terminadas) porque puede cargar su producción en varias veces; si la consulta falla
 // se usa solo lo que acaba de guardar. Se pinta en la pantalla de éxito (#okMeta).
 async function pintarFelicitacionMeta(fecha, totalPT) {
@@ -1503,7 +1506,15 @@ async function pintarFelicitacionMeta(fecha, totalPT) {
       if (suma > totalDia) totalDia = suma;
     }
   } catch(e) { console.warn('pintarFelicitacionMeta:', e); }
-  if (totalDia < meta) return;
+  if (totalDia < meta) {
+    // "Llevas X de M" (no "hoy sacaste"): puede estar cargando su producción en varias veces
+    box.innerHTML = '<div class="om-ico">💪</div>'
+      + '<div class="om-tit">No cumpliste la meta del día.</div>'
+      + '<div class="om-sub">¡Ánimo, tú puedes!</div>'
+      + '<div class="om-dato">Llevas ' + totalDia.toLocaleString('en-US') + ' de ' + meta.toLocaleString('en-US') + ' und · faltan ' + (meta - totalDia).toLocaleString('en-US') + '</div>';
+    box.className = 'ok-meta on no';
+    return;
+  }
   box.innerHTML = '<div class="om-ico">🏆🎉</div>'
     + '<div class="om-tit">¡Felicidades! Cumpliste tu meta del día.</div>'
     + '<div class="om-sub">¡Sigue así!</div>'
