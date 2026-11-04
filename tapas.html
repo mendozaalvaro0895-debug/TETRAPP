@@ -327,6 +327,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .env-cero{background:#fee2e2;color:#991b1b}
 .env-missing{background:#f1f5f9;color:#64748b}
 .env-faltante{font-family:var(--mono);font-size:12px;font-weight:800;color:#b91c1c}
+.env-ped{background:none;border:0;font:inherit;color:var(--teal);font-weight:700;cursor:pointer;padding:2px 8px;border-radius:6px;text-decoration:underline dotted;text-underline-offset:3px}
+.env-ped:hover{background:rgba(26,107,91,.1)}
+.env-pop{position:fixed;z-index:10001;width:330px;max-width:calc(100vw - 16px);background:#fff;border:1px solid #D5D3CC;border-radius:10px;box-shadow:0 6px 22px rgba(0,0,0,.18);font-size:12px;overflow:hidden}
+.env-pop-h{padding:8px 12px;background:#F5F4F0;border-bottom:1px solid #E8E6DF;display:flex;align-items:flex-start;gap:8px}
+.env-pop-h b{font-family:var(--mono);font-size:12px;color:var(--teal)}
+.env-pop-h small{display:block;color:#6B6B6A;font-size:10px;line-height:1.3;margin-top:1px}
+.env-pop-x{margin-left:auto;background:none;border:0;color:#9ca3af;cursor:pointer;font-size:14px;line-height:1}
+.env-pop-r{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:7px 12px;border-bottom:1px solid #F0EEE8;cursor:pointer;align-items:baseline}
+.env-pop-r:hover{background:#F5F4F0}
+.env-pop-r .fi{font-family:var(--mono);font-weight:700;color:var(--teal)}
+.env-pop-r .cl{font-weight:600;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.env-pop-r .u{font-family:var(--mono);font-weight:800;color:#1f2937}
+.env-pop-r .pr{grid-column:1/-1;color:#6B6B6A;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.env-pop-f{padding:6px 12px;color:#6B6B6A;font-size:10px;background:#FAFAF8}
+.env-pop-body{max-height:260px;overflow:auto}
 .env-footer{display:flex;align-items:center;gap:12px;padding:8px 14px;border-top:1px solid var(--border);background:var(--bg2);flex-wrap:wrap}
 .env-footer-kpi{font-size:10px;color:var(--gray);white-space:nowrap}
 .env-footer-kpi b{font-size:13px;color:var(--ink)}
@@ -4014,12 +4029,12 @@ function badgeAlertaTapas(r) {
   return '<span class="env-badge env-parcial">🟡 parcial</span>';
 }
 
-function buildFilaAlertaTapas(r) {
+function buildFilaAlertaTapas(r, comp) {
   var pedTxt = r.pedidos.map(function(p) { return p.codigo + ' · ' + p.cliente + ' (' + p.cant.toLocaleString() + ')'; }).join('\n');
   return '<tr>'
     + '<td style="font-family:var(--mono);font-size:10px;font-weight:700;color:var(--teal);white-space:nowrap">' + escHtml(r.sku) + '</td>'
     + '<td style="white-space:normal;line-height:1.3">' + escHtml(r.desc) + '</td>'
-    + '<td class="r" title="' + escHtml(pedTxt) + '">' + r.pedidos.length + '</td>'
+    + '<td class="r" title="' + escHtml(pedTxt) + '"><button class="env-ped" data-sku="' + escHtml(r.sku) + '" onclick="abrirPedidosAlertaTapas(event,\'' + comp.tipo + '\',this)">' + r.pedidos.length + '</button></td>'
     + '<td class="r"><b>' + fmtNumTapas(r.neto) + '</b></td>'
     + '<td class="r" style="color:' + (r.stock === 0 ? '#b91c1c' : r.stock === null ? '#9ca3af' : '#374151') + '">' + fmtNumTapas(r.stock) + '</td>'
     + '<td class="r">' + (r.faltante > 0 ? '<span class="env-faltante">' + fmtNumTapas(r.faltante) + '</span>' : '<span style="color:#9ca3af">—</span>') + '</td>'
@@ -4031,7 +4046,7 @@ function buildTablaAlertaTapas(arr, comp) {
   return '<table class="env-table"><thead><tr>'
     + '<th>SKU</th><th>Descripción</th><th class="r">Ped.</th><th class="r">Neto pend.</th>'
     + '<th class="r">Stock ' + (comp && comp.b7 ? 'B7' : 'B2') + '</th><th class="r">Pedir</th><th>Estado</th>'
-    + '</tr></thead><tbody>' + arr.map(buildFilaAlertaTapas).join('') + '</tbody></table>';
+    + '</tr></thead><tbody>' + arr.map(function(r) { return buildFilaAlertaTapas(r, comp); }).join('') + '</tbody></table>';
 }
 
 // Tipo de tapa de un componente = el de las fichas que lo piden (el que más unidades pide; "Sin clasificar" solo si no hay otro);
@@ -4060,7 +4075,7 @@ function calcularFilasAlertaTapas(comp, salidas) {
       mapa[k].total += (l.cant || 0);
       var tpF = tipoDeFicha(s);
       mapa[k].tipos[tpF] = (mapa[k].tipos[tpF] || 0) + (l.cant || 0);
-      if (!mapa[k].pedidos[s.id]) mapa[k].pedidos[s.id] = { codigo: s.id_display || s.id.slice(0, 8), cliente: s.cliente || '—', cant: 0 };
+      if (!mapa[k].pedidos[s.id]) mapa[k].pedidos[s.id] = { id: s.id, codigo: s.id_display || s.id.slice(0, 8), cliente: s.cliente || '—', cant: 0, prod: ((l.sku && l.sku !== '—' ? l.sku + ' · ' : '') + (l.desc || '')).trim(), lim: limiteFichaTapas(s).corta };
       mapa[k].pedidos[s.id].cant += (l.cant || 0);
     });
   });
@@ -4196,6 +4211,66 @@ function buildAlertaComponenteTapas(comp, rows) {
     +   '<span class="env-footer-kpi"><b>' + fmtNumTapas(totFalt) + '</b> und a pedir</span>'
     + '</div>'
     + '</div>';
+}
+
+// Popover discreto de la columna "Ped.": qué fichas piden ese componente. Clic en una fila = abre la ficha.
+// Se cierra con clic fuera, Esc o al desplazar la página.
+function cerrarPedidosAlertaTapas() {
+  var el = document.getElementById('envPop');
+  if (el) el.remove();
+  document.removeEventListener('mousedown', cerrarPedidosAlertaFuera, true);
+  document.removeEventListener('keydown', cerrarPedidosAlertaEsc, true);
+  window.removeEventListener('scroll', cerrarPedidosAlertaTapas, true);
+}
+function cerrarPedidosAlertaFuera(e) {
+  var el = document.getElementById('envPop');
+  if (el && !el.contains(e.target)) cerrarPedidosAlertaTapas();
+}
+function cerrarPedidosAlertaEsc(e) { if (e.key === 'Escape') cerrarPedidosAlertaTapas(); }
+
+function buildPedidosAlertaTapas(comp, r) {
+  var ped = r.pedidos.slice().sort(function(a, b) { return b.cant - a.cant; });
+  var filas = ped.map(function(p) {
+    return '<div class="env-pop-r" data-id="' + escHtml(String(p.id)) + '" onclick="abrirFichaDesdeAlertaTapas(this.dataset.id)" title="Abrir la ficha">'
+      + '<span class="fi">' + escHtml(p.codigo) + '</span><span class="cl">' + escHtml(p.cliente) + '</span>'
+      + '<span class="u">' + fmtNumTapas(p.cant) + '</span>'
+      + '<span class="pr">' + escHtml(p.prod || '—') + ' · ⏳ ' + escHtml(p.lim) + '</span></div>';
+  }).join('');
+  return '<div class="env-pop-h"><div><b>' + escHtml(r.sku) + '</b><small>' + escHtml(r.desc) + '</small></div>'
+    + '<button class="env-pop-x" onclick="cerrarPedidosAlertaTapas()" title="Cerrar">✕</button></div>'
+    + '<div class="env-pop-body">' + filas + '</div>'
+    + '<div class="env-pop-f">' + ped.length + ' ficha' + (ped.length !== 1 ? 's' : '') + ' · pedido ' + fmtNumTapas(ped.reduce(function(a, p) { return a + p.cant; }, 0))
+    + ' · neto pend. ' + fmtNumTapas(r.neto) + '</div>';
+}
+
+function abrirPedidosAlertaTapas(ev, tipoComp, btn) {
+  ev.stopPropagation();
+  var abierto = document.getElementById('envPop');
+  var mismo = abierto && abierto.dataset.sku === btn.dataset.sku && abierto.dataset.comp === tipoComp;
+  cerrarPedidosAlertaTapas();
+  if (mismo) return; // segundo clic en el mismo número = cerrar
+  var comp = COMPONENTES_ALERTA.find(function(c) { return c.tipo === tipoComp; });
+  if (!comp) return;
+  var r = calcularFilasAlertaTapas(comp, alertaSalidasTapas).find(function(x) { return x.sku === btn.dataset.sku; });
+  if (!r) return;
+  var pop = document.createElement('div');
+  pop.id = 'envPop'; pop.className = 'env-pop';
+  pop.dataset.sku = btn.dataset.sku; pop.dataset.comp = tipoComp;
+  pop.innerHTML = buildPedidosAlertaTapas(comp, r);
+  document.body.appendChild(pop);
+  var b = btn.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  var left = Math.max(8, Math.min(b.left + b.width / 2 - w / 2, window.innerWidth - w - 8));
+  var top = b.bottom + 6;
+  if (top + h > window.innerHeight - 8) top = Math.max(8, b.top - h - 6);
+  pop.style.left = left + 'px'; pop.style.top = top + 'px';
+  document.addEventListener('mousedown', cerrarPedidosAlertaFuera, true);
+  document.addEventListener('keydown', cerrarPedidosAlertaEsc, true);
+  window.addEventListener('scroll', cerrarPedidosAlertaTapas, true);
+}
+
+function abrirFichaDesdeAlertaTapas(id) {
+  cerrarPedidosAlertaTapas();
+  abrirFichaTapas(id);
 }
 
 // Tipos CERRADOS de cada bloque (se recuerdan en este navegador); por defecto todos abiertos
