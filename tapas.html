@@ -835,6 +835,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
             <div id="alertaContratapaTapas"></div>
           </div>
           <div class="inicio-sec">
+            <div id="alertaLinerTapas"></div>
+          </div>
+          <div class="inicio-sec">
             <div id="asistGridTapas"></div>
           </div>
           <div class="inicio-sec">
@@ -3964,7 +3967,8 @@ var ESTADOS_VIVOS_TAPAS = ['nueva', 'proceso', 'parcial'];
 var COMPLETADAS_DIAS_TAPAS = 15; // las fichas que Tapas marcó COMPLETADA siguen a la vista (al final, transparentes) este tiempo
 var COMPONENTES_ALERTA = [
   { tipo: 'base',       campo: 'skuBase',       titulo: 'Base',       icono: '📦', slot: 'alertaBaseTapas',       huecos: true  },
-  { tipo: 'contratapa', campo: 'skuContratapa', titulo: 'Contratapa', icono: '🔘', slot: 'alertaContratapaTapas', huecos: false }
+  { tipo: 'contratapa', campo: 'skuContratapa', titulo: 'Contratapa', icono: '🔘', slot: 'alertaContratapaTapas', huecos: false },
+  { tipo: 'liner',      campo: 'skuLiner',      titulo: 'Liner',      icono: '⚪', slot: 'alertaLinerTapas',      huecos: false, b7: true, sin: 'Sin fichas activas con liner asignado' }
 ];
 
 function fichaViva(s) { return ESTADOS_VIVOS_TAPAS.indexOf(s.estado) >= 0; }
@@ -3974,6 +3978,12 @@ function invB2DeTapas(sku) {
   return inventarioCache.find(function(i) { return i.sku === sku && (!i.bodega || i.bodega === 'B2'); })
       || inventarioCache.find(function(i) { return i.sku === sku; })
       || null;
+}
+
+// Existencia de un componente: Liner sale de Bodega 7 (insumos_b7); Base y Contratapa de inventario B2
+function itemStockAlertaTapas(comp, sku) {
+  if (comp.b7) return insumosB7Cache.find(function(i) { return i.sku === sku; }) || null;
+  return invB2DeTapas(sku);
 }
 
 // Unidades que YA salieron de Bodega para las fichas vivas, por SKU
@@ -4017,10 +4027,10 @@ function buildFilaAlertaTapas(r) {
     + '</tr>';
 }
 
-function buildTablaAlertaTapas(arr) {
+function buildTablaAlertaTapas(arr, comp) {
   return '<table class="env-table"><thead><tr>'
     + '<th>SKU</th><th>Descripción</th><th class="r">Ped.</th><th class="r">Neto pend.</th>'
-    + '<th class="r">Stock B2</th><th class="r">Pedir</th><th>Estado</th>'
+    + '<th class="r">Stock ' + (comp && comp.b7 ? 'B7' : 'B2') + '</th><th class="r">Pedir</th><th>Estado</th>'
     + '</tr></thead><tbody>' + arr.map(buildFilaAlertaTapas).join('') + '</tbody></table>';
 }
 
@@ -4057,7 +4067,7 @@ function calcularFilasAlertaTapas(comp, salidas) {
   var rows = Object.keys(mapa).map(function(k) {
     var e = mapa[k];
     var neto = Math.max(e.total - (salidas[k] || 0), 0);
-    var inv = invB2DeTapas(k);
+    var inv = itemStockAlertaTapas(comp, k);
     var stock = inv ? (inv.existencia || 0) : null;
     return {
       sku: k, desc: (inv && inv.descripcion) || '—', tipo: tipoDeAlertaTapas(e.tipos, inv && inv.descripcion),
@@ -4116,7 +4126,8 @@ function buildAlertaComponenteTapas(comp, rows) {
   var totNeto = vis.reduce(function(s, r) { return s + r.neto; }, 0);
   var critico = rows.some(function(r) { return r.stock === 0 && r.faltante > 0; });
   var ahora = new Date();
-  var fechaInv = 'Inv. B2 · ' + fmtFechaLetras(ahora);
+  var bodegaTxt = comp.b7 ? 'B7' : 'B2';
+  var fechaInv = 'Inv. ' + bodegaTxt + ' · ' + fmtFechaLetras(ahora);
 
   var tools = '<div class="env-tools"><span>Ordenar:</span>'
     + '<button class="env-tb' + (vista === 'faltante' ? ' act' : '') + '" onclick="setAlertaVistaTapas(\'' + comp.tipo + '\',\'faltante\')">Por faltante</button>'
@@ -4128,7 +4139,7 @@ function buildAlertaComponenteTapas(comp, rows) {
   var cuerpo;
   if (!rows.length) {
     cuerpo = '<table class="env-table"><tbody><tr><td style="text-align:center;padding:16px;color:var(--gray);font-style:italic">'
-      + 'Sin fichas activas con ' + comp.titulo.toLowerCase() + ' asignada</td></tr></tbody></table>';
+      + (comp.sin || ('Sin fichas activas con ' + comp.titulo.toLowerCase() + ' asignada')) + '</td></tr></tbody></table>';
   } else if (vista === 'tipo') {
     var chips = '<div class="env-chips">' + grupos.map(function(g) {
       return '<button class="env-chip' + (g.falt > 0 ? ' falta' : '') + (sel === g.tipo ? ' sel' : '') + '" data-tipo="' + escHtml(g.tipo) + '" onclick="setAlertaTipoTapas(\'' + comp.tipo + '\',this.dataset.tipo)" title="Clic para ver solo este tipo (otro clic = todos)">'
@@ -4140,12 +4151,12 @@ function buildAlertaComponenteTapas(comp, rows) {
       return '<div class="env-tipo-blk' + (cerrado ? ' cerrado' : '') + '"><div class="env-tipo-h clic" data-tipo="' + escHtml(g.tipo) + '" onclick="toggleAlertaTipoBlkTapas(event,\'' + comp.tipo + '\')" title="Clic para abrir o cerrar este tipo"><span class="chev">▾</span><b>' + escHtml(g.tipo) + '</b>'
         + '<span>' + g.n + ' SKU · ' + g.nFalt + ' con faltante · neto pend. ' + fmtNumTapas(g.neto) + '</span>'
         + '<span style="color:' + (g.falt > 0 ? '#b91c1c' : '#15803d') + '">' + (g.falt > 0 ? fmtNumTapas(g.falt) + ' und a pedir' : '✅ alcanza') + '</span></div>'
-        + '<div class="env-tipo-t">' + buildTablaAlertaTapas(g.rows) + '</div></div>';
+        + '<div class="env-tipo-t">' + buildTablaAlertaTapas(g.rows, comp) + '</div></div>';
     }).join('');
   } else {
     var mitad = Math.ceil(rows.length / 2);
-    cuerpo = '<div class="env-2col"><div>' + buildTablaAlertaTapas(rows.slice(0, mitad)) + '</div>'
-      + '<div>' + buildTablaAlertaTapas(rows.slice(mitad)) + '</div></div>';
+    cuerpo = '<div class="env-2col"><div>' + buildTablaAlertaTapas(rows.slice(0, mitad), comp) + '</div>'
+      + '<div>' + buildTablaAlertaTapas(rows.slice(mitad), comp) + '</div></div>';
   }
 
   var huecosHtml = '';
@@ -4171,7 +4182,7 @@ function buildAlertaComponenteTapas(comp, rows) {
     + '<div class="env-hdr" onclick="toggleAlertaTapas(event,\'' + comp.tipo + '\')">'
     +   '<span style="font-size:17px">' + comp.icono + '</span>'
     +   '<span class="env-hdr-title">Bajo Stock — ' + comp.titulo + ' para Tapas</span>'
-    +   '<span class="env-hdr-sub">Fichas activas · vs B2 · ' + escHtml(mesHdr) + '</span>'
+    +   '<span class="env-hdr-sub">Fichas activas · vs ' + bodegaTxt + ' · ' + escHtml(mesHdr) + '</span>'
     +   '<span class="env-hdr-fecha">' + fechaInv + '</span>'
     +   '<button class="env-refresh" onclick="event.stopPropagation();refrescarAlertasTapas(this)" title="Recargar inventario">↻</button>'
     +   '<span class="env-hdr-chev" style="margin-left:auto">▾</span>'
@@ -4249,6 +4260,7 @@ async function renderAlertasTapas() {
 async function refrescarAlertasTapas(btn) {
   if (btn) { btn.textContent = '…'; btn.disabled = true; }
   await cargarInventario();
+  await cargarInsumosB7(); // el stock del Liner sale de Bodega 7
   await renderAlertasTapas();
 }
 
