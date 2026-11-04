@@ -246,6 +246,10 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 /* Ficha que la supervisora marcó COMPLETADA: sigue visible al final del listado, transparente (pedCompletadaTag) */
 .ped-chip.completada{background:#F0FDF4;border-color:#16A34A;box-shadow:inset 3px 0 0 #16A34A;opacity:.65;transition:opacity .15s}
 .ped-chip.completada:hover,.ped-chip.completada.open{opacity:1}
+/* Ficha ABIERTA a la que ya se le entregó todo lo pedido (o más): no se oculta; se ve transparente y ámbar al final de su grupo. ESPEJO de .cp-chip.sobre de tapas.html */
+.ped-chip.sobre{background:#FFFBEB;border-color:#F59E0B;box-shadow:inset 3px 0 0 #F59E0B;opacity:.62;transition:opacity .15s}
+.ped-chip.sobre:hover,.ped-chip.sobre.open{opacity:1}
+.ped-sobre-tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#92400E;margin-bottom:2px}
 .ped-comp-tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#15803D;margin-bottom:2px}
 
 .ped-chip-t{display:flex;justify-content:space-between;gap:4px;font-size:11px;font-weight:800}
@@ -1931,6 +1935,7 @@ function pedModelo() {
     var completada = s.estado === 'lista' && tMarca > 0 && (Date.now() - tMarca) <= PED_COMPLETADAS_DIAS * 86400000;
     return { s: s, id: s.id, codigo: s.codigo || String(s.id).slice(0, 6), cliente: s.cliente_nombre || '—', cant: cant, entregado: entregado,
              completada: completada,
+             sobre: PED_VIVOS.indexOf(s.estado) >= 0 && cant > 0 && entregado >= cant,
              // lo entregado de verdad = ingresos PT con requi + lo reportado por Tapas que aún no tiene requi; "falta" = lo que resta del pedido
              entregadoTotal: entregado + parcSin, falta: Math.max(0, cant - entregado - parcSin),
              saldo: saldo, enProc: enProc, libre: Math.max(0, saldo - enProc), abiertos: abiertos, ings: ings,
@@ -1960,6 +1965,22 @@ function pedNum(n) { return (n || 0).toLocaleString(); }
 function pedCompletadaTexto(x) {
   return '✓ COMPLETADA' + (x.s.marcado_tapas_por ? ' · ' + pedCorto(x.s.marcado_tapas_por) : '') + (x.s.marcado_tapas_en ? ' · ' + pedFechaHoraCorta(x.s.marcado_tapas_en) : '');
 }
+// Ficha abierta con todo lo pedido ya entregado (con requi): sigue visible, transparente y ámbar. ESPEJO de chipSobreentregadoTapas (tapas.html)
+function pedChipSobre(x, conCliente) {
+  var idq = escHtml(String(x.id));
+  var extra = x.entregado > x.cant ? ' (' + pedNum(x.entregado - x.cant) + ' de más)' : '';
+  return '<div class="ped-chip sobre' + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
+    + '<span class="ped-sobre-tag">✓ ENTREGADO COMPLETO' + escHtml(extra) + ' · AÚN ABIERTA (la oficina la marca completada o amplía la cantidad)</span>'
+    + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
+    + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedComentBadge(x) + '</span><b title="Entregado / pedido" style="color:' + pedEntColor(x) + '">' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</b></div>'
+    + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
+    + pedNotaHtml(x.s.notas)
+    + '<div>' + pedComentBtn(x) + '</div>'
+    + pedParcChipHtml(x)
+    + '<div class="ped-acc"><button onclick="event.stopPropagation();abrirPedido(\'' + idq + '\')">Ver ficha</button></div>'
+    + '</div>';
+}
+
 function pedChipCompletada(x, conCliente) {
   var idq = escHtml(String(x.id));
   return '<div class="ped-chip completada' + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
@@ -2146,7 +2167,7 @@ function renderPedidos() {
 
   // 2) Todos los pedidos: por TIPO de tapa (default) o por cliente — idéntico a Fichas de Trabajo de tapas.html
   // Las COMPLETADAS por Tapas se muestran también (al final y transparentes) pero no cuentan como saldo por entregar
-  var visibles = m.filter(function(x) { return (x.viva && x.saldo > 0) || x.completada; });
+  var visibles = m.filter(function(x) { return (x.viva && x.saldo > 0) || x.sobre || x.completada; });
   var porCli = {}, clis = [];
   visibles.forEach(function(x) {
     if (!porCli[x.cliente]) { porCli[x.cliente] = []; clis.push(x.cliente); }
@@ -2161,12 +2182,13 @@ function renderPedidos() {
   var nivelStock = function(p) { return p.cubierta ? 2 : ((p.stock || 0) > 0 ? 1 : 0); };
   var ordenChips = function(a, b) {
     var pa = pedProducirInfo(a), pb = pedProducirInfo(b);
-    return ((a.completada ? 1 : 0) - (b.completada ? 1 : 0)) || (nivelStock(pa) - nivelStock(pb)) || ((pb.matOk ? 1 : 0) - (pa.matOk ? 1 : 0)) || (pb.producir - pa.producir) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at));
+    return (((a.completada || a.sobre) ? 1 : 0) - ((b.completada || b.sobre) ? 1 : 0)) || ((a.sobre ? 1 : 0) - (b.sobre ? 1 : 0)) || (nivelStock(pa) - nivelStock(pb)) || ((pb.matOk ? 1 : 0) - (pa.matOk ? 1 : 0)) || (pb.producir - pa.producir) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at));
   };
   var chip = function(x, conCliente) {
     var proc = x.abiertos.length > 0;
     var idq = escHtml(String(x.id));
     if (x.completada) return pedChipCompletada(x, conCliente);
+    if (x.sobre) return pedChipSobre(x, conCliente);
     return '<div class="ped-chip' + (proc ? ' proc' : '') + (pedProducirInfo(x).cubierta ? ' cubierta' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
       + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + pedEstadoBadge(x) + pedComentBadge(x) + '</span>' + pedEsquinaHtml(x) + '</div>'
@@ -2185,7 +2207,7 @@ function renderPedidos() {
   };
   // URGENTES SIEMPRE PRIMERO, en la vista que sea (Por tipo, Por cliente o Por prioridad): un bloque "🔴 Urgentes" arriba de todo con sus fichas,
   // y los grupos de abajo ya no las repiten (así no se pierden al cambiar de vista). ESPEJO de renderFichasCompactasTapas de tapas.html.
-  var esUrgTop = function(x) { return x.urgente && !x.completada; };
+  var esUrgTop = function(x) { return x.urgente && !x.completada && !x.sobre; };
   var noUrg = function(x) { return !esUrgTop(x); };
   var urgTop = visibles.filter(esUrgTop).sort(ordenChips);
   var bloqueUrgTop = function() {
@@ -2231,8 +2253,8 @@ function renderPedidos() {
     };
     if (!visibles.length) htmlGrid = '<div class="ped-vacio">No hay pedidos con saldo pendiente.</div>';
     else {
-      var urg = visibles.filter(function(x) { return x.urgente && !x.completada; }).sort(porFecha);
-      var resto = visibles.filter(function(x) { return !x.urgente || x.completada; }).sort(porFecha);
+      var urg = visibles.filter(function(x) { return x.urgente && !x.completada && !x.sobre; }).sort(porFecha);
+      var resto = visibles.filter(function(x) { return !x.urgente || x.completada || x.sobre; }).sort(porFecha);
       htmlGrid = (urg.length ? bloque('🔴 Urgentes', urg, ' urg') : '<div class="ped-vacio">No hay pedidos urgentes.</div>')
         + (resto.length ? bloque('Demás pedidos', resto, '') : '');
     }

@@ -479,6 +479,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 /* Ficha que la supervisora marcó COMPLETADA: sigue visible al final del listado, transparente */
 .cp-chip.completada{background:#F0FDF4;border-color:#16A34A;box-shadow:inset 3px 0 0 #16A34A;opacity:.65;transition:opacity .15s}
 .cp-chip.completada:hover,.cp-chip.completada.open{opacity:1}
+/* Ficha ABIERTA a la que ya se le entregó todo lo pedido (o más): no se oculta; se ve transparente y ámbar al final de su grupo, para decidir si se marca completada o se amplía la cantidad */
+.cp-chip.sobre{background:#FFFBEB;border-color:#F59E0B;box-shadow:inset 3px 0 0 #F59E0B;opacity:.62;transition:opacity .15s}
+.cp-chip.sobre:hover,.cp-chip.sobre.open{opacity:1}
+.cp-sobre-tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#92400E;margin-bottom:2px}
 .cp-parc{margin-top:6px;border:1px solid #FDE047;background:#FEFCE8;color:#854D0E;border-radius:7px;padding:4px 8px;font-size:11px;line-height:1.35}
 .cp-parc b{font-family:var(--mono)}
 .cp-parc .sr{color:#B45309;font-weight:800}
@@ -1988,6 +1992,7 @@ async function mostrarDetalle(id) {
   const cuerpo = `
       ${(s.lineas[0] && s.lineas[0].codigoCliente) ? `<div class="dc"><div class="dc-b" style="font-size:12px">🏷 Código del cliente: <b style="font-family:var(--mono)">${escHtml(s.lineas[0].codigoCliente)}</b></div></div>` : ''}
       ${s.notas ? `<div class="dc" style="border-color:#FDE047;border-width:2px"><div class="dc-h" style="background:#FEF9C3;color:#A16207">📝 Notas</div><div class="dc-b" style="white-space:pre-line;background:#FFFDF0">${escHtml(s.notas)}</div></div>` : ''}
+      ${bloqueSobreentregadaTapas(s)}
       ${bloqueMarcaTapasFicha(s)}
       ${bloqueParcialesTapas(s)}
       ${bloqueComentariosFicha(s)}
@@ -3988,6 +3993,12 @@ var COMPONENTES_ALERTA = [
 
 function fichaViva(s) { return ESTADOS_VIVOS_TAPAS.indexOf(s.estado) >= 0; }
 
+// Ficha ya ENTREGADA en cantidad (requis de ingreso PT + lo reportado por Tapas ≥ lo pedido) aunque siga abierta: ya no necesita componentes,
+// así que no cuenta en las alertas de Bajo Stock. Se ve en Fichas de Trabajo como "ENTREGADO COMPLETO".
+function fichaYaEntregadaTapas(s) {
+  return s.cant > 0 && entregadoTotalFichaTapas(s) >= s.cant;
+}
+
 // Busca un SKU en inventario dando prioridad a Bodega 2 (igual que serigrafia.html)
 function invB2DeTapas(sku) {
   return inventarioCache.find(function(i) { return i.sku === sku && (!i.bodega || i.bodega === 'B2'); })
@@ -4066,7 +4077,7 @@ function tipoDeAlertaTapas(tipos, descComp) {
 function calcularFilasAlertaTapas(comp, salidas) {
   var mapa = {};
   solicitudes.forEach(function(s) {
-    if (!fichaViva(s)) return;
+    if (!fichaViva(s) || fichaYaEntregadaTapas(s)) return;
     s.lineas.forEach(function(l) {
       if ((l.estado || s.estado) === 'lista') return;
       var k = String(l[comp.campo] || '').trim();
@@ -4178,7 +4189,7 @@ function buildAlertaComponenteTapas(comp, rows) {
   if (comp.huecos) {
     var huecos = [];
     solicitudes.forEach(function(s) {
-      if (!fichaViva(s)) return;
+      if (!fichaViva(s) || fichaYaEntregadaTapas(s)) return;
       s.lineas.forEach(function(l) {
         if ((l.estado || s.estado) === 'lista') return;
         if (!String(l[comp.campo] || '').trim()) huecos.push((s.id_display || s.id.slice(0, 8)) + ' · ' + (s.cliente || '?'));
@@ -4563,6 +4574,46 @@ function entregadoTotalFichaTapas(s) {
   return ent + parcialesDeFicha(s).sinRequi;
 }
 
+// Ficha ABIERTA con todo lo pedido ya entregado (con requi): en la ventana de la ficha, las dos salidas — darla por completada o ampliar la cantidad
+function bloqueSobreentregadaTapas(s) {
+  if (!fichaViva(s) || !(s.cant > 0)) return '';
+  var ent = ingresoMovs.filter(function(m) { return m.solicitud_id === s.id && m.area !== 'serig'; })
+    .reduce(function(a, m) { return a + (m.cantidad || 0); }, 0);
+  if (ent < s.cant) return '';
+  var idq = escHtml(String(s.id));
+  return '<div class="dc" style="border-color:#F59E0B;border-width:2px"><div class="dc-h" style="background:#FEF3C7;color:#92400E">'
+    + '✓ Ya se entregó todo lo pedido · ' + ent.toLocaleString() + '/' + s.cant.toLocaleString() + (ent > s.cant ? ' (' + (ent - s.cant).toLocaleString() + ' de más)' : '') + '</div>'
+    + '<div class="dc-b" style="font-size:12px">La ficha sigue abierta. Si el pedido terminó, márcala completada; si el cliente pidió más, amplía la cantidad.'
+    + '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
+    + '<button class="btn btn-g btn-xs" onclick="completarFichaTapas(\'' + idq + '\')">✅ Marcar completada</button>'
+    + '<button class="btn btn-xs" onclick="editarFichaTapas(\'' + idq + '\')">✏️ Ampliar cantidad</button>'
+    + '</div></div></div>';
+}
+
+// Master da por COMPLETADA la ficha: estado 'lista' + marca de quién/cuándo, así sigue visible 15 días (transparente, verde) como las que marca Tapas
+async function completarFichaTapas(id) {
+  var s = solicitudes.find(function(x) { return x.id === id; });
+  if (!s) return;
+  if (!confirm('¿Marcar ' + (s.id_display || 'la ficha') + ' como COMPLETADA?')) return;
+  var quien = (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || 'Master';
+  var ahora = new Date().toISOString();
+  var r1 = await db.from('solicitudes').update({ estado: 'lista', marcado_tapas_por: quien, marcado_tapas_en: ahora }).eq('id', s.dbId).select('id');
+  if (r1.error || !(r1.data || []).length) { showToast('❌ ' + (r1.error ? r1.error.message : 'No se pudo marcar (sin permiso)'), '#B83232'); return; }
+  var ids = (s.lineas || []).map(function(l) { return l.id; }).filter(Boolean);
+  if (ids.length) {
+    var r2 = await db.from('solicitud_lineas').update({ estado: 'lista' }).in('id', ids);
+    if (r2.error) { showToast('❌ ' + r2.error.message, '#B83232'); return; }
+  }
+  s.estado = 'lista'; s.prog = 100; s.marcadoTapasPor = quien; s.marcadoTapasEn = ahora;
+  (s.lineas || []).forEach(function(l) { l.estado = 'lista'; });
+  renderListas();
+  if (typeof renderFichasTapas === 'function') renderFichasTapas();
+  if (typeof renderAlertasTapas === 'function') renderAlertasTapas();
+  if (selId) mostrarDetalle(selId);
+  if (fichaModalId) mostrarDetalle(fichaModalId);
+  showToast('✅ Ficha marcada como completada');
+}
+
 function bloqueMarcaTapasFicha(s) {
   if (!s.marcadoTapasPor && !s.marcadoTapasEn) return '';
   if (s.estado !== 'lista' && s.estado !== 'parcial') return '';
@@ -4852,8 +4903,24 @@ function chipCompletadoTapas(x, conCliente) {
     + '</div>';
 }
 
+// Ficha abierta con todo lo pedido ya entregado (con requi): sigue visible, transparente y ámbar
+function chipSobreentregadoTapas(x, conCliente) {
+  var idq = escHtml(String(x.id));
+  var extra = x.ent > x.cant ? ' (' + (x.ent - x.cant).toLocaleString() + ' de más)' : '';
+  return '<div class="cp-chip sobre' + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
+    + '<span class="cp-sobre-tag">✓ ENTREGADO COMPLETO' + escHtml(extra) + ' · AÚN ABIERTA: ábrela para marcarla completada o ampliar la cantidad</span>'
+    + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
+    + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + comentBadgeHtml(x.s) + '</span><b title="Entregado / pedido" style="color:' + entColorTapas(x.s) + '">' + entregadoTotalFichaTapas(x.s).toLocaleString() + '/' + x.cant.toLocaleString() + '</b></div>'
+    + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
+    + notaChipHtml(x.s.notas)
+    + entregasChipHtml(x.s)
+    + '<div class="cp-acc"><button onclick="event.stopPropagation();abrirFichaTapas(\'' + idq + '\')">Ver detalle de la ficha</button></div>'
+    + '</div>';
+}
+
 function buildChipCompacto(x, conCliente) {
   if (x.completada) return chipCompletadoTapas(x, conCliente);
+  if (x.sobre) return chipSobreentregadoTapas(x, conCliente);
   var enProc = x.abiertos.length > 0;
   var idq = escHtml(String(x.id));
   return '<div class="cp-chip' + (enProc ? ' proc' : '') + (x.cubierta ? ' cubierta' : '') + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
@@ -4883,7 +4950,7 @@ function nivelStockChip(x) {
 // Base y Contratapa suficientes (se pueden fabricar hoy; el Liner no cuenta) antes que las que no · 3) las que MÁS falta fabricar
 // primero · 4) fecha límite más cercana · 5) antigüedad
 function ordenChipsCompactos(a, b) {
-  return ((a.completada ? 1 : 0) - (b.completada ? 1 : 0)) || (nivelStockChip(a) - nivelStockChip(b)) || ((b.matOk ? 1 : 0) - (a.matOk ? 1 : 0)) || (b.producir - a.producir) || (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt));
+  return (((a.completada || a.sobre) ? 1 : 0) - ((b.completada || b.sobre) ? 1 : 0)) || ((a.sobre ? 1 : 0) - (b.sobre ? 1 : 0)) || (nivelStockChip(a) - nivelStockChip(b)) || ((b.matOk ? 1 : 0) - (a.matOk ? 1 : 0)) || (b.producir - a.producir) || (a.s.fechaLimite || '9999').localeCompare(b.s.fechaLimite || '9999') || String(a.s.createdAt).localeCompare(String(b.s.createdAt));
 }
 
 function modeloFichasCompactas() {
@@ -4913,6 +4980,7 @@ function modeloFichasCompactas() {
              sku: l0.sku || '', descSola: (s.lineas.length > 1 ? (l0.desc || '') + ' (+' + (s.lineas.length - 1) + ')' : (l0.desc || s.desc || '')),
              desc: (l0.sku ? l0.sku + ' · ' : '') + (s.lineas.length > 1 ? (l0.desc || '') + ' (+' + (s.lineas.length - 1) + ')' : (l0.desc || s.desc || '')),
              viva: fichaViva(s),
+             sobre: fichaViva(s) && s.cant > 0 && ent >= s.cant,
              completada: s.estado === 'lista' && !!s.marcadoTapasEn && (Date.now() - new Date(s.marcadoTapasEn).getTime()) <= COMPLETADAS_DIAS_TAPAS * 86400000 };
   }).map(function(x) {
     // Stock del PRODUCTO TERMINADO (SKU principal, B2) frente al saldo: cuánto falta FABRICAR y si el stock ya lo cubre todo
@@ -4957,7 +5025,7 @@ function renderFichasCompactasTapas() {
   var modelo = modeloFichasCompactas();
   var vivas = modelo.filter(function(x) { return x.viva && x.saldo > 0; });
   // Las COMPLETADAS por Tapas se muestran también (al final y transparentes) pero no cuentan como saldo por entregar
-  var visibles = modelo.filter(function(x) { return (x.viva && x.saldo > 0) || x.completada; });
+  var visibles = modelo.filter(function(x) { return (x.viva && x.saldo > 0) || x.sobre || x.completada; });
   var saldoVivo = function(x) { return x.completada ? 0 : x.saldo; };
 
   var proc = [];
@@ -4981,7 +5049,7 @@ function renderFichasCompactasTapas() {
 
   // URGENTES SIEMPRE PRIMERO, en la vista que sea (Por tipo, Por cliente o Por prioridad): un bloque "🔴 Urgentes" arriba de todo con sus fichas,
   // y los grupos de abajo ya no las repiten (así no se pierden al cambiar de vista). ESPEJO de registro-tapas.html.
-  var esUrgTop = function(x) { return x.s.prio === 'urgente' && !x.completada; };
+  var esUrgTop = function(x) { return x.s.prio === 'urgente' && !x.completada && !x.sobre; };
   var noUrg = function(x) { return !esUrgTop(x); };
   var urgTop = visibles.filter(esUrgTop).sort(ordenChipsCompactos);
   var bloqueUrgTop = function() {
@@ -5031,8 +5099,8 @@ function renderFichasCompactasTapas() {
     var esUrg = function(x) { return x.s.prio === 'urgente'; };
     if (!visibles.length) cuerpo = '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>';
     else {
-      var urg = visibles.filter(function(x) { return esUrg(x) && !x.completada; }).sort(porFecha);
-      var resto = visibles.filter(function(x) { return !esUrg(x) || x.completada; }).sort(porFecha);
+      var urg = visibles.filter(function(x) { return esUrg(x) && !x.completada && !x.sobre; }).sort(porFecha);
+      var resto = visibles.filter(function(x) { return !esUrg(x) || x.completada || x.sobre; }).sort(porFecha);
       cuerpo = (urg.length ? bloque('🔴 Urgentes', urg, ' urg') : '<div class="empty" style="padding:16px;text-align:center;color:var(--gray)">No hay pedidos urgentes</div>')
         + (resto.length ? bloque('Demás pedidos', resto, '') : '');
     }
