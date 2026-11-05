@@ -415,6 +415,28 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-modo{display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
 .cp-modo button{border:none;background:var(--card);padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--gray)}
 .cp-modo button.act{background:var(--teal);color:#fff}
+/* Buscador de fichas (encabezado de Fichas de Trabajo): el desplegable es position:fixed porque .fich-wrap recorta con overflow:hidden */
+.fich-bus{position:relative;flex:1 1 260px;max-width:380px;min-width:170px;margin-left:auto}
+.fich-bus input{width:100%;box-sizing:border-box;padding:6px 26px 6px 28px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;background:#fff;color:var(--ink);font-family:inherit}
+.fich-bus input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 2px rgba(26,107,91,.15)}
+.fich-bus .fb-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;pointer-events:none;opacity:.7}
+.fich-bus .fb-x{position:absolute;right:5px;top:50%;transform:translateY(-50%);border:0;background:none;color:#9ca3af;cursor:pointer;font-size:13px;line-height:1;padding:3px 5px}
+.fich-dd{position:fixed;z-index:10002;background:#fff;border:1px solid #D5D3CC;border-radius:10px;box-shadow:0 8px 26px rgba(0,0,0,.2);overflow:hidden;font-size:12px}
+.fich-dd-b{max-height:min(420px,60vh);overflow:auto}
+.fich-dd-r{padding:7px 12px;border-bottom:1px solid #F0EEE8;cursor:pointer}
+.fich-dd-r:hover,.fich-dd-r.sel{background:#E8F4F1}
+.fich-dd-r .l1{display:flex;align-items:baseline;gap:8px}
+.fich-dd-r .fi{font-family:var(--mono);font-weight:800;color:var(--teal)}
+.fich-dd-r .cl{font-weight:600;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.fich-dd-r .u{margin-left:auto;font-family:var(--mono);font-weight:700;color:#1f2937;white-space:nowrap}
+.fich-dd-r .l2{color:#6B6B6A;font-size:11px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fich-dd-r .bd{font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:8px;white-space:nowrap}
+.fich-dd-r .bd.ok{background:#DCFCE7;color:#166534}
+.fich-dd-r .bd.am{background:#FEF3C7;color:#92400E}
+.fich-dd-r .bd.az{background:#DBEAFE;color:#1E40AF}
+.fich-dd-r .bd.gr{background:#EEF0F2;color:#4B5563}
+.fich-dd-f{padding:6px 12px;color:#6B6B6A;font-size:10.5px;background:#FAFAF8}
+.fich-dd-0{padding:14px 12px;color:#6B6B6A;text-align:center}
 .cp-resumen{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px}
 .cp-res{border:1.5px solid var(--border);background:var(--card);border-radius:10px;padding:5px 10px;cursor:pointer;line-height:1.2}
 .cp-res:hover{border-color:var(--teal)}
@@ -571,6 +593,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   .fich-title{font-size:14px}
   .fich-body{padding:8px}
   .cp-modo button{padding:7px 12px;font-size:12px}
+  .fich-bus{flex:1 1 100%;max-width:none;order:9}
+  .fich-bus input{padding:9px 28px 9px 30px;font-size:14px}
   .cp-proc{grid-template-columns:minmax(0,1fr)}
   .cp-grid{grid-template-columns:minmax(0,1fr) !important}
   .cp-tipo-c{grid-template-columns:minmax(0,1fr);padding:6px}
@@ -5019,9 +5043,160 @@ function tareasResumenCompacto(tareas) {
   return ult.join(' | ') + (tareas.length > 2 ? ' (+' + (tareas.length - 2) + ')' : '');
 }
 
+// ── Buscador de fichas (nov/2026): escribe palabras o números y se despliegan las fichas que coinciden — por No. de ficha (T-059, 59),
+// SKU (del producto o de sus componentes), descripción, cliente o código del cliente. Todas las palabras escritas deben aparecer
+// (sin importar mayúsculas ni tildes). Clic en una opción = abre la ficha. Busca en TODAS las fichas, también completadas.
+var fichasBuscar = '';
+var fichBusSel = -1;      // opción resaltada con las flechas
+var fichBusIds = [];      // ids de las opciones mostradas
+var fichBusListo = false; // listeners globales ya puestos
+
+function fichBusHay(s) {
+  var cod = String(s.id_display || '');
+  var num = cod.replace(/\D/g, '').replace(/^0+/, '');
+  var partes = [cod, cod.replace(/-/g, ''), num ? 't-' + num : '', num ? 't' + num : '', num, 'ficha pedido', s.cliente || ''];
+  (s.lineas || []).forEach(function(l) {
+    partes.push(l.sku || '', l.desc || '', l.skuBase || '', l.skuContratapa || '', l.skuLiner || '', l.skuBanda || '', l.codigoCliente || '');
+  });
+  return normBusqueda(partes.join(' '));
+}
+
+function fichBusResultados(q) {
+  var toks = normBusqueda(q).split(/[\s,;]+/).filter(Boolean);
+  if (!toks.length) return [];
+  var res = [];
+  solicitudes.forEach(function(s) {
+    var hay = fichBusHay(s);
+    for (var i = 0; i < toks.length; i++) if (hay.indexOf(toks[i]) < 0) return;
+    var cod = normBusqueda(s.id_display || '');
+    var num = cod.replace(/\D/g, '').replace(/^0+/, '');
+    var score = 2;
+    toks.forEach(function(t) {
+      if (t === cod || t === cod.replace(/-/g, '') || (num && (t === num || t === 't' + num || t === 't-' + num))) score = Math.min(score, 0);
+      else if ((s.lineas || []).some(function(l) { return normBusqueda(l.sku || '').indexOf(t) === 0; })) score = Math.min(score, 1);
+    });
+    res.push({ s: s, score: score, viva: fichaViva(s) ? 0 : 1 });
+  });
+  res.sort(function(a, b) {
+    return a.viva - b.viva || a.score - b.score || String(b.s.id_display || '').localeCompare(String(a.s.id_display || ''));
+  });
+  return res;
+}
+
+function fichBusBadge(s) {
+  var ent = entregadoTotalFichaTapas(s);
+  if (s.estado === 'lista') return '<span class="bd ok">✓ Completada</span>';
+  if (fichaViva(s) && s.cant > 0 && ent >= s.cant) return '<span class="bd am">Entregada · abierta</span>';
+  if (s.estado === 'proceso') return '<span class="bd az">En proceso</span>';
+  if (s.estado === 'parcial') return '<span class="bd am">Parcial</span>';
+  if (fichaViva(s)) return '<span class="bd gr">Pendiente</span>';
+  return '<span class="bd gr">' + escHtml(s.estado || '—') + '</span>';
+}
+
+function fichBusFilaHtml(r, i) {
+  var s = r.s, l0 = (s.lineas && s.lineas[0]) || {};
+  var ent = entregadoTotalFichaTapas(s);
+  return '<div class="fich-dd-r' + (i === fichBusSel ? ' sel' : '') + '" data-i="' + i + '" data-id="' + escHtml(String(s.id)) + '" onmousedown="event.preventDefault();fichBuscarElegir(this.dataset.id)">'
+    + '<div class="l1"><span class="fi">' + escHtml(s.id_display || '—') + '</span><span class="cl">' + escHtml(s.cliente || '—') + '</span>' + fichBusBadge(s)
+    + '<span class="u" title="Entregado / pedido">' + ent.toLocaleString() + '/' + (s.cant || 0).toLocaleString() + '</span></div>'
+    + '<div class="l2">' + escHtml((l0.sku && l0.sku !== '—' ? l0.sku + ' · ' : '') + (s.desc || l0.desc || '')) + '</div></div>';
+}
+
+function fichBuscarCerrar() {
+  var d = document.getElementById('fichBuscarDd');
+  if (d) d.remove();
+  fichBusSel = -1; fichBusIds = [];
+}
+
+function fichBuscarMostrar() {
+  var inp = document.getElementById('fichBuscar');
+  if (!inp) return;
+  if (!fichBusListo) {
+    fichBusListo = true;
+    document.addEventListener('mousedown', function(e) {
+      var d = document.getElementById('fichBuscarDd'), i = document.getElementById('fichBuscar');
+      if (d && !d.contains(e.target) && e.target !== i) fichBuscarCerrar();
+    }, true);
+    window.addEventListener('scroll', function(e) {
+      var d = document.getElementById('fichBuscarDd');
+      if (d && !d.contains(e.target)) fichBuscarCerrar();
+    }, true);
+    window.addEventListener('resize', fichBuscarCerrar);
+  }
+  var q = inp.value;
+  if (!normBusqueda(q).trim()) { fichBuscarCerrar(); return; }
+  var res = fichBusResultados(q), MAX = 15;
+  var mostrar = res.slice(0, MAX);
+  fichBusIds = mostrar.map(function(r) { return String(r.s.id); });
+  if (fichBusSel >= fichBusIds.length) fichBusSel = -1;
+  var d = document.getElementById('fichBuscarDd');
+  if (!d) { d = document.createElement('div'); d.id = 'fichBuscarDd'; d.className = 'fich-dd'; document.body.appendChild(d); }
+  d.innerHTML = mostrar.length
+    ? '<div class="fich-dd-b">' + mostrar.map(fichBusFilaHtml).join('') + '</div>'
+      + '<div class="fich-dd-f">' + res.length + ' ficha' + (res.length !== 1 ? 's' : '') + ' coinciden' + (res.length > MAX ? ' · mostrando las primeras ' + MAX + ': escribe más para afinar' : '') + '</div>'
+    : '<div class="fich-dd-0">Ninguna ficha coincide con “' + escHtml(q.trim()) + '”</div>';
+  var b = inp.getBoundingClientRect();
+  var w = Math.min(Math.max(b.width, 380), window.innerWidth - 16);
+  d.style.width = w + 'px';
+  d.style.left = Math.max(8, Math.min(b.left, window.innerWidth - w - 8)) + 'px';
+  d.style.top = (b.bottom + 4) + 'px';
+}
+
+function fichBuscarInput(v) {
+  fichasBuscar = v;
+  fichBusSel = -1;
+  var x = document.querySelector('.fich-bus .fb-x');
+  if (x) x.style.display = v ? '' : 'none';
+  fichBuscarMostrar();
+}
+
+function fichBuscarKey(e) {
+  var d = document.getElementById('fichBuscarDd');
+  if (e.key === 'Escape') { fichBuscarCerrar(); return; }
+  if (!d) { if (e.key === 'ArrowDown') fichBuscarMostrar(); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!fichBusIds.length) return;
+    fichBusSel = e.key === 'ArrowDown' ? (fichBusSel + 1) % fichBusIds.length : (fichBusSel <= 0 ? fichBusIds.length - 1 : fichBusSel - 1);
+    d.querySelectorAll('.fich-dd-r').forEach(function(el) {
+      var on = Number(el.dataset.i) === fichBusSel;
+      el.classList.toggle('sel', on);
+      if (on) el.scrollIntoView({ block: 'nearest' });
+    });
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (fichBusIds.length) fichBuscarElegir(fichBusIds[fichBusSel >= 0 ? fichBusSel : 0]);
+  }
+}
+
+function fichBuscarElegir(id) {
+  fichBuscarCerrar();
+  abrirFichaTapas(id);
+}
+
+function fichBuscarLimpiar() {
+  fichasBuscar = '';
+  var inp = document.getElementById('fichBuscar');
+  if (inp) { inp.value = ''; inp.focus(); }
+  var x = document.querySelector('.fich-bus .fb-x');
+  if (x) x.style.display = 'none';
+  fichBuscarCerrar();
+}
+
+function fichBuscarHtml() {
+  return '<span class="fich-bus"><span class="fb-ico">🔍</span>'
+    + '<input id="fichBuscar" type="text" autocomplete="off" spellcheck="false" placeholder="Buscar ficha: No., SKU o descripción…" value="' + escHtml(fichasBuscar) + '"'
+    + ' oninput="fichBuscarInput(this.value)" onfocus="fichBuscarMostrar()" onkeydown="fichBuscarKey(event)">'
+    + '<button class="fb-x" title="Limpiar" style="' + (fichasBuscar ? '' : 'display:none') + '" onclick="fichBuscarLimpiar()">✕</button></span>';
+}
+
 function renderFichasCompactasTapas() {
   var wrap = document.getElementById('fichasTapas');
   if (!wrap) return;
+  // El bloque se repinta solo (refrescos, cambios de vista): si se estaba escribiendo en el buscador, conservar el foco y el cursor
+  var ae = document.activeElement;
+  var busEnfocado = !!(ae && ae.id === 'fichBuscar');
+  var busCursor = busEnfocado ? ae.selectionStart : 0;
   var modelo = modeloFichasCompactas();
   var vivas = modelo.filter(function(x) { return x.viva && x.saldo > 0; });
   // Las COMPLETADAS por Tapas se muestran también (al final y transparentes) pero no cuentan como saldo por entregar
@@ -5123,7 +5298,8 @@ function renderFichasCompactasTapas() {
   wrap.innerHTML = '<div class="fich-wrap">'
     + '<div class="fich-hdr"><span class="fich-title">📋 Fichas de Trabajo</span>'
     +   '<span class="fich-count">' + vivas.length + ' pedido' + (vivas.length !== 1 ? 's' : '') + ' con saldo · ' + clis.length + ' cliente' + (clis.length !== 1 ? 's' : '') + '</span>'
-    +   '<span class="cp-modo" style="margin-left:auto"><button class="' + (fichasAgrupar === 'tipo' ? 'act' : '') + '" onclick="setFichasAgrupar(\'tipo\')">Por tipo</button>'
+    +   fichBuscarHtml()
+    +   '<span class="cp-modo"><button class="' + (fichasAgrupar === 'tipo' ? 'act' : '') + '" onclick="setFichasAgrupar(\'tipo\')">Por tipo</button>'
     +   '<button class="' + (fichasAgrupar === 'cliente' ? 'act' : '') + '" onclick="setFichasAgrupar(\'cliente\')">Por cliente</button>'
     +   '<button class="' + (fichasAgrupar === 'prioridad' ? 'act' : '') + '" onclick="setFichasAgrupar(\'prioridad\')">Por prioridad</button></span>'
     +   '<button class="btn btn-t btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button></div>'
@@ -5131,6 +5307,12 @@ function renderFichasCompactasTapas() {
     + (proc.length ? '<div class="cp-sec clic' + cpCol('proc') + '"' + cpClic('proc') + '><span class="cp-chev">▾</span>🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc.replace('class="cp-proc"', 'class="cp-proc' + cpCol('proc') + '"') : '')
     + cuerpo
     + '</div></div>';
+  if (busEnfocado) {
+    var inp = document.getElementById('fichBuscar');
+    if (inp) { inp.focus(); try { inp.setSelectionRange(busCursor, busCursor); } catch (e) {} }
+  } else {
+    fichBuscarCerrar(); // el input se recreó: un desplegable abierto quedaría huérfano
+  }
 }
 
 function renderFichasTapas() {
