@@ -641,6 +641,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .mtx-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .mtx-hdr-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--teal)}
 .mtx-hdr-sub{font-size:11px;color:var(--gray-l)}
+.mtx-nav{margin-left:auto;display:inline-flex;align-items:center;gap:4px}
+.mtx-nav button{border:1.5px solid var(--border);background:var(--card);color:var(--teal);font-weight:800;border-radius:7px;padding:3px 10px;font-size:13px;cursor:pointer;line-height:1.2}
+.mtx-nav button:hover:not(:disabled){background:var(--teal-xl)}
+.mtx-nav button:disabled{opacity:.35;cursor:default}
+.mtx-nav .mtx-mes{min-width:118px;text-align:center;font-weight:800;font-size:13px;color:var(--ink)}
+.mtx-nav .mtx-hoy{font-size:11px;padding:4px 9px}
 .term-row{display:grid;grid-template-columns:190px 1fr auto;align-items:center;gap:10px;padding:9px 12px;margin-top:6px;cursor:pointer;border-radius:8px;border:1.5px solid #C8C6C0;background:#fff;transition:border-color .12s,box-shadow .12s}
 .term-row:hover{border-color:var(--teal);box-shadow:0 1px 6px rgba(26,107,91,.18)}
 .term-row-open{border-color:var(--teal);border-bottom-left-radius:0;border-bottom-right-radius:0;box-shadow:none!important}
@@ -3532,6 +3538,21 @@ var termComandasTodas = [];  // incluye por aprobar/rechazadas — el bloque dia
 var termAsistencia = {};     // { codigo: { fecha: estado } } del mes — distingue ausente de "no registró"
 var termProcesosPorOperario = {}; // { codigo: { proceso: unidades } } — para el desglose al hacer clic
 var termExpandidoCodigo = null;   // codigo del operario con el desglose abierto, o null
+var termMes = '';                // mes que muestra el bloque ('YYYY-MM'); vacío = el mes en curso. Se cambia con ‹ › en el encabezado
+var termCargaId = 0;             // descarta respuestas atrasadas si se cambia de mes varias veces seguidas
+function termMesActual() { return termMes || fechaHoy().slice(0, 7); }
+function navegarTermMes(delta) {
+  var cur = termMesActual();
+  var y = parseInt(cur.slice(0, 4), 10), m = parseInt(cur.slice(5, 7), 10) - 1 + delta;
+  y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+  var nuevo = y + '-' + String(m + 1).padStart(2, '0');
+  var hoyYm = fechaHoy().slice(0, 7);
+  if (nuevo > hoyYm) return; // no hay producción en meses que no han llegado
+  termMes = (nuevo === hoyYm) ? '' : nuevo;
+  termProcAbiertos = {};     // los procesos abiertos eran del mes anterior; el operario y el historial se conservan
+  cargarTermometro();
+}
+function termMesHoy() { if (termMes) { termMes = ''; termProcAbiertos = {}; cargarTermometro(); } }
 
 // Agrupa comandas+comanda_tareas por operario. Reutilizado por Productividad
 // (prodPorOperario) y por el termómetro de Inicio — misma lógica, dos
@@ -3580,30 +3601,37 @@ function agruparPorOperarioYProceso(comandas) {
 
 async function cargarTermometro() {
   var wrap = document.getElementById('termometroWrap');
-  if (wrap) wrap.innerHTML = '<div class="mtx-wrap"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>';
-  var r = rangoMes();
+  var miCarga = ++termCargaId;
+  // Si ya hay algo pintado (cambio de mes), no se vacía el bloque: se atenúa mientras llega el mes nuevo, así la página no salta
+  if (wrap) {
+    if (wrap.querySelector('.term-row, .empty')) wrap.style.opacity = '.5';
+    else wrap.innerHTML = '<div class="mtx-wrap"><div class="loading"><div class="spinner"></div><div>Cargando…</div></div></div>';
+  }
+  var r = rangoMes(termMesActual());
+  var comandasMes = [], termAsisMes = {};
   try {
     var res = await db.from('comandas')
       .select('*, comanda_tareas(proceso, cantidad, unidades_completadas, estado, tapa_sku, tapa_desc)')
       .gte('fecha', r.desde).lte('fecha', r.hasta);
     if (res.error) throw res.error;
-    termComandasTodas = res.data || [];
-    termComandas = termComandasTodas.filter(comandaCuenta);
+    comandasMes = res.data || [];
   } catch(e) {
     console.error('cargarTermometro:', e);
-    termComandasTodas = [];
-    termComandas = [];
+    comandasMes = [];
   }
   // Asistencia del mes: sirve para distinguir "no subió producción" de "estuvo ausente"
-  termAsistencia = {};
   try {
     var ra = await db.from('asistencia_diaria').select('fecha,operador_codigo,estado')
       .eq('area', 'tapas').eq('turno', 'dia').gte('fecha', r.desde).lte('fecha', r.hasta);
     (ra.data || []).forEach(function(row) {
-      if (!termAsistencia[row.operador_codigo]) termAsistencia[row.operador_codigo] = {};
-      termAsistencia[row.operador_codigo][row.fecha] = row.estado;
+      if (!termAsisMes[row.operador_codigo]) termAsisMes[row.operador_codigo] = {};
+      termAsisMes[row.operador_codigo][row.fecha] = row.estado;
     });
-  } catch(e) { termAsistencia = {}; }
+  } catch(e) { termAsisMes = {}; }
+  if (miCarga !== termCargaId) return; // se pidió otro mes mientras tanto: esta respuesta ya no sirve
+  termComandasTodas = comandasMes;
+  termComandas = termComandasTodas.filter(comandaCuenta);
+  termAsistencia = termAsisMes;
   termProcesosPorOperario = agruparPorOperarioYProceso(termComandas);
   renderTermometro();
 }
@@ -3663,7 +3691,7 @@ function metaDiaTapas(fecha) {
 var ALTO_BARRAS_DIA = 180; // px de la barra más alta posible; el gráfico mide 210px
 
 function buildTermDiario(o) {
-  var r = rangoMes();
+  var r = rangoMes(termMesActual());
   var ym = r.desde.slice(0, 7);
   var ultimo = parseInt(r.hasta.slice(8, 10), 10);
   var hoy = fechaHoy();
@@ -3986,20 +4014,36 @@ function renderTermometro() {
 
   var ops = (personalData && personalData.tapas ? personalData.tapas : [])
     .filter(function(p) { return p.activo; })
-    .map(function(p) { return { codigo: p.codigo, nombre: p.nombre, und: byCodigo[p.codigo] || 0, fecha_inicio: p.fecha_inicio || null, fecha_baja: p.fecha_baja || null }; })
-    .sort(function(a, b) { return b.und - a.und; });
+    .map(function(p) { return { codigo: p.codigo, nombre: p.nombre, und: byCodigo[p.codigo] || 0, fecha_inicio: p.fecha_inicio || null, fecha_baja: p.fecha_baja || null }; });
+  // En un mes pasado: quien aún no había ingresado no aparece, y quien produjo ese mes pero hoy ya no está activo sí (el personal cargado es solo el activo)
+  var rm = rangoMes(termMesActual());
+  ops = ops.filter(function(o) { return !o.fecha_inicio || o.fecha_inicio <= rm.hasta; });
+  var conocidos = {};
+  ops.forEach(function(o) { conocidos[o.codigo] = true; });
+  agruparComandasPorOperario(termComandas).forEach(function(o) {
+    if (!conocidos[o.codigo] && o.und > 0) ops.push({ codigo: o.codigo, nombre: o.nombre, und: o.und, fecha_inicio: null, fecha_baja: null, inactivo: true });
+  });
+  ops.sort(function(a, b) { return b.und - a.und; });
 
   var maxUnd = ops.length ? ops[0].und : 0;
-  var mesNombre = new Date(fechaHoy() + 'T12:00:00').toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+  var ymSel = termMesActual();
+  var mesNombre = new Date(ymSel + '-15T12:00:00').toLocaleDateString('es-GT', { month: 'long', year: 'numeric' });
+  mesNombre = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1);
+  var esActual = ymSel === fechaHoy().slice(0, 7);
 
   var html = '<div class="mtx-wrap">'
     + '<div class="mtx-hdr"><span class="mtx-hdr-title">👥 Personal y Roles</span>'
-    + '<span class="mtx-hdr-sub">Producción de ' + mesNombre + ' por operario · clic en un nombre para ver su producción diaria y su habilidad por proceso y tapa</span></div>';
+    + '<span class="mtx-hdr-sub">Producción de ' + mesNombre + ' por operario · clic en un nombre para ver su producción diaria y su habilidad por proceso y tapa</span>'
+    + '<span class="mtx-nav"><button onclick="navegarTermMes(-1)" title="Mes anterior">‹</button>'
+    + '<span class="mtx-mes">' + escHtml(mesNombre) + '</span>'
+    + '<button onclick="navegarTermMes(1)" title="Mes siguiente"' + (esActual ? ' disabled' : '') + '>›</button>'
+    + (esActual ? '' : '<button class="mtx-hoy" onclick="termMesHoy()" title="Volver al mes en curso">Hoy</button>') + '</span></div>';
   html += ops.length
     ? ops.map(function(o) { return buildTermometroRow(o, maxUnd); }).join('')
     : '<div class="empty">📭 No hay operarios activos en Tapas</div>';
   html += '</div>';
   wrap.innerHTML = html;
+  wrap.style.opacity = '';
 }
 
 // ══ INICIO — ALERTAS DE BAJO STOCK (Base / Contratapa) ═══════

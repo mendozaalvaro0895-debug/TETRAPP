@@ -182,7 +182,8 @@ view-inicio      HUB default (vaciado sep/2026, ahora "lo más parecido a serigr
     consulta a asistencia_diaria se amplía ±5 días fuera del mes para traer esos datos
     (ya no usa el helper compartido `rangoMes()`, calcula el rango manual con
     `fmtISOTapas()` para no afectar Productividad/Trazabilidad que sí lo usan).
-  2) "👥 Personal y Roles" (termómetro; incluye a supervisión desde oct/2026 porque también registra producción; NO es el tablero drag-drop de serigrafia.html
+  2) "👥 Personal y Roles" — SELECTOR DE MES (nov/2026, solo tapas.html): el encabezado trae ‹ Mes año › (+ "Hoy" cuando se mira un mes pasado; no se puede avanzar más allá del mes en curso) — `termMes`/`navegarTermMes`/`termMesHoy`; `cargarTermometro` y `buildTermDiario` leen `rangoMes(termMesActual())`, así el barrido diario, la meta (`metaDiaTapas(mes)`), el desglose por proceso y el historial muestran el mes elegido; el operario desplegado y su historial se conservan al cambiar de mes (los procesos abiertos se cierran); en un mes pasado también aparece quien produjo ese mes y hoy ya no está activo (el personal cargado es solo el activo) y se omite a quien ingresó después. Se atenúa el bloque mientras llega el mes nuevo y `termCargaId` descarta respuestas atrasadas. ⚠️ El ESPEJO de registro-tapas.html todavía NO tiene el selector. 
+  (termómetro; incluye a supervisión desde oct/2026 porque también registra producción; NO es el tablero drag-drop de serigrafia.html
     a propósito — Tapas no tiene ese concepto de rol/línea): barra horizontal por operario
     activo (rol≠supervisor) con las unidades Terminada del MES ACTUAL desde comandas+
     comanda_tareas. 100% de la barra = el operario con más unidades ese mes (relativo, no
