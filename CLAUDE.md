@@ -615,6 +615,7 @@ SOLO CUENTAN LAS APROBADAS en: termómetro de tapas.html y de registro-tapas.htm
 KPI de comandas de hoy y dashboard.html — filtro cliente `comandaCuenta(c)` (sin columna = aprobada, así
 nada se rompe si el SQL no se ha corrido); las queries traen `select('*, comanda_tareas(...)')` para eso.
 Los KPI de comandas.html también suman solo aprobadas ("Und PT aprobadas") y muestran "Por aprobar".
+HORA DE CARGA (nov/2026): la lista y el detalle muestran a qué hora se cargó cada comanda (`created_at`, `horaCargaComanda`: "🕐 02:35 p. m."; el detalle dice "Cargada el 05/Nov/2026 a las 02:35 p. m."). Inicio/Cierre solo se muestran si la comanda los trae (las de registro-tapas.html y WhatsApp los dejan null).
 ⚠️ El editor ahora conoce los procesos nuevos (Revisado, Limpiar pestaña, Apoyo Serigrafía/Producción)
 y conserva cualquier proceso fuera de lista (ej. "Otra tarea: detalle"); antes lo cambiaba a "Armado" al guardar.
 
