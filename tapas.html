@@ -260,6 +260,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ent-fact.p{color:#B45309;font-weight:800}
 .ent-fact.n{color:var(--gray-l)}
 .ent-fact small{display:block;font-family:var(--mono);font-weight:600;color:var(--gray)}
+.fx-b{border:1px solid rgba(0,0,0,.18);background:#fff;border-radius:5px;font-size:11px;font-weight:800;cursor:pointer;padding:0 6px;line-height:1.5;color:#334155}
+.fx-b:hover{background:#F1F5F9}
+.fx-acc{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:10px;color:var(--gray)}
+.fv-row{display:grid;grid-template-columns:64px 96px 72px 1fr 64px 78px 78px;gap:6px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--border);font-size:11px}
+.fv-row.sug{background:#EFF6FF}
+.fv-row input{width:100%;padding:3px 5px;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px}
+.fv-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.fv-bar input[type=text]{flex:1;min-width:160px;padding:6px 9px;border:1.5px solid var(--border);border-radius:8px;font-size:12px}
+@media(max-width:700px){.fv-row{grid-template-columns:1fr 1fr;}}
 #fotoOvTapas img{max-width:100%;max-height:78vh;border-radius:10px;display:block;margin:0 auto}
 .ent-act button{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;color:var(--teal)}
 .ent-act button.ent-del{color:var(--gray-l);font-size:14px}
@@ -1103,6 +1112,20 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <button class="m-close" onclick="cerrarPlazoFicha()">✕</button>
     </div>
     <div class="mb" id="plzCuerpo"></div>
+  </div>
+</div>
+
+<!-- MODAL VINCULAR FACTURA A UNA FICHA (confirmación manual del cruce con ventas) -->
+<div class="overlay" id="modalFactVinc" style="z-index:10400" onclick="if(event.target===this)factCerrarVincular()">
+  <div class="modal" style="max-width:820px;width:94%">
+    <div class="mh">
+      <div>
+        <div class="mh-title" id="fvTitulo">—</div>
+        <div class="ph-sub" id="fvSub"></div>
+      </div>
+      <button class="m-close" onclick="factCerrarVincular()">✕</button>
+    </div>
+    <div class="mb" id="fvCuerpo"></div>
   </div>
 </div>
 
@@ -1987,7 +2010,7 @@ async function mostrarDetalle(id) {
       <div class="dc">
         <div class="dc-h">Ingresos PT de esta ficha (${fugas.entradas.toLocaleString()} de ${s.cant.toLocaleString()} und)</div>
         <div class="dc-b">
-          <table class="dt"><thead><tr><th>Fecha</th><th>Requi</th><th style="text-align:right">Unidades</th></tr></thead><tbody>${filasIng}</tbody></table>${factLineasHtml(s)}
+          <table class="dt"><thead><tr><th>Fecha</th><th>Requi</th><th style="text-align:right">Unidades</th></tr></thead><tbody>${filasIng}</tbody></table>${factLineasHtml(s, true)}
         </div>
       </div>` : '';
 
@@ -4546,7 +4569,7 @@ function bloqueParcialesTapas(s) {
   var sinR = p.sinRequi > 0;
   return '<div class="dc" style="border-color:' + (sinR ? '#FDE047' : '#86EFAC') + ';border-width:2px"><div class="dc-h" style="background:' + (sinR ? '#FEF9C3' : '#DCFCE7') + ';color:' + (sinR ? '#A16207' : '#166534') + '">' + (sinR ? '🟡' : '🟢')
     + ' Entregado ' + entregadoTotalFichaTapas(s).toLocaleString() + '/' + (s.cant || 0).toLocaleString() + ' · reportado por Tapas ' + p.total.toLocaleString() + ' und' + (sinR ? ' · ' + p.sinRequi.toLocaleString() + ' sin requi' : ' · todas con requi') + '</div><div class="dc-b" style="font-size:12px">'
-    + filas + (ingresoMovs.some(function(m) { return m.solicitud_id === s.id && m.area !== 'serig'; }) ? '' : factLineasHtml(s)) + '<div style="font-size:10px;color:var(--gray);margin-top:6px">Informativo: no descuenta del saldo. El saldo baja cuando registras la requi (ingreso PT) vinculada a esta ficha en Entregados.</div></div></div>';
+    + filas + (ingresoMovs.some(function(m) { return m.solicitud_id === s.id && m.area !== 'serig'; }) ? '' : factLineasHtml(s, true)) + '<div style="font-size:10px;color:var(--gray);margin-top:6px">Informativo: no descuenta del saldo. El saldo baja cuando registras la requi (ingreso PT) vinculada a esta ficha en Entregados.</div></div></div>';
 }
 
 // Corregir la cantidad de una entrega reportada, también la que completó la ficha (si con la nueva cantidad ya no alcanza, la ficha
@@ -4940,6 +4963,8 @@ var ventasFact = [];
 var ventasFactOk = false;
 var factCache = null;
 var factFilasCache = null;
+var fichaFacturas = [];      // confirmaciones manuales (tabla ficha_facturas): 'vinculada' = sí es de la ficha · 'excluida' = no lo es
+var factRem = {};            // unidades de cada línea de factura (por ventas.id) que ninguna ficha se ha llevado
 
 function factReset() { factCache = null; factFilasCache = null; }
 
@@ -4975,7 +5000,16 @@ async function cargarVentasFact() {
     ventasFact = [];
     ventasFactOk = false;
   }
+  await cargarFichaFacturas();
   factReset();
+}
+
+// Confirmaciones manuales (sql/ficha_facturas_v1.sql). Sin la tabla simplemente no hay correcciones y el cruce sigue siendo automático.
+async function cargarFichaFacturas() {
+  try {
+    var r = await db.from('ficha_facturas').select('*');
+    fichaFacturas = r.error ? [] : (r.data || []);
+  } catch(e) { fichaFacturas = []; }
 }
 
 async function refrescarVentasFact() {
@@ -4996,30 +5030,69 @@ function factClienteCalza(fichaCli, ventaCli) {
   return toks.every(function(t) { return vc.indexOf(' ' + t + ' ') >= 0; });
 }
 
+function factClave(serie, docu, sku) { return String(serie || '') + '|' + docu + '|' + String(sku || '').trim(); }
+
 function factModelo() {
   if (factCache) return factCache;
-  var res = {}, idx = {}, rem = {};
+  var res = {}, idx = {}, porClave = {}, rem = {}, porId = {}, excl = {};
+  solicitudes.forEach(function(s) { porId[s.id] = s; });
   ventasFact.forEach(function(v) {
     var sku = String(v.sku || '').trim();
     rem[v.id] = v.total_unidades || 0;
     if (!sku) return;
     (idx[sku] = idx[sku] || []).push(v);
     if (sku.length > 5) { var b = sku.slice(0, -1); (idx[b] = idx[b] || []).push(v); }
+    var k = factClave(v.serie, v.docu, sku);
+    (porClave[k] = porClave[k] || []).push(v);
   });
+  function fichaRes(s, ent) {
+    return res[s.id] || (res[s.id] = { entregado: ent, fact: 0, items: [], excluidas: [], auto: false });
+  }
+  // 1) Lo que master confirmó a mano va primero: esas unidades ya no se ofrecen a ninguna otra ficha
+  fichaFacturas.forEach(function(l) {
+    var s = porId[l.solicitud_id];
+    if (!s) return;
+    var r = fichaRes(s, entregadoTotalFichaTapas(s));
+    var k = factClave(l.serie, l.docu, l.sku);
+    if (l.modo === 'excluida') {
+      (excl[s.id] = excl[s.id] || {})[k] = true;
+      r.excluidas.push({ id: l.id, ref: l.serie + ' ' + l.docu });
+      return;
+    }
+    var falta = l.und || 0, tomado = 0, ultima = null;
+    (porClave[k] || []).forEach(function(v) {
+      if (falta <= 0 || rem[v.id] <= 0) return;
+      var t = Math.min(rem[v.id], falta);
+      rem[v.id] -= t; falta -= t; tomado += t; ultima = v;
+    });
+    if (ultima) {
+      r.items.push({ tipo: 'manual', linkId: l.id, key: k, ref: l.serie + ' ' + l.docu, fecha: ultima.fecha, und: tomado });
+      r.fact += tomado;
+    } else {
+      r.items.push({ tipo: 'perdida', linkId: l.id, key: k, ref: l.serie + ' ' + l.docu, fecha: '', und: 0 });
+    }
+  });
+  // 2) Cruce automático, de la ficha más antigua a la más nueva
   solicitudes.slice().sort(function(a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); }).forEach(function(s) {
-    if (!s.lineas || s.lineas.length !== 1 || !s.lineas[0].sku) return;
     var ent = entregadoTotalFichaTapas(s);
-    if (ent <= 0) return;
-    var falta = ent, items = [];
+    if (!res[s.id] && ent <= 0) return;
+    var r = fichaRes(s, ent);
+    r.entregado = ent;
+    if (!s.lineas || s.lineas.length !== 1 || !s.lineas[0].sku || ent <= 0) return;
+    r.auto = true;
+    var falta = ent - r.fact, ex = excl[s.id] || {};
     (idx[String(s.lineas[0].sku).trim()] || []).forEach(function(v) {
       if (falta <= 0 || rem[v.id] <= 0 || v.fecha < s.ingreso || !factClienteCalza(s.cliente, v.cliente)) return;
+      var k = factClave(v.serie, v.docu, v.sku);
+      if (ex[k]) return;
       var t = Math.min(rem[v.id], falta);
       rem[v.id] -= t; falta -= t;
-      items.push({ ref: (v.serie || 'FACT') + ' ' + v.docu, fecha: v.fecha, und: t });
+      r.items.push({ tipo: 'auto', key: k, ref: (v.serie || 'FACT') + ' ' + v.docu, fecha: v.fecha, und: t });
+      r.fact += t;
     });
-    res[s.id] = { entregado: ent, fact: ent - falta, items: items };
   });
   factCache = res;
+  factRem = rem;
   return res;
 }
 
@@ -5056,19 +5129,152 @@ function factFechaCorta(f) {
   return t.length >= 10 ? parseInt(t.slice(8, 10), 10) + '-' + ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(t.slice(5, 7), 10) - 1] : t;
 }
 
-// Líneas de facturación de una ficha (dentro del bloque de entregas del chip y de la ventana de la ficha): una por factura + lo que falta facturar
-function factLineasHtml(s) {
+// Líneas de facturación de una ficha (dentro del bloque de entregas del chip y de la ventana de la ficha): una por factura + lo que falta facturar.
+// Con acc=true (ventana de la ficha, solo master) cada línea trae sus botones: ✓ confirmar / ✕ no es de esta ficha, y abajo "Vincular factura".
+function factLineasHtml(s, acc) {
   var f = factDeFicha(s);
   if (!f) return '';
+  if (!acc && !f.items.length && !f.auto) return '';
+  var idq = escHtml(String(s.id));
   var h = f.items.map(function(it) {
+    var kq = escHtml(encodeURIComponent(it.key));
+    if (it.tipo === 'perdida') {
+      return '<div class="fx n"><span>⚠️</span><span style="font-weight:700">' + escHtml(it.ref) + '</span><span>ya no aparece en ventas (¿se reimportó?)</span><i></i>'
+        + (acc ? '<button class="fx-b" title="Quitar este vínculo" onclick="factAccion(\'quitar\',\'' + idq + '\',\'' + escHtml(String(it.linkId)) + '\')">✕</button>' : '') + '</div>';
+    }
+    var b = '';
+    if (acc && it.tipo === 'auto') {
+      b = '<button class="fx-b" title="Confirmar: sí es de esta ficha" onclick="factAccion(\'conf\',\'' + idq + '\',\'' + kq + '\',' + it.und + ')">✓</button>'
+        + '<button class="fx-b" title="No es de esta ficha: no volver a sugerirla" onclick="factAccion(\'excl\',\'' + idq + '\',\'' + kq + '\')">✕</button>';
+    } else if (acc) {
+      b = '<button class="fx-b" title="Quitar este vínculo" onclick="factAccion(\'quitar\',\'' + idq + '\',\'' + escHtml(String(it.linkId)) + '\')">✕</button>';
+    }
     return '<div class="fx ok"><span>' + escHtml(factFechaCorta(it.fecha)) + '</span><b>' + it.und.toLocaleString() + ' und</b>'
-      + '<span style="font-weight:700">' + escHtml(it.ref) + '</span><i>🧾 facturado</i></div>';
+      + '<span style="font-weight:700">' + escHtml(it.ref) + '</span><i>' + (it.tipo === 'manual' ? '✓ confirmada' : '🧾 facturado') + '</i>' + b + '</div>';
   }).join('');
   var sin = f.entregado - f.fact;
-  if (sin > 0) {
+  if (sin > 0 && (f.auto || f.items.length)) {
     h += '<div class="fx ' + (f.fact > 0 ? 'p' : 'n') + '"><span></span><b>' + sin.toLocaleString() + ' und</b><span>entregadas</span><i>⏳ sin facturar</i></div>';
   }
+  if (acc) {
+    h += '<div class="fx-acc"><button class="btn btn-g btn-xs" onclick="factAbrirVincular(\'' + idq + '\')">＋ Vincular factura</button>'
+      + (f.excluidas.length ? '<span>Descartadas:</span>' + f.excluidas.map(function(x) {
+          return '<button class="fx-b" title="Volver a permitir esta factura para la ficha" onclick="factAccion(\'quitar\',\'' + idq + '\',\'' + escHtml(String(x.id)) + '\')">↩ ' + escHtml(x.ref) + '</button>';
+        }).join('') : '')
+      + '</div>';
+  }
   return h;
+}
+
+// ── Confirmación manual: guardar / quitar vínculos y selector de facturas ──
+function factQuien() { return (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null; }
+
+function factErrTabla(e) {
+  var msg = (e && e.message) || String(e);
+  showToast('❌ ' + (/ficha_facturas|schema cache|does not exist/i.test(msg) ? 'Falta correr sql/ficha_facturas_v1.sql en Supabase' : msg), '#B83232');
+}
+
+async function factGuardarVinculo(solId, keyEnc, modo, und) {
+  var p = decodeURIComponent(keyEnc).split('|');
+  var fila = { solicitud_id: solId, serie: p[0], docu: parseInt(p[1], 10), sku: p[2], modo: modo, und: modo === 'vinculada' ? und : null, creado_por: factQuien() };
+  var r = await db.from('ficha_facturas').upsert(fila, { onConflict: 'solicitud_id,serie,docu,sku' }).select('id');
+  if (r.error || !(r.data || []).length) { factErrTabla(r.error || { message: 'No se pudo guardar (sin permiso)' }); return false; }
+  return true;
+}
+
+async function factAccion(op, solId, ref, und) {
+  var ok = false, msg = '';
+  if (op === 'conf') { ok = await factGuardarVinculo(solId, ref, 'vinculada', und); msg = '✓ Factura confirmada para la ficha'; }
+  else if (op === 'excl') { ok = await factGuardarVinculo(solId, ref, 'excluida', null); msg = 'Factura descartada para esta ficha'; }
+  else if (op === 'quitar') {
+    var r = await db.from('ficha_facturas').delete().eq('id', ref).select('id');
+    if (r.error || !(r.data || []).length) { factErrTabla(r.error || { message: 'No se pudo quitar (sin permiso)' }); return; }
+    ok = true; msg = 'Vínculo quitado';
+  }
+  if (!ok) return;
+  await cargarFichaFacturas();
+  factReset();
+  refrescarTrasComentarioTapas();
+  if (document.getElementById('modalFactVinc').classList.contains('open')) factRenderVincular();
+  showToast(msg);
+}
+
+var fvSol = null, fvBusca = '', fvTodos = false, fvLista = [];
+
+function factAbrirVincular(solId) {
+  fvSol = solId; fvBusca = ''; fvTodos = false;
+  document.getElementById('modalFactVinc').classList.add('open');
+  factRenderVincular();
+}
+
+function factCerrarVincular() {
+  document.getElementById('modalFactVinc').classList.remove('open');
+  fvSol = null;
+}
+
+function factVincFiltro(v, esTodos) {
+  if (esTodos !== undefined) fvTodos = esTodos;
+  else fvBusca = v;
+  factRenderVincular(true);
+}
+
+function factRenderVincular(sinFoco) {
+  var s = solicitudes.find(function(x) { return x.id === fvSol; });
+  if (!s) return;
+  var mod = factModelo();
+  var f = mod[s.id] || { entregado: 0, fact: 0 };
+  var sku = (s.lineas[0] && s.lineas[0].sku) ? String(s.lineas[0].sku).trim() : '';
+  var falta = Math.max(0, f.entregado - f.fact);
+  document.getElementById('fvTitulo').textContent = '🧾 Vincular factura · ' + (s.id_display || '') + ' — ' + (s.cliente || '');
+  document.getElementById('fvSub').textContent = (sku ? 'SKU ' + sku + ' · ' : '') + 'entregado ' + f.entregado.toLocaleString() + ' · facturado ' + f.fact.toLocaleString() + (falta ? ' · falta ' + falta.toLocaleString() : '');
+  var toks = normBusqueda(fvBusca).split(/[^a-z0-9]+/).filter(Boolean);
+  fvLista = ventasFact.filter(function(v) {
+    if ((factRem[v.id] || 0) <= 0) return false;
+    if (!fvTodos && !factClienteCalza(s.cliente, v.cliente)) return false;
+    if (toks.length) {
+      var n = normBusqueda(v.serie + ' ' + v.docu + ' ' + v.sku + ' ' + v.cliente);
+      return toks.every(function(t) { return n.indexOf(t) !== -1; });
+    }
+    return true;
+  }).map(function(v) {
+    var vs = String(v.sku || '').trim();
+    return { v: v, sug: !!sku && (vs === sku || (vs.length > 5 && vs.slice(0, -1) === sku)) };
+  }).sort(function(a, b) { return (b.sug - a.sug) || String(b.v.fecha).localeCompare(String(a.v.fecha)); }).slice(0, 60);
+  var filas = fvLista.map(function(x, i) {
+    var v = x.v, disp = factRem[v.id] || 0, def = Math.min(disp, falta > 0 ? falta : disp);
+    return '<div class="fv-row' + (x.sug ? ' sug' : '') + '">'
+      + '<span>' + escHtml(factFechaCorta(v.fecha)) + '</span>'
+      + '<b style="font-family:var(--mono)">' + escHtml(v.serie + ' ' + v.docu) + '</b>'
+      + '<span style="font-family:var(--mono)">' + escHtml(v.sku) + (x.sug ? ' ✓' : '') + '</span>'
+      + '<span style="color:var(--gray);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(v.cliente) + '">' + escHtml(v.cliente) + '</span>'
+      + '<span style="text-align:right" title="Unidades de esa línea que ninguna ficha se ha llevado">' + disp.toLocaleString() + '</span>'
+      + '<input type="number" min="1" max="' + disp + '" id="fvU' + i + '" value="' + def + '">'
+      + '<button class="btn btn-t btn-xs" onclick="factVincularFila(' + i + ')">Vincular</button></div>';
+  }).join('');
+  var cont = document.getElementById('fvCuerpo');
+  var enfoque = sinFoco && document.activeElement && document.activeElement.id === 'fvBuscar';
+  cont.innerHTML = '<div class="fv-bar"><input type="text" id="fvBuscar" placeholder="🔍 factura, SKU o cliente…" value="' + escHtml(fvBusca) + '" oninput="factVincFiltro(this.value)" autocomplete="off">'
+    + '<label style="font-size:11px;color:var(--gray);display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" ' + (fvTodos ? 'checked ' : '') + 'onchange="factVincFiltro(null,this.checked)">Mostrar facturas de todos los clientes</label></div>'
+    + '<div style="font-size:10px;color:var(--gray);margin-bottom:6px">Facturas con unidades aún sin asignar a ninguna ficha. En azul, las del mismo SKU. Las unidades se pueden ajustar antes de vincular.</div>'
+    + (filas ? '<div class="fv-row" style="font-size:9px;font-weight:800;color:var(--gray);text-transform:uppercase"><span>Fecha</span><span>Factura</span><span>SKU</span><span>Cliente</span><span style="text-align:right">Disp.</span><span>Und.</span><span></span></div>' + filas
+              : '<div style="padding:18px;text-align:center;color:var(--gray);font-size:12px">' + (ventasFact.length ? 'Ninguna factura coincide' + (fvTodos ? '' : ' (prueba “todos los clientes”)') : 'No hay facturas cargadas') + '</div>');
+  if (enfoque) { var inp = document.getElementById('fvBuscar'); if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } }
+}
+
+async function factVincularFila(i) {
+  var x = fvLista[i];
+  if (!x || !fvSol) return;
+  var v = x.v, disp = factRem[v.id] || 0;
+  var n = parseInt((document.getElementById('fvU' + i) || {}).value, 10);
+  if (!(n > 0)) { showToast('⚠️ Escribe las unidades', '#B83232'); return; }
+  if (n > disp) { showToast('⚠️ Esa línea solo tiene ' + disp.toLocaleString() + ' und disponibles', '#B83232'); return; }
+  var ok = await factGuardarVinculo(fvSol, encodeURIComponent(factClave(v.serie, v.docu, v.sku)), 'vinculada', n);
+  if (!ok) return;
+  await cargarFichaFacturas();
+  factReset();
+  refrescarTrasComentarioTapas();
+  factRenderVincular();
+  showToast('🔗 ' + v.serie + ' ' + v.docu + ' vinculada · ' + n.toLocaleString() + ' und');
 }
 
 // Celda "Facturación" de una fila de requi en Entregados
