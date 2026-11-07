@@ -248,6 +248,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .ent-pend-tag{display:inline-block;font-size:9px;font-weight:800;background:#F59E0B;color:#fff;border-radius:4px;padding:2px 6px;white-space:nowrap}
 .ent-pend-act{background:#F59E0B;color:#fff;border:none;border-radius:6px;padding:4px 9px;font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap}
 .foto-btn{border:none;background:none;cursor:pointer;font-size:14px;padding:0 3px}
+/* Facturación de lo entregado (cruce con la tabla ventas) */
+.fx{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;margin-top:3px;padding:2px 6px;border-radius:5px;font-size:11px;line-height:1.35}
+.fx b{font-family:var(--mono)}
+.fx i{font-style:normal;font-size:10px;font-weight:800;margin-left:auto}
+.fx.ok{background:#DBEAFE;color:#075985}
+.fx.p{background:#FEF9C3;color:#92400E}
+.fx.n{background:#F1F5F9;color:#64748B}
+.ent-fact{font-size:10px;line-height:1.5;white-space:nowrap}
+.ent-fact.ok{color:#0369A1;font-weight:800}
+.ent-fact.p{color:#B45309;font-weight:800}
+.ent-fact.n{color:var(--gray-l)}
+.ent-fact small{display:block;font-family:var(--mono);font-weight:600;color:var(--gray)}
 #fotoOvTapas img{max-width:100%;max-height:78vh;border-radius:10px;display:block;margin:0 auto}
 .ent-act button{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;color:var(--teal)}
 .ent-act button.ent-del{color:var(--gray-l);font-size:14px}
@@ -1604,6 +1616,7 @@ async function cargarSolicitudes() {
       };
     });
 
+    factReset();
     renderListas();
     refreshKPIs();
     renderInicioPedidosTapas();
@@ -1974,7 +1987,7 @@ async function mostrarDetalle(id) {
       <div class="dc">
         <div class="dc-h">Ingresos PT de esta ficha (${fugas.entradas.toLocaleString()} de ${s.cant.toLocaleString()} und)</div>
         <div class="dc-b">
-          <table class="dt"><thead><tr><th>Fecha</th><th>Requi</th><th style="text-align:right">Unidades</th></tr></thead><tbody>${filasIng}</tbody></table>
+          <table class="dt"><thead><tr><th>Fecha</th><th>Requi</th><th style="text-align:right">Unidades</th></tr></thead><tbody>${filasIng}</tbody></table>${factLineasHtml(s)}
         </div>
       </div>` : '';
 
@@ -4479,6 +4492,7 @@ async function cargarComentariosTapas() {
     var rp = await db.from('tapas_entregas_parciales').select('*').order('fecha', { ascending: true }).order('created_at', { ascending: true });
     parcialesTapas = rp.error ? [] : (rp.data || []);
   } catch(e) { parcialesTapas = []; }
+  factReset();
 }
 
 // Entregas parciales que reporta la supervisora (tabla tapas_entregas_parciales, sql/tapas_entregas_parciales_v1.sql): INFORMATIVAS,
@@ -4532,7 +4546,7 @@ function bloqueParcialesTapas(s) {
   var sinR = p.sinRequi > 0;
   return '<div class="dc" style="border-color:' + (sinR ? '#FDE047' : '#86EFAC') + ';border-width:2px"><div class="dc-h" style="background:' + (sinR ? '#FEF9C3' : '#DCFCE7') + ';color:' + (sinR ? '#A16207' : '#166534') + '">' + (sinR ? '🟡' : '🟢')
     + ' Entregado ' + entregadoTotalFichaTapas(s).toLocaleString() + '/' + (s.cant || 0).toLocaleString() + ' · reportado por Tapas ' + p.total.toLocaleString() + ' und' + (sinR ? ' · ' + p.sinRequi.toLocaleString() + ' sin requi' : ' · todas con requi') + '</div><div class="dc-b" style="font-size:12px">'
-    + filas + '<div style="font-size:10px;color:var(--gray);margin-top:6px">Informativo: no descuenta del saldo. El saldo baja cuando registras la requi (ingreso PT) vinculada a esta ficha en Entregados.</div></div></div>';
+    + filas + (ingresoMovs.some(function(m) { return m.solicitud_id === s.id && m.area !== 'serig'; }) ? '' : factLineasHtml(s)) + '<div style="font-size:10px;color:var(--gray);margin-top:6px">Informativo: no descuenta del saldo. El saldo baja cuando registras la requi (ingreso PT) vinculada a esta ficha en Entregados.</div></div></div>';
 }
 
 // Corregir la cantidad de una entrega reportada, también la que completó la ficha (si con la nueva cantidad ya no alcanza, la ficha
@@ -4916,6 +4930,166 @@ function codClienteChipHtml(s) {
 // Entregas que la supervisora registró desde Tapas: una línea por entrega con fecha + cantidad (ESPEJO de pedParcChipHtml)
 function entColorTapas(s) { return parcialesDeFicha(s).sinRequi > 0 ? '#A16207' : '#15803D'; }
 
+// ══ FACTURACIÓN DE LO ENTREGADO (nov/2026) ══════════════════════
+// Cruza cada ficha con las facturas de la tabla `ventas` para saber qué de lo entregado ya se facturó. Es una SUGERENCIA calculada en
+// pantalla (no se guarda nada): cliente (todas las palabras del nombre de la ficha dentro del nombre de la factura) + SKU (SICAF factura con
+// un dígito de más: 105391 = 10539) + factura de la fecha de la ficha en adelante, con monto > 0 (las series T en Q0 son traslados).
+// Las facturas se reparten de la ficha más antigua a la más nueva y una factura nunca se cuenta dos veces. Solo cuentan fichas con UNA
+// línea y algo entregado (requis + lo reportado por Tapas); lo facturado se topa en lo entregado.
+var ventasFact = [];
+var ventasFactOk = false;
+var factCache = null;
+var factFilasCache = null;
+
+function factReset() { factCache = null; factFilasCache = null; }
+
+async function cargarVentasFact() {
+  try {
+    var lim = new Date(fechaHoy() + 'T12:00:00');
+    lim.setDate(lim.getDate() - 120);
+    var limIso = lim.toISOString().slice(0, 10);
+    var desde = '';
+    solicitudes.forEach(function(s) {
+      var f = s.ingreso || '';
+      if (!f) return;
+      if ((fichaViva(s) || f >= limIso) && (!desde || f < desde)) desde = f;
+    });
+    var acum = [];
+    if (desde) {
+      var from = 0, paso = 1000;
+      while (true) {
+        var r = await db.from('ventas').select('id,fecha,serie,docu,sku,cliente,total_unidades,total_quetzales')
+          .gte('fecha', desde).gt('total_quetzales', 0)
+          .order('fecha', { ascending: true }).order('id', { ascending: true }).range(from, from + paso - 1);
+        if (r.error) throw r.error;
+        var d = r.data || [];
+        acum = acum.concat(d);
+        if (d.length < paso) break;
+        from += paso;
+      }
+    }
+    ventasFact = acum;
+    ventasFactOk = true;
+  } catch(e) {
+    console.error('cargarVentasFact:', e);
+    ventasFact = [];
+    ventasFactOk = false;
+  }
+  factReset();
+}
+
+async function refrescarVentasFact() {
+  await cargarVentasFact();
+  if (typeof renderFichasTapas === 'function') renderFichasTapas();
+  var ae = document.activeElement;
+  if (!(ae && ae.id === 'entBuscar')) renderEntregadosTapas();
+}
+
+function factPalabrasCliente(n) {
+  return ' ' + normBusqueda(n).replace(/\(hn\)/g, ' ').split(/[^a-z0-9]+/).filter(Boolean).join(' ') + ' ';
+}
+
+function factClienteCalza(fichaCli, ventaCli) {
+  var toks = factPalabrasCliente(fichaCli).trim().split(' ').filter(Boolean);
+  if (!toks.length) return false;
+  var vc = factPalabrasCliente(ventaCli);
+  return toks.every(function(t) { return vc.indexOf(' ' + t + ' ') >= 0; });
+}
+
+function factModelo() {
+  if (factCache) return factCache;
+  var res = {}, idx = {}, rem = {};
+  ventasFact.forEach(function(v) {
+    var sku = String(v.sku || '').trim();
+    rem[v.id] = v.total_unidades || 0;
+    if (!sku) return;
+    (idx[sku] = idx[sku] || []).push(v);
+    if (sku.length > 5) { var b = sku.slice(0, -1); (idx[b] = idx[b] || []).push(v); }
+  });
+  solicitudes.slice().sort(function(a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); }).forEach(function(s) {
+    if (!s.lineas || s.lineas.length !== 1 || !s.lineas[0].sku) return;
+    var ent = entregadoTotalFichaTapas(s);
+    if (ent <= 0) return;
+    var falta = ent, items = [];
+    (idx[String(s.lineas[0].sku).trim()] || []).forEach(function(v) {
+      if (falta <= 0 || rem[v.id] <= 0 || v.fecha < s.ingreso || !factClienteCalza(s.cliente, v.cliente)) return;
+      var t = Math.min(rem[v.id], falta);
+      rem[v.id] -= t; falta -= t;
+      items.push({ ref: (v.serie || 'FACT') + ' ' + v.docu, fecha: v.fecha, und: t });
+    });
+    res[s.id] = { entregado: ent, fact: ent - falta, items: items };
+  });
+  factCache = res;
+  return res;
+}
+
+function factDeFicha(s) {
+  if (!ventasFactOk) return null;
+  return factModelo()[s.id] || null;
+}
+
+// Reparte lo facturado de la ficha entre sus requis de ingreso PT (de la más vieja a la más nueva): qué requi ya se facturó
+function factFilas() {
+  if (factFilasCache) return factFilasCache;
+  var out = {}, mod = factModelo();
+  Object.keys(mod).forEach(function(id) {
+    var cola = mod[id].items.map(function(it) { return { ref: it.ref, rem: it.und }; });
+    ingresoMovs.filter(function(m) { return m.solicitud_id === id && m.area !== 'serig'; })
+      .sort(function(a, b) { return String(a.created_at).localeCompare(String(b.created_at)); })
+      .forEach(function(m) {
+        var total = m.cantidad || 0, falta = total, refs = [];
+        while (falta > 0 && cola.length) {
+          var c = cola[0], t = Math.min(c.rem, falta);
+          c.rem -= t; falta -= t;
+          if (refs.indexOf(c.ref) < 0) refs.push(c.ref);
+          if (c.rem <= 0) cola.shift();
+        }
+        out[m.id] = { fact: total - falta, total: total, refs: refs };
+      });
+  });
+  factFilasCache = out;
+  return out;
+}
+
+function factFechaCorta(f) {
+  var t = String(f || '');
+  return t.length >= 10 ? parseInt(t.slice(8, 10), 10) + '-' + ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][parseInt(t.slice(5, 7), 10) - 1] : t;
+}
+
+// Líneas de facturación de una ficha (dentro del bloque de entregas del chip y de la ventana de la ficha): una por factura + lo que falta facturar
+function factLineasHtml(s) {
+  var f = factDeFicha(s);
+  if (!f) return '';
+  var h = f.items.map(function(it) {
+    return '<div class="fx ok"><span>' + escHtml(factFechaCorta(it.fecha)) + '</span><b>' + it.und.toLocaleString() + ' und</b>'
+      + '<span style="font-weight:700">' + escHtml(it.ref) + '</span><i>🧾 facturado</i></div>';
+  }).join('');
+  var sin = f.entregado - f.fact;
+  if (sin > 0) {
+    h += '<div class="fx ' + (f.fact > 0 ? 'p' : 'n') + '"><span></span><b>' + sin.toLocaleString() + ' und</b><span>entregadas</span><i>⏳ sin facturar</i></div>';
+  }
+  return h;
+}
+
+// Celda "Facturación" de una fila de requi en Entregados
+function factCeldaFila(m) {
+  if (!ventasFactOk || !m.solicitud_id) return '<td class="ent-fact n">—</td>';
+  var f = factFilas()[m.id];
+  if (!f) return '<td class="ent-fact n">—</td>';
+  var refs = f.refs.length ? '<small>' + escHtml(f.refs.join(' · ')) + '</small>' : '';
+  if (f.fact >= f.total) return '<td class="ent-fact ok">✓ Facturado' + refs + '</td>';
+  if (f.fact > 0) return '<td class="ent-fact p">Parcial ' + f.fact.toLocaleString() + '/' + f.total.toLocaleString() + refs + '</td>';
+  return '<td class="ent-fact n">⏳ Sin facturar</td>';
+}
+
+// Celda de las entregas aún sin requi: solo si la ficha ya tiene facturas
+function factCeldaPend(s) {
+  var f = factDeFicha(s);
+  if (!f || f.fact <= 0) return '<td class="ent-fact n">—</td>';
+  return '<td class="ent-fact ' + (f.fact >= f.entregado ? 'ok' : 'p') + '">🧾 ' + f.fact.toLocaleString() + ' facturadas'
+    + '<small>' + escHtml(f.items.map(function(it) { return it.ref; }).join(' · ')) + '</small></td>';
+}
+
 // Esquina superior derecha del chip: ENTREGADO/PEDIDO (ej. 1500/3000) cuando ya hay algo entregado; si no, el saldo por entregar
 function cpEsquinaHtml(x) {
   var tot = entregadoTotalFichaTapas(x.s);
@@ -4942,6 +5116,8 @@ function entregasChipHtml(s) {
   var con = entregadoTotalFichaTapas(s) - p.sinRequi, det = [];
   if (con > 0) det.push('<span class="cr">✓ ' + con.toLocaleString() + ' con requi</span>');
   if (p.sinRequi > 0) det.push('<span class="sr">⏳ ' + p.sinRequi.toLocaleString() + ' sin requi</span>');
+  var fa = factDeFicha(s);
+  if (fa && fa.fact > 0) det.push('<span class="cr" style="color:#0369A1">🧾 ' + fa.fact.toLocaleString() + ' facturadas</span>');
   var lineasReq = grupos.map(function(g) {
     return '<div class="ent ok"><span>' + escHtml(fc(g.fecha)) + '</span><b>' + g.cant.toLocaleString() + ' und</b>'
       + '<span style="min-width:0;font-weight:700;color:#334155">Requi ' + escHtml(g.doc || '—') + '</span><i>✓ con requi</i></div>';
@@ -4953,7 +5129,7 @@ function entregasChipHtml(s) {
   }).join('');
   return '<div class="cp-parc' + (p.sinRequi > 0 ? '' : ' ok') + '">'
     + '<div class="top"><span>🚚 ENTREGAS</span><span class="det">' + det.join(' · ') + '</span></div>'
-    + lineasReq + lineasPend
+    + lineasReq + lineasPend + factLineasHtml(s)
     + '</div>';
 }
 
@@ -6559,6 +6735,7 @@ async function init() {
   await cargarCodigosCliente();
   await cargarSolicitudes();
   await cargarMovimientos(); // alimenta el bloque "Entregados" del Inicio
+  await refrescarVentasFact(); // facturación de lo entregado (cruce con ventas)
   await cargarRechazos();
 
   // Poblar select de operadores en modal rechazo
@@ -6568,7 +6745,8 @@ async function init() {
   setInterval(tick, 30000);
   setInterval(refreshKPIs, 30000);
   setInterval(function() { if (!document.hidden) refrescarStockVivo(); }, 60000);
-  document.addEventListener('visibilitychange', function() { if (!document.hidden) refrescarStockVivo(); });
+  setInterval(function() { if (!document.hidden) refrescarVentasFact(); }, 300000);
+  document.addEventListener('visibilitychange', function() { if (!document.hidden) { refrescarStockVivo(); refrescarVentasFact(); } });
 
   // Arrancar en el hub de inicio
   switchTab('inicio');
@@ -6704,6 +6882,7 @@ async function cargarMovimientos() {
     var ing = await db.from('movimientos_materiales').select('*').eq('tipo','entrada_pt').order('created_at', { ascending: false });
     salidaMovs  = sal.data || [];
     ingresoMovs = ing.data || [];
+    factReset();
     await cargarLotesTapas();
     renderMov(movVistaActual);
     renderEntregadosTapas();
@@ -6944,7 +7123,7 @@ function renderEntregadosTapas() {
   wrap.innerHTML = '<div class="fich-wrap">'
     + '<div class="fich-hdr"><span class="fich-title">📦 Entregados</span>'
     +   '<span class="fich-count" id="entCuenta">—</span>'
-    +   '<input class="fi ent-busca" id="entBuscar" placeholder="🔍 Requi, SKU, cliente o pedido…" value="' + escHtml(entBusca) + '" oninput="entBuscarInput(this.value)" autocomplete="off">'
+    +   '<input class="fi ent-busca" id="entBuscar" placeholder="🔍 Requi, SKU, cliente, pedido o factura…" value="' + escHtml(entBusca) + '" oninput="entBuscarInput(this.value)" autocomplete="off">'
     +   '<button class="btn btn-t btn-sm" onclick="abrirIngPT()">+ Registrar entregado</button></div>'
     + '<div class="fich-body"><div id="entTabla"></div></div></div>';
   renderEntTabla();
@@ -6971,7 +7150,8 @@ function renderEntTabla() {
     grupos = grupos.filter(function(g) {
       var txt = g.doc + ' ' + g.nota + ' ' + g.rows.map(function(m) {
         var s = solicitudes.find(function(x) { return x.id === m.solicitud_id; });
-        return (m.sku_original || '') + ' ' + getSkuDesc(m.sku_original) + ' ' + (s ? (s.cliente || '') + ' ' + (s.id_display || '') : '');
+        var fr = ventasFactOk ? factFilas()[m.id] : null;
+        return (m.sku_original || '') + ' ' + getSkuDesc(m.sku_original) + ' ' + (s ? (s.cliente || '') + ' ' + (s.id_display || '') : '') + ' ' + (fr ? fr.refs.join(' ') : '');
       }).join(' ');
       var n = normBusqueda(txt);
       return toks.every(function(t) { return n.indexOf(t) !== -1; });
@@ -6995,11 +7175,11 @@ function renderEntTabla() {
     return;
   }
   var filas = buildEntPendSeccionHtml(pend, mp)
-    + (pend.length && grupos.length ? '<tr><td colspan="10" class="ent-sec ent-sec-ok">📦 Requis registradas</td></tr>' : '')
+    + (pend.length && grupos.length ? '<tr><td colspan="11" class="ent-sec ent-sec-ok">📦 Requis registradas</td></tr>' : '')
     + grupos.slice(0, entVisibles).map(function(g, gi) { return buildEntGrupoHtml(g, gi, mp); }).join('');
   cont.innerHTML = '<div class="ent-scroll"><table class="mov-table ent-tabla"><thead><tr>'
     + '<th>No. Requi</th><th>Cliente</th><th>Pedido</th><th>Producto</th><th style="text-align:right">Unidades</th>'
-    + '<th>Fecha</th><th>Lote</th><th>Origen</th><th>Requi Salida Bodega</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+    + '<th>Fecha</th><th>Lote</th><th>Origen</th><th>Requi Salida Bodega</th><th>Facturación</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>'
     + (grupos.length > entVisibles
         ? '<button class="btn btn-g btn-sm ent-mas" onclick="entMasGrupos()">Mostrar más (' + (grupos.length - entVisibles) + ' requis restantes)</button>'
         : '');
@@ -7082,7 +7262,7 @@ function entPendLoteLineas(g) {
 function buildEntPendSeccionHtml(pend, mp) {
   if (!pend.length) return '';
   var t = entPendTotales(pend);
-  return '<tr><td colspan="10" class="ent-sec ent-sec-pend">⏳ Entregas reportadas por Tapas · pendientes de requi de ingreso · '
+  return '<tr><td colspan="11" class="ent-sec ent-sec-pend">⏳ Entregas reportadas por Tapas · pendientes de requi de ingreso · '
     + t.fichas + ' ficha' + (t.fichas !== 1 ? 's' : '') + (t.entregas !== t.fichas ? ' (' + t.entregas + ' entregas)' : '') + ' · ' + t.und.toLocaleString() + ' und</td></tr>'
     + pend.map(function(g) { return buildEntPendHtml(g, mp); }).join('');
 }
@@ -7114,6 +7294,7 @@ function buildEntPendHtml(g, mp) {
     + (cierra ? ' <span style="font-size:10px;font-weight:800;color:#047857">✅ completó la ficha</span>' : '') + fotos
     + (notaPend ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(notaPend) + '</span>' : '') + '</td>'
     + '<td style="font-size:11px;font-family:var(--mono);color:var(--gray-l)">' + escHtml(sal) + '</td>'
+    + factCeldaPend(s)
     + '<td class="ent-act" style="white-space:nowrap"><button class="ent-pend-act" title="Abrir el registro de entregado con esta ficha y el total pendiente" onclick="entRegistrarDesdeEntrega(\'' + escHtml(String(s.id)) + '\')">📝 Registrar requi</button></td>'
     + '</tr>';
 }
@@ -7286,7 +7467,7 @@ function buildEntGrupoHtml(g, gi, mp) {
           : '<td style="font-size:11px;color:var(--gray-l)">—</td>')
       + '<td><span class="ent-orig">MANUAL</span>' + (primera && g.nota ? ' <span style="font-size:10px;color:var(--gray-l)">· ' + escHtml(g.nota) + '</span>' : '') + '</td>'
       + '<td style="font-size:11px;font-family:var(--mono);color:var(--gray-l)">' + escHtml(sal) + '</td>'
-      + acc + '</tr>';
+      + factCeldaFila(m) + acc + '</tr>';
   }).join('');
 }
 
