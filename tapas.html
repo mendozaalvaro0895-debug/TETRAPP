@@ -4057,8 +4057,10 @@ function renderTermometro() {
   ops = ops.filter(function(o) { return !o.fecha_inicio || o.fecha_inicio <= rm.hasta; });
   var conocidos = {};
   ops.forEach(function(o) { conocidos[o.codigo] = true; });
+  // Las personas dadas de baja solo se ven en MESES ANTERIORES (para no perder lo que produjeron); en el mes en curso ya no figuran
+  var mesEnCurso = termMesActual() === fechaHoy().slice(0, 7);
   agruparComandasPorOperario(termComandas).forEach(function(o) {
-    if (!conocidos[o.codigo] && o.und > 0) ops.push({ codigo: o.codigo, nombre: o.nombre, und: o.und, fecha_inicio: null, fecha_baja: null, inactivo: true });
+    if (!mesEnCurso && !conocidos[o.codigo] && o.und > 0) ops.push({ codigo: o.codigo, nombre: o.nombre, und: o.und, fecha_inicio: null, fecha_baja: null, inactivo: true });
   });
   ops.sort(function(a, b) { return b.und - a.und; });
 
