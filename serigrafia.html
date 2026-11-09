@@ -8067,46 +8067,98 @@ function toggleEnvConsolidado(e) {
   localStorage.setItem('env_cons_collapsed', collapsed ? '1' : '0');
 }
 
+// Fila del PDF: mismas columnas, colores e insignias que la tabla de pantalla (b7BuildFila)
+function b7FilaPDF(i) {
+  var exist = i.existencia || 0;
+  var min   = i.stock_minimo || 0;
+  var cero  = exist === 0;
+  var bajo  = !cero && exist <= min;
+  var existFmt = exist % 1 === 0 ? exist.toLocaleString() : exist.toFixed(2);
+  var minFmt   = min % 1 === 0   ? min.toLocaleString()   : min.toFixed(2);
+  var badge, rowBg;
+  if (cero) {
+    badge = '<span class="bdg" style="background:#FEF2F2;color:#B83232">🔴 Sin stock</span>';
+    rowBg = '#FEF2F2';
+  } else if (bajo) {
+    badge = '<span class="bdg" style="background:#FEF3C7;color:#92400e">🟡 Bajo</span>';
+    rowBg = '#FFFBEB';
+  } else {
+    badge = '<span class="bdg" style="background:#D1FAE5;color:#065f46">🟢 Ok</span>';
+    rowBg = '';
+  }
+  var uso;
+  if (!b7UsoMap) uso = '<span style="color:#6B6B6A">—</span>';
+  else if (!b7UsoDe(i).veces) uso = '<span style="color:#6B6B6A">💤 sin uso</span>';
+  else uso = '<b>' + b7MensualTxt(b7UsoDe(i).consumo) + '</b> <span style="color:#6B6B6A">/mes</span>';
+  return '<tr style="background:' + rowBg + '">' +
+    '<td class="mono" style="color:#6d28d9">' + escHtml(i.sku) + '</td>' +
+    '<td>' + escHtml(i.descripcion || '') + '</td>' +
+    '<td class="r" style="font-weight:700;color:' + (cero ? '#B83232' : bajo ? '#92400e' : '#0C0C0B') + '">' + existFmt + '</td>' +
+    '<td class="r" style="color:#6B6B6A">' + minFmt + '</td>' +
+    '<td class="r">' + uso + '</td>' +
+    '<td>' + badge + '</td>' +
+  '</tr>';
+}
+
+// Orden del PDF: dentro de cada grupo → sin stock, luego bajo mínimo, luego ok; a igual estado, el de más consumo primero
+function b7OrdenPDF(a, b) {
+  function tier(i) { var e = i.existencia || 0, m = i.stock_minimo || 0; return e === 0 ? 0 : (e <= m ? 1 : 2); }
+  var ta = tier(a), tb = tier(b);
+  if (ta !== tb) return ta - tb;
+  if (b7UsoMap) {
+    var ua = b7UsoDe(a), ub = b7UsoDe(b);
+    if (ua.veces !== ub.veces) return ub.veces - ua.veces;
+    if (ua.consumo !== ub.consumo) return ub.consumo - ua.consumo;
+  }
+  return (a.descripcion || '').localeCompare(b.descripcion || '');
+}
+
 function descargarAlertasB7() {
-  if (!b7AlertasData.length) return;
+  if (!b7TodosData.length) return;
   var fecha = fmtFechaLetras(new Date());
-  // Mismo orden que el bloque visual: frecuencia de uso (sin historial: sin stock → bajo mínimo, alfabético)
-  var sortedB7 = b7AlertasData.slice().sort(b7Orden);
-  var filas = sortedB7.map(function(i) {
-    var exist = i.existencia || 0;
-    var cero  = exist === 0;
-    var existFmt = exist % 1 === 0 ? exist.toLocaleString() : exist.toFixed(2);
-    var minFmt   = (i.stock_minimo || 0) % 1 === 0 ? (i.stock_minimo||0).toLocaleString() : (i.stock_minimo||0).toFixed(2);
-    var rowBg = cero ? '#FEF2F2' : '#FFFBEB';
-    var numColor = cero ? '#B83232' : '#B87200';
-    return '<tr style="background:' + rowBg + '">' +
-      '<td style="font-family:monospace;font-size:11px;color:#6B6B6A;padding:7px 10px;border-bottom:1px solid #eee">' + i.sku + '</td>' +
-      '<td style="font-size:12px;font-weight:600;padding:7px 10px;border-bottom:1px solid #eee">' + (i.descripcion || '') + '</td>' +
-      '<td style="font-family:monospace;font-size:12px;font-weight:700;color:' + numColor + ';text-align:right;padding:7px 10px;border-bottom:1px solid #eee">' + existFmt + '</td>' +
-      '<td style="font-family:monospace;font-size:11px;text-align:right;padding:7px 10px;border-bottom:1px solid #eee;color:#6B6B6A">mín. ' + minFmt + '</td>' +
-      '<td style="font-size:11px;text-align:right;padding:7px 10px;border-bottom:1px solid #eee;color:#6B6B6A">' + (b7UsoMap ? (b7UsoDe(i).veces ? b7MensualTxt(b7UsoDe(i).consumo) + '/mes' : 'sin uso') : '—') + '</td>' +
-    '</tr>';
-  }).join('');
+  // Dos grupos: primero los EN USO, luego los SIN USO (sin historial no se puede separar: un solo grupo)
+  var enUso  = b7UsoMap ? b7TodosData.filter(function(i) { return b7UsoDe(i).veces > 0; }).sort(b7OrdenPDF) : b7TodosData.slice().sort(b7OrdenPDF);
+  var sinUso = b7UsoMap ? b7TodosData.filter(function(i) { return !b7UsoDe(i).veces; }).sort(b7OrdenPDF) : [];
+
+  function seccion(titulo, lista) {
+    if (!lista.length) return '';
+    return '<tr class="sec"><td colspan="6">' + titulo + ' · ' + lista.length + '</td></tr>' + lista.map(b7FilaPDF).join('');
+  }
+  var filas = b7UsoMap
+    ? seccion('EN USO — primero sin stock, luego bajo mínimo, luego ok', enUso) + seccion('💤 SIN USO — sin movimiento en las fotos de Bodega 7', sinUso)
+    : seccion('Insumos Serigrafía — sin stock, bajo mínimo, ok', enUso);
+
+  var nCero = b7TodosData.filter(function(i) { return (i.existencia || 0) === 0; }).length;
+  var nBajo = b7TodosData.filter(function(i) { var e = i.existencia || 0; return e > 0 && e <= (i.stock_minimo || 0); }).length;
+  var notaUso = b7UsoMap
+    ? ' · Consumo = unidades por mes estimadas con ' + b7UsoInfo.fotos + ' fotos desde ' + escHtml(fmtFechaLetras(b7UsoInfo.primera))
+    : ' · sin historial suficiente para medir consumo';
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-    '<title>Bajo Stock Serigrafía — ' + fecha + '</title>' +
-    '<style>*{box-sizing:border-box;margin:0;padding:0}' +
-    'body{font-family:"DM Sans",Arial,sans-serif;padding:32px;color:#0C0C0B}' +
-    'h1{font-size:18px;font-weight:700;margin-bottom:4px}' +
-    '.sub{font-size:12px;color:#6B6B6A;margin-bottom:20px}' +
-    'table{width:100%;border-collapse:collapse;font-size:12px}' +
-    'thead tr{background:#1A6B5B;color:#fff}' +
-    'th{padding:8px 10px;text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase}' +
-    'th:nth-child(3),th:nth-child(4),th:nth-child(5){text-align:right}' +
-    '@media print{body{padding:16px}}' +
+    '<title>Bajo Stock Insumos Serigrafía — ' + fecha + '</title>' +
+    '<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+    'body{font-family:"DM Sans",Arial,sans-serif;padding:28px;color:#0C0C0B}' +
+    'h1{font-size:18px;font-weight:700;margin-bottom:4px;color:#B83232}' +
+    '.sub{font-size:11px;color:#6B6B6A;margin-bottom:14px;line-height:1.4}' +
+    'table{width:100%;border-collapse:collapse;font-size:11px}' +
+    'thead tr{background:#F3F2EE}' +
+    'th{padding:5px 8px;text-align:left;font-size:9px;font-weight:700;color:#6B6B6A;border-bottom:1px solid #ddd}' +
+    'th.r,td.r{text-align:right}' +
+    'td{padding:4px 8px;border-bottom:1px solid #eee}' +
+    '.mono{font-family:monospace;font-size:10px;white-space:nowrap}' +
+    '.bdg{border-radius:4px;padding:1px 7px;font-size:9px;font-weight:800;white-space:nowrap}' +
+    'tr.sec td{background:#1A6B5B;color:#fff;font-weight:700;font-size:10px;letter-spacing:.3px;padding:6px 8px;border:0}' +
+    'tr{page-break-inside:avoid}thead{display:table-header-group}' +
+    '@media print{body{padding:14px}}' +
     '</style></head><body>' +
-    '<h1>⚠️ Insumos Serigrafía — Bajo Stock</h1>' +
-    '<div class="sub">Generado: ' + fecha + ' · ' + b7AlertasData.length + ' ítem(s)</div>' +
-    '<table><thead><tr><th>SKU</th><th>Descripción</th><th style="text-align:right">Existencia</th><th style="text-align:right">Mínimo</th><th style="text-align:right">Consumo</th></tr></thead>' +
+    '<h1>⚠️ Bajo stock — Insumos Serigrafía</h1>' +
+    '<div class="sub">Generado: ' + fecha + ' · Inv. B7 · ' + b7TodosData.length + ' insumos (' + nCero + ' sin stock, ' + nBajo + ' bajo mínimo)' + notaUso + '</div>' +
+    '<table><thead><tr><th>SKU</th><th>Descripción</th><th class="r">Existencia</th><th class="r">Mínimo</th><th class="r">Consumo</th><th></th></tr></thead>' +
     '<tbody>' + filas + '</tbody></table>' +
     '</body></html>';
 
   var win = window.open('', '_blank');
+  if (!win) { showToast('El navegador bloqueó la ventana del PDF — permite pop-ups', '#B83232'); return; }
   win.document.write(html);
   win.document.close();
   win.focus();
