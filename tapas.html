@@ -393,6 +393,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .fich-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--teal-xl);border-bottom:1px solid var(--teal-l)}
 .fich-title{font-family:var(--display);font-size:15px;font-weight:800;color:var(--teal)}
 .fich-count{font-size:11px;color:var(--gray)}
+.fich-comp{font-size:10.5px;color:var(--gray);opacity:.75;white-space:nowrap}
 .fich-body{padding:12px;overflow-x:auto}
 .fich-grid{display:grid;gap:14px;align-items:start}
 .fich-cell{min-width:0}
@@ -5616,6 +5617,15 @@ function fichBuscarHtml() {
     + '<button class="fb-x" title="Limpiar" style="' + (fichasBuscar ? '' : 'display:none') + '" onclick="fichBuscarLimpiar()">✕</button></span>';
 }
 
+// Detalle sutil del encabezado: cuántas fichas de Tapas están COMPLETADAS (estado 'lista') del total de fichas registradas
+function fichCompletadasHtml() {
+  var tot = solicitudes.length;
+  if (!tot) return '';
+  var comp = solicitudes.filter(function(s) { return s.estado === 'lista'; }).length;
+  var pct = Math.round(comp / tot * 100);
+  return '<span class="fich-comp" title="Fichas completadas del total de fichas de Tapas registradas (' + pct + '%)">✓ ' + comp.toLocaleString() + ' de ' + tot.toLocaleString() + ' completadas</span>';
+}
+
 function renderFichasCompactasTapas() {
   var wrap = document.getElementById('fichasTapas');
   if (!wrap) return;
@@ -5724,6 +5734,7 @@ function renderFichasCompactasTapas() {
   wrap.innerHTML = '<div class="fich-wrap">'
     + '<div class="fich-hdr"><span class="fich-title">📋 Fichas de Trabajo</span>'
     +   '<span class="fich-count">' + vivas.length + ' pedido' + (vivas.length !== 1 ? 's' : '') + ' con saldo · ' + clis.length + ' cliente' + (clis.length !== 1 ? 's' : '') + '</span>'
+    +   fichCompletadasHtml()
     +   fichBuscarHtml()
     +   '<span class="cp-modo"><button class="' + (fichasAgrupar === 'tipo' ? 'act' : '') + '" onclick="setFichasAgrupar(\'tipo\')">Por tipo</button>'
     +   '<button class="' + (fichasAgrupar === 'cliente' ? 'act' : '') + '" onclick="setFichasAgrupar(\'cliente\')">Por cliente</button>'
