@@ -7759,11 +7759,15 @@ async function cargarUsoB7() {
     if (r.error || !r.data) { b7UsoMap = null; b7UsoInfo = null; return; }
     var mapa = {}, info = null;
     r.data.forEach(function(f) {
-      if (f.sku == null) { info = { fotos: f.fotos || 0, primera: f.primera }; return; }
+      if (f.sku == null) {
+        var dd = (f.primera && f.ultima) ? Math.round((new Date(f.ultima + 'T12:00:00') - new Date(f.primera + 'T12:00:00')) / 86400000) : 0;
+        info = { fotos: f.fotos || 0, primera: f.primera, dias: dd };
+        return;
+      }
       mapa[f.sku] = { veces: f.dias_baja || 0, consumo: Number(f.consumo) || 0 };
     });
     // Con menos de 2 fotos no hay forma de medir consumo: no ordenar por uso
-    if (!info || info.fotos < 2) { b7UsoMap = null; b7UsoInfo = info; return; }
+    if (!info || info.fotos < 2 || !info.dias) { b7UsoMap = null; b7UsoInfo = info; return; }
     b7UsoMap = mapa; b7UsoInfo = info;
   } catch (e) { b7UsoMap = null; b7UsoInfo = null; }
 }
@@ -7797,7 +7801,13 @@ function b7UsoCelda(i) {
     return '<td style="' + td + 'font-size:10px;color:var(--gray);text-align:right;opacity:.7" title="No bajó su existencia en ninguna foto de Bodega 7 desde ' + escHtml(fmtFechaLetras(b7UsoInfo.primera)) + '">💤 sin uso</td>';
   }
   var cons = u.consumo % 1 === 0 ? u.consumo.toLocaleString() : u.consumo.toFixed(2);
-  return '<td style="' + td + 'font-size:10px;font-weight:700;color:var(--ink);text-align:right" title="Su existencia bajó ' + u.veces + ' veces · consumo total ' + cons + ' desde ' + escHtml(fmtFechaLetras(b7UsoInfo.primera)) + '">' + u.veces + '× <span style="font-weight:500;color:var(--gray)">(' + cons + ')</span></td>';
+  return '<td style="' + td + 'font-size:10px;font-weight:700;color:var(--ink);text-align:right" title="Consumo total ' + cons + ' en ' + b7UsoInfo.dias + ' días (desde ' + escHtml(fmtFechaLetras(b7UsoInfo.primera)) + ') · la existencia bajó ' + u.veces + ' veces">' + b7MensualTxt(u.consumo) + ' <span style="font-weight:500;color:var(--gray)">/mes</span></td>';
+}
+
+// Consumo mensual estimado = consumo del período ÷ días cubiertos por las fotos × 30
+function b7MensualTxt(consumo) {
+  // Siempre unidades enteras, redondeadas hacia arriba (no se puede pedir 2.1 galones; <1 cuenta como 1)
+  return Math.ceil(consumo / b7UsoInfo.dias * 30 - 1e-9).toLocaleString();
 }
 
 function b7NotaUso(todos) {
@@ -7806,8 +7816,8 @@ function b7NotaUso(todos) {
     return '<div style="' + st + '">Sin historial suficiente de Bodega 7 para ordenar por uso — orden: sin stock → bajo mínimo.</div>';
   }
   var muertos = todos.filter(function(i) { return !b7UsoDe(i).veces; }).length;
-  return '<div style="' + st + '">Ordenado por <b>frecuencia de uso</b>: veces que bajó la existencia entre inventarios desde ' +
-    escHtml(fmtFechaLetras(b7UsoInfo.primera)) + ' (' + b7UsoInfo.fotos + ' fotos) y, entre paréntesis, lo consumido. ' +
+  return '<div style="' + st + '">Ordenado por <b>frecuencia de uso</b> (veces que bajó la existencia entre inventarios). Columna Consumo = unidades por mes, estimadas con ' +
+    b7UsoInfo.fotos + ' fotos desde ' + escHtml(fmtFechaLetras(b7UsoInfo.primera)) + '. ' +
     '<b>💤 ' + muertos + ' sin uso</b> al final = candidatos a código muerto.</div>';
 }
 
@@ -7826,7 +7836,7 @@ function b7BuildTabla(items) {
       '<th style="' + th + 'text-align:left">Descripción</th>' +
       '<th style="' + th + 'text-align:right">Existencia</th>' +
       '<th style="' + th + 'text-align:right">Mínimo</th>' +
-      '<th style="' + th + 'text-align:right" title="Veces que bajó la existencia entre fotos de Bodega 7 (y unidades consumidas)">Uso</th>' +
+      '<th style="' + th + 'text-align:right" title="Consumo mensual estimado (unidades por mes) según las fotos de Bodega 7">Consumo</th>' +
       '<th style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:9px"></th>' +
     '</tr></thead><tbody>';
   html += items.map(b7BuildFila).join('');
@@ -8074,7 +8084,7 @@ function descargarAlertasB7() {
       '<td style="font-size:12px;font-weight:600;padding:7px 10px;border-bottom:1px solid #eee">' + (i.descripcion || '') + '</td>' +
       '<td style="font-family:monospace;font-size:12px;font-weight:700;color:' + numColor + ';text-align:right;padding:7px 10px;border-bottom:1px solid #eee">' + existFmt + '</td>' +
       '<td style="font-family:monospace;font-size:11px;text-align:right;padding:7px 10px;border-bottom:1px solid #eee;color:#6B6B6A">mín. ' + minFmt + '</td>' +
-      '<td style="font-size:11px;text-align:right;padding:7px 10px;border-bottom:1px solid #eee;color:#6B6B6A">' + (b7UsoMap ? (b7UsoDe(i).veces ? b7UsoDe(i).veces + '×' : 'sin uso') : '—') + '</td>' +
+      '<td style="font-size:11px;text-align:right;padding:7px 10px;border-bottom:1px solid #eee;color:#6B6B6A">' + (b7UsoMap ? (b7UsoDe(i).veces ? b7MensualTxt(b7UsoDe(i).consumo) + '/mes' : 'sin uso') : '—') + '</td>' +
     '</tr>';
   }).join('');
 
@@ -8092,7 +8102,7 @@ function descargarAlertasB7() {
     '</style></head><body>' +
     '<h1>⚠️ Insumos Serigrafía — Bajo Stock</h1>' +
     '<div class="sub">Generado: ' + fecha + ' · ' + b7AlertasData.length + ' ítem(s)</div>' +
-    '<table><thead><tr><th>SKU</th><th>Descripción</th><th style="text-align:right">Existencia</th><th style="text-align:right">Mínimo</th><th style="text-align:right">Uso</th></tr></thead>' +
+    '<table><thead><tr><th>SKU</th><th>Descripción</th><th style="text-align:right">Existencia</th><th style="text-align:right">Mínimo</th><th style="text-align:right">Consumo</th></tr></thead>' +
     '<tbody>' + filas + '</tbody></table>' +
     '</body></html>';
 
