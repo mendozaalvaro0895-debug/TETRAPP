@@ -206,6 +206,28 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-hdr{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .ped-h1{font-family:'Playfair Display',serif;font-size:20px;font-weight:800;color:#1A6B5B}
 .ped-sub{font-size:11px;color:#9A9A98}
+/* Buscador de fichas (ESPEJO del de Fichas de Trabajo de tapas.html): el desplegable es position:fixed para que nada lo recorte */
+.ped-bus{position:relative;margin:0 0 10px}
+.ped-bus input{width:100%;box-sizing:border-box;padding:9px 30px 9px 32px;border:1.5px solid #E0DED8;border-radius:8px;font-size:14px;background:#fff;color:#0C0C0B;font-family:inherit}
+.ped-bus input:focus{outline:none;border-color:#1A6B5B;box-shadow:0 0 0 2px rgba(26,107,91,.15)}
+.ped-bus .fb-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;opacity:.7}
+.ped-bus .fb-x{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:#9ca3af;cursor:pointer;font-size:15px;line-height:1;padding:4px 6px}
+.ped-dd{position:fixed;z-index:10002;background:#fff;border:1px solid #D5D3CC;border-radius:10px;box-shadow:0 8px 26px rgba(0,0,0,.2);overflow:hidden;font-size:12px}
+.ped-dd-b{max-height:min(420px,60vh);overflow:auto}
+.ped-dd-r{padding:8px 12px;border-bottom:1px solid #F0EEE8;cursor:pointer}
+.ped-dd-r:hover,.ped-dd-r.sel{background:#E8F4F1}
+.ped-dd-r .l1{display:flex;align-items:baseline;gap:8px}
+.ped-dd-r .fi{font-family:'DM Mono',monospace;font-weight:800;color:#1A6B5B}
+.ped-dd-r .cl{font-weight:600;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ped-dd-r .u{margin-left:auto;font-family:'DM Mono',monospace;font-weight:700;color:#1f2937;white-space:nowrap}
+.ped-dd-r .l2{color:#6B6B6A;font-size:11px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ped-dd-r .bd{font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:8px;white-space:nowrap}
+.ped-dd-r .bd.ok{background:#DCFCE7;color:#166534}
+.ped-dd-r .bd.am{background:#FEF3C7;color:#92400E}
+.ped-dd-r .bd.az{background:#DBEAFE;color:#1E40AF}
+.ped-dd-r .bd.gr{background:#EEF0F2;color:#4B5563}
+.ped-dd-f{padding:6px 12px;color:#6B6B6A;font-size:10.5px;background:#FAFAF8}
+.ped-dd-0{padding:14px 12px;color:#6B6B6A;text-align:center}
 .ped-ref{margin-left:auto;background:#fff;border:1.5px solid #E0DED8;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;color:#1A6B5B}
 .ped-aviso{background:#FFF3D6;color:#7A4800;border:1px solid #E8C468;border-radius:8px;padding:7px 10px;font-size:11px;margin:6px 0}
 .ped-chev{display:inline-block;width:12px;font-size:10px;color:#1A6B5B;transition:transform .12s}
@@ -636,6 +658,10 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
       <button class="ped-ref" onclick="cargarPedidos()">↻ Actualizar</button>
       <button class="ped-ref" id="pedBloqBtn" style="margin-left:8px" onclick="pedBloquear()">🔒 Bloquear</button>
     </div>
+    <div class="ped-bus"><span class="fb-ico">🔍</span>
+      <input id="pedBuscar" type="text" autocomplete="off" spellcheck="false" placeholder="Buscar ficha: No., SKU, cliente o descripción…"
+        oninput="pedBuscarInput(this.value)" onfocus="pedBuscarMostrar()" onkeydown="pedBuscarKey(event)">
+      <button class="fb-x" id="pedBuscarX" title="Limpiar" style="display:none" onclick="pedBuscarLimpiar()">✕</button></div>
     <div id="pedAviso"></div>
     <div id="pedCuerpo"><div class="cargando"><div class="spinner"></div><div>Cargando pedidos…</div></div></div>
   </div>
@@ -2140,6 +2166,143 @@ function pedPendRowHtml(g) {
     + '<span class="lt">' + escHtml(pedPendLotes(g)) + '</span>'
     + '<span class="pr">' + escHtml((x.sku ? x.sku + ' · ' : '') + x.desc) + '</span>'
     + '<span class="u">' + pedNum(g.falta) + '</span></div>';
+}
+
+// ── Buscador de fichas (ESPEJO de fichBuscar* de tapas.html) ─────────────────────────────────────────────
+// Escribe No. de ficha (T-059, t59, 59), SKU (del producto o de sus componentes), cliente o descripción: todas las palabras deben aparecer
+// (sin importar mayúsculas ni tildes). Busca en TODAS las fichas, también las completadas. Elegir una opción abre la ficha.
+// El cuadro vive FUERA de #pedCuerpo, así el refresco automático de 45 s no le quita el foco ni lo que se escribe.
+var pedBus = { sel: -1, ids: [], listo: false };
+
+function pedBusHay(x) {
+  var cod = String(x.codigo || '');
+  var num = cod.replace(/\D/g, '').replace(/^0+/, '');
+  var partes = [cod, cod.replace(/-/g, ''), num ? 't-' + num : '', num ? 't' + num : '', num, 'ficha pedido', x.cliente || ''];
+  (x.s.solicitud_lineas || []).forEach(function(l) {
+    partes.push(l.sku || '', l.descripcion || '', l.sku_base || '', l.sku_contratapa || '', l.sku_liner || '', l.sku_banda || '');
+  });
+  return acNorm(partes.join(' '));
+}
+
+function pedBusResultados(q) {
+  var toks = acNorm(q).split(/[\s,;]+/).filter(Boolean);
+  if (!toks.length) return [];
+  var res = [];
+  (PED.modelo || []).forEach(function(x) {
+    var hay = pedBusHay(x);
+    for (var i = 0; i < toks.length; i++) if (hay.indexOf(toks[i]) < 0) return;
+    var cod = acNorm(x.codigo || '');
+    var num = cod.replace(/\D/g, '').replace(/^0+/, '');
+    var score = 2;
+    toks.forEach(function(t) {
+      if (t === cod || t === cod.replace(/-/g, '') || (num && (t === num || t === 't' + num || t === 't-' + num))) score = Math.min(score, 0);
+      else if ((x.s.solicitud_lineas || []).some(function(l) { return acNorm(l.sku || '').indexOf(t) === 0; })) score = Math.min(score, 1);
+    });
+    res.push({ x: x, score: score, viva: x.viva ? 0 : 1 });
+  });
+  res.sort(function(a, b) {
+    return a.viva - b.viva || a.score - b.score || String(b.x.codigo || '').localeCompare(String(a.x.codigo || ''));
+  });
+  return res;
+}
+
+function pedBusBadge(x) {
+  if (x.s.estado === 'lista') return '<span class="bd ok">✓ Completada</span>';
+  if (x.viva && x.cant > 0 && x.entregadoTotal >= x.cant) return '<span class="bd am">Entregada · abierta</span>';
+  if (x.s.estado === 'proceso') return '<span class="bd az">En proceso</span>';
+  if (x.s.estado === 'parcial') return '<span class="bd am">Parcial</span>';
+  if (x.viva) return '<span class="bd gr">Pendiente</span>';
+  return '<span class="bd gr">' + escHtml(x.s.estado || '—') + '</span>';
+}
+
+function pedBusFilaHtml(r, i) {
+  var x = r.x;
+  return '<div class="ped-dd-r' + (i === pedBus.sel ? ' sel' : '') + '" data-i="' + i + '" data-id="' + escHtml(String(x.id)) + '" onmousedown="event.preventDefault();pedBuscarElegir(this.dataset.id)">'
+    + '<div class="l1"><span class="fi">' + escHtml(x.codigo || '—') + '</span><span class="cl">' + escHtml(x.cliente || '—') + '</span>' + pedBusBadge(x)
+    + '<span class="u" title="Entregado / pedido">' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</span></div>'
+    + '<div class="l2">' + escHtml((x.sku ? x.sku + ' · ' : '') + (x.desc || '')) + '</div></div>';
+}
+
+function pedBuscarCerrar() {
+  var d = document.getElementById('pedBuscarDd');
+  if (d) d.remove();
+  pedBus.sel = -1; pedBus.ids = [];
+}
+
+function pedBuscarMostrar() {
+  var inp = document.getElementById('pedBuscar');
+  if (!inp) return;
+  if (!pedBus.listo) {
+    pedBus.listo = true;
+    document.addEventListener('mousedown', function(e) {
+      var d = document.getElementById('pedBuscarDd'), i = document.getElementById('pedBuscar');
+      if (d && !d.contains(e.target) && e.target !== i) pedBuscarCerrar();
+    }, true);
+    window.addEventListener('scroll', function(e) {
+      var d = document.getElementById('pedBuscarDd');
+      if (d && !d.contains(e.target)) pedBuscarCerrar();
+    }, true);
+    window.addEventListener('resize', pedBuscarCerrar);
+  }
+  var q = inp.value;
+  if (!acNorm(q).trim()) { pedBuscarCerrar(); return; }
+  var res = pedBusResultados(q), MAX = 15;
+  var mostrar = res.slice(0, MAX);
+  pedBus.ids = mostrar.map(function(r) { return String(r.x.id); });
+  if (pedBus.sel >= pedBus.ids.length) pedBus.sel = -1;
+  var d = document.getElementById('pedBuscarDd');
+  if (!d) { d = document.createElement('div'); d.id = 'pedBuscarDd'; d.className = 'ped-dd'; document.body.appendChild(d); }
+  d.innerHTML = mostrar.length
+    ? '<div class="ped-dd-b">' + mostrar.map(pedBusFilaHtml).join('') + '</div>'
+      + '<div class="ped-dd-f">' + res.length + ' ficha' + (res.length !== 1 ? 's' : '') + ' coinciden' + (res.length > MAX ? ' · mostrando las primeras ' + MAX + ': escribe más para afinar' : '') + '</div>'
+    : '<div class="ped-dd-0">Ninguna ficha coincide con “' + escHtml(q.trim()) + '”</div>';
+  var b = inp.getBoundingClientRect();
+  var w = Math.min(Math.max(b.width, 300), window.innerWidth - 16);
+  d.style.width = w + 'px';
+  d.style.left = Math.max(8, Math.min(b.left, window.innerWidth - w - 8)) + 'px';
+  d.style.top = (b.bottom + 4) + 'px';
+}
+
+function pedBuscarInput(v) {
+  pedBus.sel = -1;
+  var x = document.getElementById('pedBuscarX');
+  if (x) x.style.display = v ? '' : 'none';
+  pedBuscarMostrar();
+}
+
+function pedBuscarKey(e) {
+  var d = document.getElementById('pedBuscarDd');
+  if (e.key === 'Escape') { pedBuscarCerrar(); return; }
+  if (!d) { if (e.key === 'ArrowDown') pedBuscarMostrar(); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!pedBus.ids.length) return;
+    pedBus.sel = e.key === 'ArrowDown' ? (pedBus.sel + 1) % pedBus.ids.length : (pedBus.sel <= 0 ? pedBus.ids.length - 1 : pedBus.sel - 1);
+    d.querySelectorAll('.ped-dd-r').forEach(function(el) {
+      var on = Number(el.dataset.i) === pedBus.sel;
+      el.classList.toggle('sel', on);
+      if (on) el.scrollIntoView({ block: 'nearest' });
+    });
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (pedBus.ids.length) pedBuscarElegir(pedBus.ids[pedBus.sel >= 0 ? pedBus.sel : 0]);
+  }
+}
+
+// Una ficha viva (o completada hace poco) se abre completa; una vieja ya cerrada se abre en su ventana de estado (solo lectura)
+function pedBuscarElegir(id) {
+  pedBuscarCerrar();
+  var x = (PED.modelo || []).find(function(m) { return String(m.id) === String(id); });
+  if (!x) return;
+  if (x.viva || x.completada) abrirPedido(id); else abrirEstadoFicha(id);
+}
+
+function pedBuscarLimpiar() {
+  var inp = document.getElementById('pedBuscar');
+  if (inp) { inp.value = ''; inp.focus(); }
+  var x = document.getElementById('pedBuscarX');
+  if (x) x.style.display = 'none';
+  pedBuscarCerrar();
 }
 
 function renderPedidos() {
