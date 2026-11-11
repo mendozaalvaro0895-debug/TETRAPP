@@ -1773,7 +1773,30 @@ function getLastImport(bodega) {
 function saveLastImport(bodega, rows) {
   var key = IMPORT_KEYS[bodega];
   if (!key) return;
-  localStorage.setItem(key, JSON.stringify({ ts: new Date().toISOString(), rows: rows }));
+  var reg = { ts: new Date().toISOString(), rows: rows };
+  try { localStorage.setItem(key, JSON.stringify(reg)); } catch(e) {}
+  // Supabase (tabla configuracion): "última importación" visible desde cualquier equipo.
+  db.from('configuracion').upsert({ clave: 'bodega_ultima_import_' + bodega, valor: reg, updated_at: reg.ts })
+    .then(function(r) { if (r && r.error) console.warn('bodega_ultima_import:', r.error.message); });
+}
+/* Trae de Supabase la última importación de cada bodega y la deja en la copia local
+   (la base manda: si otro equipo importó después, aquí se ve esa fecha). */
+async function cargarUltimasImportDB() {
+  try {
+    var claves = Object.keys(IMPORT_KEYS).map(function(b) { return 'bodega_ultima_import_' + b; });
+    var r = await db.from('configuracion').select('clave,valor').in('clave', claves);
+    if (!r || r.error || !r.data) return;
+    r.data.forEach(function(f) {
+      var b = String(f.clave).replace('bodega_ultima_import_', '');
+      var remoto = f.valor;
+      if (!IMPORT_KEYS[b] || !remoto || !remoto.ts) return;
+      var local = getLastImport(b);
+      if (!local || !local.ts || remoto.ts > local.ts) {
+        try { localStorage.setItem(IMPORT_KEYS[b], JSON.stringify(remoto)); } catch(e) {}
+      }
+    });
+    actualizarTimestampsDropdown();
+  } catch(e) {}
 }
 function fmtLastImport(bodega) {
   var d = getLastImport(bodega);
@@ -2185,6 +2208,7 @@ document.addEventListener('click', function(e) {
 
 (async function init() {
   actualizarTimestampsDropdown();
+  cargarUltimasImportDB();
   await cargarTodo();
   cargarRotacion();
   await cargarMovimientos();
