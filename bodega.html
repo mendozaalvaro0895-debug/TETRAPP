@@ -2136,6 +2136,8 @@ async function confirmarImport() {
       if ((i.bodega || 'B2') === bodeganKey) skuActuales[i.sku] = i;
     });
     var descActualizadas = 0;
+    var descFallidas = 0;
+    var primerError = '';
 
     var existentes = importPendiente.filter(function(p) { return skuActuales[p.sku]; });
     var nuevos     = importPendiente.filter(function(p) { return !skuActuales[p.sku]; });
@@ -2143,12 +2145,22 @@ async function confirmarImport() {
     var PARALLEL = 20;
     for (var i = 0; i < existentes.length; i += PARALLEL) {
       var chunk = existentes.slice(i, i + PARALLEL);
-      var results = await Promise.all(chunk.map(function(p) {
+      var results = await Promise.all(chunk.map(async function(p) {
         var cambio = { existencia: p.existencia };
         var antes = String((skuActuales[p.sku] && skuActuales[p.sku].descripcion) || '').trim();
-        if (p.descripcion && p.descripcion !== antes.toUpperCase()) { cambio.descripcion = p.descripcion; descActualizadas++; }
-        return db.from('inventario').update(cambio)
-          .eq('sku', p.sku).eq('bodega', bodeganKey);
+        var conDesc = !!(p.descripcion && p.descripcion !== antes.toUpperCase());
+        if (conDesc) cambio.descripcion = p.descripcion;
+        var r = await db.from('inventario').update(cambio).eq('sku', p.sku).eq('bodega', bodeganKey);
+        if (r.error && conDesc) {
+          // Lo importante es la existencia: si la descripción es la que falla, se reintenta sin ella.
+          if (!primerError) primerError = r.error.message || r.error.code || 'error';
+          descFallidas++;
+          r = await db.from('inventario').update({ existencia: p.existencia }).eq('sku', p.sku).eq('bodega', bodeganKey);
+        } else if (conDesc) {
+          descActualizadas++;
+        }
+        if (r.error && !primerError) primerError = r.error.message || r.error.code || 'error';
+        return r;
       }));
       results.forEach(function(r) { if (r.error) errores++; });
       hecho += chunk.length;
@@ -2171,7 +2183,9 @@ async function confirmarImport() {
     var msg = total + ' productos actualizados';
     if (nuevos.length) msg += ' · ' + nuevos.length + ' nuevos agregados';
     if (descActualizadas) msg += ' · ' + descActualizadas + ' descripciones actualizadas';
+    if (descFallidas) msg += ' · ' + descFallidas + ' descripciones no se pudieron cambiar (existencia sí)';
     if (errores) msg += ' · ' + errores + ' errores';
+    if (primerError) { console.warn('Importación inventario, primer error:', primerError); msg += ' [' + primerError.substring(0, 80) + ']'; }
     nuevosRegistrar(bodeganKey, nuevos);
     toast(msg, errores ? 'err' : 'ok');
     if (!errores) {
