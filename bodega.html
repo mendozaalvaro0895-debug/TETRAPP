@@ -2137,6 +2137,7 @@ async function confirmarImport() {
     });
     var descActualizadas = 0;
     var descFallidas = 0;
+    var redondeados = 0;
     var primerError = '';
 
     var existentes = importPendiente.filter(function(p) { return skuActuales[p.sku]; });
@@ -2158,6 +2159,11 @@ async function confirmarImport() {
           r = await db.from('inventario').update({ existencia: p.existencia }).eq('sku', p.sku).eq('bodega', bodeganKey);
         } else if (conDesc) {
           descActualizadas++;
+        }
+        if (r.error && /integer/i.test(String(r.error.message)) && p.existencia % 1 !== 0) {
+          // La columna existencia de inventario es entera: SICAF trae decimales (ej. 23.68) en algunos SKU.
+          r = await db.from('inventario').update({ existencia: Math.round(p.existencia) }).eq('sku', p.sku).eq('bodega', bodeganKey);
+          if (!r.error) redondeados++;
         }
         if (r.error && !primerError) primerError = r.error.message || r.error.code || 'error';
         return r;
@@ -2183,6 +2189,7 @@ async function confirmarImport() {
     var msg = total + ' productos actualizados';
     if (nuevos.length) msg += ' · ' + nuevos.length + ' nuevos agregados';
     if (descActualizadas) msg += ' · ' + descActualizadas + ' descripciones actualizadas';
+    if (redondeados) msg += ' · ' + redondeados + ' con decimales redondeados al entero';
     if (descFallidas) msg += ' · ' + descFallidas + ' descripciones no se pudieron cambiar (existencia sí)';
     if (errores) msg += ' · ' + errores + ' errores';
     if (primerError) { console.warn('Importación inventario, primer error:', primerError); msg += ' [' + primerError.substring(0, 80) + ']'; }
