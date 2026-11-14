@@ -1999,8 +1999,7 @@ async function mostrarDetalle(id) {
         <button class="btn btn-t btn-xs" onclick="abrirPlazoFicha('${s.id}')" title="Arrancar un parcial de esta ficha o cambiar el plazo">▶ Trabajar parcial</button>
         <button class="btn btn-g btn-xs" onclick="editarFichaTapas('${s.id}')">✏️ Editar</button>
         ${DETALLE_FICHA_EXTRAS && s.estado === 'nueva' ? `<button class="btn btn-t btn-xs" onclick="cambiarEstado('${s.id}','proceso')">▶ Iniciar</button>` : ''}
-        ${s.estado === 'proceso' ? `<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','lista')">✓ Lista</button>` : ''}
-        ${s.estado === 'lista' ? `<button class="btn btn-g btn-xs" onclick="cambiarEstado('${s.id}','entregada')">📦 Entregar</button>` : ''}
+        ${s.estado !== 'lista' ? `<button class="btn btn-g btn-xs" onclick="completarFichaTapas('${s.id}')" title="Dar la ficha por completada (sigue visible 15 días al final de su grupo)">✅ Marcar completada</button>` : ''}
         <button class="btn btn-del btn-xs" onclick="confirmarBorrar('${s.id}')">🗑</button>`;
 
   const filasIng = ingresos.map(m =>
@@ -4702,7 +4701,9 @@ function bloqueSobreentregadaTapas(s) {
 async function completarFichaTapas(id) {
   var s = solicitudes.find(function(x) { return x.id === id; });
   if (!s) return;
-  if (!confirm('¿Marcar ' + (s.id_display || 'la ficha') + ' como COMPLETADA?')) return;
+  var entTot = entregadoTotalFichaTapas(s), falta = Math.max(0, (s.cant || 0) - entTot);
+  if (!confirm('¿Marcar ' + (s.id_display || 'la ficha') + ' como COMPLETADA?'
+    + (falta > 0 ? '\n\nOjo: aún faltan ' + falta.toLocaleString() + ' und por entregar (' + entTot.toLocaleString() + '/' + (s.cant || 0).toLocaleString() + '). Saldrá de los pendientes igualmente.' : ''))) return;
   var quien = (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || 'Master';
   var ahora = new Date().toISOString();
   var r1 = await db.from('solicitudes').update({ estado: 'lista', marcado_tapas_por: quien, marcado_tapas_en: ahora }).eq('id', s.dbId).select('id');
@@ -4723,13 +4724,13 @@ async function completarFichaTapas(id) {
 }
 
 function bloqueMarcaTapasFicha(s) {
-  if (!s.marcadoTapasPor && !s.marcadoTapasEn) return '';
+  if (!s.marcadoTapasPor && !s.marcadoTapasEn && s.estado !== 'lista') return '';
   if (s.estado !== 'lista' && s.estado !== 'parcial') return '';
   var lista = s.estado === 'lista';
   var idq = escHtml(String(s.id));
   return '<div class="dc" style="border-color:' + (lista ? '#6EE7B7' : '#FDE047') + ';border-width:2px"><div class="dc-h" style="background:' + (lista ? '#ECFDF5' : '#FEF9C3') + ';color:' + (lista ? '#047857' : '#A16207') + '">'
     + (lista ? '✅ Marcada COMPLETADA desde Tapas · entregado ' + entregadoTotalFichaTapas(s).toLocaleString() + '/' + s.cant.toLocaleString() : '🟡 Entrega parcial marcada desde Tapas') + '</div><div class="dc-b" style="font-size:12px">'
-    + escHtml(s.marcadoTapasPor || 'Tapas') + (s.marcadoTapasEn ? ' · ' + escHtml(comentFechaHoraTapas(s.marcadoTapasEn)) : '')
+    + escHtml(s.marcadoTapasPor || (s.marcadoTapasEn ? 'Tapas' : 'Completada antes de registrar quién y cuándo')) + (s.marcadoTapasEn ? ' · ' + escHtml(comentFechaHoraTapas(s.marcadoTapasEn)) : '')
     + ' <button class="btn btn-g btn-xs" style="margin-left:8px" onclick="reabrirFichaTapas(\'' + idq + '\')">↩ Reabrir ficha</button></div></div>';
 }
 
