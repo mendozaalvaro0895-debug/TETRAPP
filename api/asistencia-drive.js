@@ -82,7 +82,7 @@ function parsearHoja(csv, anio, mes) {
   // reconoce la pestaña por INGRESO/ROL en B1/C1 o por el título clásico en A1.
   const h = filas.length ? filas[0] : [];
   const okFormato = normalizar(h[0]) === 'NOMBRE Y APELLIDO' ||
-    (normalizar(h[1]) === 'INGRESO' && normalizar(h[2]) === 'ROL');
+    normalizar(h[2]) === 'ROL';   // gviz deja B1 (INGRESO) vacío cuando la columna mezcla fechas y texto
   if (!okFormato) {
     return { error: 'La pestaña no tiene el formato esperado (¿existe la pestaña del mes?)' };
   }
