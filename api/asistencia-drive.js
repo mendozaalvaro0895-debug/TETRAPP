@@ -78,7 +78,12 @@ function pad(n) { return String(n).padStart(2, '0'); }
 
 function parsearHoja(csv, anio, mes) {
   const filas = parseCsv(csv);
-  if (!filas.length || normalizar(filas[0][0]) !== 'NOMBRE Y APELLIDO') {
+  // El encabezado de A1 cambió entre meses (OCT: "NOMBRE Y APELLIDO", NOV: vacío), así que se
+  // reconoce la pestaña por INGRESO/ROL en B1/C1 o por el título clásico en A1.
+  const h = filas.length ? filas[0] : [];
+  const okFormato = normalizar(h[0]) === 'NOMBRE Y APELLIDO' ||
+    (normalizar(h[1]) === 'INGRESO' && normalizar(h[2]) === 'ROL');
+  if (!okFormato) {
     return { error: 'La pestaña no tiene el formato esperado (¿existe la pestaña del mes?)' };
   }
   const cols = [];
