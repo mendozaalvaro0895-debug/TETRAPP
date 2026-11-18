@@ -428,7 +428,9 @@ view-lockers: 86 espacios fijos (`LOCKERS_TOTAL`), SIN tabla propia — la dispo
   base — solo cambia qué dice el papel impreso). Genera, en una pestaña nueva, una hoja con
   una ficha por locker seleccionado lista para imprimir y pegar en el locker físico — si el
   número no tiene ocupante, la ficha muestra solo "VACÍO" (o el texto editado) centrado
-  (sin área/turno). Diseño en escala de grises puro
+  (sin área/turno) y, cuando dice el "VACÍO" de siempre, una nota pequeña debajo (nov/2026,
+  `NOTA_LOCKER_VACIO`: "Si estás usando este locker, notifica en Oficina o se asignará a
+  alguien más."; si se editó el texto a mano, p. ej. "RESERVADO", va sin nota). Diseño en escala de grises puro
   (sin color, probado para imprimir bien en blanco y negro): "Locker #N" como chip de
   referencia arriba, NOMBRE en mayúsculas grande (lo que se lee al pasar), línea divisoria,
   ÁREA en mayúsculas grande, y "Turno Alex"/"Turno Gabino" en chico SOLO si
