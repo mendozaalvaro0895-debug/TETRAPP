@@ -82,13 +82,17 @@ function parsearHoja(csv, anio, mes) {
   // reconoce la pestaña por INGRESO/ROL en B1/C1 o por el título clásico en A1.
   const h = filas.length ? filas[0] : [];
   const okFormato = normalizar(h[0]) === 'NOMBRE Y APELLIDO' ||
-    normalizar(h[2]) === 'ROL';   // gviz deja B1 (INGRESO) vacío cuando la columna mezcla fechas y texto
+    h.some(function (x) { return normalizar(x) === 'ROL'; });   // gviz deja B1 (INGRESO) vacío cuando la columna mezcla fechas y texto
   if (!okFormato) {
     return { error: 'La pestaña no tiene el formato esperado (¿existe la pestaña del mes?)' };
   }
+  // La columna ROL no siempre está en la misma posición (nov/2026: la hoja agregó LOCKER antes de ROL):
+  // se ubica por su encabezado y los días son las columnas con formato "1-nov" a su derecha.
+  let rolCol = 2;
+  filas[0].forEach(function (h, c) { if (normalizar(h) === 'ROL') rolCol = c; });
   const cols = [];
   filas[0].forEach(function (h, c) {
-    if (c < 3) return;
+    if (c <= rolCol) return;
     const m = String(h || '').match(/^\s*(\d{1,2})\s*-\s*([A-Za-z]{3})/);
     if (!m) return;
     const mm = ABR_MES[m[2].toLowerCase()] || mes;
@@ -102,7 +106,7 @@ function parsearHoja(csv, anio, mes) {
     const nombre = String(f[0] || '').trim();
     if (!nombre) continue;
     const esSeccion = SECCIONES[normalizar(nombre)];
-    if (esSeccion && !String(f[1] || '').trim() && !String(f[2] || '').trim()) { sec = esSeccion; continue; }
+    if (esSeccion && !String(f[1] || '').trim() && !String(f[rolCol] || '').trim()) { sec = esSeccion; continue; }
     if (!sec) continue;
     const estados = {};
     let bajaDesde = null;
@@ -116,7 +120,7 @@ function parsearHoja(csv, anio, mes) {
     });
     personas.push({
       nombre: nombre, area: sec.area, turno_prod: sec.turno,
-      ingreso: parseIngreso(f[1]), rol: String(f[2] || '').trim(),
+      ingreso: parseIngreso(f[1]), rol: String(f[rolCol] || '').trim(),
       estados: estados, baja_desde: bajaDesde
     });
   }
