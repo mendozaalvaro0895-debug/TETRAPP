@@ -357,19 +357,24 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-lane.drag-over{border-color:var(--serig-m);box-shadow:0 0 0 3px rgba(108,46,163,.15)}
 .board-lane-hdr{padding:10px 12px;border-bottom:1px solid var(--border)}
 /* Matriz semanal: líneas (X) × días (Y) */
-.plan-wrap{overflow-x:auto;margin-bottom:24px;padding-bottom:6px}
-.plan-nav{display:flex;align-items:center;gap:8px;margin:0 0 8px;flex-wrap:wrap}
+.plan-wrap{overflow:auto;max-height:78vh;margin-bottom:24px;padding:0 4px 6px 0;border:1px solid var(--border);border-radius:10px;background:var(--bg)}
+.plan-nav{display:flex;align-items:center;gap:8px;margin:0;padding:8px 8px 6px;flex-wrap:wrap}
 .plan-nav-t{font-size:13px;font-weight:800;color:var(--ink);min-width:190px;text-align:center}
 .plan-nav-btn{border:1px solid var(--border);background:var(--bg2);color:var(--ink);border-radius:8px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .plan-nav-btn:hover{border-color:var(--serig-m);color:var(--serig-m)}
-.plan-grid{display:grid;grid-template-columns:96px repeat(4,minmax(230px,1fr));gap:6px;min-width:1000px}
-.plan-lane-hdr{border-radius:10px;border:2px solid var(--border);overflow:hidden;background:var(--bg2)}
+.plan-grid{display:grid;grid-template-columns:96px repeat(4,minmax(230px,1fr));gap:6px;min-width:1000px;padding:0 8px 8px}
+.plan-lane-hdr{border-radius:10px;border:2px solid var(--border);overflow:hidden;background:var(--bg2);position:sticky;top:0;z-index:3}
+.plan-corner{position:sticky;top:0;z-index:3;background:var(--bg)}
+.plan-weekhdr{grid-column:1/-1;font-size:11px;font-weight:800;color:var(--serig-m);letter-spacing:.3px;padding:8px 4px 0;border-bottom:2px solid var(--serig-l)}
 .plan-daylbl{border-radius:8px;background:var(--bg2);border:1px solid var(--border);padding:8px 8px;display:flex;flex-direction:column;gap:2px;justify-content:flex-start}
 .plan-daylbl b{font-size:12px;color:var(--ink)}
 .plan-daylbl span{font-size:10px;color:var(--gray-l)}
 .plan-daylbl.hoy{border-color:var(--serig-m);background:var(--serig-l)}
 .plan-daylbl.hoy b{color:var(--serig-m)}
 .plan-daylbl.sin{border-style:dashed}
+.plan-daylbl .fec{font-size:17px;font-weight:800;color:var(--ink);line-height:1.15;font-family:'DM Mono',monospace;letter-spacing:-.3px}
+.plan-daylbl.hoy .fec{color:var(--serig-m)}
+.plan-daylbl .plan-hoy{font-style:normal;font-size:9px;font-weight:800;letter-spacing:.6px;color:#fff;background:var(--serig-m);border-radius:8px;padding:1px 7px;align-self:flex-start;margin-top:2px}
 .plan-cell{min-height:64px;border:1.5px dashed var(--border);border-radius:8px;padding:5px;display:flex;flex-direction:column;gap:4px;background:transparent;transition:border-color .15s,background .15s}
 .plan-cell.plan-sin{background:rgba(0,0,0,.015)}
 .plan-cell.drag-over{border-color:var(--serig-m);background:rgba(108,46,163,.07)}
@@ -3404,15 +3409,13 @@ function boardBuildLaneHdr(ln, items) {
     '</div></div>';
 }
 
-// ── Programación semanal: matriz líneas (X) × días Lun–Sáb (Y) ──
-// El día de cada ficha se guarda por semana en configuracion (clave plan_semanal_serig):
-// { 'AAAA-MM-DD' (lunes): { <llave de ficha>: 'lun'|'mar'|'mie'|'jue'|'vie'|'sab' } }. Sin día = fila "Sin día".
-var PLAN_DIAS = [
-  { k: 'sin', n: 'Sin día' }, { k: 'lun', n: 'Lunes' }, { k: 'mar', n: 'Martes' }, { k: 'mie', n: 'Miércoles' },
-  { k: 'jue', n: 'Jueves' }, { k: 'vie', n: 'Viernes' }, { k: 'sab', n: 'Sábado' }
-];
-var planSemCache = {};
-var planSemLunes = '';
+// ── Programación por días: matriz líneas (X) × días Lun–Sáb corridos, semana tras semana (Y) ──
+// El día de cada ficha se guarda en configuracion (clave plan_dias_serig): { <llave de ficha>: 'AAAA-MM-DD' }.
+// Sin día (o con un día fuera del rango visible) = fila "Sin día". Los domingos no se programan.
+var PLAN_DIA_NOM = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+var planSemCache = {};      // llave de ficha → fecha ISO
+var planSemanas = 3;        // semanas visibles (se amplía sola si hay fichas programadas más adelante)
+var planRango = { desde: '', semanas: 3 };
 
 function planIso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function planSumarDias(iso, n) { var d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return planIso(d); }
@@ -3423,24 +3426,51 @@ function planLunesInicial() {
   d.setDate(d.getDate() + (w === 0 ? 1 : 1 - w));
   return planIso(d);
 }
-function planSemNav(delta) {
-  planSemLunes = (delta === 0 || !planSemLunes) ? planLunesInicial() : planSumarDias(planSemLunes, delta * 7);
+// Convierte el formato anterior { lunes: { llave: 'lun'|'mar'… } } al nuevo { llave: fecha }
+function planMigrar(viejo) {
+  var idx = { lun: 0, mar: 1, mie: 2, jue: 3, vie: 4, sab: 5 };
+  var out = {};
+  Object.keys(viejo || {}).sort().forEach(function(lunes) {
+    var m = viejo[lunes];
+    if (!m || typeof m !== 'object') return;
+    Object.keys(m).forEach(function(k) { if (idx[m[k]] !== undefined) out[k] = planSumarDias(lunes, idx[m[k]]); });
+  });
+  return out;
+}
+// Rango visible: desde el lunes de esta semana, con las semanas pedidas o las que haga falta para ver lo ya programado
+function planCalcRango() {
+  var desde = planLunesInicial();
+  var sem = Math.max(planSemanas, 1);
+  Object.keys(planSemCache).forEach(function(k) {
+    var f = planSemCache[k];
+    if (typeof f !== 'string' || f < desde) return;
+    var dias = Math.round((new Date(f + 'T12:00:00') - new Date(desde + 'T12:00:00')) / 86400000);
+    sem = Math.max(sem, Math.floor(dias / 7) + 1);
+  });
+  planRango = { desde: desde, semanas: sem };
+}
+function planFechaVisible(f) {
+  if (typeof f !== 'string' || !planRango.desde) return false;
+  var hasta = planSumarDias(planRango.desde, planRango.semanas * 7);
+  if (f < planRango.desde || f >= hasta) return false;
+  return new Date(f + 'T12:00:00').getDay() !== 0; // domingo no se programa
+}
+function planSemMas(delta) {
+  planCalcRango();
+  planSemanas = Math.max(1, Math.min(12, planRango.semanas + delta));
   renderBoard();
 }
 function planDiaDe(key) {
-  var m = planSemCache[planSemLunes] || {};
-  var d = m[key];
-  return PLAN_DIAS.some(function(x){ return x.k === d && d !== 'sin'; }) ? d : 'sin';
+  var f = planSemCache[key];
+  return planFechaVisible(f) ? f : 'sin';
 }
 function savePlanSem() {
-  var lim = planSumarDias(planLunesInicial(), -120); // no acumular semanas muy viejas
-  Object.keys(planSemCache).forEach(function(k){ if (k < lim) delete planSemCache[k]; });
-  db.from('configuracion').upsert({ clave: 'plan_semanal_serig', valor: planSemCache, updated_at: new Date().toISOString() }).then(function(){});
+  var lim = planSumarDias(planLunesInicial(), -120); // no acumular programación muy vieja
+  Object.keys(planSemCache).forEach(function(k){ if (typeof planSemCache[k] !== 'string' || planSemCache[k] < lim) delete planSemCache[k]; });
+  db.from('configuracion').upsert({ clave: 'plan_dias_serig', valor: planSemCache, updated_at: new Date().toISOString() }).then(function(){});
 }
 function planSetDia(key, dia) {
-  if (!planSemLunes) planSemLunes = planLunesInicial();
-  var m = planSemCache[planSemLunes] || (planSemCache[planSemLunes] = {});
-  if (dia === 'sin') delete m[key]; else m[key] = dia;
+  if (dia === 'sin') delete planSemCache[key]; else planSemCache[key] = dia;
   savePlanSem();
 }
 function lineaActualDeFicha(dbId) {
@@ -3497,7 +3527,7 @@ async function planCellDrop(e, laneId, dia) {
 }
 
 function boardBuildMatriz(lanes) {
-  if (!planSemLunes) planSemLunes = planLunesInicial();
+  planCalcRango();
   var hoy = fechaHoy();
   var esLista = function(i){ return i.estado === 'lista'; };
   var noLista = function(i){ return i.estado !== 'lista'; };
@@ -3507,43 +3537,51 @@ function boardBuildMatriz(lanes) {
     porLinea[ln.id] = ord.filter(noLista).concat(ord.filter(esLista)); // completadas al final
   });
 
+  var ultimo = planSumarDias(planRango.desde, planRango.semanas * 7 - 2); // sábado de la última semana
   var nav = '<div class="plan-nav">' +
-    '<button class="plan-nav-btn" onclick="planSemNav(-1)" title="Semana anterior">‹</button>' +
-    '<span class="plan-nav-t">📅 Semana del ' + fmtFechaLetras(planSemLunes, true) + ' al ' + fmtFechaLetras(planSumarDias(planSemLunes, 5), true) + '</span>' +
-    '<button class="plan-nav-btn" onclick="planSemNav(1)" title="Semana siguiente">›</button>' +
-    (planSemLunes !== planLunesInicial() ? '<button class="plan-nav-btn" onclick="planSemNav(0)">Hoy</button>' : '') +
+    '<span class="plan-nav-t">📅 ' + fmtFechaLetras(planRango.desde, true) + ' → ' + fmtFechaLetras(ultimo, true) + ' · ' + planRango.semanas + ' semana' + (planRango.semanas > 1 ? 's' : '') + '</span>' +
+    '<button class="plan-nav-btn" onclick="planSemMas(1)" title="Mostrar una semana más">＋ Semana</button>' +
+    (planRango.semanas > 1 ? '<button class="plan-nav-btn" onclick="planSemMas(-1)" title="Ocultar la última semana">－ Semana</button>' : '') +
     '</div>';
 
-  var head = '<div></div>' + LINEAS_PRODUCCION.map(function(ln) { return boardBuildLaneHdr(ln, lanes[ln.id] || []); }).join('');
+  var head = '<div class="plan-corner"></div>' + LINEAS_PRODUCCION.map(function(ln) { return boardBuildLaneHdr(ln, lanes[ln.id] || []); }).join('');
 
-  var filas = PLAN_DIAS.map(function(dia, idx) {
-    var fecha = dia.k === 'sin' ? '' : planSumarDias(planSemLunes, idx - 1);
-    var lbl = '<div class="plan-daylbl' + (dia.k === 'sin' ? ' sin' : '') + (fecha && fecha === hoy ? ' hoy' : '') + '">' +
-      '<b>' + dia.n + '</b>' +
-      (fecha ? '<span>' + fmtFechaLetras(fecha, true) + (fecha === hoy ? ' · hoy' : '') + '</span>' : '<span>por programar</span>') +
-      '</div>';
+  var armarFila = function(clave, titulo, sub, esHoy, esSin) {
+    var lbl = '<div class="plan-daylbl' + (esSin ? ' sin' : '') + (esHoy ? ' hoy' : '') + '">' +
+      '<b>' + titulo + '</b><span' + (esSin ? '' : ' class="fec"') + '>' + sub + '</span>' + (esHoy ? '<em class="plan-hoy">HOY</em>' : '') + '</div>';
     var celdas = LINEAS_PRODUCCION.map(function(ln) {
-      var its = porLinea[ln.id].filter(function(it){ return planDiaDe(laneCardKey(it)) === dia.k; });
+      var its = porLinea[ln.id].filter(function(it){ return planDiaDe(laneCardKey(it)) === clave; });
       var und = its.filter(noLista).reduce(function(sum, i){ return sum + (i.cant || 0); }, 0);
       var cards = its.map(function(it) {
         var key = laneCardKey(it);
         return '<div class="lane-card-wrap" data-key="' + key + '"' +
           ' ondragover="laneCardDragOver(event)"' +
           ' ondragleave="laneCardDragLeave(event)"' +
-          ' ondrop="laneCardDrop(event,' + ln.id + ',\'' + key + '\',\'' + dia.k + '\')">' +
+          ' ondrop="laneCardDrop(event,' + ln.id + ',\'' + key + '\',\'' + clave + '\')">' +
           boardBuildCard(it) +
         '</div>';
       }).join('');
-      return '<div class="plan-cell' + (dia.k === 'sin' ? ' plan-sin' : '') + (ln.activa ? '' : ' linea-inactiva') + '" id="pc-' + ln.id + '-' + dia.k + '"' +
-        ' ondragover="planCellOver(event,' + ln.id + ',\'' + dia.k + '\')"' +
-        ' ondragleave="planCellLeave(event,' + ln.id + ',\'' + dia.k + '\')"' +
-        ' ondrop="planCellDrop(event,' + ln.id + ',\'' + dia.k + '\')">' +
+      return '<div class="plan-cell' + (esSin ? ' plan-sin' : '') + (ln.activa ? '' : ' linea-inactiva') + '" id="pc-' + ln.id + '-' + clave + '"' +
+        ' ondragover="planCellOver(event,' + ln.id + ',\'' + clave + '\')"' +
+        ' ondragleave="planCellLeave(event,' + ln.id + ',\'' + clave + '\')"' +
+        ' ondrop="planCellDrop(event,' + ln.id + ',\'' + clave + '\')">' +
         (und > 0 ? '<div class="plan-cell-tot">' + und.toLocaleString() + ' und</div>' : '') +
         (cards || '<div class="plan-empty">·</div>') +
       '</div>';
     }).join('');
     return lbl + celdas;
-  }).join('');
+  };
+
+  var filas = armarFila('sin', 'Sin día', 'por programar', false, true);
+  for (var w = 0; w < planRango.semanas; w++) {
+    var lunes = planSumarDias(planRango.desde, w * 7);
+    var rot = w === 0 ? ' · esta semana' : (w === 1 ? ' · próxima semana' : '');
+    filas += '<div class="plan-weekhdr">Semana del ' + fmtFechaLetras(lunes, true) + ' al ' + fmtFechaLetras(planSumarDias(lunes, 5), true) + rot + '</div>';
+    for (var d = 0; d < 6; d++) {
+      var f = planSumarDias(lunes, d);
+      filas += armarFila(f, PLAN_DIA_NOM[d], fmtFechaLetras(f, true), f === hoy, false);
+    }
+  }
 
   return nav + '<div class="plan-grid">' + head + filas + '</div>';
 }
@@ -3673,7 +3711,9 @@ function renderBoard() {
     return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
   });
   contSin.innerHTML = boardBuildSinBlock(lanes[0].concat(sinExtra));
+  var _scTop = contLines.scrollTop, _scLeft = contLines.scrollLeft;
   contLines.innerHTML = boardBuildMatriz(lanes);
+  contLines.scrollTop = _scTop; contLines.scrollLeft = _scLeft;
   verificarCierresPeriodo(lanes[0]); // fire-and-forget: cierra períodos vencidos si aplica
 }
 
@@ -12877,14 +12917,17 @@ async function asistCambiarFecha(delta) {
 
 async function cargarOrdenSinAsignar() {
   try {
-    var r = await db.from('configuracion').select('clave,valor').in('clave', ['sin_cards_serig', 'sin_grupos_serig', 'lane_cards_serig', 'plan_semanal_serig']);
+    var planViejo = {}, planNuevo = null;
+    var r = await db.from('configuracion').select('clave,valor').in('clave', ['sin_cards_serig', 'sin_grupos_serig', 'lane_cards_serig', 'plan_dias_serig', 'plan_semanal_serig']);
     if (r.data && r.data.length) {
       r.data.forEach(function(row) {
         if (row.clave === 'sin_cards_serig') sinCardOrdenCache = row.valor || {};
         if (row.clave === 'sin_grupos_serig') sinGrupoOrdenCache = row.valor || [];
         if (row.clave === 'lane_cards_serig') laneCardOrdenCache = row.valor || {};
-        if (row.clave === 'plan_semanal_serig') planSemCache = row.valor || {};
+        if (row.clave === 'plan_semanal_serig') planViejo = row.valor || {};
+        if (row.clave === 'plan_dias_serig') planNuevo = row.valor || null;
       });
+      planSemCache = planNuevo || planMigrar(planViejo); // formato anterior (por semana) se convierte solo
     } else {
       // migrar desde localStorage si existe
       try { sinCardOrdenCache  = JSON.parse(localStorage.getItem('tetra_sin_cards_s')  || '{}'); } catch(_) {}
