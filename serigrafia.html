@@ -3414,7 +3414,7 @@ function boardBuildLaneHdr(ln, items) {
 
 // ── Programación por días: matriz líneas (X) × días Lun–Sáb corridos, semana tras semana (Y) ──
 // El día de cada ficha se guarda en configuracion (clave plan_dias_serig): { <llave de ficha>: 'AAAA-MM-DD' }.
-// Sin día (o con un día fuera del rango visible) = fila "Sin día". Los domingos no se programan.
+// Sin día (o con un día ya pasado/fuera del rango) se muestra en el primer día visible (hoy). Los domingos no se programan.
 var PLAN_DIA_NOM = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 var planSemCache = {};      // llave de ficha → fecha ISO
 var planSemanas = 3;        // semanas visibles (se amplía sola si hay fichas programadas más adelante)
@@ -3468,6 +3468,12 @@ function planSemMas(delta) {
 function planDiaDe(key) {
   var f = planSemCache[key];
   return planFechaVisible(f) ? f : 'sin';
+}
+// Día en que se muestra una ficha de línea: el programado; si no tiene (o ya pasó), el primer día visible (hoy).
+// No se guarda: solo es presentación. Lo no asignado a ninguna línea se lee en el bloque "Sin asignar".
+function planDiaEfectivo(key) {
+  var d = planDiaDe(key);
+  return d === 'sin' ? planRango.inicio : d;
 }
 function savePlanSem() {
   var lim = planSumarDias(planLunesInicial(), -120); // no acumular programación muy vieja
@@ -3555,7 +3561,7 @@ function boardBuildMatriz(lanes) {
     var lbl = '<div class="plan-daylbl' + (esSin ? ' sin' : '') + (esHoy ? ' hoy' : '') + '">' +
       '<b>' + titulo + '</b><span' + (esSin ? '' : ' class="fec"') + '>' + sub + '</span>' + (esHoy ? '<em class="plan-hoy">HOY</em>' : '') + '</div>';
     var celdas = LINEAS_PRODUCCION.map(function(ln) {
-      var its = porLinea[ln.id].filter(function(it){ return planDiaDe(laneCardKey(it)) === clave; });
+      var its = porLinea[ln.id].filter(function(it){ return planDiaEfectivo(laneCardKey(it)) === clave; });
       var und = its.filter(noLista).reduce(function(sum, i){ return sum + (i.cant || 0); }, 0);
       var cards = its.map(function(it) {
         var key = laneCardKey(it);
@@ -3577,7 +3583,7 @@ function boardBuildMatriz(lanes) {
     return lbl + celdas;
   };
 
-  var filas = armarFila('sin', 'Sin día', 'por programar', false, true);
+  var filas = '';
   for (var w = 0; w < planRango.semanas; w++) {
     var lunes = planSumarDias(planRango.desde, w * 7);
     var rot = w === 0 ? ' · esta semana' : (w === 1 ? ' · próxima semana' : '');
