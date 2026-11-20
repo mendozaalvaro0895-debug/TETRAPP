@@ -3150,7 +3150,8 @@ function sinGrupoDrop(e, targetCliente) {
   renderBoard();
 }
 
-function boardBuildSinBlock(items) {
+function boardBuildSinBlock(items, enLinea) {
+  enLinea = enLinea || []; // fichas ya asignadas a una línea: cuentan en el resumen del período, pero su tarjeta vive en la matriz
   var propios = items.filter(function(i){ return !i.restaurada; });
   var total = propios.reduce(function(s,i){ return s + (i.cant||0); }, 0);
   var countTxt = propios.length + (total > 0 ? ' · ' + total.toLocaleString() + ' und' : '');
@@ -3166,6 +3167,14 @@ function boardBuildSinBlock(items) {
     var gk  = cli + '§' + per.key;
     if (!grupoMap[gk]) { grupoMap[gk] = { cli: cli, per: per, items: [] }; grupoKeys.push(gk); }
     grupoMap[gk].items.push(item);
+  });
+  // Fichas en línea (con o sin entregas): se cuentan en el resumen de su cliente + período, no se dibujan aquí
+  enLinea.forEach(function(item) {
+    var cli = item.cliente || '(Sin cliente)';
+    var per = periodoEfectivoDe(item);
+    var gk  = cli + '§' + per.key;
+    if (!grupoMap[gk]) { grupoMap[gk] = { cli: cli, per: per, items: [] }; grupoKeys.push(gk); }
+    (grupoMap[gk].extra = grupoMap[gk].extra || []).push(Object.assign({}, item, { enLinea: true }));
   });
 
   // Fichas cerradas (congeladas) sin ningún pedido pendiente que las
@@ -3249,22 +3258,32 @@ function boardBuildSinBlock(items) {
         // snapshot guardado — NO se recalculan en vivo desde gItems (que
         // ya solo contendría lo que quedó sin trasladar).
         var cerrado = periodoCierresCache[gk];
-        var totalG, nTotal, nListos, nParciales, nPendientes, undVerde, undAmb, undRojo, pctEnt;
+        var totalG, nTotal, nListos, nParciales, nPendientes, undVerde, undAmb, undRojo, pctEnt, nEnLinea = 0;
         if (cerrado) {
           totalG = cerrado.und_total; nTotal = cerrado.n_total;
           nListos = cerrado.n_listos; nParciales = cerrado.n_parciales; nPendientes = cerrado.n_pendientes;
           undVerde = cerrado.und_verde; undAmb = cerrado.und_ambar; undRojo = cerrado.und_rojo;
           pctEnt = cerrado.pct_entregado;
         } else {
-          totalG     = gItems.reduce(function(s,i){ return s+(i.cant||0); }, 0);
-          nTotal     = gItems.length;
-          nListos    = gItems.filter(function(i){ return i.estado === 'lista' || getTier(i) === 2; }).length;
-          nParciales = gItems.filter(function(i){ return getTier(i) === 1 && i.estado !== 'lista'; }).length;
-          nPendientes= gItems.filter(function(i){ return getTier(i) === 0 && i.estado !== 'lista'; }).length;
-          undVerde  = gItems.filter(function(i){ return getTier(i) === 2 || i.estado === 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
-          undAmb    = gItems.filter(function(i){ return getTier(i) === 1 && i.estado !== 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
-          undRojo   = gItems.filter(function(i){ return getTier(i) === 0 && i.estado !== 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
-          var totalEntG = gItems.reduce(function(s,i){ return s+(entregadoMap[i.solId]||0); },0);
+          // El resumen cuenta TODAS las fichas del período: las sin asignar (por su estado) y las que están en línea
+          // (por lo realmente entregado: el estado de una ficha en línea no pasa a "parcial" con una entrega parcial)
+          var cuenta = gItems.concat(grupo.extra || []);
+          nEnLinea = (grupo.extra || []).length;
+          var tierC = function(i) {
+            if (!i.enLinea) return getTier(i);
+            var ent = entregadoMap[i.solId] || 0;
+            if (i.estado === 'lista' || (ent > 0 && ent >= (i.cant || 0))) return 2;
+            return ent > 0 ? 1 : 0;
+          };
+          totalG     = cuenta.reduce(function(s,i){ return s+(i.cant||0); }, 0);
+          nTotal     = cuenta.length;
+          nListos    = cuenta.filter(function(i){ return i.estado === 'lista' || tierC(i) === 2; }).length;
+          nParciales = cuenta.filter(function(i){ return tierC(i) === 1 && i.estado !== 'lista'; }).length;
+          nPendientes= cuenta.filter(function(i){ return tierC(i) === 0 && i.estado !== 'lista'; }).length;
+          undVerde  = cuenta.filter(function(i){ return tierC(i) === 2 || i.estado === 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
+          undAmb    = cuenta.filter(function(i){ return tierC(i) === 1 && i.estado !== 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
+          undRojo   = cuenta.filter(function(i){ return tierC(i) === 0 && i.estado !== 'lista'; }).reduce(function(s,i){return s+(i.cant||0);},0);
+          var totalEntG = cuenta.reduce(function(s,i){ return s+(entregadoMap[i.solId]||0); },0);
           pctEnt    = totalG > 0 ? Math.round(totalEntG / totalG * 100) : 0;
         }
         // % de capacidad de la línea (no de pedidos): ver capPctCliente()
@@ -3286,6 +3305,7 @@ function boardBuildSinBlock(items) {
           '<div style="display:flex;gap:16px;align-items:flex-start">' +
             '<div style="' + _col + '">' +
               '<span style="font-size:11px;font-weight:700;color:rgba(255,255,255,.9)">' + nTotal + ' pedido' + (nTotal!==1?'s':'') + '</span>' +
+              (nEnLinea > 0 ? '<span title="Fichas de este período que ya están en una línea de producción: siguen en el calendario y cuentan aquí" style="font-size:10px;color:rgba(255,255,255,.7)">▸ ' + nEnLinea + ' en línea</span>' : '') +
               (totalG > 0 ? '<span style="' + _und + ';color:rgba(255,255,255,.6)">' + totalG.toLocaleString() + ' und</span>' : '') +
             '</div>' +
             (nListos > 0 ?
@@ -3354,7 +3374,7 @@ function boardBuildSinBlock(items) {
               '</div>' +
             '</div>' +
           '</div>' +
-          '<div class="sin-grupo-cards">' + (cardsHtml || (cerrado ? '<div class="sin-grupo-vacio">Todos los pedidos de este período se trasladaron al mes actual</div>' : '')) + '</div>' +
+          '<div class="sin-grupo-cards">' + (cardsHtml || (cerrado ? '<div class="sin-grupo-vacio">Todos los pedidos de este período se trasladaron al mes actual</div>' : (grupo.extra && grupo.extra.length ? '<div class="sin-grupo-vacio">Todos los pedidos de este período están en líneas de producción</div>' : ''))) + '</div>' +
         '</div>';
       });
 
@@ -3801,11 +3821,13 @@ function renderBoard() {
     if (ca > cb) return 1;
     return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
   });
-  contSin.innerHTML = boardBuildSinBlock(lanes[0].concat(sinExtra));
+  var enLineaCont = [];
+  LINEAS_PRODUCCION.forEach(function(ln) { (lanes[ln.id] || []).forEach(function(it) { enLineaCont.push(it); }); });
+  contSin.innerHTML = boardBuildSinBlock(lanes[0].concat(sinExtra), enLineaCont);
   var _scTop = contLines.scrollTop, _scLeft = contLines.scrollLeft;
   contLines.innerHTML = boardBuildMatriz(lanes);
   contLines.scrollTop = _scTop; contLines.scrollLeft = _scLeft;
-  verificarCierresPeriodo(lanes[0]); // fire-and-forget: cierra períodos vencidos si aplica
+  verificarCierresPeriodo(lanes[0].concat(enLineaCont)); // fire-and-forget: cierra períodos vencidos si aplica (las fichas en línea también cuentan en el snapshot)
 }
 
 // ── Auto-scroll al arrastrar fichas cerca del borde de pantalla ──
