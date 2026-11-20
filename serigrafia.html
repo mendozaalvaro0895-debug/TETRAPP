@@ -357,8 +357,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-lane.drag-over{border-color:var(--serig-m);box-shadow:0 0 0 3px rgba(108,46,163,.15)}
 .board-lane-hdr{padding:10px 12px;border-bottom:1px solid var(--border)}
 /* Matriz semanal: líneas (X) × días (Y) — bloque enmarcado, con sombras */
-.plan-wrap{overflow:auto;max-height:78vh;margin-bottom:24px;padding:0;border:2px solid #CFC6E6;border-radius:16px;background:linear-gradient(180deg,#F8F6FC 0,#F4F1EA 120px);box-shadow:0 8px 28px rgba(76,38,120,.14),0 2px 6px rgba(0,0,0,.06)}
-.plan-nav{display:flex;align-items:center;gap:8px;margin:0;padding:11px 14px;flex-wrap:wrap;background:linear-gradient(90deg,var(--serig-l),#F8F6FC);border-bottom:1px solid #DDD5EE}
+.plan-wrap{overflow:auto;max-height:78vh;margin-bottom:24px;padding:0;border:4px solid var(--serig-m);border-radius:16px;background:linear-gradient(180deg,#F8F6FC 0,#F4F1EA 120px);box-shadow:0 0 0 1px #fff,0 0 0 3px rgba(108,46,163,.28),0 14px 36px rgba(76,38,120,.30),0 3px 8px rgba(0,0,0,.12)}
+.plan-nav{display:flex;align-items:center;gap:8px;margin:0;padding:11px 14px;flex-wrap:wrap;background:linear-gradient(90deg,var(--serig-l),#F8F6FC);border-bottom:3px solid var(--serig-m)}
 .plan-nav-t{font-size:13px;font-weight:800;color:var(--serig-m);margin-right:auto;letter-spacing:.2px}
 .plan-nav-btn{border:1px solid #CFC6E6;background:#fff;color:var(--serig-m);border-radius:9px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:transform .1s,box-shadow .15s}
 .plan-nav-btn:hover{border-color:var(--serig-m);box-shadow:0 3px 8px rgba(108,46,163,.2);transform:translateY(-1px)}
@@ -3418,7 +3418,7 @@ function boardBuildLaneHdr(ln, items) {
 var PLAN_DIA_NOM = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 var planSemCache = {};      // llave de ficha → fecha ISO
 var planSemanas = 3;        // semanas visibles (se amplía sola si hay fichas programadas más adelante)
-var planRango = { desde: '', semanas: 3 };
+var planRango = { desde: '', inicio: '', semanas: 3 }; // desde = lunes de la semana en curso; inicio = primer día mostrado (hoy)
 
 function planIso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function planSumarDias(iso, n) { var d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return planIso(d); }
@@ -3450,12 +3450,14 @@ function planCalcRango() {
     var dias = Math.round((new Date(f + 'T12:00:00') - new Date(desde + 'T12:00:00')) / 86400000);
     sem = Math.max(sem, Math.floor(dias / 7) + 1);
   });
-  planRango = { desde: desde, semanas: sem };
+  var hoy = fechaHoy();
+  var inicio = new Date(hoy + 'T12:00:00').getDay() === 0 ? desde : hoy; // domingo: arranca el lunes
+  planRango = { desde: desde, inicio: inicio, semanas: sem };
 }
 function planFechaVisible(f) {
   if (typeof f !== 'string' || !planRango.desde) return false;
   var hasta = planSumarDias(planRango.desde, planRango.semanas * 7);
-  if (f < planRango.desde || f >= hasta) return false;
+  if (f < planRango.inicio || f >= hasta) return false; // lo anterior a hoy cae en "Sin día" para reprogramarlo
   return new Date(f + 'T12:00:00').getDay() !== 0; // domingo no se programa
 }
 function planSemMas(delta) {
@@ -3542,7 +3544,7 @@ function boardBuildMatriz(lanes) {
 
   var ultimo = planSumarDias(planRango.desde, planRango.semanas * 7 - 2); // sábado de la última semana
   var nav = '<div class="plan-nav">' +
-    '<span class="plan-nav-t">📅 ' + fmtFechaLetras(planRango.desde, true) + ' → ' + fmtFechaLetras(ultimo, true) + ' · ' + planRango.semanas + ' semana' + (planRango.semanas > 1 ? 's' : '') + '</span>' +
+    '<span class="plan-nav-t">📅 ' + fmtFechaLetras(planRango.inicio, true) + ' → ' + fmtFechaLetras(ultimo, true) + ' · ' + planRango.semanas + ' semana' + (planRango.semanas > 1 ? 's' : '') + '</span>' +
     '<button class="plan-nav-btn" onclick="planSemMas(1)" title="Mostrar una semana más">＋ Semana</button>' +
     (planRango.semanas > 1 ? '<button class="plan-nav-btn" onclick="planSemMas(-1)" title="Ocultar la última semana">－ Semana</button>' : '') +
     '</div>';
@@ -3579,9 +3581,14 @@ function boardBuildMatriz(lanes) {
   for (var w = 0; w < planRango.semanas; w++) {
     var lunes = planSumarDias(planRango.desde, w * 7);
     var rot = w === 0 ? ' · esta semana' : (w === 1 ? ' · próxima semana' : '');
-    filas += '<div class="plan-weekhdr">Semana del ' + fmtFechaLetras(lunes, true) + ' al ' + fmtFechaLetras(planSumarDias(lunes, 5), true) + rot + '</div>';
+    var encab = false;
     for (var d = 0; d < 6; d++) {
       var f = planSumarDias(lunes, d);
+      if (f < planRango.inicio) continue; // los días ya pasados no se listan: HOY es la primera fila
+      if (!encab) {
+        encab = true;
+        filas += '<div class="plan-weekhdr">Semana del ' + fmtFechaLetras(lunes, true) + ' al ' + fmtFechaLetras(planSumarDias(lunes, 5), true) + rot + '</div>';
+      }
       filas += armarFila(f, PLAN_DIA_NOM[d], fmtFechaLetras(f, true), f === hoy, false);
     }
   }
