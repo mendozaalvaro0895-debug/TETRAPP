@@ -5409,6 +5409,24 @@ function exportarBoardPDF(filtroMes) {
 
   completados.sort(function(a,b){ return (b.created_at||'')<(a.created_at||'') ? -1 : 1; });
 
+  // En cada línea, las fichas van en EL MISMO ORDEN que en el tablero "Líneas de producción" (orden manual por arrastre,
+  // laneCardOrdenCache; las completadas al final). Se arma con los mismos ítems/llaves que renderBoard y se vuelve a fichas.
+  function ordenarComoBoard(laneId, lista) {
+    var items = [], porSol = {};
+    lista.forEach(function(s) {
+      porSol[s.id] = s;
+      var ls = (s.lineas || []).filter(function(l){ return String(l.linea_id) === String(laneId); });
+      if (!ls.length) ls = [{}];
+      ls.forEach(function(l){ items.push({ lineaDbId: l.id || null, solId: s.id, estado: estadoEfectivoSol(s) }); });
+    });
+    var ord = ordenarLaneItems(laneId, items);
+    ord = ord.filter(function(i){ return i.estado !== 'lista'; }).concat(ord.filter(function(i){ return i.estado === 'lista'; }));
+    var vistos = {}, out = [];
+    ord.forEach(function(i){ if (!vistos[i.solId]) { vistos[i.solId] = 1; out.push(porSol[i.solId]); } });
+    return out;
+  }
+  LINEAS_PRODUCCION.forEach(function(ln){ enCurso[ln.id] = ordenarComoBoard(ln.id, enCurso[ln.id]); });
+
   // Tier por estado EFECTIVO (resuelve nivel línea, igual que el board):
   // lista=verde, parcial=amarillo, resto=rojo
   function getTier(s) {
