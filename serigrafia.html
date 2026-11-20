@@ -356,6 +356,25 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-lane{border-radius:10px;border:2px solid var(--border);overflow:hidden;background:var(--bg2);transition:border-color .15s,box-shadow .15s;display:flex;flex-direction:column}
 .board-lane.drag-over{border-color:var(--serig-m);box-shadow:0 0 0 3px rgba(108,46,163,.15)}
 .board-lane-hdr{padding:10px 12px;border-bottom:1px solid var(--border)}
+/* Matriz semanal: líneas (X) × días (Y) */
+.plan-wrap{overflow-x:auto;margin-bottom:24px;padding-bottom:6px}
+.plan-nav{display:flex;align-items:center;gap:8px;margin:0 0 8px;flex-wrap:wrap}
+.plan-nav-t{font-size:13px;font-weight:800;color:var(--ink);min-width:190px;text-align:center}
+.plan-nav-btn{border:1px solid var(--border);background:var(--bg2);color:var(--ink);border-radius:8px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.plan-nav-btn:hover{border-color:var(--serig-m);color:var(--serig-m)}
+.plan-grid{display:grid;grid-template-columns:96px repeat(4,minmax(230px,1fr));gap:6px;min-width:1000px}
+.plan-lane-hdr{border-radius:10px;border:2px solid var(--border);overflow:hidden;background:var(--bg2)}
+.plan-daylbl{border-radius:8px;background:var(--bg2);border:1px solid var(--border);padding:8px 8px;display:flex;flex-direction:column;gap:2px;justify-content:flex-start}
+.plan-daylbl b{font-size:12px;color:var(--ink)}
+.plan-daylbl span{font-size:10px;color:var(--gray-l)}
+.plan-daylbl.hoy{border-color:var(--serig-m);background:var(--serig-l)}
+.plan-daylbl.hoy b{color:var(--serig-m)}
+.plan-daylbl.sin{border-style:dashed}
+.plan-cell{min-height:64px;border:1.5px dashed var(--border);border-radius:8px;padding:5px;display:flex;flex-direction:column;gap:4px;background:transparent;transition:border-color .15s,background .15s}
+.plan-cell.plan-sin{background:rgba(0,0,0,.015)}
+.plan-cell.drag-over{border-color:var(--serig-m);background:rgba(108,46,163,.07)}
+.plan-cell-tot{align-self:flex-end;font-size:9.5px;font-weight:700;color:var(--gray);background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:0 7px}
+.plan-empty{text-align:center;color:var(--gray-l);font-size:12px;opacity:.5;padding:8px 0}
 .board-cards-wrap{padding:7px;display:flex;flex-direction:column;gap:4px;min-height:96px;flex:1}
 .board-card{background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:6px 9px;cursor:grab;user-select:none;transition:box-shadow .15s,transform .12s,opacity .15s}
 .board-card:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px);border-color:var(--serig-m)}
@@ -746,9 +765,9 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
         <!-- Board: carriles línea 1-4 (con pipeline de procesos integrado) -->
         <div class="sec-hdr">
           <div class="sec-title">Líneas de Producción</div>
-          <div class="sec-sub">Arrastra los pedidos desde "Sin asignar" · 🔥 Flameado › 🖨️ Impresión › 💨 Secado › 📦 Empaque</div>
+          <div class="sec-sub">Programa la semana: arrastra los pedidos desde "Sin asignar" a una línea y un día · 🔥 Flameado › 🖨️ Impresión › 💨 Secado › 📦 Empaque</div>
         </div>
-        <div class="board-lines-row" id="boardLines"></div>
+        <div class="plan-wrap" id="boardLines"></div>
 
         <!-- Sin asignar (full width, debajo de líneas) -->
         <div id="boardSin" style="margin-bottom:18px"></div>
@@ -3009,21 +3028,22 @@ function laneCardDragLeave(e) {
   e.currentTarget.classList.remove('drop-before','drop-after');
 }
 
-async function laneCardDrop(e, laneId, targetKey) {
+async function laneCardDrop(e, laneId, targetKey, dia) {
   document.querySelectorAll('.lane-card-wrap').forEach(function(el){ el.classList.remove('drop-before','drop-after'); });
   var dragKey = boardDragId;
-  if (!dragKey) return; // no es una ficha arrastrada: dejar que lo maneje la línea
+  if (!dragKey) return; // no es una ficha arrastrada: dejar que lo maneje la celda
   e.preventDefault();
   e.stopPropagation();
   if (dragKey === targetKey) { boardDragId = null; boardDragSolId = null; return; }
+  dia = dia || planDiaDe(targetKey);
 
   var wrap = e.currentTarget;
   var rect = wrap.getBoundingClientRect();
   var insertBefore = e.clientY < rect.top + rect.height / 2;
 
-  // Orden actual tal como se ve en pantalla (incluye fichas aún sin posición guardada)
+  // Orden actual de la celda destino tal como se ve en pantalla (incluye fichas aún sin posición guardada)
   var actual = [];
-  document.querySelectorAll('#bc-' + laneId + ' .lane-card-wrap').forEach(function(el) {
+  document.querySelectorAll('#pc-' + laneId + '-' + dia + ' .lane-card-wrap').forEach(function(el) {
     var k = el.getAttribute('data-key');
     if (k && k !== dragKey) actual.push(k);
   });
@@ -3031,19 +3051,11 @@ async function laneCardDrop(e, laneId, targetKey) {
   if (idx === -1) idx = actual.length; else if (!insertBefore) idx++;
   actual.splice(idx, 0, dragKey);
 
-  var todos = Object.assign({}, laneCardOrdenCache);
-  Object.keys(todos).forEach(function(l) {
-    if (l !== String(laneId)) todos[l] = (todos[l] || []).filter(function(k){ return k !== dragKey; });
-  });
-  todos[String(laneId)] = actual;
-  saveLaneCardOrden(todos);
+  planSetDia(dragKey, dia);
+  laneOrdenColocar(laneId, dragKey, actual);
 
   // ¿Viene de otra línea (o de Sin asignar)? Entonces además hay que asignarla
-  var desde = 0;
-  solicitudes.forEach(function(s) {
-    (s.lineas || []).forEach(function(l) { if (l.id === dragKey) desde = l.linea_id || 0; });
-  });
-  if (desde !== laneId) {
+  if (lineaActualDeFicha(dragKey) !== laneId) {
     await boardDrop(e, laneId); // asigna la línea, recarga y re-renderiza
   } else {
     boardDragId = null;
@@ -3371,49 +3383,169 @@ function boardBuildSinBlock(items) {
     '</div>';
 }
 
-function boardBuildLane(laneId, items, label, active) {
+// Encabezado de una línea en la matriz semanal (nombre, pendientes y unidades)
+function boardBuildLaneHdr(ln, items) {
+  var active = ln.activa;
   var nHechas = items.filter(function(i){ return i.estado === 'lista'; }).length;
   var pend    = items.filter(function(i){ return i.estado !== 'lista'; });
   var total   = pend.reduce(function(s,i){ return s + (i.cant||0); }, 0);
-  var procIts = items.filter(function(i){ return i.estado === 'proceso' || i.estado === 'parcial'; });
-  var avg     = procIts.length > 0
-    ? Math.round(procIts.reduce(function(s,i){ return s+i.prog; },0)/procIts.length)
-    : 0;
   var hdrBg  = active ? 'var(--serig-l)' : '#f8f8f8';
   var hdrClr = active ? 'var(--serig-m)' : 'var(--gray-l)';
-  var therm  = '';
-  var ordenados = ordenarLaneItems(laneId, items);
-  // Las completadas (verde) al final de la línea
-  ordenados = ordenados.filter(function(i){ return i.estado !== 'lista'; })
-    .concat(ordenados.filter(function(i){ return i.estado === 'lista'; }));
-  var cards  = ordenados.map(function(it) {
-    var key = laneCardKey(it);
-    return '<div class="lane-card-wrap" data-key="' + key + '"' +
-      ' ondragover="laneCardDragOver(event)"' +
-      ' ondragleave="laneCardDragLeave(event)"' +
-      ' ondrop="laneCardDrop(event,' + laneId + ',\'' + key + '\')">' +
-      boardBuildCard(it) +
-    '</div>';
-  }).join('');
-  return '<div class="board-lane' + (active ? '' : ' linea-inactiva') + '" id="bl-' + laneId + '"' +
-    ' ondragover="event.preventDefault();document.getElementById(\'bl-' + laneId + '\').classList.add(\'drag-over\')"' +
-    ' ondragleave="document.getElementById(\'bl-' + laneId + '\').classList.remove(\'drag-over\')"' +
-    ' ondrop="boardDrop(event,' + laneId + ')">' +
-    '<div class="board-lane-hdr" style="background:' + hdrBg + '">' +
+  return '<div class="plan-lane-hdr' + (active ? '' : ' linea-inactiva') + '" id="bl-' + ln.id + '">' +
+    '<div class="board-lane-hdr" style="background:' + hdrBg + ';border-bottom:0">' +
       '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<span style="font-size:12px;font-weight:800;color:' + hdrClr + '">' + label +
+        '<span style="font-size:12px;font-weight:800;color:' + hdrClr + '">' + ln.nombre +
           (active ? '' : ' <span style="font-size:9px;font-weight:700;color:var(--gray-l)">(inactiva)</span>') + '</span>' +
         '<span style="font-size:10px;background:white;color:var(--gray);border-radius:10px;padding:1px 7px;font-weight:600">' + pend.length + '</span>' +
       '</div>' +
       (total > 0 ? '<div style="font-size:10px;color:' + hdrClr + ';margin-top:1px">' + total.toLocaleString() + ' und' +
         (nHechas ? ' <span style="color:#15803d;font-weight:700">· ✓ ' + nHechas + ' completada' + (nHechas > 1 ? 's' : '') + '</span>' : '') + '</div>'
         : (nHechas ? '<div style="font-size:10px;color:#15803d;font-weight:700;margin-top:1px">✓ ' + nHechas + ' completada' + (nHechas > 1 ? 's' : '') + '</div>' : '')) +
-      therm +
-    '</div>' +
-    '<div class="board-cards-wrap" id="bc-' + laneId + '">' +
-      (cards || '<div class="board-empty-lane">— vacía —</div>') +
-    '</div>' +
+    '</div></div>';
+}
+
+// ── Programación semanal: matriz líneas (X) × días Lun–Sáb (Y) ──
+// El día de cada ficha se guarda por semana en configuracion (clave plan_semanal_serig):
+// { 'AAAA-MM-DD' (lunes): { <llave de ficha>: 'lun'|'mar'|'mie'|'jue'|'vie'|'sab' } }. Sin día = fila "Sin día".
+var PLAN_DIAS = [
+  { k: 'sin', n: 'Sin día' }, { k: 'lun', n: 'Lunes' }, { k: 'mar', n: 'Martes' }, { k: 'mie', n: 'Miércoles' },
+  { k: 'jue', n: 'Jueves' }, { k: 'vie', n: 'Viernes' }, { k: 'sab', n: 'Sábado' }
+];
+var planSemCache = {};
+var planSemLunes = '';
+
+function planIso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function planSumarDias(iso, n) { var d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return planIso(d); }
+// Lunes de la semana en curso (si hoy es domingo, la semana que viene)
+function planLunesInicial() {
+  var d = new Date(fechaHoy() + 'T12:00:00');
+  var w = d.getDay();
+  d.setDate(d.getDate() + (w === 0 ? 1 : 1 - w));
+  return planIso(d);
+}
+function planSemNav(delta) {
+  planSemLunes = (delta === 0 || !planSemLunes) ? planLunesInicial() : planSumarDias(planSemLunes, delta * 7);
+  renderBoard();
+}
+function planDiaDe(key) {
+  var m = planSemCache[planSemLunes] || {};
+  var d = m[key];
+  return PLAN_DIAS.some(function(x){ return x.k === d && d !== 'sin'; }) ? d : 'sin';
+}
+function savePlanSem() {
+  var lim = planSumarDias(planLunesInicial(), -120); // no acumular semanas muy viejas
+  Object.keys(planSemCache).forEach(function(k){ if (k < lim) delete planSemCache[k]; });
+  db.from('configuracion').upsert({ clave: 'plan_semanal_serig', valor: planSemCache, updated_at: new Date().toISOString() }).then(function(){});
+}
+function planSetDia(key, dia) {
+  if (!planSemLunes) planSemLunes = planLunesInicial();
+  var m = planSemCache[planSemLunes] || (planSemCache[planSemLunes] = {});
+  if (dia === 'sin') delete m[key]; else m[key] = dia;
+  savePlanSem();
+}
+function lineaActualDeFicha(dbId) {
+  var desde = 0;
+  solicitudes.forEach(function(s) {
+    (s.lineas || []).forEach(function(l) { if (l.id === dbId) desde = l.linea_id || 0; });
+  });
+  return desde;
+}
+// Deja la ficha en la posición pedida dentro de su celda: el orden guardado de la línea conserva a las demás
+// fichas y la celda de destino queda en el orden "actual" (llaves ya con la ficha movida incluida).
+function laneOrdenColocar(laneId, dragKey, actual) {
+  var todos = Object.assign({}, laneCardOrdenCache);
+  Object.keys(todos).forEach(function(l) {
+    if (l !== String(laneId)) todos[l] = (todos[l] || []).filter(function(k){ return k !== dragKey; });
+  });
+  var enCelda = {};
+  actual.forEach(function(k){ enCelda[k] = 1; });
+  var otros = (todos[String(laneId)] || []).filter(function(k){ return !enCelda[k]; });
+  todos[String(laneId)] = otros.concat(actual);
+  saveLaneCardOrden(todos);
+}
+function planCellOver(e, laneId, dia) {
+  if (!boardDragId) return;
+  e.preventDefault();
+  var el = document.getElementById('pc-' + laneId + '-' + dia);
+  if (el) el.classList.add('drag-over');
+}
+function planCellLeave(e, laneId, dia) {
+  var el = document.getElementById('pc-' + laneId + '-' + dia);
+  if (el && !el.contains(e.relatedTarget)) el.classList.remove('drag-over');
+}
+async function planCellDrop(e, laneId, dia) {
+  document.querySelectorAll('.plan-cell.drag-over').forEach(function(el){ el.classList.remove('drag-over'); });
+  var dragKey = boardDragId;
+  if (!dragKey) return;
+  e.preventDefault();
+  e.stopPropagation();
+  planSetDia(dragKey, dia);
+  var actual = [];
+  document.querySelectorAll('#pc-' + laneId + '-' + dia + ' .lane-card-wrap').forEach(function(el) {
+    var k = el.getAttribute('data-key');
+    if (k && k !== dragKey) actual.push(k);
+  });
+  actual.push(dragKey); // al final de la celda
+  laneOrdenColocar(laneId, dragKey, actual);
+  if (lineaActualDeFicha(dragKey) !== laneId) {
+    await boardDrop(e, laneId); // asigna la línea, recarga y re-renderiza
+  } else {
+    boardDragId = null;
+    boardDragSolId = null;
+    renderBoard();
+  }
+}
+
+function boardBuildMatriz(lanes) {
+  if (!planSemLunes) planSemLunes = planLunesInicial();
+  var hoy = fechaHoy();
+  var esLista = function(i){ return i.estado === 'lista'; };
+  var noLista = function(i){ return i.estado !== 'lista'; };
+  var porLinea = {};
+  LINEAS_PRODUCCION.forEach(function(ln) {
+    var ord = ordenarLaneItems(ln.id, lanes[ln.id] || []);
+    porLinea[ln.id] = ord.filter(noLista).concat(ord.filter(esLista)); // completadas al final
+  });
+
+  var nav = '<div class="plan-nav">' +
+    '<button class="plan-nav-btn" onclick="planSemNav(-1)" title="Semana anterior">‹</button>' +
+    '<span class="plan-nav-t">📅 Semana del ' + fmtFechaLetras(planSemLunes, true) + ' al ' + fmtFechaLetras(planSumarDias(planSemLunes, 5), true) + '</span>' +
+    '<button class="plan-nav-btn" onclick="planSemNav(1)" title="Semana siguiente">›</button>' +
+    (planSemLunes !== planLunesInicial() ? '<button class="plan-nav-btn" onclick="planSemNav(0)">Hoy</button>' : '') +
     '</div>';
+
+  var head = '<div></div>' + LINEAS_PRODUCCION.map(function(ln) { return boardBuildLaneHdr(ln, lanes[ln.id] || []); }).join('');
+
+  var filas = PLAN_DIAS.map(function(dia, idx) {
+    var fecha = dia.k === 'sin' ? '' : planSumarDias(planSemLunes, idx - 1);
+    var lbl = '<div class="plan-daylbl' + (dia.k === 'sin' ? ' sin' : '') + (fecha && fecha === hoy ? ' hoy' : '') + '">' +
+      '<b>' + dia.n + '</b>' +
+      (fecha ? '<span>' + fmtFechaLetras(fecha, true) + (fecha === hoy ? ' · hoy' : '') + '</span>' : '<span>por programar</span>') +
+      '</div>';
+    var celdas = LINEAS_PRODUCCION.map(function(ln) {
+      var its = porLinea[ln.id].filter(function(it){ return planDiaDe(laneCardKey(it)) === dia.k; });
+      var und = its.filter(noLista).reduce(function(sum, i){ return sum + (i.cant || 0); }, 0);
+      var cards = its.map(function(it) {
+        var key = laneCardKey(it);
+        return '<div class="lane-card-wrap" data-key="' + key + '"' +
+          ' ondragover="laneCardDragOver(event)"' +
+          ' ondragleave="laneCardDragLeave(event)"' +
+          ' ondrop="laneCardDrop(event,' + ln.id + ',\'' + key + '\',\'' + dia.k + '\')">' +
+          boardBuildCard(it) +
+        '</div>';
+      }).join('');
+      return '<div class="plan-cell' + (dia.k === 'sin' ? ' plan-sin' : '') + (ln.activa ? '' : ' linea-inactiva') + '" id="pc-' + ln.id + '-' + dia.k + '"' +
+        ' ondragover="planCellOver(event,' + ln.id + ',\'' + dia.k + '\')"' +
+        ' ondragleave="planCellLeave(event,' + ln.id + ',\'' + dia.k + '\')"' +
+        ' ondrop="planCellDrop(event,' + ln.id + ',\'' + dia.k + '\')">' +
+        (und > 0 ? '<div class="plan-cell-tot">' + und.toLocaleString() + ' und</div>' : '') +
+        (cards || '<div class="plan-empty">·</div>') +
+      '</div>';
+    }).join('');
+    return lbl + celdas;
+  }).join('');
+
+  return nav + '<div class="plan-grid">' + head + filas + '</div>';
 }
 
 // Ficha COMPLETADA que sigue asignada a una línea: se muestra (en verde, al final de su línea)
@@ -3541,11 +3673,7 @@ function renderBoard() {
     return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
   });
   contSin.innerHTML = boardBuildSinBlock(lanes[0].concat(sinExtra));
-  var html = '';
-  LINEAS_PRODUCCION.forEach(function(ln) {
-    html += boardBuildLane(ln.id, lanes[ln.id] || [], ln.nombre, ln.activa);
-  });
-  contLines.innerHTML = html;
+  contLines.innerHTML = boardBuildMatriz(lanes);
   verificarCierresPeriodo(lanes[0]); // fire-and-forget: cierra períodos vencidos si aplica
 }
 
@@ -12749,12 +12877,13 @@ async function asistCambiarFecha(delta) {
 
 async function cargarOrdenSinAsignar() {
   try {
-    var r = await db.from('configuracion').select('clave,valor').in('clave', ['sin_cards_serig', 'sin_grupos_serig', 'lane_cards_serig']);
+    var r = await db.from('configuracion').select('clave,valor').in('clave', ['sin_cards_serig', 'sin_grupos_serig', 'lane_cards_serig', 'plan_semanal_serig']);
     if (r.data && r.data.length) {
       r.data.forEach(function(row) {
         if (row.clave === 'sin_cards_serig') sinCardOrdenCache = row.valor || {};
         if (row.clave === 'sin_grupos_serig') sinGrupoOrdenCache = row.valor || [];
         if (row.clave === 'lane_cards_serig') laneCardOrdenCache = row.valor || {};
+        if (row.clave === 'plan_semanal_serig') planSemCache = row.valor || {};
       });
     } else {
       // migrar desde localStorage si existe
