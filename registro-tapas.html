@@ -1844,22 +1844,27 @@ function pedChipTap(id) {
 
 // Resumen de una línea para el chip cerrado en celular: ¿alcanzan los componentes?
 // ESPEJO de stkPTHtml (tapas.html): stock del producto terminado (SKU principal) frente a lo que falta entregar
-function pedStkPTTexto(stock, falta) {
+function pedStkPTTexto(stock, falta, propio) {
   if (stock === null || stock === undefined) return null;
-  if (stock <= 0) return { cls: 'cero', stock: 0, acc: falta > 0 ? 'PRODUCIR TODO <b>' + pedNum(falta) + '</b> und' : 'SIN STOCK' };
-  if (falta > 0 && stock >= falta) return { cls: 'ok', stock: stock, acc: '✓ CUBRE EL SALDO' };
-  if (falta > 0) return { cls: 'par', stock: stock, acc: 'PRODUCIR <b>' + pedNum(falta - stock) + '</b> und' };
-  return { cls: 'ok', stock: stock, acc: '' };
+  // El stock de B2 ya incluye lo entregado con requi de ESTA ficha y el saldo ya lo descontó: "libre" = stock − lo ya entregado
+  propio = Math.max(0, propio || 0);
+  var libre = Math.max(0, stock - propio);
+  var ex = (propio > 0 && stock > 0) ? ' <i>(' + pedNum(libre) + ' libres)</i>' : '';
+  if (stock <= 0) return { cls: 'cero', stock: 0, ex: '', acc: falta > 0 ? 'PRODUCIR TODO <b>' + pedNum(falta) + '</b> und' : 'SIN STOCK' };
+  if (falta > 0 && libre >= falta) return { cls: 'ok', stock: stock, ex: ex, acc: '✓ CUBRE EL SALDO' };
+  if (falta > 0 && libre > 0) return { cls: 'par', stock: stock, ex: ex, acc: 'PRODUCIR <b>' + pedNum(falta - libre) + '</b> und' };
+  if (falta > 0) return { cls: 'cero', stock: stock, ex: ex, acc: 'PRODUCIR TODO <b>' + pedNum(falta) + '</b> und' };
+  return { cls: 'ok', stock: stock, ex: ex, acc: '' };
 }
 // Barra bien visible: izquierda lo que hay en stock, derecha lo que falta producir (o "cubre el saldo")
 function pedStkPTBarra(t) {
   return '<div class="ped-stk ' + t.cls + '" title="Existencia actual del producto terminado en inventario (Bodega 2)">'
-    + '<span class="k">📦 STOCK PT <b>' + pedNum(t.stock) + '</b></span>' + (t.acc ? '<span class="a">' + t.acc + '</span>' : '') + '</div>';
+    + '<span class="k">📦 STOCK PT <b>' + pedNum(t.stock) + '</b>' + (t.ex || '') + '</span>' + (t.acc ? '<span class="a">' + t.acc + '</span>' : '') + '</div>';
 }
-function pedStkPTHtml(sku, falta) {
+function pedStkPTHtml(sku, falta, propio) {
   if (!sku) return '';
   var it = (PED.stockInv || {})[sku];
-  var t = pedStkPTTexto(it ? it.ex : null, falta);
+  var t = pedStkPTTexto(it ? it.ex : null, falta, propio);
   return t ? pedStkPTBarra(t) : '';
 }
 
@@ -1878,7 +1883,9 @@ function pedProducirInfo(x) {
     var porSacar = Math.max(0, f.cant - (f.salido || 0));
     return f.stock === null || porSacar === 0 || f.stock >= porSacar;
   });
-  return { stock: st, producir: st === null ? x.saldo : Math.max(0, x.saldo - st), cubierta: st !== null && x.saldo > 0 && st >= x.saldo, matOk: matOk };
+  // stock LIBRE = stock − lo ya entregado con requi de esta ficha (ese stock ya salió del saldo; ver pedStkPTTexto)
+  var libre = st === null ? null : Math.max(0, st - (x.entregado || 0));
+  return { stock: st, libre: libre, producir: st === null ? x.saldo : Math.max(0, x.saldo - libre), cubierta: st !== null && x.saldo > 0 && libre >= x.saldo, matOk: matOk };
 }
 
 function pedCompResumenHtml(x) {
@@ -2342,7 +2349,7 @@ function renderPedidos() {
   // terminado, luego las de stock parcial y al final las CUBIERTAS (con stock hay 1 despacho o más de ventaja, pueden esperar) ·
   // 2) las que ya tienen Base y Contratapa suficientes (el Liner no cuenta) antes que las que no · 3) las que MÁS falta fabricar
   // primero · 4) fecha límite · 5) antigüedad
-  var nivelStock = function(p) { return p.cubierta ? 2 : ((p.stock || 0) > 0 ? 1 : 0); };
+  var nivelStock = function(p) { return p.cubierta ? 2 : ((p.libre || 0) > 0 ? 1 : 0); };
   var ordenChips = function(a, b) {
     var pa = pedProducirInfo(a), pb = pedProducirInfo(b);
     return (((a.completada || a.sobre) ? 1 : 0) - ((b.completada || b.sobre) ? 1 : 0)) || ((a.sobre ? 1 : 0) - (b.sobre ? 1 : 0)) || (nivelStock(pa) - nivelStock(pb)) || ((pb.matOk ? 1 : 0) - (pa.matOk ? 1 : 0)) || (pb.producir - pa.producir) || (a.limite || '9999').localeCompare(b.limite || '9999') || String(a.s.created_at).localeCompare(String(b.s.created_at));
@@ -2356,7 +2363,7 @@ function renderPedidos() {
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
       + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + pedEstadoBadge(x) + pedComentBadge(x) + '</span>' + pedEsquinaHtml(x) + '</div>'
       + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
-      + pedStkPTHtml(x.sku, x.saldo)
+      + pedStkPTHtml(x.sku, x.saldo, x.entregado)
       + pedNotaHtml(x.s.notas)
       + '<div class="ped-resum">' + (proc ? '<span class="ped-res-b proc">▶ ' + pedNum(x.enProc) + ' en proceso</span>' : '') + pedCompResumenHtml(x) + '</div>'
       + '<div>' + pedComentBtn(x) + '</div>'

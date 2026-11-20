@@ -4921,22 +4921,28 @@ function componentesResumenHtml(s) {
 
 // Stock del PRODUCTO TERMINADO (SKU principal, inventario B2) frente a lo que falta entregar: a veces ya hay existencia y no
 // hace falta producir todo. Informativo — el mismo stock puede estar apartado para otra ficha. ESPEJO: pedStkPTHtml (registro-tapas.html).
-function stkPTTexto(stock, falta) {
+function stkPTTexto(stock, falta, propio) {
   if (stock === null || stock === undefined) return null;
-  if (stock <= 0) return { cls: 'cero', stock: 0, acc: falta > 0 ? 'PRODUCIR TODO <b>' + falta.toLocaleString() + '</b> und' : 'SIN STOCK' };
-  if (falta > 0 && stock >= falta) return { cls: 'ok', stock: stock, acc: '✓ CUBRE EL SALDO' };
-  if (falta > 0) return { cls: 'par', stock: stock, acc: 'PRODUCIR <b>' + (falta - stock).toLocaleString() + '</b> und' };
-  return { cls: 'ok', stock: stock, acc: '' };
+  // El stock de B2 ya incluye lo que esta ficha entregó con requi (el ingreso PT suma a inventario) y el saldo ya lo descontó:
+  // contarlo otra vez haría creer que el stock "cubre" lo que falta. "Libre" = stock − lo ya entregado de ESTA ficha.
+  propio = Math.max(0, propio || 0);
+  var libre = Math.max(0, stock - propio);
+  var ex = (propio > 0 && stock > 0) ? ' <i>(' + libre.toLocaleString() + ' libres)</i>' : '';
+  if (stock <= 0) return { cls: 'cero', stock: 0, ex: '', acc: falta > 0 ? 'PRODUCIR TODO <b>' + falta.toLocaleString() + '</b> und' : 'SIN STOCK' };
+  if (falta > 0 && libre >= falta) return { cls: 'ok', stock: stock, ex: ex, acc: '✓ CUBRE EL SALDO' };
+  if (falta > 0 && libre > 0) return { cls: 'par', stock: stock, ex: ex, acc: 'PRODUCIR <b>' + (falta - libre).toLocaleString() + '</b> und' };
+  if (falta > 0) return { cls: 'cero', stock: stock, ex: ex, acc: 'PRODUCIR TODO <b>' + falta.toLocaleString() + '</b> und' };
+  return { cls: 'ok', stock: stock, ex: ex, acc: '' };
 }
 // Barra bien visible: izquierda lo que hay en stock, derecha lo que falta producir (o "cubre el saldo")
 function stkPTBarra(t) {
   return '<div class="cp-stk ' + t.cls + '" title="Existencia actual del producto terminado en inventario (Bodega 2)">'
-    + '<span class="k">📦 STOCK PT <b>' + t.stock.toLocaleString() + '</b></span>' + (t.acc ? '<span class="a">' + t.acc + '</span>' : '') + '</div>';
+    + '<span class="k">📦 STOCK PT <b>' + t.stock.toLocaleString() + '</b>' + (t.ex || '') + '</span>' + (t.acc ? '<span class="a">' + t.acc + '</span>' : '') + '</div>';
 }
-function stkPTHtml(sku, falta) {
+function stkPTHtml(sku, falta, propio) {
   if (!sku) return '';
   var it = invB2DeTapas(sku);
-  var t = stkPTTexto(it ? (it.existencia || 0) : null, falta);
+  var t = stkPTTexto(it ? (it.existencia || 0) : null, falta, propio);
   return t ? stkPTBarra(t) : '';
 }
 
@@ -5382,7 +5388,7 @@ function buildChipCompacto(x, conCliente) {
     + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + comentBadgeHtml(x.s) + '</span>' + cpEsquinaHtml(x) + '</div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
     + codClienteChipHtml(x.s)
-    + stkPTHtml(x.sku, x.saldo)
+    + stkPTHtml(x.sku, x.saldo, x.ent)
     + notaChipHtml(x.s.notas)
     + '<div class="cp-resum">' + (enProc ? '<span class="cp-res-b proc">▶ ' + x.enProc.toLocaleString() + ' en proceso</span>' : '') + componentesResumenHtml(x.s) + '</div>'
     + '<div class="cp-more">'
@@ -5396,7 +5402,7 @@ function buildChipCompacto(x, conCliente) {
 
 // Nivel de stock PT del SKU principal: 0 = SIN stock (0 o sin dato) · 1 = stock parcial · 2 = el stock cubre el saldo
 function nivelStockChip(x) {
-  return x.cubierta ? 2 : ((x.stockPT || 0) > 0 ? 1 : 0);
+  return x.cubierta ? 2 : ((x.stockLibre || 0) > 0 ? 1 : 0);
 }
 
 // Orden de los chips (igual en Por tipo, Por cliente y Por prioridad): 1) primero las SIN stock del producto terminado, luego
@@ -5440,8 +5446,10 @@ function modeloFichasCompactas() {
     // Stock del PRODUCTO TERMINADO (SKU principal, B2) frente al saldo: cuánto falta FABRICAR y si el stock ya lo cubre todo
     var it = x.sku ? invB2DeTapas(x.sku) : null;
     x.stockPT = it ? (it.existencia || 0) : null;
-    x.producir = x.stockPT === null ? x.saldo : Math.max(0, x.saldo - x.stockPT);
-    x.cubierta = x.stockPT !== null && x.saldo > 0 && x.stockPT >= x.saldo;
+    // stock LIBRE = stock − lo ya entregado con requi de esta ficha (ese stock ya salió del saldo; ver stkPTTexto)
+    x.stockLibre = x.stockPT === null ? null : Math.max(0, x.stockPT - (x.ent || 0));
+    x.producir = x.stockPT === null ? x.saldo : Math.max(0, x.saldo - x.stockLibre);
+    x.cubierta = x.stockPT !== null && x.saldo > 0 && x.stockLibre >= x.saldo;
     x.matOk = baseContratapaOk(x.s);
     return x;
   });
