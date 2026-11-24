@@ -523,6 +523,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 /* Ficha que la supervisora marcó COMPLETADA: sigue visible al final del listado, transparente */
 .cp-chip.completada{background:#F0FDF4;border-color:#16A34A;box-shadow:inset 3px 0 0 #16A34A;opacity:.65;transition:opacity .15s}
 .cp-chip.completada:hover,.cp-chip.completada.open{opacity:1}
+/* Completada = versión MINI (nov/2026): solo 2 líneas — ✓ ficha · cliente · entregado/pedido, y SKU · producto en una línea cortada. Notas, entregas y quién/cuándo
+   quedan dentro de la ficha (clic en el chip); en celular, tocar el chip los despliega aquí mismo (.open) */
+.cp-chip.completada{padding:3px 7px;line-height:1.25}
+.cp-mini-1{display:flex;align-items:baseline;gap:6px;font-size:11px;min-width:0}
+.cp-mini-1 .ck{color:#15803D;font-weight:800}
+.cp-mini-1 .cod{font-weight:800;white-space:nowrap}
+.cp-mini-1 .cli{flex:1;min-width:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.2px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cp-mini-1 .rat{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:800;white-space:nowrap}
+.cp-mini-2{font-size:10.5px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cp-mini-2 b{font-family:var(--mono);color:var(--ink);margin-right:4px}
+.cp-chip.completada.open .cp-mini-2{white-space:normal}
+.cp-mini-x{display:none}
+.cp-chip.completada.open .cp-mini-x{display:block;margin-top:4px}
 /* Ficha ABIERTA a la que ya se le entregó todo lo pedido (o más): no se oculta; se ve transparente y ámbar al final de su grupo, para decidir si se marca completada o se amplía la cantidad */
 .cp-chip.sobre{background:#FFFBEB;border-color:#F59E0B;box-shadow:inset 3px 0 0 #F59E0B;opacity:.62;transition:opacity .15s}
 .cp-chip.sobre:hover,.cp-chip.sobre.open{opacity:1}
@@ -5374,14 +5387,17 @@ function entregasChipHtml(s) {
 function chipCompletadoTapas(x, conCliente) {
   var idq = escHtml(String(x.id));
   var tag = '✓ COMPLETADA' + (x.s.marcadoTapasPor ? ' · ' + x.s.marcadoTapasPor : '') + (x.s.marcadoTapasEn ? ' · ' + comentFechaHoraTapas(x.s.marcadoTapasEn) : '');
-  return '<div class="cp-chip completada' + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
-    + '<span class="cp-comp-tag">' + escHtml(tag) + '</span>'
-    + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
-    + '<div class="cp-chip-t"><span>' + escHtml(x.codigo) + comentBadgeHtml(x.s) + '</span><b title="Entregado / pedido" style="color:' + entColorTapas(x.s) + '">' + entregadoTotalFichaTapas(x.s).toLocaleString() + '/' + x.cant.toLocaleString() + '</b></div>'
-    + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
-    + notaChipHtml(x.s.notas)
-    + entregasChipHtml(x.s)
-    + '<div class="cp-acc"><button onclick="event.stopPropagation();abrirFichaTapas(\'' + idq + '\')">Ver detalle de la ficha</button></div>'
+  return '<div class="cp-chip completada' + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')" title="' + escHtml(tag) + '">'
+    + '<div class="cp-mini-1"><span class="ck">✓</span><span class="cod">' + escHtml(x.codigo) + comentBadgeHtml(x.s) + '</span>'
+    +   (conCliente ? '<span class="cli">' + escHtml(x.cliente) + '</span>' : '')
+    +   '<span class="rat" title="Entregado / pedido" style="color:' + entColorTapas(x.s) + '">' + entregadoTotalFichaTapas(x.s).toLocaleString() + '/' + x.cant.toLocaleString() + '</span></div>'
+    + '<div class="cp-mini-2"><b>' + escHtml(x.sku || 'sin SKU') + '</b>' + escHtml(x.descSola) + '</div>'
+    + '<div class="cp-mini-x">'
+    +   '<span class="cp-comp-tag">' + escHtml(tag) + '</span>'
+    +   notaChipHtml(x.s.notas)
+    +   entregasChipHtml(x.s)
+    +   '<div class="cp-acc"><button onclick="event.stopPropagation();abrirFichaTapas(\'' + idq + '\')">Ver detalle de la ficha</button></div>'
+    + '</div>'
     + '</div>';
 }
 
