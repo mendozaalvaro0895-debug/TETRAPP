@@ -1425,7 +1425,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
       <div id="ingPendientes"></div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div class="fl">PRODUCTOS * <span style="font-weight:500;color:var(--gray-l)">(cada línea se vincula a su propio pedido, y de ahí sale su cliente; suma al inventario de PT)</span></div>
-        <button class="btn btn-g btn-sm" onclick="ingAgregarLinea()">+ Agregar producto</button>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-g btn-sm" id="ingBtnFicha" onclick="ingNuevaFicha()" title="Caso especial: lo que entregas no tiene ficha. Se crea aquí sin salir de esta requi y queda vinculada a la fila.">📋 Agregar ficha</button>
+          <button class="btn btn-g btn-sm" onclick="ingAgregarLinea()">+ Agregar producto</button>
+        </div>
       </div>
       <div id="ingLineas"></div>
       <div class="fg full" style="margin-top:10px">
@@ -2704,7 +2707,10 @@ function abrirForm() {
 function cerrarForm() {
   cerrarFormDrop();
   editandoFichaId = null;
-  document.getElementById('overlay').classList.remove('open');
+  ingFichaPend = null; // si se abrió desde "Registrar entregado" y se cancela, la requi sigue como estaba
+  var ov = document.getElementById('overlay');
+  ov.classList.remove('open');
+  ov.style.zIndex = '';
 }
 
 // Editar una ficha: mismo formulario que "Nueva solicitud", precargado. Solo se edita la PRIMERA línea
@@ -3116,9 +3122,11 @@ async function guardar() {
 
     var partesReceta = construirPartesReceta(linea, l); // antes de cerrar: el formulario se reinicia
     guardarTipoTapa(linea.sku, l.tipo);
+    var vincIng = ingFichaPend; // si se abrió desde "Registrar entregado", cerrarForm lo limpia
     cerrarForm();
     await cargarSolicitudes();
-    showToast('✅ ' + codigo + ' guardada');
+    if (vincIng) ingFichaCreada(vincIng, solId);
+    showToast('✅ ' + codigo + ' guardada' + (vincIng ? ' y vinculada a la requi' : ''));
     guardarVinculoCodigo(cliente, codCli, linea.sku, linea.descripcion);
     ofrecerRecetaDeFicha(linea.sku, linea.descripcion, partesReceta, cliente); // no bloquea ni rompe el guardado
   } catch(e) {
@@ -7730,6 +7738,47 @@ function cerrarIngPT() {
   document.getElementById('overlayIngPT').classList.remove('open');
   cerrarFormDrop();
   ingEdit = null;
+}
+
+// "📋 Agregar ficha" (caso especial): se entrega algo que no tiene ficha. Abre el mismo formulario "Nueva solicitud" ENCIMA de esta
+// requi (sin cerrarla: No. de requi, fecha y demás líneas se conservan) y, al guardar, la ficha nueva queda vinculada a la fila
+// destino (la primera sin pedido que ya trae SKU, si no una en blanco, si no una nueva). Si la fila ya trae SKU/cantidad, el
+// formulario arranca con ellos.
+var ingFichaPend = null; // { i: índice de la línea de la requi que recibe la ficha nueva }
+
+function ingNuevaFicha() {
+  ingSincronizarCant();
+  var i = -1, k;
+  for (k = 0; k < ingLineas.length && i < 0; k++) { if (!ingLineas[k].sol && ingLineas[k].sku) i = k; }
+  for (k = 0; k < ingLineas.length && i < 0; k++) {
+    var q = ingLineas[k];
+    if (!q.sol && !q.solTxt && !q.sku && !q.skuTxt && !(parseInt(q.cant, 10) > 0)) i = k;
+  }
+  if (i < 0) { ingLineas.push(ingNuevaLinea()); i = ingLineas.length - 1; renderIngLineas(); }
+  abrirForm();
+  ingFichaPend = { i: i }; // después de abrirForm (que no lo toca) y antes de cualquier cierre
+  document.getElementById('overlay').style.zIndex = '10040'; // encima de la requi (10000), debajo de los desplegables de SKU (10050)
+  var l = ingLineas[i];
+  var c = parseInt(l.cant, 10) || 0;
+  if (c > 0 && lineas[0]) lineas[0].cant = c;
+  if (l.sku) formSkuSelect('prod', l.sku);
+  else { renderLineas(); calcular(); }
+}
+
+// La ficha recién guardada se pone en la fila destino de la requi (con su SKU y cantidad si la fila estaba vacía)
+function ingFichaCreada(p, solId) {
+  var s = solicitudes.find(function(x) { return x.id === solId; });
+  if (!s || !document.getElementById('overlayIngPT').classList.contains('open')) return;
+  ingSincronizarCant();
+  var l = ingLineas[p.i];
+  if (!l) { ingLineas.push(ingNuevaLinea()); l = ingLineas[ingLineas.length - 1]; }
+  l.sol = s.id; l.solTxt = '';
+  if (!l.sku && s.lineas.length === 1 && s.lineas[0].sku) {
+    var it = invB2DeTapas(s.lineas[0].sku);
+    if (it) { l.sku = it.sku; l.desc = it.descripcion || ''; l.skuTxt = ''; }
+  }
+  if (!(parseInt(l.cant, 10) > 0)) l.cant = s.cant;
+  renderIngLineas();
 }
 
 function ingAgregarLinea() {
