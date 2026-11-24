@@ -545,6 +545,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-parc .ent.ok i{color:#047857}
 .cp-parc.ok{border-color:#86EFAC;background:#F0FDF4;color:#166534}
 .cp-parc.ok .top b{color:#15803D}
+/* Tamaño estándar de la ficha (nov/2026): las entregas arrancan COLAPSADAS (solo el resumen); al abrirlas el detalle tiene alto máximo con scroll */
+.cp-parc .top{cursor:pointer}
+.cp-parc .top>span:first-child::after{content:" ▸";color:#94A3B8}
+.cp-parc.abierto .top>span:first-child::after{content:" ▾"}
+.cp-parc .ent-ls{display:none}
+.cp-parc.abierto .ent-ls{display:block;max-height:128px;overflow-y:auto;padding-right:2px}
 .cp-chip-t b.cp-esq.y{color:#A16207}
 .cp-chip-t b.cp-esq.g{color:#15803D}
 .cp-comp-tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#15803D;margin-bottom:2px}
@@ -5324,6 +5330,13 @@ function cpEsquinaHtml(x) {
 // Bloque ENTREGAS al final del chip: el detalle de TODO lo entregado, una línea por entrega: fecha · cantidad · No. de requi (verde, ya con
 // requi de ingreso PT) y, en amarillo, lo que la supervisora reportó y aún no tiene requi. Las entregas reportadas ya cubiertas por una
 // requi no se repiten (esa cantidad ya sale en la línea de su requi). ESPEJO de pedParcChipHtml de registro-tapas.html
+var cpEntAbiertos = {}; // fichas con el detalle de entregas desplegado (se conserva al repintar)
+function cpEntToggle(el, id) {
+  var box = el.closest ? el.closest('.cp-parc') : null;
+  if (!box) return;
+  cpEntAbiertos[id] = box.classList.toggle('abierto');
+}
+
 function entregasChipHtml(s) {
   var p = parcialesDeFicha(s);
   var pend = p.lista.filter(function(it) { return it.cubierto < (it.e.cantidad || 0); });
@@ -5351,9 +5364,10 @@ function entregasChipHtml(s) {
       + (it.e.lote ? '<span style="min-width:0;font-weight:700;color:#334155">Lote ' + escHtml(it.e.lote) + '</span>' : '')
       + '<i>⏳ sin requi</i>' + fotoBtnTapas(it.e, true) + '</div>';
   }).join('');
-  return '<div class="cp-parc' + (p.sinRequi > 0 ? '' : ' ok') + '">'
-    + '<div class="top"><span>🚚 ENTREGAS</span><span class="det">' + det.join(' · ') + '</span></div>'
-    + lineasReq + lineasPend + factLineasHtml(s)
+  var idE = escHtml(String(s.id));
+  return '<div class="cp-parc' + (p.sinRequi > 0 ? '' : ' ok') + (cpEntAbiertos[s.id] ? ' abierto' : '') + '">'
+    + '<div class="top" title="Clic para ver / ocultar el detalle de las entregas" onclick="event.stopPropagation();cpEntToggle(this,\'' + idE + '\')"><span>🚚 ENTREGAS (' + (grupos.length + pend.length) + ')</span><span class="det">' + det.join(' · ') + '</span></div>'
+    + '<div class="ent-ls">' + lineasReq + lineasPend + factLineasHtml(s) + '</div>'
     + '</div>';
 }
 

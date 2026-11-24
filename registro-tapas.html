@@ -450,6 +450,12 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-parc .ent.ok i{color:#047857}
 .ped-parc.ok{border-color:#86EFAC;background:#F0FDF4;color:#166534}
 .ped-parc.ok .top b{color:#15803D}
+/* Tamaño estándar de la ficha (nov/2026, ESPEJO de tapas.html): entregas colapsadas por defecto, detalle con alto máximo y scroll */
+.ped-parc .top{cursor:pointer}
+.ped-parc .top>span:first-child::after{content:" ▸";color:#94A3B8}
+.ped-parc.abierto .top>span:first-child::after{content:" ▾"}
+.ped-parc .ent-ls{display:none}
+.ped-parc.abierto .ent-ls{display:block;max-height:128px;overflow-y:auto;padding-right:2px}
 .ped-pe.ok{border-color:#86EFAC;background:#F0FDF4}
 .ped-pe.edit input{width:120px;border:1.5px solid #CBD5E1;border-radius:8px;padding:7px 9px;font-size:15px;font-family:'DM Mono',monospace}
 .ped-pe.edit button.g{background:#A16207;color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800}
@@ -2812,6 +2818,13 @@ function pedEsquinaHtml(x) {
 // Bloque ENTREGAS al final del chip (ESPEJO de entregasChipHtml de tapas.html): el detalle de TODO lo entregado, una línea por entrega:
 // fecha · cantidad · No. de requi (verde, ya con requi de ingreso PT) y, en amarillo, lo que la supervisora reportó y aún no tiene requi.
 // Las entregas reportadas que ya quedaron cubiertas por una requi no se repiten (esa cantidad ya sale en la línea de su requi).
+var pedEntAbiertos = {}; // fichas con el detalle de entregas desplegado (se conserva al repintar)
+function pedEntToggle(el, id) {
+  var box = el.closest ? el.closest('.ped-parc') : null;
+  if (!box) return;
+  pedEntAbiertos[id] = box.classList.toggle('abierto');
+}
+
 function pedParcChipHtml(x) {
   var pend = x.parc.lista.filter(function(e) { return (e.cubierto || 0) < e.cantidad; });
   var grupos = [], idx = {};
@@ -2830,9 +2843,10 @@ function pedParcChipHtml(x) {
       + (e.lote ? '<span style="min-width:0;font-weight:700;color:#334155">Lote ' + escHtml(e.lote) + '</span>' : '')
       + '<i>⏳ sin requi</i>' + pedFotoBtn(e, true) + '</div>';
   }).join('');
-  return '<div class="ped-parc' + (x.parc.sinRequi > 0 ? '' : ' ok') + '">'
-    + '<div class="top"><span>🚚 ENTREGAS</span><span class="det">' + pedEntDetHtml(x) + '</span></div>'
-    + lineasReq + lineasPend
+  var idE = escHtml(String(x.id));
+  return '<div class="ped-parc' + (x.parc.sinRequi > 0 ? '' : ' ok') + (pedEntAbiertos[x.id] ? ' abierto' : '') + '">'
+    + '<div class="top" title="Toca para ver / ocultar el detalle de las entregas" onclick="event.stopPropagation();pedEntToggle(this,\'' + idE + '\')"><span>🚚 ENTREGAS (' + (grupos.length + pend.length) + ')</span><span class="det">' + pedEntDetHtml(x) + '</span></div>'
+    + '<div class="ent-ls">' + lineasReq + lineasPend + '</div>'
     + '</div>';
 }
 
