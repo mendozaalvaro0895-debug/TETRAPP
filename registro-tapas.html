@@ -310,6 +310,31 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-vacio{font-size:12px;color:#9A9A98;font-style:italic;padding:14px;text-align:center}
 .ped-comp{background:#fff;border:1.5px solid #E0DED8;border-radius:10px;overflow:hidden}
 .ped-comp-r{display:grid;grid-template-columns:100px 96px 88px 54px 74px 78px minmax(0,1fr) 84px;gap:8px;align-items:baseline;font-size:11px;padding:5px 10px;border-bottom:1px solid #F0EDE8}
+/* Entregados: misma tabla que tapas.html (solo consulta) */
+.et-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;background:#EBF7F4;border-bottom:1px solid #C8EDE7}
+.et-count{font-size:11px;color:#6B6B6A}
+.et-busca{margin-left:auto;width:230px;max-width:100%;padding:6px 9px;border:1.5px solid #E0DED8;border-radius:8px;font-size:12px;font-family:inherit;box-sizing:border-box}
+.et-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.et-tabla{width:100%;border-collapse:collapse;min-width:980px}
+.et-tabla th{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#6B6B6A;padding:8px 10px;border-bottom:2px solid #E0DED8;text-align:left;white-space:nowrap}
+.et-tabla td{padding:9px 10px;font-size:12px;border-bottom:1px solid #F7F6F2;vertical-align:top}
+.et-tabla tr:hover td{background:#EBF7F4}
+.et-doc{font-family:'DM Mono',monospace;font-weight:700;color:#0C0C0B;font-size:12px}
+.et-cant{font-family:'DM Mono',monospace;font-weight:700;color:#1A6B5B;text-align:right}
+.et-ped{font-family:'DM Mono',monospace;font-size:9px;font-weight:800;background:#EBF7F4;color:#1A6B5B;border-radius:3px;padding:1px 5px;cursor:pointer}
+.et-ped-x{background:#FEE2E2;color:#B91C1C;text-decoration:line-through;cursor:default}
+.et-orig{font-size:9px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:2px 6px;font-weight:700}
+.et-sec{padding:6px 10px;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+.et-sec-pend{background:#FDE68A;color:#78350F;border-top:2px solid #F59E0B}
+.et-sec-ok{background:#EBF7F4;color:#1A6B5B;border-top:2px solid #E0DED8}
+.et-pend td{background:#FFFBEB}
+.et-pend td:first-child{border-left:5px solid #F59E0B}
+.et-pend-tag{display:inline-block;font-size:9px;font-weight:800;background:#F59E0B;color:#fff;border-radius:4px;padding:2px 6px;white-space:nowrap}
+.et-fact{font-size:10px;line-height:1.5;white-space:nowrap}
+.et-fact.ok{color:#0369A1;font-weight:800}
+.et-fact.p{color:#B45309;font-weight:800}
+.et-fact.n{color:#A8A6A0}
+.et-fact small{display:block;font-family:'DM Mono',monospace;font-weight:600;color:#6B6B6A}
 .ped-comp-r:last-child{border-bottom:none}
 .ped-comp-h{background:#EBF7F4;border-bottom:2px solid #1A6B5B !important;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#1A6B5B}
 .ped-comp-h span,.ped-comp-h .f,.ped-comp-h .rq,.ped-comp-h .fi,.ped-comp-h .pr,.ped-comp-r.ped-comp-h .lt{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:800;color:#1A6B5B}
@@ -1672,7 +1697,7 @@ async function guardarRegistro() {
 // ficha (movimientos_materiales entrada_pt, bloque Entregados de tapas.html). Reparto de ingresos a lotes
 // = FIFO por fecha de marcado (solo cuentan ingresos posteriores al marcado). Abajo se listan los ingresos
 // ya hechos con su requi, marcados Parcial / Completa según lo acumulado de la ficha.
-var PED = { stockInv: {}, stockB7: {}, salidas: [], tipos: {}, sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, coment: [], comentOk: true, comentTxt: '', parc: [], parcOk: true, parcForm: false, parcCant: '', parcFecha: '', parcNota: '', parcLote: '', form: null, selOp: [], selProc: [], cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40 };
+var PED = { stockInv: {}, stockB7: {}, salidas: [], tipos: {}, sols: [], ing: [], lotes: [], tareas: [], tareasOk: true, coment: [], comentOk: true, comentTxt: '', parc: [], parcOk: true, parcForm: false, parcCant: '', parcFecha: '', parcNota: '', parcLote: '', form: null, selOp: [], selProc: [], cantTmp: null, lotesOk: true, modelo: [], timer: null, masComp: 40, ingAll: [], descSku: {}, etSols: [], etMap: {}, lotesMov: {}, ventasTs: 0 };
 var PED_VIVOS = ['nueva', 'proceso', 'parcial'];
 var PED_COMPLETADAS_DIAS = 15; // las fichas marcadas COMPLETADA siguen a la vista (al final, transparentes) este tiempo
 
@@ -1797,7 +1822,14 @@ async function cargarPedidos(silencioso) {
     await pedCargarStock(PED.sols);
     PED.ing = ri.data || [];
     PED.lotes = rl.error ? [] : (rl.data || []);
+    // Entregados: TODOS los ingresos PT (también los que no tienen ficha), como en tapas.html
+    try {
+      var rall = await db.from('movimientos_materiales').select('*').eq('tipo', 'entrada_pt').order('created_at', { ascending: false }).limit(3000);
+      PED.ingAll = rall.error ? [] : (rall.data || []);
+      await etCargarDescripciones();
+    } catch(e) { console.warn('ingAll:', e); }
     renderPedidos();
+    pedCargarVentas().then(function(nuevo) { if (nuevo) renderPedidos(); });
   } catch(e) {
     console.error('cargarPedidos:', e);
     if (!silencioso) document.getElementById('pedCuerpo').innerHTML = '<div class="ped-vacio">No se pudieron cargar los pedidos: ' + escHtml(e.message || String(e)) + '</div>';
@@ -1826,7 +1858,7 @@ async function pedCargarStock(sols) {
       var r7 = await db.from('insumos_b7').select('sku,descripcion,existencia').in('sku', kb);
       (r7.data || []).forEach(function(row) { nB7[row.sku] = { ex: row.existencia || 0, desc: row.descripcion || '' }; });
     }
-    var rsal = await db.from('movimientos_materiales').select('solicitud_id,sku_original,cantidad,area')
+    var rsal = await db.from('movimientos_materiales').select('solicitud_id,sku_original,cantidad,area,num_documento')
       .eq('tipo', 'salida_bodega').not('solicitud_id', 'is', null).limit(3000);
     nSal = (rsal.data || []).filter(function(m) { return m.area !== 'serig'; });
   } catch(e) { console.warn('pedCargarStock:', e); }
@@ -2129,13 +2161,236 @@ function pintarEstadoFicha() {
   document.getElementById('estOv').classList.add('open');
 }
 
-// Encabezado de las columnas del bloque Entregados (las filas normales y las ámbar "sin requi" comparten las mismas columnas)
-function pedCompHeadHtml() {
-  return '<div class="ped-comp-r ped-comp-h"><span class="f">Fecha</span><span class="rq">No. de requi</span><span class="cl">Cliente</span><span class="fi">Ficha</span>'
-    + '<span>Estado</span><span class="lt">Lote</span><span class="pr">SKU · Descripción</span><span class="u">Cantidad</span></div>';
+// ── ENTREGADOS: ESPEJO de la tabla de tapas.html (mismas columnas, filas, lotes y facturación; aquí es solo consulta) ──────────
+// Fuente: TODOS los ingresos PT (PED.ingAll), no solo los vinculados a una ficha. Cualquier cambio de diseño se hace en AMBOS archivos.
+var entBusca = '';
+
+function etHoyIso() { return new Date(Date.now() - 6 * 3600 * 1000).toISOString().slice(0, 10); }
+function etParseObs(obs) { return obs ? String(obs).replace(/^FECHA:\d{4}-\d{2}-\d{2}( \| ?)?/, '') : ''; }
+function etSkuDesc(sku) {
+  if (!sku) return '—';
+  if (PED.descSku[sku]) return PED.descSku[sku];
+  var i = PED.stockInv[sku];
+  return (i && i.desc) ? i.desc : '—';
 }
 
-// Entregas que reportó la supervisora y aún no tienen requi de ingreso PT (misma regla que Entregados de tapas.html: e.cubierto lo calcula pedModelo)
+// Fichas con la forma que usa el cruce con facturas en tapas.html (id, id_display, cliente, lineas, ingreso, createdAt) + lotes de cada ingreso
+function etPrepara() {
+  PED.etSols = PED.modelo.map(function(x) {
+    var t = x.s.created_at ? new Date(new Date(x.s.created_at).getTime() - 6 * 3600 * 1000).toISOString().slice(0, 10) : '';
+    return { id: x.id, id_display: x.codigo, cliente: x.cliente, estado: x.s.estado, createdAt: x.s.created_at, ingreso: t,
+             lineas: (x.s.solicitud_lineas || []).map(function(l) { return { sku: l.sku }; }), x: x };
+  });
+  PED.etMap = {};
+  PED.etSols.forEach(function(s) { PED.etMap[s.id] = s; });
+  PED.lotesMov = {};
+  PED.modelo.forEach(function(x) { x.ings.forEach(function(g) { PED.lotesMov[g.id] = g.lotesEnt || []; }); });
+  factReset();
+}
+
+async function etCargarDescripciones() {
+  var faltan = {};
+  PED.ingAll.forEach(function(m) { var k = m.sku_original; if (k && !PED.descSku[k]) faltan[k] = 1; });
+  var ks = Object.keys(faltan);
+  for (var i = 0; i < ks.length; i += 100) {
+    var r = await db.from('inventario').select('sku,descripcion,bodega').in('sku', ks.slice(i, i + 100));
+    (r.data || []).forEach(function(row) { if (row.descripcion && (!PED.descSku[row.sku] || !row.bodega || row.bodega === 'B2')) PED.descSku[row.sku] = row.descripcion; });
+  }
+}
+
+// ── Facturación de lo entregado (cruce con la tabla ventas): ESPEJO de factModelo/factFilas de tapas.html. Solo lectura; sin ✓/✕ de confirmación (eso es de master) ──
+var ventasFact = [], ventasFactOk = false, factCache = null, factFilasCache = null, fichaFacturas = [];
+function factReset() { factCache = null; factFilasCache = null; }
+function fichaViva(s) { return PED_VIVOS.indexOf(s.estado) >= 0; }
+function entregadoTotalFichaTapas(s) { return s.x ? s.x.entregadoTotal : 0; }
+
+async function pedCargarVentas() {
+  if (PED.ventasTs && Date.now() - PED.ventasTs < 300000) return false;
+  PED.ventasTs = Date.now();
+  try {
+    var lim = new Date(etHoyIso() + 'T12:00:00');
+    lim.setDate(lim.getDate() - 120);
+    var limIso = lim.toISOString().slice(0, 10);
+    var desde = '';
+    (PED.etSols || []).forEach(function(s) {
+      var f = s.ingreso || '';
+      if (!f) return;
+      if ((fichaViva(s) || f >= limIso) && (!desde || f < desde)) desde = f;
+    });
+    var acum = [];
+    if (desde) {
+      var from = 0, paso = 1000;
+      while (true) {
+        var r = await db.from('ventas').select('id,fecha,serie,docu,sku,cliente,total_unidades,total_quetzales')
+          .gte('fecha', desde).gt('total_quetzales', 0)
+          .order('fecha', { ascending: true }).order('id', { ascending: true }).range(from, from + paso - 1);
+        if (r.error) throw r.error;
+        var d = r.data || [];
+        acum = acum.concat(d);
+        if (d.length < paso) break;
+        from += paso;
+      }
+    }
+    ventasFact = acum;
+    ventasFactOk = true;
+  } catch(e) {
+    console.error('pedCargarVentas:', e);
+    ventasFact = [];
+    ventasFactOk = false;
+  }
+  try {
+    var rf = await db.from('ficha_facturas').select('*');
+    fichaFacturas = rf.error ? [] : (rf.data || []);
+  } catch(e) { fichaFacturas = []; }
+  factReset();
+  return true;
+}
+
+function factPalabrasCliente(n) {
+  return ' ' + acNorm(n).replace(/\(hn\)/g, ' ').split(/[^a-z0-9]+/).filter(Boolean).join(' ') + ' ';
+}
+
+function factClienteCalza(fichaCli, ventaCli) {
+  var toks = factPalabrasCliente(fichaCli).trim().split(' ').filter(Boolean);
+  if (!toks.length) return false;
+  var vc = factPalabrasCliente(ventaCli);
+  return toks.every(function(t) { return vc.indexOf(' ' + t + ' ') >= 0; });
+}
+
+function factClave(serie, docu, sku) { return String(serie || '') + '|' + docu + '|' + String(sku || '').trim(); }
+
+function factModelo() {
+  if (factCache) return factCache;
+  var res = {}, idx = {}, porClave = {}, rem = {}, porId = {}, excl = {};
+  (PED.etSols || []).forEach(function(s) { porId[s.id] = s; });
+  ventasFact.forEach(function(v) {
+    var sku = String(v.sku || '').trim();
+    rem[v.id] = v.total_unidades || 0;
+    if (!sku) return;
+    (idx[sku] = idx[sku] || []).push(v);
+    if (sku.length > 5) { var b = sku.slice(0, -1); (idx[b] = idx[b] || []).push(v); }
+    var k = factClave(v.serie, v.docu, sku);
+    (porClave[k] = porClave[k] || []).push(v);
+  });
+  function fichaRes(s, ent) {
+    return res[s.id] || (res[s.id] = { entregado: ent, fact: 0, items: [], excluidas: [], auto: false });
+  }
+  // 1) Lo que master confirmó a mano va primero
+  fichaFacturas.forEach(function(l) {
+    var s = porId[l.solicitud_id];
+    if (!s) return;
+    var r = fichaRes(s, entregadoTotalFichaTapas(s));
+    var k = factClave(l.serie, l.docu, l.sku);
+    if (l.modo === 'excluida') {
+      (excl[s.id] = excl[s.id] || {})[k] = true;
+      r.excluidas.push({ id: l.id, ref: l.serie + ' ' + l.docu });
+      return;
+    }
+    var falta = l.und || 0, tomado = 0, ultima = null;
+    (porClave[k] || []).forEach(function(v) {
+      if (falta <= 0 || rem[v.id] <= 0) return;
+      var t = Math.min(rem[v.id], falta);
+      rem[v.id] -= t; falta -= t; tomado += t; ultima = v;
+    });
+    if (ultima) {
+      r.items.push({ tipo: 'manual', linkId: l.id, key: k, ref: l.serie + ' ' + l.docu, fecha: ultima.fecha, und: tomado });
+      r.fact += tomado;
+    } else {
+      r.items.push({ tipo: 'perdida', linkId: l.id, key: k, ref: l.serie + ' ' + l.docu, fecha: '', und: 0 });
+    }
+  });
+  // 2) Cruce automático, de la ficha más antigua a la más nueva
+  (PED.etSols || []).slice().sort(function(a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); }).forEach(function(s) {
+    var ent = entregadoTotalFichaTapas(s);
+    if (!res[s.id] && ent <= 0) return;
+    var r = fichaRes(s, ent);
+    r.entregado = ent;
+    if (!s.lineas || s.lineas.length !== 1 || !s.lineas[0].sku || ent <= 0) return;
+    r.auto = true;
+    var falta = ent - r.fact, ex = excl[s.id] || {};
+    (idx[String(s.lineas[0].sku).trim()] || []).forEach(function(v) {
+      if (falta <= 0 || rem[v.id] <= 0 || v.fecha < s.ingreso || !factClienteCalza(s.cliente, v.cliente)) return;
+      var k = factClave(v.serie, v.docu, v.sku);
+      if (ex[k]) return;
+      var t = Math.min(rem[v.id], falta);
+      rem[v.id] -= t; falta -= t;
+      r.items.push({ tipo: 'auto', key: k, ref: (v.serie || 'FACT') + ' ' + v.docu, fecha: v.fecha, und: t });
+      r.fact += t;
+    });
+  });
+  factCache = res;
+  return res;
+}
+
+function factDeFicha(s) {
+  if (!ventasFactOk) return null;
+  return factModelo()[s.id] || null;
+}
+
+// Reparte lo facturado de la ficha entre sus requis de ingreso PT (de la más vieja a la más nueva)
+function factFilas() {
+  if (factFilasCache) return factFilasCache;
+  var out = {}, mod = factModelo();
+  Object.keys(mod).forEach(function(id) {
+    var cola = mod[id].items.map(function(it) { return { ref: it.ref, rem: it.und }; });
+    PED.ingAll.filter(function(m) { return m.solicitud_id === id && m.area !== 'serig'; })
+      .sort(function(a, b) { return String(a.created_at).localeCompare(String(b.created_at)); })
+      .forEach(function(m) {
+        var total = m.cantidad || 0, falta = total, refs = [];
+        while (falta > 0 && cola.length) {
+          var c = cola[0], t = Math.min(c.rem, falta);
+          c.rem -= t; falta -= t;
+          if (refs.indexOf(c.ref) < 0) refs.push(c.ref);
+          if (c.rem <= 0) cola.shift();
+        }
+        out[m.id] = { fact: total - falta, total: total, refs: refs };
+      });
+  });
+  factFilasCache = out;
+  return out;
+}
+
+function factCeldaFila(m) {
+  if (!ventasFactOk || !m.solicitud_id) return '<td class="et-fact n">—</td>';
+  var f = factFilas()[m.id];
+  if (!f) return '<td class="et-fact n">—</td>';
+  var refs = f.refs.length ? '<small>' + escHtml(f.refs.join(' · ')) + '</small>' : '';
+  if (f.fact >= f.total) return '<td class="et-fact ok">✓ Facturado' + refs + '</td>';
+  if (f.fact > 0) return '<td class="et-fact p">Parcial ' + pedNum(f.fact) + '/' + pedNum(f.total) + refs + '</td>';
+  return '<td class="et-fact n">⏳ Sin facturar</td>';
+}
+
+function factCeldaPend(s) {
+  var f = factDeFicha(s);
+  if (!f || f.fact <= 0) return '<td class="et-fact n">—</td>';
+  return '<td class="et-fact ' + (f.fact >= f.entregado ? 'ok' : 'p') + '">🧾 ' + pedNum(f.fact) + ' facturadas'
+    + '<small>' + escHtml(f.items.map(function(it) { return it.ref; }).join(' · ')) + '</small></td>';
+}
+
+// Requis de ingreso PT agrupadas por No. de requi (las filas sin número van solas); dentro de la requi, en orden de captura
+function etGrupos() {
+  var map = {}, out = [];
+  PED.ingAll.forEach(function(m) {
+    if (m.area === 'serig') return;
+    var k = m.num_documento ? 'd:' + m.num_documento : 'i:' + m.id;
+    if (!map[k]) { map[k] = { doc: m.num_documento || '', fecha: pedFechaMov(m), nota: etParseObs(m.observaciones), rows: [] }; out.push(map[k]); }
+    map[k].rows.unshift(m);
+  });
+  return out;
+}
+
+// Requis de salida de bodega de cada ficha
+function etSalidas() {
+  var sal = {};
+  PED.salidas.forEach(function(m) {
+    if (m.area === 'serig' || !m.solicitud_id || !m.num_documento) return;
+    var a = sal[m.solicitud_id] || (sal[m.solicitud_id] = []);
+    if (a.indexOf(m.num_documento) < 0) a.push(m.num_documento);
+  });
+  return sal;
+}
+
+// Entregas que reportó la supervisora y aún no tienen requi de ingreso PT (misma regla que tapas.html: e.cubierto lo calcula pedModelo)
 function pedPendientesSinRequi(m) {
   var out = [];
   m.forEach(function(x) {
@@ -2150,55 +2405,157 @@ function pedPendientesSinRequi(m) {
   return out;
 }
 
-// Varias entregas pendientes de la MISMA ficha se funden en UNA fila con el total a ingresar (la requi se hace por el total);
-// el detalle de cuánto se entregó y cuándo queda en la columna Fecha. ESPEJO de entPendientesPorFicha de tapas.html.
+// Varias entregas pendientes de la MISMA ficha se funden en UNA fila con el total a ingresar. ESPEJO de entPendientesPorFicha de tapas.html.
 function pedPendientesPorFicha(m) {
   var por = {}, out = [];
   pedPendientesSinRequi(m).forEach(function(p) {
     var k = String(p.x.id);
-    if (!por[k]) { por[k] = { x: p.x, falta: 0, cubierto: 0, items: [] }; out.push(por[k]); }
+    if (!por[k]) { por[k] = { x: p.x, falta: 0, cubierto: 0, reportado: 0, items: [] }; out.push(por[k]); }
     por[k].falta += p.falta;
     por[k].cubierto += p.e.cubierto || 0;
+    por[k].reportado += p.e.cantidad || 0;
     por[k].items.push(p);
   });
   out.forEach(function(g) {
     g.items.sort(function(a, b) {
       return String(a.e.fecha || '').localeCompare(String(b.e.fecha || '')) || String(a.e.created_at || '').localeCompare(String(b.e.created_at || ''));
     });
-    g.ultima = g.items[g.items.length - 1].e;
-  });
-  out.sort(function(a, b) {
-    return String(b.ultima.fecha || '').localeCompare(String(a.ultima.fecha || '')) || String(b.ultima.created_at || '').localeCompare(String(a.ultima.created_at || ''));
   });
   return out;
 }
 
-// Una línea por entrega: "30-oct · 6,500" = lo que falta ingresar de esa entrega ("de N" si ya tiene requi parcial); solo la fecha si la ficha tiene una sola
-function pedPendFechaLineas(g) {
-  var uno = g.items.length === 1;
+function etPendFiltrados(toks) {
+  var lista = pedPendientesPorFicha(PED.modelo);
+  if (!toks.length) return lista;
+  return lista.filter(function(g) {
+    var extra = g.items.map(function(p) { return (p.e.nota || '') + ' ' + (p.e.lote || '') + ' ' + (p.e.registrado_por || ''); }).join(' ');
+    var n = acNorm('sin requi tapas ' + (g.x.cliente || '') + ' ' + (g.x.codigo || '') + ' ' + (g.x.sku || '') + ' ' + etSkuDesc(g.x.sku) + ' ' + extra);
+    return toks.every(function(t) { return n.indexOf(t) !== -1; });
+  });
+}
+
+function etPendTotales(grupos) {
+  var ent = 0, und = 0;
+  grupos.forEach(function(g) { ent += g.items.length; und += g.falta; });
+  return { fichas: grupos.length, entregas: ent, und: und };
+}
+
+// Una línea de detalle por entrega: "02/Nov/2026 · 6,000" (con una sola entrega, solo la fecha)
+function etPendFechaLineas(g) {
+  var multi = g.items.length > 1;
   return g.items.map(function(p) {
-    return escHtml(pedFechaCorta(p.e.fecha)) + (uno ? '' : ' · <b>' + pedNum(p.falta) + '</b>' + (p.e.cubierto ? ' <i title="Reportó ' + pedNum(p.e.cantidad) + '; ' + pedNum(p.e.cubierto) + ' ya tienen requi" style="font-weight:400">de ' + pedNum(p.e.cantidad) + '</i>' : ''));
+    return escHtml(fmtFechaLetras(p.e.fecha)) + (multi ? ' · <b style="color:#0C0C0B">' + pedNum(p.falta) + '</b>' : '');
   }).join('<br>');
 }
 
-// Lotes distintos de las entregas de la ficha, sin repetir
-function pedPendLotes(g) {
-  var vistos = [];
-  g.items.forEach(function(p) { if (p.e.lote && vistos.indexOf(p.e.lote) < 0) vistos.push(p.e.lote); });
-  return vistos.join(' · ');
+function etPendLoteLineas(g) {
+  return g.items.map(function(p) { return escHtml(p.e.lote || '—'); }).join('<br>');
 }
 
-function pedPendRowHtml(g) {
-  var x = g.x, idq = escHtml(String(x.id)), n = g.items.length;
-  var cierra = g.items.some(function(p) { return p.e.cierra; });
-  return '<div class="ped-comp-r pend" title="Entregas reportadas por Tapas: falta la requi de ingreso" onclick="abrirEstadoFicha(\'' + idq + '\')">'
-    + '<span class="f">' + pedPendFechaLineas(g) + '</span>'
-    + '<span class="rq">⏳ SIN REQUI' + (n > 1 ? '<small>' + n + ' entregas</small>' : '') + '</span>'
-    + '<span class="cl">' + escHtml(x.cliente) + '</span><span class="fi">' + escHtml(x.codigo) + '</span>'
-    + '<span class="ped-tag sr"' + (cierra ? ' title="Una de estas entregas completó la ficha"' : '') + '>' + (cierra ? 'TAPAS ✓' : 'TAPAS') + '</span>'
-    + '<span class="lt">' + escHtml(pedPendLotes(g)) + '</span>'
-    + '<span class="pr">' + escHtml((x.sku ? x.sku + ' · ' : '') + x.desc) + '</span>'
-    + '<span class="u">' + pedNum(g.falta) + '</span></div>';
+function etPendSeccionHtml(pend) {
+  if (!pend.length) return '';
+  var t = etPendTotales(pend);
+  return '<tr><td colspan="10" class="et-sec et-sec-pend">⏳ Entregas reportadas por Tapas · pendientes de requi de ingreso · '
+    + t.fichas + ' ficha' + (t.fichas !== 1 ? 's' : '') + (t.entregas !== t.fichas ? ' (' + t.entregas + ' entregas)' : '') + ' · ' + pedNum(t.und) + ' und</td></tr>'
+    + pend.map(etPendHtml).join('');
+}
+
+function etPendHtml(g) {
+  var x = g.x, s = PED.etMap[x.id] || { id: x.id, x: x, lineas: [] };
+  var sal = etSalidas()[x.id] ? etSalidas()[x.id].join(', ') : '—';
+  var quienes = [], notas = [], fotos = '', cierra = false;
+  g.items.forEach(function(p) {
+    var e = p.e;
+    if (e.registrado_por && quienes.indexOf(e.registrado_por) < 0) quienes.push(e.registrado_por);
+    if (e.nota && notas.indexOf(e.nota) < 0) notas.push(e.nota);
+    if (e.cierra) cierra = true;
+    fotos += pedFotoBtn(e, false);
+  });
+  var notaPend = notas.concat(quienes).join(' · ');
+  var multi = g.items.length > 1;
+  return '<tr class="et-pend">'
+    + '<td><span class="et-pend-tag">⏳ SIN REQUI</span>' + (multi ? '<div style="font-size:9px;font-weight:700;color:#B45309;margin-top:3px">' + g.items.length + ' entregas</div>' : '') + '</td>'
+    + '<td style="font-weight:600;font-size:11px">' + escHtml(x.cliente || '—') + '</td>'
+    + '<td><span class="et-ped" title="Ver el estado de la ficha" onclick="abrirEstadoFicha(\'' + escHtml(String(x.id)) + '\')">' + escHtml(x.codigo) + '</span></td>'
+    + '<td style="font-size:11px;color:#6B6B6A"><span style="font-family:\'DM Mono\',monospace;font-size:10px;margin-right:4px">' + escHtml(x.sku || '') + '</span>' + escHtml(x.sku ? etSkuDesc(x.sku) : (x.desc || '')) + '</td>'
+    + '<td class="et-cant" title="' + (multi ? 'Total de ' + g.items.length + ' entregas reportadas por Tapas' : 'Reportado por Tapas') + '">' + pedNum(g.falta)
+    + (g.cubierto > 0 ? '<div style="font-size:9px;font-weight:600;color:#A8A6A0">de ' + pedNum(g.reportado) + '</div>' : '') + '</td>'
+    + '<td style="font-size:11px;color:#6B6B6A;white-space:nowrap;line-height:1.55">' + etPendFechaLineas(g) + '</td>'
+    + '<td style="font-size:11px;font-weight:800;font-family:\'DM Mono\',monospace;white-space:nowrap;line-height:1.55">' + etPendLoteLineas(g) + '</td>'
+    + '<td><span class="et-orig" style="background:#F59E0B;color:#fff">TAPAS</span>'
+    + (cierra ? ' <span style="font-size:10px;font-weight:800;color:#047857">✅ completó la ficha</span>' : '') + fotos
+    + (notaPend ? ' <span style="font-size:10px;color:#A8A6A0">· ' + escHtml(notaPend) + '</span>' : '') + '</td>'
+    + '<td style="font-size:11px;font-family:\'DM Mono\',monospace;color:#A8A6A0">' + escHtml(sal) + '</td>'
+    + factCeldaPend(s)
+    + '</tr>';
+}
+
+function etGrupoHtml(g, gi, sal) {
+  var bg = gi % 2 === 0 ? '#ffffff' : '#EBF7F4';
+  var sep = gi > 0 ? 'border-top:2px solid #E0DED8;' : '';
+  return g.rows.map(function(m, li) {
+    var primera = li === 0;
+    var s = m.solicitud_id ? PED.etMap[m.solicitud_id] : null;
+    var ped = s ? '<span class="et-ped" title="Ver el estado de la ficha" onclick="abrirEstadoFicha(\'' + escHtml(String(s.id)) + '\')">' + escHtml(s.id_display) + '</span>'
+                : (m.solicitud_id ? '<span class="et-ped et-ped-x" title="Pedido eliminado">eliminado</span>' : '');
+    var sl = (m.solicitud_id && sal[m.solicitud_id]) ? sal[m.solicitud_id].join(', ') : '—';
+    var lotes = PED.lotesMov[m.id] || [];
+    return '<tr style="background:' + bg + ';' + (primera ? sep : '') + '">'
+      + '<td>' + (primera ? '<span class="et-doc">' + escHtml(g.doc || '—') + '</span>' : '<span style="color:#E0DED8;padding-left:8px">└</span>') + '</td>'
+      + '<td style="font-weight:600;font-size:11px">' + escHtml(s ? (s.cliente || '—') : '—') + '</td>'
+      + '<td>' + ped + '</td>'
+      + '<td style="font-size:11px;color:#6B6B6A"><span style="font-family:\'DM Mono\',monospace;font-size:10px;margin-right:4px">' + escHtml(m.sku_original || '') + '</span>' + escHtml(etSkuDesc(m.sku_original)) + '</td>'
+      + '<td class="et-cant">' + pedNum(m.cantidad || 0) + '</td>'
+      + '<td style="font-size:11px;color:#6B6B6A;white-space:nowrap">' + escHtml(fmtFechaLetras(g.fecha)) + '</td>'
+      + (lotes.length
+          ? '<td style="font-size:11px;font-weight:700;font-family:\'DM Mono\',monospace;color:#334155;white-space:nowrap">' + escHtml(lotes.join(' · ')) + '</td>'
+          : '<td style="font-size:11px;color:#A8A6A0">—</td>')
+      + '<td><span class="et-orig">MANUAL</span>' + (primera && g.nota ? ' <span style="font-size:10px;color:#A8A6A0">· ' + escHtml(g.nota) + '</span>' : '') + '</td>'
+      + '<td style="font-size:11px;font-family:\'DM Mono\',monospace;color:#A8A6A0">' + escHtml(sl) + '</td>'
+      + factCeldaFila(m) + '</tr>';
+  }).join('');
+}
+
+// Devuelve el HTML de la tabla y el texto del contador (el buscador solo repinta esto, sin perder el foco)
+function etConstruir() {
+  var grupos = etGrupos();
+  var toks = acNorm(entBusca).split(/[^a-z0-9]+/).filter(Boolean);
+  if (toks.length) {
+    grupos = grupos.filter(function(g) {
+      var txt = g.doc + ' ' + g.nota + ' ' + g.rows.map(function(m) {
+        var s = m.solicitud_id ? PED.etMap[m.solicitud_id] : null;
+        var fr = ventasFactOk ? factFilas()[m.id] : null;
+        return (m.sku_original || '') + ' ' + etSkuDesc(m.sku_original) + ' ' + (s ? (s.cliente || '') + ' ' + (s.id_display || '') : '') + ' ' + (fr ? fr.refs.join(' ') : '');
+      }).join(' ');
+      var n = acNorm(txt);
+      return toks.every(function(t) { return n.indexOf(t) !== -1; });
+    });
+  }
+  var pend = etPendFiltrados(toks);
+  var tp = etPendTotales(pend);
+  var cuenta = grupos.length + ' requi' + (grupos.length !== 1 ? 's' : '') + (toks.length ? ' (filtradas)' : '')
+    + (pend.length ? ' · ⏳ ' + tp.entregas + ' entrega' + (tp.entregas !== 1 ? 's' : '') + ' de Tapas sin requi' : '') + ' · historial de ingresos a PT';
+  if (!grupos.length && !pend.length) {
+    return { cuenta: cuenta, html: '<div class="ped-vacio" style="padding:18px;text-align:center">' + (toks.length ? '🔍 Ninguna requi coincide con la búsqueda' : '📭 No hay entregados registrados aún') + '</div>' };
+  }
+  var sal = etSalidas();
+  var filas = etPendSeccionHtml(pend)
+    + (pend.length && grupos.length ? '<tr><td colspan="10" class="et-sec et-sec-ok">📦 Requis registradas</td></tr>' : '')
+    + grupos.slice(0, PED.masComp).map(function(g, gi) { return etGrupoHtml(g, gi, sal); }).join('');
+  var html = '<div class="et-scroll"><table class="et-tabla"><thead><tr>'
+    + '<th>No. Requi</th><th>Cliente</th><th>Pedido</th><th>Producto</th><th style="text-align:right">Unidades</th>'
+    + '<th>Fecha</th><th>Lote</th><th>Origen</th><th>Requi Salida Bodega</th><th>Facturación</th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+    + (grupos.length > PED.masComp ? '<button class="ped-mas" onclick="PED.masComp+=40;renderPedidos()">Mostrar más (' + (grupos.length - PED.masComp) + ' requis restantes)</button>' : '');
+  return { cuenta: cuenta, html: html };
+}
+
+function etBuscarInput(v) {
+  entBusca = v;
+  PED.masComp = 40;
+  var r = etConstruir();
+  var c = document.getElementById('etCuerpo'), n = document.getElementById('etCuenta');
+  if (c) c.innerHTML = r.html;
+  if (n) n.textContent = r.cuenta;
 }
 
 // ── Buscador de fichas (ESPEJO de fichBuscar* de tapas.html) ─────────────────────────────────────────────
@@ -2341,6 +2698,8 @@ function pedBuscarLimpiar() {
 function renderPedidos() {
   var m = pedModelo();
   PED.modelo = m;
+  etPrepara();
+  var aeAct = document.activeElement, etEnfoque = !!(aeAct && aeAct.id === 'etBuscar'), etPos = etEnfoque ? aeAct.selectionStart : 0;
   var vivas = m.filter(function(x) { return x.viva && x.saldo > 0; });
   var ahora = new Date();
   document.getElementById('pedAct').textContent = vivas.length + ' pedido' + (vivas.length !== 1 ? 's' : '') + ' con saldo · actualizado ' + String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
@@ -2476,45 +2835,18 @@ function renderPedidos() {
     + '<button class="' + (pedAgrupar === 'cliente' ? 'act' : '') + '" onclick="setPedAgrupar(\'cliente\')">Por cliente</button>'
     + '<button class="' + (pedAgrupar === 'prioridad' ? 'act' : '') + '" onclick="setPedAgrupar(\'prioridad\')">Por prioridad</button></span>';
 
-  // 3) Completados: ingresos PT con su requi, agrupados por requi + ficha
-  var grupos = {}, orden = [];
-  m.forEach(function(x) {
-    var acum = 0;
-    x.ings.forEach(function(g) {
-      var k = (g.num_documento || ('i' + g.id)) + '|' + x.id;
-      if (!grupos[k]) { grupos[k] = { x: x, doc: g.num_documento || '—', fecha: pedFechaMov(g), und: 0, ts: g.created_at, lotes: [] }; orden.push(grupos[k]); }
-      grupos[k].und += g.cantidad || 0;
-      (g.lotesEnt || []).forEach(function(lt) { if (grupos[k].lotes.indexOf(lt) < 0) grupos[k].lotes.push(lt); });
-      acum += g.cantidad || 0;
-      grupos[k].acum = acum;
-      grupos[k].fecha = pedFechaMov(g);
-    });
-  });
-  orden.sort(function(a, b) { return String(b.ts).localeCompare(String(a.ts)); });
-  var filas = orden.slice(0, PED.masComp).map(function(g) {
-    var completa = g.acum >= g.x.cant && g.x.cant > 0;
-    return '<div class="ped-comp-r"><span class="f">' + escHtml(fmtFechaLetras(g.fecha)) + '</span><span class="rq">' + escHtml(g.doc) + '</span>'
-      + '<span class="cl">' + escHtml(g.x.cliente) + '</span><span class="fi lnk" title="Ver el estado de la ficha" onclick="abrirEstadoFicha(\'' + escHtml(String(g.x.id)) + '\')">' + escHtml(g.x.codigo) + '</span>'
-      + '<span class="ped-tag ' + (completa ? 'ok' : 'par') + '">' + (completa ? 'Completa' : 'Parcial') + '</span>'
-      + '<span class="lt">' + escHtml(g.lotes.join(' · ')) + '</span>'
-      + '<span class="pr">' + escHtml((g.x.sku ? g.x.sku + ' · ' : '') + g.x.desc) + '</span>'
-      + '<span class="u">' + pedNum(g.und) + '</span></div>';
-  }).join('');
-  var pend = pedPendientesPorFicha(m);
-  var pendTot = pend.reduce(function(a, g) { return a + g.falta; }, 0);
-  var pendEnt = pend.reduce(function(a, g) { return a + g.items.length; }, 0);
-  var htmlPend = pend.length
-    ? '<div class="ped-comp-sec pend">⏳ Entregas que reportaste · pendientes de requi · ' + pend.length + ' ficha' + (pend.length !== 1 ? 's' : '') + (pendEnt !== pend.length ? ' (' + pendEnt + ' entregas)' : '') + ' · ' + pedNum(pendTot) + ' und</div>' + pend.map(pedPendRowHtml).join('')
-    : '';
-  var htmlComp = (orden.length || pend.length)
-    ? '<div class="ped-comp">' + pedCompHeadHtml() + htmlPend + (pend.length && orden.length ? '<div class="ped-comp-sec ok">📦 Requis registradas</div>' : '') + filas + '</div>' + (orden.length > PED.masComp ? '<button class="ped-mas" onclick="PED.masComp+=40;renderPedidos()">Mostrar más (' + (orden.length - PED.masComp) + ')</button>' : '')
-    : '<div class="ped-vacio">Todavía no hay entregas ni ingresos PT vinculados a pedidos.</div>';
+  // 3) Entregados: MISMA tabla que tapas.html (requis de ingreso PT + entregas de Tapas sin requi + facturación)
+  var etR = etConstruir();
+  var htmlComp = '<div class="ped-comp"><div class="et-bar"><span class="et-count" id="etCuenta">' + escHtml(etR.cuenta) + '</span>'
+    + '<input class="et-busca" id="etBuscar" placeholder="🔍 Requi, SKU, cliente, pedido o factura…" value="' + escHtml(entBusca) + '" oninput="etBuscarInput(this.value)" autocomplete="off"></div>'
+    + '<div id="etCuerpo">' + etR.html + '</div></div>';
 
   document.getElementById('pedCuerpo').innerHTML =
     '<div class="ped-sec-t clic' + pedCol('proc') + '"' + pedClic('proc') + '><span class="ped-chev">▾</span>🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc.replace('class="ped-proc"', 'class="ped-proc' + pedCol('proc') + '"')
     + '<div class="ped-sec-t">📋 ' + (pedAgrupar === 'tipo' ? 'Por entregar según el tipo de tapa' : (pedAgrupar === 'prioridad' ? 'Pedidos por prioridad' : 'Todos los pedidos por cliente')) + ' <i>toca un pedido para marcarlo en proceso</i>' + modoBtns + '</div>' + htmlGrid
-    + '<div class="ped-sec-t clic' + pedCol('comp') + '"' + pedClic('comp') + '><span class="ped-chev">▾</span>📦 Entregados — ingresos PT con su requi <i>(' + orden.length + ' requi' + (orden.length !== 1 ? 's' : '') + (pend.length ? ' · ⏳ ' + pend.length + ' sin requi' : '') + ')</i></div>' + htmlComp.replace('class="ped-comp"', 'class="ped-comp' + pedCol('comp') + '"').replace('class="ped-mas"', 'class="ped-mas' + pedCol('comp') + '"');
+    + '<div class="ped-sec-t clic' + pedCol('comp') + '"' + pedClic('comp') + '><span class="ped-chev">▾</span>📦 Entregados — ingresos PT con su requi</div>' + htmlComp.replace('class="ped-comp"', 'class="ped-comp' + pedCol('comp') + '"').replace('class="ped-mas"', 'class="ped-mas' + pedCol('comp') + '"');
 
+  if (etEnfoque) { var etB = document.getElementById('etBuscar'); if (etB) { etB.focus(); try { etB.setSelectionRange(etPos, etPos); } catch(e) {} } }
   if (document.getElementById('pedOv').classList.contains('open') && PED.abierto) pintarPedido();
   if (document.getElementById('estOv').classList.contains('open') && PED.estId) pintarEstadoFicha();
 }
