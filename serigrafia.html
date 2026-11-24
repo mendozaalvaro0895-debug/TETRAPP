@@ -1024,16 +1024,13 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
       <div class="fr">
         <div class="fg">
           <div class="fl">Cliente</div>
-          <select class="fs" id="fCli" onchange="actualizarCampoOC()">
+          <select class="fs" id="fCli" onchange="clienteCambiadoForm()">
             <option value="">— Selecciona cliente —</option>
           </select>
         </div>
-        <div class="fg">
-          <div class="fl">Área solicitante</div>
-          <select class="fs" id="fArea">
-            <option value="Ventas">Ventas</option>
-            <option value="Otro">Otro</option>
-          </select>
+        <div class="fg" id="fOcRow">
+          <div class="fl">Número de OC <span id="fOcStar" style="color:#dc2626;display:none">*</span></div>
+          <input class="fi" id="fNumeroOC" type="text" placeholder="Opcional · Ej.: OC-12345" autocomplete="off" oninput="this.style.borderColor=''">
         </div>
       </div>
       <div class="fr">
@@ -1057,28 +1054,11 @@ th.ag-col-sel{background:var(--serig-l);color:var(--serig-m);font-weight:900;box
           <select class="fs" id="fMesPedido"></select>
         </div>
       </div>
-      <div class="fr" id="fOcRow" style="display:none">
-        <div class="fg">
-          <div class="fl">Número de OC *</div>
-          <input class="fi" id="fNumeroOC" type="text" placeholder="Ej.: OC-12345" autocomplete="off" oninput="this.style.borderColor=''">
-        </div>
-      </div>
+      <select id="fArea" style="display:none"><option value="Ventas">Ventas</option><option value="Otro">Otro</option></select>
       <div class="fg full">
-        <div class="fl">Líneas de pedido</div>
-        <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px;overflow:hidden">
-          <div style="display:grid;grid-template-columns:1fr 116px 56px 28px;gap:6px;padding:7px 10px;background:var(--bg2);border-bottom:1px solid var(--border)">
-            <div style="font-size:9px;font-weight:700">Producto · SKU</div>
-            <div style="font-size:9px;font-weight:700;text-align:right">Cantidad</div>
-            <div style="font-size:9px;font-weight:700;text-align:right">Stock</div>
-            <div></div>
-          </div>
+        <div class="fl">Producto del pedido <span style="font-weight:500;color:var(--gray-l)">(una ficha = un producto; escribe el código del cliente y se rellena con lo que ya se hizo antes)</span></div>
+        <div style="background:var(--bg);border:1.5px solid var(--border);border-radius:8px">
           <div id="lineasPedido"></div>
-          <div style="padding:6px 10px;border-top:1px solid var(--border)">
-            <button type="button" class="btn btn-g btn-xs" onclick="addLinea()">+ Agregar línea</button>
-          </div>
-        </div>
-        <div style="display:flex;justify-content:flex-end;gap:16px;margin-top:6px">
-          <span>Total: <strong id="totalUnid" style="font-family:var(--mono)">0</strong> und</span>
         </div>
       </div>
       <div class="cbox cs" id="cboxEl">
@@ -2019,7 +1999,8 @@ async function cargarSolicitudes() {
                    estado: l.estado || null,
                    cap_impresion: l.cap_impresion || null,
                    tiros: l.tiros || 1,
-                   sku_base: l.sku_base || '' };
+                   sku_base: l.sku_base || '',
+                   codigo_cliente: l.codigo_cliente || '' };
         }),
         cant: ld.reduce(function(sum, l) { return sum + (l.cantidad || 0); }, 0),
         fecha_lim: s.fecha_limite || '',
@@ -7937,8 +7918,11 @@ function poblarMesPedido(mesExtra) {
 function esClienteConOC(cli) { return /darosa/i.test(cli || ''); }
 function actualizarCampoOC() {
   var cli = (document.getElementById('fCli') || {}).value || '';
-  var row = document.getElementById('fOcRow');
-  if (row) row.style.display = esClienteConOC(cli) ? '' : 'none';
+  var obl = esClienteConOC(cli);
+  var st = document.getElementById('fOcStar');
+  if (st) st.style.display = obl ? '' : 'none';
+  var inp = document.getElementById('fNumeroOC');
+  if (inp) inp.placeholder = (obl ? 'Obligatorio · ' : 'Opcional · ') + 'Ej.: OC-12345';
 }
 function valorOC() { return ((document.getElementById('fNumeroOC') || {}).value || '').trim(); }
 
@@ -7946,6 +7930,7 @@ function abrirForm() {
   editandoSolicitudId = null;
   lineas = [];
   addLinea();
+  cargarCodigosClienteS(); // vínculos código del cliente → nuestro SKU (memoria)
   document.getElementById('fCli').value = '';
   document.getElementById('fNotas').value = '';
   document.getElementById('fNumeroOC').value = '';
@@ -7991,15 +7976,19 @@ function abrirFormEditar(solId) {
       procs: (l.procs && l.procs.length) ? l.procs : ['flameado','impresion','secado','empaque'],
       existencia: l.existencia, cap_impresion: l.cap_impresion || 0,
       tiros: l.tiros || 1, linea_id: l.linea_id || 0, es_nuevo: false,
-      sku_base: l.sku_base || '', colores: '', formula_tinta: '', empaque: ''
+      sku_base: l.sku_base || '', colores: '', formula_tinta: '', empaque: '',
+      codCli: l.codigo_cliente || '', codNota: '', tocado: true, autoDe: '', autoOrigen: '', autoSpecs: false
     };
   });
   if (lineas.length === 0) addLinea();
   document.getElementById('mTitle').textContent = 'Editar · ' + (s.id_display || s.id.slice(0,8));
   document.getElementById('btnSave').textContent = 'Guardar cambios';
   document.getElementById('overlay').classList.add('open');
+  cargarCodigosClienteS();
   renderLineas();
   calcular();
+  if (lineas[0] && lineas[0].sku && !lineas[0].es_nuevo) serigRecetaAsync(lineas[0].sku, false); // colores / fórmula / empaque del Recetario
+  if (s.lineas.length > 1) showToast('⚠️ Esta ficha tiene ' + s.lineas.length + ' líneas (formato anterior): el formulario muestra la primera y conserva las demás', '#92400e');
 }
 
 function cerrarForm() {
@@ -8448,7 +8437,8 @@ function addLinea() {
   lineas.push({ sku: '', desc: '', cant: 0,
     procs: ['flameado', 'impresion', 'secado', 'empaque'],
     existencia: undefined, cap_impresion: 0, tiros: 1, linea_id: 0, es_nuevo: false,
-    sku_base: '', colores: '', formula_tinta: '', empaque: '' });
+    sku_base: '', colores: '', formula_tinta: '', empaque: '',
+    codCli: '', codNota: '', tocado: false, autoDe: '', autoOrigen: '', autoSpecs: false });
   renderLineas();
 }
 function removeLinea(idx) { lineas.splice(idx, 1); renderLineas(); calcular(); }
@@ -8473,100 +8463,327 @@ function buildLineaBtnsHtml(idx, lineaIdActual) {
 
 function selectLineaLinea(idx, lineaId) {
   lineas[idx].linea_id = lineaId;
+  lineas[idx].tocado = true;
   renderLineas();
 }
 
+function sfLbl(txt, title) {
+  return '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap"' + (title ? ' title="' + escHtml(title) + '"' : '') + '>' + txt + '</span>';
+}
+
+// Una ficha = un producto (como en Tapas). Si una ficha vieja trae varias líneas, el formulario muestra la primera y conserva las demás al guardar.
 function renderLineas() {
   var cont = document.getElementById('lineasPedido');
   if (!cont) return;
-  var html = lineas.map(function(l, i) {
-    var exColor = l.es_nuevo ? 'var(--serig-m)'
-      : (l.existencia !== undefined)
-        ? ((l.existencia >= (l.cant || 0)) ? 'var(--green)' : 'var(--amber)')
-        : 'var(--gray-l)';
-    var exVal = l.es_nuevo ? '🆕' : (l.existencia !== undefined ? l.existencia.toLocaleString() : '—');
-    var descRow = l.es_nuevo
-      ? '<div style="font-size:11px;color:var(--serig-m);padding:3px 0 2px;font-weight:600">🆕 Producto nuevo (sin SKU en inventario)</div>'
-      : (l.desc
-        ? '<div style="font-size:11px;color:var(--gray);padding:3px 0 2px;font-weight:500">📦 ' + l.desc + '</div>'
-        : '');
-    var lineaRow = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;padding-top:5px;border-top:1px dashed var(--border)">' +
-      '<div style="display:flex;align-items:center;gap:4px">' +
-        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Cap u/h</span>' +
-        '<input type="number" class="fi" placeholder="1000" value="' + (l.cap_impresion || '') + '" min="1"' +
-        ' style="width:70px;font-size:11px;padding:3px 6px"' +
-        ' onchange="lineas[' + i + '].cap_impresion=parseInt(this.value)||0;calcular()">' +
-      '</div>' +
-      '<div style="display:flex;align-items:center;gap:4px">' +
-        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Tiros</span>' +
-        '<input type="number" class="fi" placeholder="1" value="' + (l.tiros || '') + '" min="1" max="10"' +
-        ' style="width:50px;font-size:11px;padding:3px 6px"' +
-        ' onchange="lineas[' + i + '].tiros=parseInt(this.value)||1;calcular()">' +
-      '</div>' +
-      '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">' +
-        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Línea</span>' +
-        buildLineaBtnsHtml(i, l.linea_id || 0) +
-      '</div>' +
-      '</div>';
-    var recetaRow = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:5px">' +
-      '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap" title="No se guarda en la ficha: va directo al Recetario del SKU">Para el Recetario · opcional</span>' +
-      '<div style="display:flex;align-items:center;gap:4px">' +
-        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px">Colores</span>' +
-        '<input type="text" class="fi" placeholder="Ej: Negro + Blanco" value="' + escHtml(l.colores || '') + '" autocomplete="off"' +
-        ' style="width:150px;font-size:11px;padding:3px 6px" oninput="lineas[' + i + '].colores=this.value">' +
-      '</div>' +
-      '<div style="display:flex;align-items:center;gap:4px;flex:1;min-width:200px">' +
-        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Fórmula de tinta</span>' +
-        '<input type="text" class="fi" placeholder="Ej: tinta + catalizador + solvente" value="' + escHtml(l.formula_tinta || '') + '" autocomplete="off"' +
-        ' style="flex:1;font-size:11px;padding:3px 6px;min-width:0" oninput="lineas[' + i + '].formula_tinta=this.value">' +
-      '</div>' +
-      '<div style="display:flex;align-items:center;gap:4px;flex:1;min-width:200px">' +
-        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px">Empaque</span>' +
-        '<input type="text" class="fi" placeholder="Ej: caja de 500, bolsa de 50" value="' + escHtml(l.empaque || '') + '" autocomplete="off"' +
-        ' style="flex:1;font-size:11px;padding:3px 6px;min-width:0" oninput="lineas[' + i + '].empaque=this.value">' +
-      '</div>' +
-      '</div>';
-    return '<div style="border-bottom:1px solid var(--border);padding:8px 10px">' +
-      '<div style="display:grid;grid-template-columns:1fr 116px 56px 28px;gap:6px;margin-bottom:2px">' +
-        '<div class="sku-wrap-s">' +
-          '<input class="fi" placeholder="🔍 SKU, nombre o producto nuevo…" value="' + escHtml(l.sku) + '" autocomplete="off"' +
-            ' oninput="lineaSkuInput(' + i + ',this.value)"' +
-            ' onblur="setTimeout(function(){cerrarLineaSkuDrop(' + i + ')},200)">' +
-          '<div class="sku-drop-s" id="linea-drop-' + i + '"></div>' +
-        '</div>' +
-        '<input class="fi" type="number" placeholder="Cant" value="' + (l.cant || '') + '" onchange="lineas[' + i + '].cant=parseInt(this.value)||0;calcular()">' +
-        '<div style="font-size:11px;text-align:right;padding:6px 4px;color:' + exColor + '">' + exVal + '</div>' +
-        '<button onclick="removeLinea(' + i + ')" style="background:var(--red-l);border:none;border-radius:5px;cursor:pointer;font-size:13px">✕</button>' +
-      '</div>' +
-      descRow +
-      '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">' +
-        '<span style="font-size:9px;font-weight:700;color:var(--gray-l);white-space:nowrap;text-transform:uppercase;letter-spacing:.4px">Envase base SKU</span>' +
-        '<div class="sku-wrap-s" style="flex:1;max-width:220px">' +
-          '<input class="fi" placeholder="🔍 SKU o descripción…" value="' + escHtml(l.sku_base || '') + '" autocomplete="off"' +
-            ' style="font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box"' +
-            ' oninput="lineaSkuBaseInput(' + i + ',this.value)"' +
-            ' onblur="setTimeout(function(){cerrarLineaSkuBaseDrop(' + i + ')},200)">' +
-          '<div class="sku-drop-s" id="linea-base-drop-' + i + '"></div>' +
-        '</div>' +
-        (l.existencia_base !== undefined ? (function() {
-          var disponible = l.existencia_base;
-          var faltante   = (l.cant || 0) - disponible;
-          var alcanza    = faltante <= 0;
-          return '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap">' +
-            '<span style="font-size:9px;font-weight:700;color:var(--gray-l);text-transform:uppercase;letter-spacing:.4px">Stock</span>' +
-            '<span style="font-size:11px;font-weight:700;color:' + (alcanza ? 'var(--green)' : 'var(--amber)') + '">' + disponible.toLocaleString() + '</span>' +
-            (l.comprometido_base > 0 ? '<span style="font-size:9px;color:var(--gray-l)">(−' + l.comprometido_base.toLocaleString() + ' comprometidos)</span>' : '') +
-            (!alcanza ? '<span style="font-size:9px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.3px">· Faltante: ' + faltante.toLocaleString() + '</span>' : '') +
-          '</div>';
-        })() : '') +
-      '</div>' +
-      (l.desc_base ? '<div style="font-size:11px;color:var(--gray);padding:2px 0 0 0;margin-top:1px">📦 ' + escHtml(l.desc_base) + '</div>' : '') +
-      lineaRow +
-      recetaRow +
-      '</div>';
+  var l = lineas[0];
+  if (!l) { cont.innerHTML = ''; return; }
+  var i = 0;
+  var exColor = l.es_nuevo ? 'var(--serig-m)'
+    : (l.existencia !== undefined)
+      ? ((l.existencia >= (l.cant || 0)) ? 'var(--green)' : 'var(--amber)')
+      : 'var(--gray-l)';
+  var exVal = l.es_nuevo ? '🆕' : (l.existencia !== undefined ? l.existencia.toLocaleString() : '—');
+  var descRow = l.es_nuevo
+    ? '<div style="font-size:11px;color:var(--serig-m);padding:3px 0 2px;font-weight:600">🆕 Producto nuevo (sin SKU en inventario)</div>'
+    : (l.desc
+      ? '<div style="font-size:11px;color:var(--gray);padding:3px 0 2px;font-weight:500">📦 ' + escHtml(l.desc) + '</div>'
+      : '');
+  var codNota = l.codNota ? '<div style="font-size:10.5px;color:var(--serig-m);margin-top:2px;font-weight:600">' + escHtml(l.codNota) + '</div>' : '';
+  var auto = '';
+  if (l.autoDe && l.autoOrigen === 'ficha') {
+    auto = '↺ Rellenado con la ficha <b>' + escHtml(l.autoDe) + '</b> (mismo cliente y mismo producto): base, procesos, tiros, cap. u/h y línea' + (l.autoSpecs ? ', más colores / fórmula / empaque del Recetario' : '') + '. Revisa y cambia lo que haga falta';
+  } else if (l.autoDe) {
+    auto = '↺ Rellenado con la <b>receta guardada en el Recetario</b> para este SKU (este cliente aún no lo había pedido). Revisa y cambia lo que haga falta';
+  } else if (l.autoSpecs) {
+    auto = '📖 Colores / fórmula de tinta / empaque tomados del Recetario de este SKU';
+  }
+  var autoRow = auto ? '<div style="font-size:10.5px;color:#1E3A8A;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:4px 8px;margin:4px 0">' + auto + '</div>' : '';
+
+  var procsList = ALL_PROCS_SERIG.slice();
+  (l.procs || []).forEach(function(v) {
+    if (!procsList.some(function(p) { return p.val === v; })) procsList.push({ val: v, lbl: nombreProcesoReceta(v) });
+  });
+  var procsChips = procsList.map(function(p) {
+    var sel = (l.procs || []).indexOf(p.val) >= 0;
+    return '<div class="op-chip' + (sel ? ' sel-proc' : '') + '" style="padding:4px 11px;font-size:11px;border:1px solid var(--border)" onclick="toggleProcLinea(\'' + p.val + '\')">' + escHtml(p.lbl) + '</div>';
   }).join('');
-  cont.innerHTML = html;
+
+  var baseStock = (l.existencia_base !== undefined ? (function() {
+    var disponible = l.existencia_base;
+    var faltante   = (l.cant || 0) - disponible;
+    var alcanza    = faltante <= 0;
+    return '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap">' +
+      sfLbl('Stock') +
+      '<span style="font-size:11px;font-weight:700;color:' + (alcanza ? 'var(--green)' : 'var(--amber)') + '">' + disponible.toLocaleString() + '</span>' +
+      (l.comprometido_base > 0 ? '<span style="font-size:9px;color:var(--gray-l)">(−' + l.comprometido_base.toLocaleString() + ' comprometidos)</span>' : '') +
+      (!alcanza ? '<span style="font-size:9px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.3px">· Faltante: ' + faltante.toLocaleString() + '</span>' : '') +
+    '</div>';
+  })() : '');
+
+  var lineaRow = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:6px;border-top:1px dashed var(--border)">' +
+    '<div style="display:flex;align-items:center;gap:4px">' + sfLbl('Cap u/h') +
+      '<input type="number" class="fi" placeholder="1000" value="' + (l.cap_impresion || '') + '" min="1"' +
+      ' style="width:70px;font-size:11px;padding:3px 6px"' +
+      ' onchange="lineas[0].cap_impresion=parseInt(this.value)||0;lineas[0].tocado=true;calcular()">' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:4px">' + sfLbl('Tiros') +
+      '<input type="number" class="fi" placeholder="1" value="' + (l.tiros || '') + '" min="1" max="10"' +
+      ' style="width:50px;font-size:11px;padding:3px 6px"' +
+      ' onchange="lineas[0].tiros=parseInt(this.value)||1;lineas[0].tocado=true;calcular()">' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">' + sfLbl('Línea') + buildLineaBtnsHtml(0, l.linea_id || 0) + '</div>' +
+    '</div>';
+  var recetaRow = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
+    sfLbl('Para el Recetario · opcional', 'No se guarda en la ficha: va directo al Recetario del SKU') +
+    '<div style="display:flex;align-items:center;gap:4px">' + sfLbl('Colores') +
+      '<input type="text" class="fi" placeholder="Ej: Negro + Blanco" value="' + escHtml(l.colores || '') + '" autocomplete="off"' +
+      ' style="width:150px;font-size:11px;padding:3px 6px" oninput="lineas[0].colores=this.value">' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:4px;flex:1;min-width:200px">' + sfLbl('Fórmula de tinta') +
+      '<input type="text" class="fi" placeholder="Ej: tinta + catalizador + solvente" value="' + escHtml(l.formula_tinta || '') + '" autocomplete="off"' +
+      ' style="flex:1;font-size:11px;padding:3px 6px;min-width:0" oninput="lineas[0].formula_tinta=this.value">' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:4px;flex:1;min-width:200px">' + sfLbl('Empaque') +
+      '<input type="text" class="fi" placeholder="Ej: caja de 500, bolsa de 50" value="' + escHtml(l.empaque || '') + '" autocomplete="off"' +
+      ' style="flex:1;font-size:11px;padding:3px 6px;min-width:0" oninput="lineas[0].empaque=this.value">' +
+    '</div>' +
+    '</div>';
+
+  cont.innerHTML = '<div style="padding:10px">' +
+    '<div style="display:grid;grid-template-columns:150px 1fr 110px 64px;gap:6px;margin-bottom:2px">' +
+      '<input class="fi" placeholder="🏷 Cód. cliente" title="Código con el que el cliente identifica este producto en su OC: al escribirlo se elige solo nuestro SKU" value="' + escHtml(l.codCli || '') + '" autocomplete="off"' +
+        ' oninput="lineas[0].codCli=this.value" onchange="lineas[0].codCli=this.value;aplicarCodigoCliente(true)" onkeydown="if(event.key===\'Enter\')this.blur()" style="width:100%;box-sizing:border-box">' +
+      '<div class="sku-wrap-s">' +
+        '<input class="fi" placeholder="🔍 SKU, nombre o producto nuevo…" value="' + escHtml(l.sku) + '" autocomplete="off"' +
+          ' oninput="lineaSkuInput(0,this.value)"' +
+          ' onblur="setTimeout(function(){cerrarLineaSkuDrop(0)},200)">' +
+        '<div class="sku-drop-s" id="linea-drop-0"></div>' +
+      '</div>' +
+      '<input class="fi" type="number" placeholder="Cant" value="' + (l.cant || '') + '" onchange="lineas[0].cant=parseInt(this.value)||0;calcular()">' +
+      '<div style="font-size:11px;text-align:right;padding:6px 4px;color:' + exColor + '" title="Stock del producto terminado">' + exVal + '</div>' +
+    '</div>' +
+    codNota +
+    descRow +
+    autoRow +
+    '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">' +
+      sfLbl('Envase base SKU') +
+      '<div class="sku-wrap-s" style="flex:1;max-width:240px">' +
+        '<input class="fi" placeholder="🔍 SKU o descripción…" value="' + escHtml(l.sku_base || '') + '" autocomplete="off"' +
+          ' style="font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box"' +
+          ' oninput="lineas[0].tocado=true;lineaSkuBaseInput(0,this.value)"' +
+          ' onblur="setTimeout(function(){cerrarLineaSkuBaseDrop(0)},200)">' +
+        '<div class="sku-drop-s" id="linea-base-drop-0"></div>' +
+      '</div>' +
+      baseStock +
+    '</div>' +
+    (l.desc_base ? '<div style="font-size:11px;color:var(--gray);padding:2px 0 0 0;margin-top:1px">📦 ' + escHtml(l.desc_base) + '</div>' : '') +
+    '<div style="margin-top:8px">' + sfLbl('Procesos', 'Todos se pueden marcar o quitar') +
+      '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px">' + procsChips + '</div></div>' +
+    lineaRow +
+    recetaRow +
+    '</div>';
   updateTotals();
+}
+
+function toggleProcLinea(procVal) {
+  var l = lineas[0];
+  if (!l) return;
+  l.procs = (l.procs || []).slice();
+  var pos = l.procs.indexOf(procVal);
+  if (pos >= 0) l.procs.splice(pos, 1); else l.procs.push(procVal);
+  var orden = ALL_PROCS_SERIG.map(function(p) { return p.val; });
+  l.procs.sort(function(a, b) {
+    var ia = orden.indexOf(a), ib = orden.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  l.tocado = true;
+  renderLineas();
+  calcular();
+}
+
+// ── Memoria del formulario (como Tapas) ───────────────────────
+// 1) CÓDIGO DEL CLIENTE → nuestro SKU (tabla sku_codigo_cliente, area 'serigrafia'): el cliente identifica sus productos con SU
+//    código en la OC; al escribirlo (con el cliente ya elegido) se elige solo el SKU. Si el código es nuevo, queda vinculado al guardar.
+// 2) FICHA ANTERIOR del mismo cliente + SKU → base, procesos, tiros, cap. u/h y línea (la más reciente).
+// 3) RECETARIO del SKU → colores, fórmula de tinta y empaque (y, si ese cliente nunca lo había pedido, base/procesos/tiros).
+// Todo queda editable; nada se rellena si la persona ya empezó a llenar esos campos (l.tocado).
+var SERIG_PROCS_DEFAULT = ['flameado', 'impresion', 'secado', 'empaque'];
+var codigosClienteS = {};   // 'cliente|CODNORM' → { sku, codigo }
+var codigosPorSkuS = {};    // 'cliente|sku' → código (el último gana)
+var codigosClienteSOk = true;
+var recetasSerigCache = {}; // sku → { partes:[], specs:{campo:valor} }
+
+function serigNorm(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+function codNormS(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function claveCodCliS(cli, cod) { return serigNorm(cli) + '|' + codNormS(cod); }
+
+async function cargarCodigosClienteS() {
+  try {
+    var r = await db.from('sku_codigo_cliente').select('cliente,codigo_cliente,sku,actualizado_en').eq('area', 'serigrafia').order('actualizado_en', { ascending: true }).limit(5000);
+    if (r.error) { codigosClienteSOk = false; return; }
+    codigosClienteSOk = true;
+    var a = {}, b = {};
+    (r.data || []).forEach(function(x) {
+      a[claveCodCliS(x.cliente, x.codigo_cliente)] = { sku: x.sku, codigo: x.codigo_cliente };
+      b[serigNorm(x.cliente) + '|' + x.sku] = x.codigo_cliente;
+    });
+    codigosClienteS = a; codigosPorSkuS = b;
+  } catch(e) { codigosClienteSOk = false; }
+}
+
+// Busca el vínculo del código escrito (o, sin código, el que ya tiene guardado ese cliente para el SKU elegido)
+function aplicarCodigoCliente(renderizar) {
+  var l = lineas[0];
+  if (!l) return;
+  var cliente = (document.getElementById('fCli') || {}).value || '';
+  var cod = String(l.codCli || '').trim();
+  l.codNota = '';
+  if (cod) {
+    if (!cliente) l.codNota = 'elige primero el cliente para buscar el vínculo';
+    else {
+      var m = codigosClienteS[claveCodCliS(cliente, cod)];
+      if (m) {
+        var it = inventarioCache.find(function(i) { return i.sku === m.sku; });
+        if (!it) l.codNota = '⚠️ vinculado al SKU ' + m.sku + ', que ya no está en el inventario';
+        else if (!l.sku) { l.codNota = '🔗 vinculado: ' + cod + ' = SKU ' + it.sku; seleccionarLineaSku(0, it.sku); }
+        else if (l.sku === it.sku) l.codNota = '🔗 vinculado: ' + cod + ' = SKU ' + it.sku;
+        else l.codNota = '⚠️ ' + cod + ' estaba vinculado al SKU ' + it.sku + ' (elegiste ' + l.sku + '): al guardar se te preguntará cuál queda';
+      } else l.codNota = codigosClienteSOk ? 'código nuevo: elige el producto y el vínculo se guarda con la ficha' : '⚠️ no se pudo leer sku_codigo_cliente (el vínculo no se guardará)';
+    }
+  } else if (cliente && l.sku && codigosPorSkuS[serigNorm(cliente) + '|' + l.sku]) {
+    l.codCli = codigosPorSkuS[serigNorm(cliente) + '|' + l.sku];
+    l.codNota = 'código guardado de este cliente para este SKU';
+  }
+  if (renderizar) renderLineas();
+}
+
+function clienteCambiadoForm() {
+  actualizarCampoOC();
+  serigAutorrellenar();
+  aplicarCodigoCliente(false);
+  renderLineas();
+  calcular();
+}
+
+// Después de guardar la ficha: el código del cliente queda vinculado a nuestro SKU (si cambia de SKU, se pregunta)
+async function guardarVinculoCodigoS(cliente, codigo, sku, desc) {
+  try {
+    codigo = String(codigo || '').trim();
+    if (!cliente || !codigo || !sku) return;
+    if (!inventarioCache.some(function(i) { return i.sku === sku; })) return; // producto nuevo sin SKU: no hay a qué vincular
+    var previo = codigosClienteS[claveCodCliS(cliente, codigo)];
+    if (previo && previo.sku === sku) return;
+    if (previo && !confirm('El código "' + codigo + '" de ' + cliente + ' estaba vinculado al SKU ' + previo.sku + '.\n\n¿Cambiarlo para que apunte al SKU ' + sku + '?')) return;
+    var quien = (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || null;
+    var r = await db.from('sku_codigo_cliente').upsert({
+      cliente: cliente, codigo_cliente: codigo, codigo_norm: codNormS(codigo), sku: sku, descripcion: desc || null, area: 'serigrafia', actualizado_por: quien
+    }, { onConflict: 'cliente,codigo_norm,area' }).select('id');
+    if (r.error || !(r.data || []).length) throw r.error || new Error('sin permiso');
+    showToast('🔗 Código ' + codigo + ' de ' + cliente + ' vinculado al SKU ' + sku);
+    cargarCodigosClienteS();
+  } catch(e) {
+    console.warn('guardarVinculoCodigoS:', e);
+    showToast('⚠️ No se pudo guardar el vínculo del código: ' + ((e && e.message) || e), '#92400e');
+  }
+}
+
+// Ficha MÁS RECIENTE del mismo cliente que lleve ese SKU
+function serigFichaPrevia(cliente, sku) {
+  var cand = (solicitudes || []).filter(function(x) {
+    return x.cliente === cliente && (x.lineas || []).some(function(l) { return l.sku === sku; });
+  }).sort(function(a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); });
+  if (!cand.length) return null;
+  return { s: cand[0], l: cand[0].lineas.find(function(l) { return l.sku === sku; }) };
+}
+
+async function serigCargarReceta(sku) {
+  if (recetasSerigCache[sku]) return recetasSerigCache[sku];
+  var out = { partes: [], specs: {} };
+  try {
+    var r = await db.from('sku_recetas').select('sku_fact,sku_receta_partes(tipo,codigo,nota,orden)').eq('sku_fact', sku).eq('area', 'serigrafia').limit(1);
+    if (!r.error && r.data && r.data[0]) out.partes = (r.data[0].sku_receta_partes || []).slice().sort(function(a, b) { return (a.orden || 0) - (b.orden || 0); });
+    var e = await db.from('sku_especificaciones').select('campo,valor').eq('area', 'serigrafia').eq('sku', sku);
+    ((e && e.data) || []).forEach(function(x) { if (x.valor && String(x.valor).trim()) out.specs[x.campo] = String(x.valor).trim(); });
+    recetasSerigCache[sku] = out;
+  } catch(err) { /* sin Recetario: solo se autorrellena desde fichas */ }
+  return out;
+}
+
+function serigAplicarBase(l, skuBase) {
+  var it = inventarioCache.find(function(i) { return i.sku === skuBase; });
+  if (!it) return false;
+  var estadosActivos = ['nueva', 'proceso', 'parcial'], comprometido = 0;
+  (solicitudes || []).forEach(function(sol) {
+    if (estadosActivos.indexOf(sol.estado) < 0) return;
+    (sol.lineas || []).forEach(function(x) { if (x.sku_base === skuBase) comprometido += (x.cant || 0); });
+  });
+  l.sku_base = skuBase;
+  l.desc_base = it.descripcion || '';
+  l.existencia_base = (it.existencia || 0) - comprometido;
+  l.comprometido_base = comprometido;
+  return true;
+}
+
+// Rellena con la ficha anterior del mismo cliente + SKU (síncrono) y pide al Recetario lo que falte (asíncrono). Devuelve true si usó una ficha.
+function serigAutorrellenar() {
+  var l = lineas[0];
+  if (!l) return false;
+  if (l.autoDe) { // lo autorrellenado antes ya no aplica (otro cliente u otro producto)
+    l.sku_base = ''; l.desc_base = ''; l.existencia_base = undefined; l.comprometido_base = 0;
+    l.procs = SERIG_PROCS_DEFAULT.slice(); l.tiros = 1; l.cap_impresion = 0; l.linea_id = 0;
+    l.autoDe = ''; l.autoOrigen = ''; l.tocado = false;
+  }
+  if (l.autoSpecs) { l.colores = ''; l.formula_tinta = ''; l.empaque = ''; l.autoSpecs = false; }
+  if (!l.sku || l.es_nuevo) return false;
+  if (editandoSolicitudId) { serigRecetaAsync(l.sku, false); return false; }
+  if (l.tocado) { serigRecetaAsync(l.sku, false); return false; } // ya empezó a llenar: no se pisa
+  var cliente = (document.getElementById('fCli') || {}).value || '';
+  var prev = cliente ? serigFichaPrevia(cliente, l.sku) : null;
+  if (prev) {
+    var p = prev.l;
+    l.procs = (p.procs && p.procs.length) ? p.procs.slice() : SERIG_PROCS_DEFAULT.slice();
+    l.tiros = p.tiros || 1;
+    l.cap_impresion = p.cap_impresion || 0;
+    l.linea_id = p.linea_id || 0;
+    if (p.sku_base) serigAplicarBase(l, p.sku_base);
+    l.autoDe = prev.s.id_display || String(prev.s.id).slice(0, 8);
+    l.autoOrigen = 'ficha';
+  }
+  serigRecetaAsync(l.sku, !prev);
+  return !!prev;
+}
+
+// Colores / fórmula / empaque (y, sin ficha previa, base/procesos/tiros) desde el Recetario del SKU; nunca pisa lo ya escrito
+async function serigRecetaAsync(sku, usarPartes) {
+  var r = await serigCargarReceta(sku);
+  var l = lineas[0];
+  if (!l || l.sku !== sku || !document.getElementById('overlay').classList.contains('open')) return;
+  var cambio = false;
+  if (!l.colores && r.specs['Colores']) { l.colores = r.specs['Colores']; l.autoSpecs = true; cambio = true; }
+  if (!l.formula_tinta && r.specs['Fórmula de tinta']) { l.formula_tinta = r.specs['Fórmula de tinta']; l.autoSpecs = true; cambio = true; }
+  if (!l.empaque && r.specs['Empaque']) { l.empaque = r.specs['Empaque']; l.autoSpecs = true; cambio = true; }
+  if (usarPartes && !l.tocado && !l.autoDe) {
+    var base = '', procs = [];
+    r.partes.forEach(function(p) {
+      var cod = String(p.codigo || '').split(' - ')[0].trim();
+      if (p.tipo === 'base' && !base) base = cod;
+      else if (p.tipo === 'proceso') {
+        var pr = ALL_PROCS_SERIG.find(function(x) { return serigNorm(x.lbl) === serigNorm(cod); });
+        if (pr && procs.indexOf(pr.val) < 0) procs.push(pr.val);
+      }
+    });
+    var algo = false;
+    if (base && !l.sku_base && serigAplicarBase(l, base)) algo = true;
+    if (procs.length) {
+      var orden = ALL_PROCS_SERIG.map(function(x) { return x.val; });
+      procs.sort(function(a, b) { return orden.indexOf(a) - orden.indexOf(b); });
+      l.procs = procs; algo = true;
+    }
+    var tr = parseInt(r.specs['Tiros'], 10);
+    if (tr > 0 && (!l.tiros || l.tiros <= 1)) { l.tiros = tr; algo = true; }
+    if (algo) { l.autoDe = 'Recetario'; l.autoOrigen = 'receta'; cambio = true; }
+  }
+  if (cambio) { renderLineas(); calcular(); }
 }
 
 function lineaSkuInput(idx, val) {
@@ -8611,6 +8828,11 @@ function seleccionarLineaSku(idx, sku) {
   lineas[idx].existencia = item.existencia  || 0;
   lineas[idx].es_nuevo   = false;
   cerrarLineaSkuDrop(idx);
+  if (idx === 0) {
+    var conFicha = serigAutorrellenar();
+    aplicarCodigoCliente(false);
+    if (conFicha) { renderLineas(); calcular(); return; } // la ficha anterior del mismo cliente manda
+  }
 
   var hist = buscarHistorialBase(sku);
   var tirosAlmacenado = item.tiros_hora || 0;
@@ -9052,6 +9274,7 @@ function buildLineasPayload(lineasValidas, solicitudId) {
     if (l.tiros && l.tiros !== 1) ext.tiros = l.tiros;
     if (l.linea_id) ext.linea_id = l.linea_id;
     if (l.sku_base) ext.sku_base = l.sku_base;
+    if (String(l.codCli || '').trim()) ext.codigo_cliente = String(l.codCli).trim(); // solo si se escribió
     return ext;
   });
   return { base: base, full: full };
@@ -9084,7 +9307,7 @@ async function guardarNuevo(lineasValidas, cliente) {
       prioridad: document.getElementById('fPrioSelect').value,
       estado: 'nueva', progreso_pct: 0, notas: notasFinal
     };
-    if (esClienteConOC(cliente) && valorOC()) datosNuevo.numero_oc = valorOC();
+    if (valorOC()) datosNuevo.numero_oc = valorOC();
     // Mes futuro elegido: la ficha queda como ingresada el día 1 de ese mes (12:00 hora de Guatemala)
     var mesElegido = (document.getElementById('fMesPedido') || {}).value || '';
     if (mesElegido && mesElegido > periodoActualKey()) datosNuevo.created_at = mesElegido + '-01T12:00:00-06:00';
@@ -9100,9 +9323,11 @@ async function guardarNuevo(lineasValidas, cliente) {
     var payload = buildLineasPayload(lineasValidas, nuevaId);
     await insertarLineas(payload.base, payload.full);
     registrarUsoCliente(cliente);
+    var lvCod = lineasValidas.find(function(x) { return String(x.codCli || '').trim(); });
     cerrarForm();
     await cargarSolicitudes();
     showToast('✅ ' + codigo + ' guardada');
+    if (lvCod) guardarVinculoCodigoS(cliente, lvCod.codCli, lvCod.sku, lvCod.desc);
     ofrecerRecetasDeFicha(lineasValidas); // no bloquea ni rompe el guardado
   } catch(e) {
     console.error('Error guardando:', e);
@@ -9124,7 +9349,7 @@ async function guardarEdicion(lineasValidas, cliente) {
       prioridad: document.getElementById('fPrioSelect').value,
       notas: notasFinal
     };
-    if (esClienteConOC(cliente)) datosEdit.numero_oc = valorOC() || null;
+    datosEdit.numero_oc = valorOC() || null;
     // Mes del pedido: distinto del mes de ingreso original = traslado (periodo_efectivo); igual = sin traslado (null)
     var mesEd = (document.getElementById('fMesPedido') || {}).value || '';
     if (mesEd) datosEdit.periodo_efectivo = (mesEd !== periodoDe(s.created_at).key) ? mesEd : null;
@@ -9135,10 +9360,12 @@ async function guardarEdicion(lineasValidas, cliente) {
     var payload = buildLineasPayload(lineasValidas, s.dbId);
     await insertarLineas(payload.base, payload.full);
     registrarUsoCliente(cliente);
+    var lvCodE = lineasValidas.find(function(x) { return String(x.codCli || '').trim(); });
     var reopenId = _editFromDetailId;
     cerrarForm();
     await cargarSolicitudes();
     showToast('✅ ' + (s.id_display || '') + ' actualizada');
+    if (lvCodE) guardarVinculoCodigoS(cliente, lvCodE.codCli, lvCodE.sku, lvCodE.desc);
     ofrecerRecetasDeFicha(lineasValidas);
     if (reopenId) mostrarDetalle(reopenId);
   } catch(e) {
