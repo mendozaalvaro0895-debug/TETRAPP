@@ -475,6 +475,9 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-ent-det{font-size:11px;margin-top:6px;text-align:center}
 .ped-chip-t b.ped-esq.y{color:#A16207}
 .ped-chip-t b.ped-esq.g{color:#15803D}
+.ped-chip .ped-chip-t b.ped-tot{font-size:11px;font-weight:600;color:#6B6B6A}
+.ped-chip .ped-chip-t b.ped-tot::before{content:"total ";font-family:inherit;font-size:9.5px}
+.ped-chip.tstk .ped-chip-t b.ped-tot{font-size:10.5px;font-weight:500;color:#9A9A98}
 .ped-ent-det .sr{color:#B45309;font-weight:800}
 .ped-ent-det .cr{color:#047857;font-weight:800}
 .ped-pe{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border:1px solid #FDE047;background:#FEFCE8;border-radius:8px;padding:6px 9px;margin-bottom:6px;font-size:12px}
@@ -587,14 +590,16 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-tipo-h.urg .ped-tipo-n{color:#B83232}
 .ped-stk{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:2px 8px;width:100%;box-sizing:border-box;margin-top:5px;padding:4px 9px;border-radius:7px;border:1px solid;font-size:11px;font-weight:700}
 .ped-stk .k b{font-family:'DM Mono',monospace;font-size:13px}
-.ped-stk .a{font-size:11px;font-weight:800;white-space:nowrap}
-.ped-stk .a b{font-family:'DM Mono',monospace;font-size:14px}
+.ped-stk .a{font-size:12px;font-weight:800;white-space:nowrap;padding:4px 11px;border-radius:7px;color:#fff;line-height:1.1;letter-spacing:.2px}
+.ped-stk .a b{font-family:'DM Mono',monospace;font-size:26px;font-weight:800;vertical-align:-2px;margin:0 2px}
 .ped-stk.ok{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
-.ped-stk.ok .a{color:#15803D}
+.ped-stk.ok .a{background:#15803D}
 .ped-stk.par{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
-.ped-stk.par .a{color:#B45309}
+.ped-stk.par .a{background:#C2410C}
 .ped-stk.cero{background:#FEF2F2;border-color:#FECACA;color:#7F1D1D}
-.ped-stk.cero .a{color:#B91C1C}
+.ped-stk.cero .a{background:#B91C1C}
+.ped-stk .k{font-size:10.5px;font-weight:600}
+.ped-stk .k b{font-weight:700}
 .ped-cerrar{display:block;margin:12px auto 0;background:none;border:none;color:#6B6B6A;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline}
 /* ── Time Picker 12h ── */
 </style>
@@ -1869,7 +1874,7 @@ function pedStkPTTexto(stock, falta, propio) {
   var ex = (propio > 0 && stock > 0) ? ' <i>(' + pedNum(libre) + ' libres)</i>' : '';
   if (stock <= 0) return { cls: 'cero', stock: 0, ex: '', acc: falta > 0 ? 'PRODUCIR TODO <b>' + pedNum(falta) + '</b> und' : 'SIN STOCK' };
   if (falta > 0 && libre >= falta) return { cls: 'ok', stock: stock, ex: ex, acc: '✓ CUBRE EL SALDO' };
-  if (falta > 0 && libre > 0) return { cls: 'par', stock: stock, ex: ex, acc: 'PRODUCIR <b>' + pedNum(falta - libre) + '</b> und' };
+  if (falta > 0 && libre > 0) return { cls: 'par', stock: stock, ex: ex, acc: 'PRODUCIR SOLO <b>' + pedNum(falta - libre) + '</b> und' };
   if (falta > 0) return { cls: 'cero', stock: stock, ex: ex, acc: 'PRODUCIR TODO <b>' + pedNum(falta) + '</b> und' };
   return { cls: 'ok', stock: stock, ex: ex, acc: '' };
 }
@@ -2380,11 +2385,12 @@ function renderPedidos() {
     var idq = escHtml(String(x.id));
     if (x.completada) return pedChipCompletada(x, conCliente);
     if (x.sobre) return pedChipSobre(x, conCliente);
-    return '<div class="ped-chip' + (proc ? ' proc' : '') + (pedProducirInfo(x).cubierta ? ' cubierta' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
+    var stkHtml = pedStkPTHtml(x.sku, x.saldo, x.entregado);
+    return '<div class="ped-chip' + (stkHtml ? ' tstk' : '') + (proc ? ' proc' : '') + (pedProducirInfo(x).cubierta ? ' cubierta' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
       + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + pedEstadoBadge(x) + pedComentBadge(x) + '</span>' + pedEsquinaHtml(x) + '</div>'
       + '<div class="ped-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.desc) + '</span></div>'
-      + pedStkPTHtml(x.sku, x.saldo, x.entregado)
+      + stkHtml
       + pedNotaHtml(x.s.notas)
       + '<div class="ped-resum">' + (proc ? '<span class="ped-res-b proc">▶ ' + pedNum(x.enProc) + ' en proceso</span>' : '') + pedCompResumenHtml(x) + '</div>'
       + '<div>' + pedComentBtn(x) + '</div>'
@@ -2826,7 +2832,7 @@ function pedEntDetHtml(x) {
 
 // Esquina superior derecha del chip: ENTREGADO/PEDIDO (ej. 1500/3000) cuando ya hay algo entregado; si no, el saldo por entregar
 function pedEsquinaHtml(x) {
-  if (!x.entregadoTotal) return '<b>' + pedNum(x.saldo) + '</b>';
+  if (!x.entregadoTotal) return '<b class="ped-tot">' + pedNum(x.saldo) + '</b>';
   return '<b class="ped-esq ' + (x.parc.sinRequi > 0 ? 'y' : 'g') + '" title="Entregado / pedido">' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant) + '</b>';
 }
 

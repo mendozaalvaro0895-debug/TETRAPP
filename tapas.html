@@ -566,6 +566,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-parc.abierto .ent-ls{display:block;max-height:128px;overflow-y:auto;padding-right:2px}
 .cp-chip-t b.cp-esq.y{color:#A16207}
 .cp-chip-t b.cp-esq.g{color:#15803D}
+.cp-chip .cp-chip-t b.cp-tot{font-size:11px;font-weight:600;color:var(--gray)}
+.cp-chip .cp-chip-t b.cp-tot::before{content:"total ";font-family:inherit;font-size:9.5px}
+.cp-chip.tstk .cp-chip-t b.cp-tot{font-size:10.5px;font-weight:500;color:var(--gray-l)}
 .cp-comp-tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#15803D;margin-bottom:2px}
 
 .cp-chip-t{display:flex;justify-content:space-between;gap:4px;font-size:11px;font-weight:800;align-items:baseline}
@@ -604,14 +607,16 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 @media(max-width:700px){.rec-conf-grid{grid-template-columns:1fr !important}}
 .cp-stk{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:2px 8px;width:100%;box-sizing:border-box;margin-top:5px;padding:4px 9px;border-radius:7px;border:1px solid;font-size:11px;font-weight:700}
 .cp-stk .k b{font-family:'DM Mono',monospace;font-size:13px}
-.cp-stk .a{font-size:11px;font-weight:800;white-space:nowrap}
-.cp-stk .a b{font-family:'DM Mono',monospace;font-size:14px}
+.cp-stk .a{font-size:12px;font-weight:800;white-space:nowrap;padding:4px 11px;border-radius:7px;color:#fff;line-height:1.1;letter-spacing:.2px}
+.cp-stk .a b{font-family:'DM Mono',monospace;font-size:26px;font-weight:800;vertical-align:-2px;margin:0 2px}
 .cp-stk.ok{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
-.cp-stk.ok .a{color:#15803D}
+.cp-stk.ok .a{background:#15803D}
 .cp-stk.par{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
-.cp-stk.par .a{color:#B45309}
+.cp-stk.par .a{background:#C2410C}
 .cp-stk.cero{background:#FEF2F2;border-color:#FECACA;color:#7F1D1D}
-.cp-stk.cero .a{color:#B91C1C}
+.cp-stk.cero .a{background:#B91C1C}
+.cp-stk .k{font-size:10.5px;font-weight:600}
+.cp-stk .k b{font-weight:700}
 
 .cp-resum,.cp-acc{display:none}
 .cp-res-b{font-size:10px;font-weight:800;border-radius:10px;padding:1px 8px}
@@ -4956,7 +4961,7 @@ function stkPTTexto(stock, falta, propio) {
   var ex = (propio > 0 && stock > 0) ? ' <i>(' + libre.toLocaleString() + ' libres)</i>' : '';
   if (stock <= 0) return { cls: 'cero', stock: 0, ex: '', acc: falta > 0 ? 'PRODUCIR TODO <b>' + falta.toLocaleString() + '</b> und' : 'SIN STOCK' };
   if (falta > 0 && libre >= falta) return { cls: 'ok', stock: stock, ex: ex, acc: '✓ CUBRE EL SALDO' };
-  if (falta > 0 && libre > 0) return { cls: 'par', stock: stock, ex: ex, acc: 'PRODUCIR <b>' + (falta - libre).toLocaleString() + '</b> und' };
+  if (falta > 0 && libre > 0) return { cls: 'par', stock: stock, ex: ex, acc: 'PRODUCIR SOLO <b>' + (falta - libre).toLocaleString() + '</b> und' };
   if (falta > 0) return { cls: 'cero', stock: stock, ex: ex, acc: 'PRODUCIR TODO <b>' + falta.toLocaleString() + '</b> und' };
   return { cls: 'ok', stock: stock, ex: ex, acc: '' };
 }
@@ -5335,7 +5340,7 @@ function factCeldaPend(s) {
 // Esquina superior derecha del chip: ENTREGADO/PEDIDO (ej. 1500/3000) cuando ya hay algo entregado; si no, el saldo por entregar
 function cpEsquinaHtml(x) {
   var tot = entregadoTotalFichaTapas(x.s);
-  if (!tot) return '<b>' + x.saldo.toLocaleString() + '</b>';
+  if (!tot) return '<b class="cp-tot">' + x.saldo.toLocaleString() + '</b>';
   return '<b class="cp-esq ' + (parcialesDeFicha(x.s).sinRequi > 0 ? 'y' : 'g') + '" title="Entregado / pedido">' + tot.toLocaleString() + '/' + x.cant.toLocaleString() + '</b>';
 }
 
@@ -5420,12 +5425,13 @@ function buildChipCompacto(x, conCliente) {
   if (x.sobre) return chipSobreentregadoTapas(x, conCliente);
   var enProc = x.abiertos.length > 0;
   var idq = escHtml(String(x.id));
-  return '<div class="cp-chip' + (enProc ? ' proc' : '') + (x.cubierta ? ' cubierta' : '') + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
+  var stkHtml = stkPTHtml(x.sku, x.saldo, x.ent);
+  return '<div class="cp-chip' + (stkHtml ? ' tstk' : '') + (enProc ? ' proc' : '') + (x.cubierta ? ' cubierta' : '') + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
     + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
     + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + comentBadgeHtml(x.s) + '</span>' + cpEsquinaHtml(x) + '</div>'
     + '<div class="cp-chip-p"><b>' + escHtml(x.sku || 'sin SKU') + '</b><span>' + escHtml(x.descSola) + '</span></div>'
     + codClienteChipHtml(x.s)
-    + stkPTHtml(x.sku, x.saldo, x.ent)
+    + stkHtml
     + notaChipHtml(x.s.notas)
     + '<div class="cp-resum">' + (enProc ? '<span class="cp-res-b proc">▶ ' + x.enProc.toLocaleString() + ' en proceso</span>' : '') + componentesResumenHtml(x.s) + '</div>'
     + '<div class="cp-more">'
