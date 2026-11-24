@@ -1662,6 +1662,7 @@ async function cargarSolicitudes() {
         notas: s.notas || '',
         marcadoTapasPor: s.marcado_tapas_por || '',
         marcadoTapasEn: s.marcado_tapas_en || '',
+        stockNoAplica: !!s.stock_no_aplica,
         created: new Date(s.created_at).toLocaleString('es-GT')
       };
     });
@@ -1950,7 +1951,7 @@ function buildBloqueBodegaFicha(s, filas) {
     if (f.rol === 'Tapa') {
       return '<div class="bod-r tapa"><div class="bod-t"><i>Tapa</i><b>' + escHtml(f.sku) + '</b><span>' + escHtml(f.desc || '') + '</span></div>'
         + '<div class="bod-n"><span>Pedido <b>' + (f.cant || 0).toLocaleString() + '</b> und</span>'
-        + (function() { var t = stkPTTexto(f.stock, f.cant || 0); return t ? stkPTBarra(t) : ''; })() + '</div></div>';
+        + (function() { var t = stkPTTexto(f.stock, f.cant || 0, 0, s.stockNoAplica); return t ? stkPTBarra(t) : ''; })() + '</div></div>';
     }
     var pedir = Math.max(0, f.cant - (f.salido || 0));
     var falta = f.stock !== null && pedir > f.stock ? pedir - f.stock : 0;
@@ -2085,6 +2086,7 @@ async function mostrarDetalle(id) {
       ${(s.lineas[0] && s.lineas[0].codigoCliente) ? `<div class="dc"><div class="dc-b" style="font-size:12px">🏷 Código del cliente: <b style="font-family:var(--mono)">${escHtml(s.lineas[0].codigoCliente)}</b></div></div>` : ''}
       ${s.notas ? `<div class="dc" style="border-color:#FDE047;border-width:2px"><div class="dc-h" style="background:#FEF9C3;color:#A16207">📝 Notas</div><div class="dc-b" style="white-space:pre-line;background:#FFFDF0">${escHtml(s.notas)}</div></div>` : ''}
       ${bloqueSobreentregadaTapas(s)}
+      ${bloqueStockEspecialTapas(s)}
       ${bloqueMarcaTapasFicha(s)}
       ${bloqueParcialesTapas(s)}
       ${bloqueComentariosFicha(s)}
@@ -4728,6 +4730,30 @@ function bloqueSobreentregadaTapas(s) {
     + '</div></div></div>';
 }
 
+// CASO ESPECIAL (solo master): el stock del SKU no sirve para esta ficha (ej. 900 und con un liner especial). Enciende/apaga solicitudes.stock_no_aplica
+function bloqueStockEspecialTapas(s) {
+  if (!fichaViva(s)) return '';
+  var on = !!s.stockNoAplica, idq = escHtml(String(s.id));
+  return '<div class="dc"><div class="dc-b" style="font-size:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    + '<span>' + (on ? '⚙ <b>Caso especial:</b> el stock del producto terminado NO aplica a esta ficha (se produce todo).' : '¿Esta ficha lleva algo especial y el stock existente no le sirve?') + '</span>'
+    + '<button class="btn btn-xs' + (on ? '' : ' btn-g') + '" onclick="toggleStockEspecialTapas(\'' + idq + '\')">' + (on ? '↩ Quitar caso especial' : '⚙ Marcar caso especial') + '</button>'
+    + '</div></div>';
+}
+async function toggleStockEspecialTapas(id) {
+  var s = solicitudes.find(function(x) { return x.id === id; });
+  if (!s) return;
+  var nuevo = !s.stockNoAplica;
+  var r = await db.from('solicitudes').update({ stock_no_aplica: nuevo }).eq('id', s.dbId).select('id');
+  if (r.error || !(r.data || []).length) { showToast('❌ No se pudo cambiar' + (r.error ? ': ' + r.error.message : ' (sin permiso)'), '#B83232'); return; }
+  s.stockNoAplica = nuevo;
+  renderListas();
+  if (typeof renderFichasTapas === 'function') renderFichasTapas();
+  if (typeof renderAlertasTapas === 'function') renderAlertasTapas();
+  if (selId) mostrarDetalle(selId);
+  if (fichaModalId) mostrarDetalle(fichaModalId);
+  showToast(nuevo ? '⚙ Marcada como caso especial' : '↩ Caso especial quitado');
+}
+
 // Master da por COMPLETADA la ficha: estado 'lista' + marca de quién/cuándo, así sigue visible 15 días (transparente, verde) como las que marca Tapas
 async function completarFichaTapas(id) {
   var s = solicitudes.find(function(x) { return x.id === id; });
@@ -4952,7 +4978,9 @@ function componentesResumenHtml(s) {
 
 // Stock del PRODUCTO TERMINADO (SKU principal, inventario B2) frente a lo que falta entregar: a veces ya hay existencia y no
 // hace falta producir todo. Informativo — el mismo stock puede estar apartado para otra ficha. ESPEJO: pedStkPTHtml (registro-tapas.html).
-function stkPTTexto(stock, falta, propio) {
+function stkPTTexto(stock, falta, propio, noAplica) {
+  // CASO ESPECIAL (solicitudes.stock_no_aplica): el stock del SKU no sirve para esta ficha (ej. lleva un liner especial) → producir todo
+  if (noAplica && falta > 0) return { cls: 'cero', stock: Math.max(0, stock || 0), ex: ' <i>(no aplica)</i>', acc: '⚙ CASO ESPECIAL · PRODUCIR TODO <b>' + falta.toLocaleString() + '</b> und' };
   if (stock === null || stock === undefined) return null;
   // El stock de B2 ya incluye lo que esta ficha entregó con requi (el ingreso PT suma a inventario) y el saldo ya lo descontó:
   // contarlo otra vez haría creer que el stock "cubre" lo que falta. "Libre" = stock − lo ya entregado de ESTA ficha.
@@ -4970,10 +4998,10 @@ function stkPTBarra(t) {
   return '<div class="cp-stk ' + t.cls + '" title="Existencia actual del producto terminado en inventario (Bodega 2)">'
     + '<span class="k">📦 STOCK PT <b>' + t.stock.toLocaleString() + '</b>' + (t.ex || '') + '</span>' + (t.acc ? '<span class="a">' + t.acc + '</span>' : '') + '</div>';
 }
-function stkPTHtml(sku, falta, propio) {
+function stkPTHtml(sku, falta, propio, noAplica) {
   if (!sku) return '';
   var it = invB2DeTapas(sku);
-  var t = stkPTTexto(it ? (it.existencia || 0) : null, falta, propio);
+  var t = stkPTTexto(it ? (it.existencia || 0) : null, falta, propio, noAplica);
   return t ? stkPTBarra(t) : '';
 }
 
@@ -5425,7 +5453,7 @@ function buildChipCompacto(x, conCliente) {
   if (x.sobre) return chipSobreentregadoTapas(x, conCliente);
   var enProc = x.abiertos.length > 0;
   var idq = escHtml(String(x.id));
-  var stkHtml = stkPTHtml(x.sku, x.saldo, x.ent);
+  var stkHtml = stkPTHtml(x.sku, x.saldo, x.ent, x.s.stockNoAplica);
   return '<div class="cp-chip' + (stkHtml ? ' tstk' : '') + (enProc ? ' proc' : '') + (x.cubierta ? ' cubierta' : '') + (cpAbiertos[x.id] ? ' open' : '') + '" data-cpid="' + idq + '" onclick="cpChipTap(\'' + idq + '\')">'
     + (conCliente ? '<div class="cp-chip-c">' + escHtml(x.cliente) + '</div>' : '')
     + '<div class="cp-chip-t"><span>' + (x.s.prio === 'urgente' ? '<em class="cp-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + limiteCompactoHtml(x.s) + comentBadgeHtml(x.s) + '</span>' + cpEsquinaHtml(x) + '</div>'
@@ -5493,6 +5521,8 @@ function modeloFichasCompactas() {
     x.stockLibre = x.stockPT === null ? null : Math.max(0, x.stockPT - (x.ent || 0));
     x.producir = x.stockPT === null ? x.saldo : Math.max(0, x.saldo - x.stockLibre);
     x.cubierta = x.stockPT !== null && x.saldo > 0 && x.stockLibre >= x.saldo;
+    // caso especial: el stock del SKU no sirve para esta ficha → se produce todo, sin transparencia ni 'cubre el saldo'
+    if (x.s.stockNoAplica) { x.stockLibre = 0; x.producir = x.saldo; x.cubierta = false; }
     x.matOk = baseContratapaOk(x.s);
     return x;
   });

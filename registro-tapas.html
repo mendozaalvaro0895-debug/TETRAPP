@@ -1791,6 +1791,8 @@ async function cargarPedidos(silencioso) {
     var intentos = [cMarca + ',plazo_tipo,solicitud_lineas(' + linC + ')', cMarca + ',solicitud_lineas(' + linC + ')',
                     cBase + ',plazo_tipo,solicitud_lineas(' + linC + ')', cBase + ',solicitud_lineas(' + linC + ')',
                     cBase + ',plazo_tipo,solicitud_lineas(' + lin + ')', cBase + ',solicitud_lineas(' + lin + ')'];
+    // stock_no_aplica (sql/solicitudes_stock_no_aplica_v1.sql): caso especial por ficha; sin la columna se reintenta sin ella
+    intentos.unshift(cMarca + ',stock_no_aplica,plazo_tipo,solicitud_lineas(' + linC + ')');
     var rs = null;
     for (var q = 0; q < intentos.length; q++) {
       rs = await db.from('solicitudes').select(intentos[q]).eq('area', 'tapas').order('created_at', { ascending: true });
@@ -1898,7 +1900,9 @@ function pedChipTap(id) {
 
 // Resumen de una línea para el chip cerrado en celular: ¿alcanzan los componentes?
 // ESPEJO de stkPTHtml (tapas.html): stock del producto terminado (SKU principal) frente a lo que falta entregar
-function pedStkPTTexto(stock, falta, propio) {
+function pedStkPTTexto(stock, falta, propio, noAplica) {
+  // CASO ESPECIAL (solicitudes.stock_no_aplica): el stock del SKU no sirve para esta ficha → producir todo. ESPEJO de stkPTTexto
+  if (noAplica && falta > 0) return { cls: 'cero', stock: Math.max(0, stock || 0), ex: ' <i>(no aplica)</i>', acc: '⚙ CASO ESPECIAL · PRODUCIR TODO <b>' + pedNum(falta) + '</b> und' };
   if (stock === null || stock === undefined) return null;
   // El stock de B2 ya incluye lo entregado con requi de ESTA ficha y el saldo ya lo descontó: "libre" = stock − lo ya entregado
   propio = Math.max(0, propio || 0);
@@ -1915,10 +1919,10 @@ function pedStkPTBarra(t) {
   return '<div class="ped-stk ' + t.cls + '" title="Existencia actual del producto terminado en inventario (Bodega 2)">'
     + '<span class="k">📦 STOCK PT <b>' + pedNum(t.stock) + '</b>' + (t.ex || '') + '</span>' + (t.acc ? '<span class="a">' + t.acc + '</span>' : '') + '</div>';
 }
-function pedStkPTHtml(sku, falta, propio) {
+function pedStkPTHtml(sku, falta, propio, noAplica) {
   if (!sku) return '';
   var it = (PED.stockInv || {})[sku];
-  var t = pedStkPTTexto(it ? it.ex : null, falta, propio);
+  var t = pedStkPTTexto(it ? it.ex : null, falta, propio, noAplica);
   return t ? pedStkPTBarra(t) : '';
 }
 
@@ -1939,6 +1943,8 @@ function pedProducirInfo(x) {
   });
   // stock LIBRE = stock − lo ya entregado con requi de esta ficha (ese stock ya salió del saldo; ver pedStkPTTexto)
   var libre = st === null ? null : Math.max(0, st - (x.entregado || 0));
+  // caso especial: el stock del SKU no sirve para esta ficha → se produce todo, sin transparencia ni 'cubre el saldo'
+  if (x.s && x.s.stock_no_aplica) return { stock: st, libre: 0, producir: x.saldo, cubierta: false, matOk: matOk };
   return { stock: st, libre: libre, producir: st === null ? x.saldo : Math.max(0, x.saldo - libre), cubierta: st !== null && x.saldo > 0 && libre >= x.saldo, matOk: matOk };
 }
 
@@ -2748,7 +2754,7 @@ function renderPedidos() {
     var idq = escHtml(String(x.id));
     if (x.completada) return pedChipCompletada(x, conCliente);
     if (x.sobre) return pedChipSobre(x, conCliente);
-    var stkHtml = pedStkPTHtml(x.sku, x.saldo, x.entregado);
+    var stkHtml = pedStkPTHtml(x.sku, x.saldo, x.entregado, x.s.stock_no_aplica);
     return '<div class="ped-chip' + (stkHtml ? ' tstk' : '') + (proc ? ' proc' : '') + (pedProducirInfo(x).cubierta ? ' cubierta' : '') + (pedAbiertos[x.id] ? ' open' : '') + '" data-pedid="' + idq + '" onclick="pedChipTap(\'' + idq + '\')">'
       + (conCliente ? '<div class="ped-chip-c">' + escHtml(x.cliente) + '</div>' : '')
       + '<div class="ped-chip-t"><span>' + (x.urgente ? '<em class="ped-urg" title="Prioridad urgente">🔴 URGENTE</em> ' : '') + escHtml(x.codigo) + pedLimiteHtml(x) + pedEstadoBadge(x) + pedComentBadge(x) + '</span>' + pedEsquinaHtml(x) + '</div>'
@@ -2911,7 +2917,7 @@ function pedBloqueBodegaHtml(x) {
     if (f.rol === 'Tapa') {
       return '<div class="ped-bod-r tapa"><div class="ped-bod-t"><i>Tapa</i><b>' + escHtml(f.sku) + '</b><span>' + escHtml(f.desc) + '</span></div>'
         + '<div class="ped-bod-n"><span>Pedido <b>' + pedNum(f.cant) + '</b> und</span>'
-        + (function() { var t = pedStkPTTexto(f.stock, f.cant || 0); return t ? pedStkPTBarra(t) : ''; })() + '</div></div>';
+        + (function() { var t = pedStkPTTexto(f.stock, f.cant || 0, 0, x.s && x.s.stock_no_aplica); return t ? pedStkPTBarra(t) : ''; })() + '</div></div>';
     }
     var pedir = Math.max(0, f.cant - (f.salido || 0));
     var falta = f.stock !== null && pedir > f.stock ? pedir - f.stock : 0;
