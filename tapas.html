@@ -357,6 +357,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .env-pop-x{margin-left:auto;background:none;border:0;color:#9ca3af;cursor:pointer;font-size:14px;line-height:1}
 .env-pop-r{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:7px 12px;border-bottom:1px solid #F0EEE8;cursor:pointer;align-items:baseline}
 .env-pop-r:hover{background:#F5F4F0}
+.env-pop-r.con-desc{grid-template-columns:auto 1fr auto auto}
+.env-pop-r .dsc{border:1px solid #FECACA;background:#FEF2F2;color:#B91C1C;border-radius:5px;font-size:10px;font-weight:700;padding:1px 6px;cursor:pointer;font-family:inherit}
+.env-pop-r .dsc:hover{background:#FEE2E2}
 .env-pop-r .fi{font-family:var(--mono);font-weight:700;color:var(--teal)}
 .env-pop-r .cl{font-weight:600;color:#1f2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .env-pop-r .u{font-family:var(--mono);font-weight:800;color:#1f2937}
@@ -1663,6 +1666,8 @@ async function cargarSolicitudes() {
         marcadoTapasPor: s.marcado_tapas_por || '',
         marcadoTapasEn: s.marcado_tapas_en || '',
         stockNoAplica: !!s.stock_no_aplica,
+        descontinuadaPor: s.descontinuada_por || '',
+        descontinuadaEn: s.descontinuada_en || '',
         created: new Date(s.created_at).toLocaleString('es-GT')
       };
     });
@@ -2087,6 +2092,7 @@ async function mostrarDetalle(id) {
       ${s.notas ? `<div class="dc" style="border-color:#FDE047;border-width:2px"><div class="dc-h" style="background:#FEF9C3;color:#A16207">📝 Notas</div><div class="dc-b" style="white-space:pre-line;background:#FFFDF0">${escHtml(s.notas)}</div></div>` : ''}
       ${bloqueSobreentregadaTapas(s)}
       ${bloqueStockEspecialTapas(s)}
+      ${bloqueDescontinuadaTapas(s)}
       ${bloqueMarcaTapasFicha(s)}
       ${bloqueParcialesTapas(s)}
       ${bloqueComentariosFicha(s)}
@@ -4381,9 +4387,10 @@ function cerrarPedidosAlertaEsc(e) { if (e.key === 'Escape') cerrarPedidosAlerta
 function buildPedidosAlertaTapas(comp, r) {
   var ped = r.pedidos.slice().sort(function(a, b) { return b.cant - a.cant; });
   var filas = ped.map(function(p) {
-    return '<div class="env-pop-r" data-id="' + escHtml(String(p.id)) + '" onclick="abrirFichaDesdeAlertaTapas(this.dataset.id)" title="Abrir la ficha">'
+    return '<div class="env-pop-r con-desc" data-id="' + escHtml(String(p.id)) + '" onclick="abrirFichaDesdeAlertaTapas(this.dataset.id)" title="Abrir la ficha">'
       + '<span class="fi">' + escHtml(p.codigo) + '</span><span class="cl">' + escHtml(p.cliente) + '</span>'
       + '<span class="u">' + fmtNumTapas(p.cant) + '</span>'
+      + '<button class="dsc" title="Descontinuar: ya se entregó / no se va a producir; deja de pedir componentes" onclick="event.stopPropagation();descontinuarFichaTapas(this.closest(\'.env-pop-r\').dataset.id)">⛔ Descontinuar</button>'
       + '<span class="pr">' + escHtml(p.prod || '—') + ' · ⏳ ' + escHtml(p.lim) + '</span></div>';
   }).join('');
   return '<div class="env-pop-h"><div><b>' + escHtml(r.sku) + '</b><small>' + escHtml(r.desc) + '</small></div>'
@@ -4752,6 +4759,71 @@ async function toggleStockEspecialTapas(id) {
   if (selId) mostrarDetalle(selId);
   if (fichaModalId) mostrarDetalle(fichaModalId);
   showToast(nuevo ? '⚙ Marcada como caso especial' : '↩ Caso especial quitado');
+}
+
+// DESCONTINUAR (solo master): la ficha ya se entregó / ya no se va a producir → estado 'lista' SIN marca de completada de Tapas, así
+// sale de Fichas de Trabajo y deja de pedir componentes en las alertas de Bajo Stock. Guarda quién y cuándo (solicitudes.descontinuada_*,
+// sql/solicitudes_descontinuada_v1.sql). Se puede reactivar desde su ventana.
+function bloqueDescontinuadaTapas(s) {
+  var idq = escHtml(String(s.id));
+  if (s.descontinuadaEn) {
+    return '<div class="dc" style="border-color:#FECACA;border-width:2px"><div class="dc-h" style="background:#FEF2F2;color:#B91C1C">⛔ Ficha DESCONTINUADA · entregado ' + entregadoTotalFichaTapas(s).toLocaleString() + '/' + (s.cant || 0).toLocaleString() + '</div>'
+      + '<div class="dc-b" style="font-size:12px">' + escHtml(s.descontinuadaPor || 'Master') + ' · ' + escHtml(comentFechaHoraTapas(s.descontinuadaEn))
+      + ' <button class="btn btn-g btn-xs" style="margin-left:8px" onclick="reactivarFichaTapas(\'' + idq + '\')">↩ Reactivar</button></div></div>';
+  }
+  if (!fichaViva(s)) return '';
+  return '<div class="dc"><div class="dc-b" style="font-size:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    + '<span>¿Ya se entregó o no se va a producir? Descontinúala: sale de Fichas de Trabajo y de las alertas de bajo stock.</span>'
+    + '<button class="btn btn-xs" style="color:#B91C1C;border-color:#FECACA" onclick="descontinuarFichaTapas(\'' + idq + '\')">⛔ Descontinuar ficha</button></div></div>';
+}
+
+async function descontinuarFichaTapas(id) {
+  var s = solicitudes.find(function(x) { return x.id === id; });
+  if (!s || !fichaViva(s)) return;
+  var entTot = entregadoTotalFichaTapas(s), falta = Math.max(0, (s.cant || 0) - entTot);
+  if (!confirm('¿DESCONTINUAR ' + (s.id_display || 'la ficha') + '?\n\nEntregado ' + entTot.toLocaleString() + ' de ' + (s.cant || 0).toLocaleString() + (falta > 0 ? ' (faltan ' + falta.toLocaleString() + ' que ya no se van a producir).' : '.')
+    + '\nDeja de pedir componentes en las alertas de bajo stock y sale de Fichas de Trabajo. Puedes reactivarla después.')) return;
+  var quien = (typeof TETRA !== 'undefined' && (TETRA.nombre || TETRA.email)) || 'Master';
+  var ahora = new Date().toISOString();
+  var r1 = await db.from('solicitudes').update({ estado: 'lista', descontinuada_por: quien, descontinuada_en: ahora }).eq('id', s.dbId).select('id');
+  if (r1.error || !(r1.data || []).length) { showToast('❌ No se pudo descontinuar' + (r1.error ? ': ' + r1.error.message : ' (sin permiso)'), '#B83232'); return; }
+  var ids = (s.lineas || []).map(function(l) { return l.id; }).filter(Boolean);
+  if (ids.length) {
+    var r2 = await db.from('solicitud_lineas').update({ estado: 'lista' }).in('id', ids);
+    if (r2.error) { showToast('❌ ' + r2.error.message, '#B83232'); return; }
+  }
+  s.estado = 'lista'; s.descontinuadaPor = quien; s.descontinuadaEn = ahora;
+  (s.lineas || []).forEach(function(l) { l.estado = 'lista'; });
+  if (typeof cerrarPedidosAlertaTapas === 'function') cerrarPedidosAlertaTapas();
+  renderListas();
+  if (typeof renderFichasTapas === 'function') renderFichasTapas();
+  if (typeof renderAlertasTapas === 'function') renderAlertasTapas();
+  if (selId) mostrarDetalle(selId);
+  if (fichaModalId) mostrarDetalle(fichaModalId);
+  showToast('⛔ Ficha descontinuada');
+}
+
+async function reactivarFichaTapas(id) {
+  var s = solicitudes.find(function(x) { return x.id === id; });
+  if (!s) return;
+  var hayEntregas = entregadoTotalFichaTapas(s) > 0;
+  var dest = hayEntregas ? 'parcial' : 'nueva';
+  if (!confirm('¿Reactivar ' + (s.id_display || 'la ficha') + '? Vuelve a estado "' + dest + '" y reaparece en Fichas de Trabajo y en las alertas.')) return;
+  var r1 = await db.from('solicitudes').update({ estado: dest, descontinuada_por: null, descontinuada_en: null }).eq('id', s.dbId).select('id');
+  if (r1.error || !(r1.data || []).length) { showToast('❌ No se pudo reactivar' + (r1.error ? ': ' + r1.error.message : ' (sin permiso)'), '#B83232'); return; }
+  var ids = (s.lineas || []).map(function(l) { return l.id; }).filter(Boolean);
+  if (ids.length) {
+    var r2 = await db.from('solicitud_lineas').update({ estado: dest }).in('id', ids);
+    if (r2.error) { showToast('❌ ' + r2.error.message, '#B83232'); return; }
+  }
+  s.estado = dest; s.descontinuadaPor = ''; s.descontinuadaEn = '';
+  (s.lineas || []).forEach(function(l) { l.estado = dest; });
+  renderListas();
+  if (typeof renderFichasTapas === 'function') renderFichasTapas();
+  if (typeof renderAlertasTapas === 'function') renderAlertasTapas();
+  if (selId) mostrarDetalle(selId);
+  if (fichaModalId) mostrarDetalle(fichaModalId);
+  showToast('↩ Ficha reactivada');
 }
 
 // Master da por COMPLETADA la ficha: estado 'lista' + marca de quién/cuándo, así sigue visible 15 días (transparente, verde) como las que marca Tapas
