@@ -2363,7 +2363,11 @@ function renderPedidos() {
 
   // 2) Todos los pedidos: por TIPO de tapa (default) o por cliente — idéntico a Fichas de Trabajo de tapas.html
   // Las COMPLETADAS por Tapas se muestran también (al final y transparentes) pero no cuentan como saldo por entregar
-  var visibles = m.filter(function(x) { return (x.viva && x.saldo > 0) || x.sobre || x.completada; });
+  // Una ficha COMPLETADA deja de mostrarse cuando ya existe una ficha VIGENTE del mismo cliente y SKU (el pedido nuevo): así la supervisora
+  // solo ve —y solo puede cargar a— la ficha nueva. Sin una vigente, la completada sigue a la vista PED_COMPLETADAS_DIAS días, solo lectura.
+  var vigentes = {};
+  m.forEach(function(x) { if (x.viva && x.sku) vigentes[x.cliente + '|' + x.sku] = 1; });
+  var visibles = m.filter(function(x) { return (x.viva && x.saldo > 0) || x.sobre || (x.completada && !(x.sku && vigentes[x.cliente + '|' + x.sku])); });
   var porCli = {}, clis = [];
   visibles.forEach(function(x) {
     if (!porCli[x.cliente]) { porCli[x.cliente] = []; clis.push(x.cliente); }
@@ -2709,7 +2713,7 @@ function pintarPedido() {
       + (x.entregadoTotal > 0 ? '<div class="ped-ent-det">' + pedEntDetHtml(x) + '</div>' : ''), 's')
     + (x.completada ? '' : (lotes ? pedFrame('🔵 Lotes en proceso', lotes, 'b') : '') + pedFrame('▶ ' + formTit, form, 'b'))
     + (x.completada ? pedFrame('✅ Ficha COMPLETADA · ' + pedNum(x.entregadoTotal) + '/' + pedNum(x.cant), '<div class="ped-est-n" style="margin:0 0 6px">' + escHtml(pedCompletadaTexto(x)) + (x.entregadoTotal > x.cant ? '. Se entregaron ' + pedNum(x.entregadoTotal - x.cant) + ' und de más.' : '.') + '</div>'
-      + (pedPuedeDeshacer(x) ? '<div class="ped-est" style="margin:0"><button class="e-p" onclick="deshacerEntrega()">↩ Deshacer (fue un error)</button></div>' : '<div class="ped-est-n" style="margin:0">Si fue un error, pídele al administrador que la reabra.</div>'), 'g') + pedParcHistHtml(x) : pedEstadoHtml(x))
+      + (pedPuedeDeshacer(x) ? '<div class="ped-est" style="margin:0"><button class="e-p" onclick="deshacerEntrega()">↩ Deshacer (fue un error)</button></div>' : '<div class="ped-est-n" style="margin:0">Esta ficha ya no recibe entregas. Si fue un error, pídele al administrador que la reabra.</div>'), 'g') + pedParcHistHtml(x) : pedEstadoHtml(x))
     + pedComentariosHtml(x)
     + '<button class="ped-cerrar" onclick="cerrarPedido()">Cerrar</button>';
   document.getElementById('pedOv').classList.add('open');
@@ -2877,12 +2881,13 @@ function pedParcHistHtml(x) {
   var filas = x.parc.lista.map(function(e) {
     var ok = (e.cubierto || 0) >= e.cantidad;
     var falta = e.cantidad - (e.cubierto || 0);
+    var bloq = x.s.estado === 'lista' && TETRA.rol !== 'master'; // ficha completada: la supervisora ya no toca sus entregas (salvo corregir la que la cerró)
     if (PED.editEnt && String(PED.editEnt) === String(e.id)) return pedEditEntregaHtml(e);
     return '<div class="ped-pe' + (ok ? ' ok' : '') + '"><b>' + pedNum(e.cantidad) + ' und</b>' + (e.cierra ? '<span class="e cr">✅ completó la ficha</span>' : '') + '<span>' + escHtml(pedFechaCorta(e.fecha)) + '</span>' + pedFotoBtn(e, false)
       + '<span class="t">' + escHtml(pedNotaEntrega(e)) + '</span>'
       + '<span class="e ' + (ok ? 'cr' : 'sr') + '">' + (ok ? '✓ con requi' : (e.cubierto ? '⏳ faltan ' + pedNum(falta) + ' por requi' : '⏳ sin requi')) + '</span>'
-      + (pedPuedeEditarEntrega(e) ? '<button title="Corregir la cantidad" onclick="abrirEdicionEntrega(\'' + escHtml(String(e.id)) + '\')">✏️</button>' : '')
-      + (pedPuedeMarcar() ? '<button title="Quitar esta entrega" onclick="quitarParcial(\'' + escHtml(String(e.id)) + '\')">✕</button>' : '') + '</div>';
+      + (pedPuedeEditarEntrega(e) && (!bloq || e.cierra) ? '<button title="Corregir la cantidad" onclick="abrirEdicionEntrega(\'' + escHtml(String(e.id)) + '\')">✏️</button>' : '')
+      + (pedPuedeMarcar() && !bloq ? '<button title="Quitar esta entrega" onclick="quitarParcial(\'' + escHtml(String(e.id)) + '\')">✕</button>' : '') + '</div>';
   }).join('');
   return pedFrame((x.parc.sinRequi > 0 ? '🟡' : '🟢') + ' Entregas reportadas <i>(' + pedNum(x.parc.total) + ' und · ' + (x.parc.sinRequi > 0 ? pedNum(x.parc.sinRequi) + ' sin requi' : 'todas con requi') + ')</i>', filas, x.parc.sinRequi > 0 ? 'y' : 'g');
 }
@@ -3035,7 +3040,8 @@ async function guardarParcial() {
 // Corrige un cierre equivocado: la supervisora tiene 24 h desde que se marcó (la función de la base lo valida; master sin límite)
 function pedPuedeDeshacer(x) {
   var t = x.s.marcado_tapas_en ? new Date(x.s.marcado_tapas_en).getTime() : 0;
-  return pedPuedeMarcar() && (TETRA.rol === 'master' || (t > 0 && Date.now() - t <= 86400000));
+  // Solo se puede deshacer un cierre hecho POR TAPAS (con una entrega que cerró la ficha): una ficha completada por la oficina ya no se reabre desde aquí
+  return pedPuedeMarcar() && (TETRA.rol === 'master' || (t > 0 && Date.now() - t <= 86400000 && x.parc.lista.some(function(e) { return e.cierra; })));
 }
 
 async function deshacerEntrega() {

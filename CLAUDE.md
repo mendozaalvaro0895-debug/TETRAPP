@@ -839,6 +839,8 @@ Estado al 31-oct-2026: TODOS corridos y verificados contra la base (tablas, colu
 
 54. ✅ YA CORRIDO (7-nov-2026, vía MCP de Supabase) — `sql/ficha_facturas_v1.sql` — tabla `ficha_facturas` (solicitud_id, serie, docu, sku, modo 'vinculada'|'excluida', und, nota, creado_por; único por ficha+serie+docu+sku) con RLS: lectura con perfil, escritura SOLO master. Confirmación manual del cruce ficha ↔ facturación de tapas.html. Sin ella el cruce sigue siendo automático y los botones avisan qué archivo falta.
 
+55. ✅ YA CORRIDO (24-nov-2026, vía MCP de Supabase) — `sql/tapas_completada_bloqueo_v1.sql` — fichas COMPLETADAS ya no admiten movimientos de la supervisora: `tapas_deshacer_entrega` solo deja deshacer a no-master un cierre hecho POR TAPAS (existe una entrega con `cierra`; una ficha completada por la oficina, p. ej. con "Marcar completada" de tapas.html, solo la reabre master) y `tapas_editar_entrega` no deja a no-master editar entregas de una ficha completada salvo la que la cerró. `tapas_registrar_entrega` ya rechazaba fichas `lista`. En registro-tapas.html la completada se OCULTA del listado cuando existe otra ficha VIGENTE del mismo cliente + SKU (el pedido nuevo; `vigentes` en `renderPedidos`) y, si sigue visible (15 días), su popup es solo lectura para la supervisora: sin Deshacer ni ✏️/✕ en entregas (master conserva todo).
+
 ### ⚠️ Duplicados en `personal` — causa probable y cómo evitarlos
 `personal.codigo` es UNIQUE, así que un duplicado real son DOS filas con códigos distintos
 para la misma persona (no un simple typo de UI) — confirmado con Karen Hernández y Blandina
