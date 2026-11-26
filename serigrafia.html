@@ -357,42 +357,53 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .board-lane.drag-over{border-color:var(--serig-m);box-shadow:0 0 0 3px rgba(108,46,163,.15)}
 .board-lane-hdr{padding:10px 12px;border-bottom:1px solid var(--border)}
 /* Matriz semanal: líneas (X) × días (Y) — bloque enmarcado, con sombras */
-.plan-wrap{overflow:auto;max-height:78vh;margin-bottom:24px;padding:0;border:4px solid var(--serig-m);border-radius:16px;background:linear-gradient(180deg,#F8F6FC 0,#F4F1EA 120px);box-shadow:0 0 0 1px #fff,0 0 0 3px rgba(108,46,163,.28),0 14px 36px rgba(76,38,120,.30),0 3px 8px rgba(0,0,0,.12)}
+.plan-wrap{overflow:auto;max-height:84vh;width:min(100%,1240px);margin:0 auto 24px;padding:0;border:4px solid var(--serig-m);border-radius:16px;background:linear-gradient(180deg,#F8F6FC 0,#F4F1EA 120px);box-shadow:0 0 0 1px #fff,0 0 0 3px rgba(108,46,163,.28),0 14px 36px rgba(76,38,120,.30),0 3px 8px rgba(0,0,0,.12)}
 .plan-nav{display:flex;align-items:center;gap:8px;margin:0;padding:11px 14px;flex-wrap:wrap;background:linear-gradient(90deg,var(--serig-l),#F8F6FC);border-bottom:3px solid var(--serig-m)}
 .plan-nav-t{font-size:13px;font-weight:800;color:var(--serig-m);margin-right:auto;letter-spacing:.2px}
 .plan-nav-btn{border:1px solid #CFC6E6;background:#fff;color:var(--serig-m);border-radius:9px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:transform .1s,box-shadow .15s}
 .plan-nav-btn:hover{border-color:var(--serig-m);box-shadow:0 3px 8px rgba(108,46,163,.2);transform:translateY(-1px)}
-.plan-grid{display:grid;grid-template-columns:104px repeat(4,minmax(230px,1fr));gap:8px;min-width:1020px;padding:0 12px 14px}
+.plan-grid{display:grid;grid-template-columns:84px repeat(4,minmax(210px,1fr));gap:5px;min-width:940px;padding:0 10px 10px}
 .plan-corner{position:sticky;top:0;z-index:4;background:#F8F6FC}
 .plan-lane-hdr{border-radius:12px;border:2px solid #CFC6E6;overflow:hidden;background:#fff;position:sticky;top:0;z-index:4;box-shadow:0 6px 12px -4px rgba(76,38,120,.22);margin-top:0}
-.plan-weekhdr{grid-column:1/-1;margin-top:10px;font-size:12px;font-weight:800;color:var(--serig-m);letter-spacing:.3px;padding:7px 12px;border-radius:10px;background:linear-gradient(90deg,var(--serig-l),transparent);border-left:5px solid var(--serig-m);box-shadow:0 1px 3px rgba(0,0,0,.06)}
-.plan-daylbl{border-radius:10px;background:#fff;border:1px solid var(--border);border-left:4px solid #CFC6E6;padding:9px 9px;display:flex;flex-direction:column;gap:2px;justify-content:center;align-items:center;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.08)}
-.plan-daylbl b{font-size:12px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px}
+.plan-weekhdr{grid-column:1/-1;margin-top:4px;font-size:11px;font-weight:800;color:var(--serig-m);letter-spacing:.3px;padding:3px 10px;border-radius:10px;background:linear-gradient(90deg,var(--serig-l),transparent);border-left:5px solid var(--serig-m);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.plan-daylbl{border-radius:10px;background:#fff;border:1px solid var(--border);border-left:4px solid #CFC6E6;padding:4px 4px;display:flex;flex-direction:column;gap:0;justify-content:center;align-items:center;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.plan-daylbl b{font-size:10.5px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px}
 .plan-daylbl span{font-size:10px;color:var(--gray-l)}
 .plan-daylbl.hoy{border-color:var(--serig-m);border-left-color:var(--serig-m);background:linear-gradient(180deg,var(--serig-l),#fff);box-shadow:0 4px 14px rgba(108,46,163,.28)}
 .plan-daylbl.hoy b{color:var(--serig-m)}
 .plan-daylbl.sin{border-style:dashed;border-left-style:solid;border-left-color:#B8B2A6;background:#F1EEE8}
-.plan-daylbl .fec{font-size:14px;font-weight:800;color:var(--ink);line-height:1.15;font-family:'DM Mono',monospace;letter-spacing:-.3px;text-transform:none}
+.plan-daylbl .fec{font-size:13px;font-weight:800;color:var(--ink);line-height:1.15;font-family:'DM Mono',monospace;letter-spacing:-.3px;text-transform:none}
 .plan-daylbl.hoy .fec{color:var(--serig-m)}
-.plan-daylbl .plan-hoy{font-style:normal;font-size:9px;font-weight:800;letter-spacing:.6px;color:#fff;background:var(--serig-m);border-radius:8px;padding:2px 8px;align-self:center;margin-top:3px;box-shadow:0 1px 4px rgba(108,46,163,.4)}
-.plan-cell{min-height:70px;border:1.5px dashed #D6D1C6;border-radius:12px;padding:6px;display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,.55);box-shadow:inset 0 2px 5px rgba(0,0,0,.05);transition:border-color .15s,background .15s,box-shadow .15s}
+.plan-daylbl .plan-hoy{font-style:normal;font-size:9px;font-weight:800;letter-spacing:.6px;color:#fff;background:var(--serig-m);border-radius:8px;padding:1px 7px;align-self:center;margin-top:2px;box-shadow:0 1px 4px rgba(108,46,163,.4)}
+.plan-cell{min-height:50px;border:1.5px dashed #D6D1C6;border-radius:10px;padding:4px;display:flex;flex-direction:column;gap:4px;background:rgba(255,255,255,.55);box-shadow:inset 0 2px 5px rgba(0,0,0,.05);transition:border-color .15s,background .15s,box-shadow .15s}
 .plan-cell:has(.lane-card-wrap){border-style:solid;border-color:#DDD8CD;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .plan-cell.plan-sin{background:#F1EEE8}
 .plan-cell.plan-sin:has(.lane-card-wrap){background:#F6F3EC}
 .plan-cell.drag-over{border-color:var(--serig-m);border-style:solid;background:rgba(108,46,163,.10);box-shadow:0 0 0 3px rgba(108,46,163,.18),inset 0 2px 6px rgba(108,46,163,.12)}
 .plan-cell .lane-card-wrap:not(.drop-before):not(.drop-after){box-shadow:0 2px 6px rgba(0,0,0,.14)}
 .plan-cell-tot{align-self:flex-end;font-size:10px;font-weight:800;color:var(--serig-m);background:var(--serig-l);border:1px solid #DDD5EE;border-radius:10px;padding:1px 9px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.plan-cell .lane-card-wrap{position:relative;margin-bottom:11px}
-.plan-cont-btn{position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);z-index:2;border:1.5px solid var(--serig-m);background:#fff;color:var(--serig-m);border-radius:12px;padding:1px 12px;font-size:10px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 2px 6px rgba(0,0,0,.18);white-space:nowrap;letter-spacing:.3px}
+.plan-cell .lane-card-wrap{position:relative}
+.board-card.mini{padding:3px 6px;border-radius:6px;display:flex;flex-direction:column;gap:1px}
+.board-card.mini.mini-lista{border-left:3px solid #22c55e;background:rgba(34,197,94,.06)}
+.mini-h{display:flex;align-items:center;gap:5px;min-width:0;line-height:1.2}
+.mini-cod{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--serig-m);flex:none}
+.mini-cli{font-size:11px;font-weight:800;color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini-bdg{border-radius:4px;padding:0 4px;font-size:7.5px;font-weight:800;flex:none;line-height:14px}
+.mini-d{font-size:10px;line-height:1.2;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.mini-d b{font-family:var(--mono);font-weight:500;color:var(--gray-l);font-size:9.5px}
+.mini-f{display:flex;align-items:center;justify-content:space-between;gap:6px;line-height:1.2}
+.mini-c{font-size:11.5px;font-weight:800}
+.mini-c i{font-style:normal;font-size:9px;font-weight:400;color:var(--gray)}
+.mini-sep{font-weight:400;color:var(--gray-l);margin:0 2px}
+.plan-cont-btn{border:1px solid var(--serig-m);background:#fff;color:var(--serig-m);border-radius:10px;padding:0 7px;font-size:9px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;line-height:15px;flex:none}
 .plan-cont-btn:hover{background:var(--serig-m);color:#fff}
-.plan-clone{border:2px dashed var(--serig-m);border-radius:8px;background:rgba(108,46,163,.06);opacity:.72;padding:5px 8px;font-size:10.5px;color:var(--ink)}
-.plan-clone-h{display:flex;justify-content:space-between;align-items:center;font-size:9.5px;font-weight:800;color:var(--serig-m);gap:6px}
-.plan-clone-x{border:0;background:rgba(108,46,163,.15);color:var(--serig-m);border-radius:50%;width:18px;height:18px;line-height:18px;padding:0;cursor:pointer;font-size:10px;font-weight:800;flex:none}
+.plan-clone{display:flex;align-items:center;gap:5px;border:1.5px dashed var(--serig-m);border-radius:6px;background:rgba(108,46,163,.06);opacity:.75;padding:2px 5px;font-size:9.5px;color:var(--ink);line-height:1.2}
+.plan-clone-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plan-clone-t b{color:var(--serig-m)}
+.plan-clone-c{font-weight:800;font-size:10.5px;flex:none}
+.plan-clone-x{border:0;background:rgba(108,46,163,.15);color:var(--serig-m);border-radius:50%;width:15px;height:15px;line-height:15px;padding:0;cursor:pointer;font-size:9px;font-weight:800;flex:none}
 .plan-clone-x:hover{background:var(--serig-m);color:#fff}
-.plan-clone-b{margin-top:2px;line-height:1.25}
-.plan-clone-c{font-weight:800;font-size:12px;margin-top:2px}
-.plan-cell:not(:has(.lane-card-wrap)) .plan-clone{margin-top:auto;margin-bottom:auto}
-.plan-empty{text-align:center;color:var(--gray-l);font-size:12px;opacity:.45;padding:10px 0}
+.plan-empty{text-align:center;color:var(--gray-l);font-size:12px;opacity:.45;padding:2px 0}
 .board-cards-wrap{padding:7px;display:flex;flex-direction:column;gap:4px;min-height:96px;flex:1}
 .board-card{background:var(--card);border:1.5px solid var(--border);border-radius:8px;padding:6px 9px;cursor:grab;user-select:none;transition:box-shadow .15s,transform .12s,opacity .15s}
 .board-card:hover{box-shadow:0 3px 10px rgba(0,0,0,.12);transform:translateY(-1px);border-color:var(--serig-m)}
@@ -3581,14 +3592,56 @@ async function planCellDrop(e, laneId, dia) {
   }
 }
 
-// Clon transparente de continuación: solo SKU + descripción + cantidad; no es una ficha ni suma a ninguna cuenta
+// Unidades entregadas (requis manuales) de una ficha
+function entregadoDeFicha(solId) {
+  var ent = 0;
+  (getEntregasManuales() || []).forEach(function(m) {
+    if (m.lineas && m.lineas.length) {
+      m.lineas.forEach(function(l) { if (l.solId === solId) ent += (l.cant || 0); });
+    } else if (m.solId === solId) {
+      ent += (m.cant || 0);
+    }
+  });
+  return ent;
+}
+
+// Ficha MINI para la matriz semanal (3 líneas: código·cliente / SKU·descripción / cantidad + "continúa").
+// El detalle completo (stock, requis, fechas, comentarios) se abre con un clic en la ficha.
+function boardBuildCardMini(item, key) {
+  var ent = entregadoDeFicha(item.solId);
+  var tot = item.cant || 0;
+  var esLista = item.estado === 'lista';
+  var bTxt = esLista ? 'COMPL.' : item.estado === 'proceso' ? 'PROC.' : item.estado === 'parcial' ? 'PARC.' : 'NUEVA';
+  var bBg  = esLista ? '#dcfce7' : item.estado === 'proceso' ? 'var(--serig-l)' : item.estado === 'parcial' ? '#fef9c3' : '#f1f5f9';
+  var bClr = esLista ? '#15803d' : item.estado === 'proceso' ? 'var(--serig-m)' : item.estado === 'parcial' ? '#92400e' : '#64748b';
+  var dragArg = item.lineaDbId === null ? 'null' : "'" + item.lineaDbId + "'";
+  var cantHtml = ent > 0
+    ? '<span style="color:#16a34a">' + ent.toLocaleString() + '</span><span class="mini-sep">/</span>' + tot.toLocaleString()
+    : tot.toLocaleString();
+  var tip = item.solCodigo + ' · ' + (item.cliente || '') + '\n' + (item.sku ? item.sku + ' · ' : '') + (item.desc || '') +
+    '\n' + ent.toLocaleString() + ' / ' + tot.toLocaleString() + ' und';
+  var btn = !esLista
+    ? '<button class="plan-cont-btn" title="Esta ficha sigue el día siguiente: se agrega un clon transparente (no cuenta unidades)" onclick="event.stopPropagation();planContMas(\'' + key + '\')">» ' + ((planContCache[key] || 0) > 0 ? '+1 día' : 'mañana') + '</button>'
+    : '';
+  return '<div class="board-card mini' + (esLista ? ' mini-lista' : '') + '" title="' + escHtml(tip) + '" draggable="true"' +
+    ' ondragstart="boardDragStart(event,' + dragArg + ',\'' + item.solId + '\')"' +
+    ' ondragend="this.classList.remove(\'dragging\')"' +
+    ' onclick="mostrarDetalle(\'' + item.solId + '\')">' +
+    '<div class="mini-h"><span class="mini-cod">' + escHtml(item.solCodigo) + '</span>' +
+      '<span class="mini-cli">' + escHtml(item.cliente || '') + '</span>' +
+      '<span class="mini-bdg" style="background:' + bBg + ';color:' + bClr + '">' + bTxt + '</span></div>' +
+    '<div class="mini-d"><b>' + escHtml(item.sku || '') + '</b> ' + escHtml(item.desc || '—') + '</div>' +
+    '<div class="mini-f"><span class="mini-c">' + cantHtml + ' <i>und</i></span>' + btn + '</div>' +
+  '</div>';
+}
+
+// Clon transparente de continuación (una sola línea): no es una ficha ni suma a ninguna cuenta
 function boardBuildClon(it, i) {
   var key = laneCardKey(it);
-  return '<div class="plan-clone" title="Continuación de ' + escHtml(it.solCodigo) + ' (no se cuenta de nuevo)">' +
-    '<div class="plan-clone-h"><span>↳ ' + escHtml(it.solCodigo) + ' · continúa (día ' + (i + 1) + ')</span>' +
-      '<button class="plan-clone-x" title="Quitar este día (y los siguientes)" onclick="event.stopPropagation();planContQuitar(\'' + key + '\',' + i + ')">✕</button></div>' +
-    '<div class="plan-clone-b"><b>' + escHtml(it.sku || '') + '</b> ' + escHtml(it.desc || '') + '</div>' +
-    '<div class="plan-clone-c">' + (it.cant || 0).toLocaleString() + ' und</div>' +
+  return '<div class="plan-clone" title="Continuación de ' + escHtml(it.solCodigo) + ' (día ' + (i + 1) + '; no se cuenta de nuevo)">' +
+    '<span class="plan-clone-t">↳ <b>' + escHtml(it.solCodigo) + '</b> ' + escHtml(it.sku || '') + ' ' + escHtml(it.desc || '') + '</span>' +
+    '<span class="plan-clone-c">' + (it.cant || 0).toLocaleString() + '</span>' +
+    '<button class="plan-clone-x" title="Quitar este día (y los siguientes)" onclick="event.stopPropagation();planContQuitar(\'' + key + '\',' + i + ')">✕</button>' +
   '</div>';
 }
 
@@ -3639,10 +3692,7 @@ function boardBuildMatriz(lanes) {
           ' ondragover="laneCardDragOver(event)"' +
           ' ondragleave="laneCardDragLeave(event)"' +
           ' ondrop="laneCardDrop(event,' + ln.id + ',\'' + key + '\',\'' + clave + '\')">' +
-          boardBuildCard(it) +
-          (it.estado !== 'lista'
-            ? '<button class="plan-cont-btn" title="Esta ficha sigue el día siguiente: se agrega un clon transparente (no cuenta unidades)" onclick="event.stopPropagation();planContMas(\'' + key + '\')">»  ' + ((planContCache[key] || 0) > 0 ? '+1 día más' : 'Continúa mañana') + '</button>'
-            : '') +
+          boardBuildCardMini(it, key) +
         '</div>';
       }).join('');
       var clonHtml = ((clones[ln.id] || {})[clave] || []).map(function(c) {
@@ -3652,7 +3702,7 @@ function boardBuildMatriz(lanes) {
         ' ondragover="planCellOver(event,' + ln.id + ',\'' + clave + '\')"' +
         ' ondragleave="planCellLeave(event,' + ln.id + ',\'' + clave + '\')"' +
         ' ondrop="planCellDrop(event,' + ln.id + ',\'' + clave + '\')">' +
-        (und > 0 ? '<div class="plan-cell-tot">' + und.toLocaleString() + ' und</div>' : '') +
+        (und > 0 && its.filter(noLista).length > 1 ? '<div class="plan-cell-tot">' + und.toLocaleString() + ' und</div>' : '') +
         ((clonHtml + cards) || '<div class="plan-empty">·</div>') +
       '</div>';
     }).join('');
