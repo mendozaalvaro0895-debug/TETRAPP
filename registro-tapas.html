@@ -426,6 +426,22 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 .ped-modo{display:inline-flex;border:1.5px solid #E0DED8;border-radius:8px;overflow:hidden;margin-left:auto;text-transform:none;letter-spacing:0}
 .ped-modo button{border:none;background:#fff;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:#6B6B6A;font-family:'DM Sans',sans-serif}
 .ped-modo button.act{background:#1A6B5B;color:#fff}
+/* Meses (nov/2026): barra sobre los pedidos + ventana de cierre, solo consulta (espejo de tapas.html) */
+.ped-mes-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px}
+.ped-mes{border:1.5px solid #E0DED8;background:#fff;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:800;cursor:pointer;color:#6B6B6A;text-align:left;line-height:1.2;font-family:'DM Sans',sans-serif}
+.ped-mes i{display:block;font-style:normal;font-weight:600;font-size:9px;opacity:.85}
+.ped-mes.act{background:#1A6B5B;border-color:#1A6B5B;color:#fff}
+.ped-mes.fut:not(.act){border-style:dashed;color:#1e5fa8}
+.ped-mes.cierre{color:#1A6B5B}
+.ped-mes-info{font-size:11px;color:#6B6B6A;margin-left:6px}
+.ped-mes-info b{color:#1A1A19}
+.ped-mes-nota{font-size:11px;color:#6B6B6A;background:#F4F3EF;border-radius:8px;padding:8px 10px;margin-bottom:10px}
+.ped-ct{width:100%;border-collapse:collapse}
+.ped-ct th,.ped-ct td{padding:6px 8px;font-size:12px;border-bottom:1px solid #E0DED8;text-align:right}
+.ped-ct th:first-child,.ped-ct td:first-child{text-align:left}
+.ped-ct tr.tot{font-weight:800;background:#E8F4F1}
+#cierreOv{z-index:9300}
+#cierreOv .ped-box{max-width:760px;width:100%}
 .ped-resumen{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px}
 .ped-res{border:1.5px solid #E0DED8;background:#fff;border-radius:10px;padding:5px 10px;cursor:pointer;line-height:1.2}
 .ped-res:hover{border-color:#1A6B5B}
@@ -729,6 +745,10 @@ body{font-family:'DM Sans',sans-serif;background:#F7F6F2;color:#0C0C0B;min-heigh
 
 <div class="ped-ov" id="estOv" onclick="if(event.target===this)cerrarEstadoFicha()">
   <div class="ped-box" id="estBox"></div>
+</div>
+
+<div class="ped-ov" id="cierreOv" onclick="if(event.target===this)pedCerrarCierre()">
+  <div class="ped-box" id="cierreBox"></div>
 </div>
 
 <div class="ped-ov" id="fotoOv" onclick="if(event.target===this)cerrarFotoEntrega()">
@@ -1784,7 +1804,7 @@ function pedAutoRefresco(activo) {
 async function cargarPedidos(silencioso) {
   try {
     // Con componentes (sku_base…) y plazo_tipo; si alguna columna aún no existe (SQL #29 / #37 sin correr) se reintenta sin ella
-    var cBase = 'id,codigo,cliente_nombre,estado,created_at,fecha_limite,prioridad,notas';
+    var cBase = 'id,codigo,cliente_nombre,estado,created_at,fecha_limite,prioridad,notas,periodo_efectivo';
     var lin = 'sku,descripcion,cantidad,procesos', linC = lin + ',sku_base,sku_contratapa,sku_liner,sku_banda';
     // marcado_tapas_por/en (sql/tapas_marcar_ficha_v2.sql) dicen quién y cuándo marcó la ficha COMPLETADA; sin esas columnas se reintenta sin ellas
     var cMarca = cBase + ',marcado_tapas_por,marcado_tapas_en';
@@ -1814,6 +1834,8 @@ async function cargarPedidos(silencioso) {
     var rpa = await db.from('tapas_entregas_parciales').select('*').order('fecha', { ascending: true }).order('created_at', { ascending: true });
     PED.parcOk = !rpa.error;
     PED.parc = rpa.error ? [] : (rpa.data || []);
+    // cierres de mes ya congelados por master (periodo_cierres, area 'tapas'): solo se consultan para la ventana "Cierre de mes"
+    try { var rcm = await db.from('periodo_cierres').select('*').eq('area', 'tapas'); PED.cierres = rcm.error ? [] : (rcm.data || []); } catch(e) { PED.cierres = []; }
     var re =await db.from('sku_especificaciones').select('sku,valor').eq('area', 'tapas').eq('campo', 'Familia');
     if (!re.error) {
       PED.tipos = {};
@@ -1977,6 +1999,113 @@ function pedCompStockHtml(x) {
     });
   });
   return out;
+}
+
+// ── MES DEL PEDIDO (nov/2026) — ESPEJO DE SOLO CONSULTA de la barra de meses de Fichas de Trabajo de tapas.html ──
+// Mes de una ficha = solicitudes.periodo_efectivo ('YYYY-MM') o, si no lo trae, el mes de su creación (hora GT). Aquí no se cambia el mes ni se
+// cierra: el cierre es automático y lo hace master desde tapas.html (tabla periodo_cierres, area='tapas'); este perfil solo lo consulta.
+var PED_MESES_L = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+var PED_MESES_C = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+var pedMes = ''; // '' = mes en curso · 'todos' · 'YYYY-MM'
+var pedCierreKey = '';
+function pedMesActual() { return fechaGT().slice(0, 7); }
+function pedMesLargo(k) { return (PED_MESES_L[parseInt(String(k).slice(5, 7), 10) - 1] || '—') + ' ' + String(k).slice(0, 4); }
+function pedMesCorto(k) { return (PED_MESES_C[parseInt(String(k).slice(5, 7), 10) - 1] || '—') + ' ' + String(k).slice(0, 4); }
+function pedMesDeSol(s) {
+  if (s.periodo_efectivo) return s.periodo_efectivo;
+  var d = new Date(s.created_at);
+  return isNaN(d.getTime()) ? '0000-00' : new Date(d.getTime() - 6 * 3600 * 1000).toISOString().slice(0, 7);
+}
+function pedEnMesSel(x) {
+  if (pedMes === 'todos') return true;
+  var sel = pedMes || pedMesActual();
+  if (pedMesDeSol(x.s) === sel) return true;
+  return sel === pedMesActual() && x.completada; // las completadas recientes siguen a la vista unos días, sea cual sea su mes
+}
+function setPedMes(k) { pedMes = k; renderPedidos(); }
+function pedTierMes(x) {
+  if (x.s.estado === 'lista' || (x.cant > 0 && x.entregadoTotal >= x.cant)) return 2;
+  return x.entregadoTotal > 0 ? 1 : 0;
+}
+function pedResumenMes(key) {
+  var porCli = {}, tot = { n: 0, und: 0, ent: 0, listos: 0, parc: 0, pend: 0 };
+  (PED.modelo || []).forEach(function(x) {
+    if (pedMesDeSol(x.s) !== key) return;
+    var und = x.cant || 0, ent = Math.min(x.entregadoTotal || 0, und), t = pedTierMes(x);
+    var g = porCli[x.cliente] = porCli[x.cliente] || { cli: x.cliente, n: 0, und: 0, ent: 0, listos: 0, parc: 0, pend: 0 };
+    [g, tot].forEach(function(o) {
+      o.n++; o.und += und; o.ent += ent;
+      if (t === 2) o.listos++; else if (t === 1) o.parc++; else o.pend++;
+    });
+  });
+  var filas = Object.keys(porCli).map(function(k) { return porCli[k]; }).sort(function(a, b) { return b.und - a.und; });
+  return { filas: filas, tot: tot };
+}
+function pedPct(ent, und) { return und > 0 ? Math.round(ent / und * 100) : 0; }
+function pedMesBarHtml(m) {
+  var sel = pedMes || pedMesActual(), hoy = pedMesActual();
+  var meses = {}; meses[hoy] = { n: 0, saldo: 0 };
+  m.forEach(function(x) {
+    if (!((x.viva && x.saldo > 0) || x.sobre)) return;
+    var k = pedMesDeSol(x.s), mm = meses[k] = meses[k] || { n: 0, saldo: 0 };
+    mm.n++; mm.saldo += x.saldo;
+  });
+  var chips = Object.keys(meses).sort().map(function(k) {
+    return '<button class="ped-mes' + (k === sel && pedMes !== 'todos' ? ' act' : '') + (k > hoy ? ' fut' : '') + '" onclick="setPedMes(\'' + k + '\')" title="' + escHtml(pedMesLargo(k)) + '">'
+      + pedMesCorto(k) + (k === hoy ? ' · actual' : (k > hoy ? ' · próximo' : '')) + '<i>' + meses[k].n + ' · ' + pedNum(meses[k].saldo) + ' und</i></button>';
+  }).join('') + '<button class="ped-mes' + (pedMes === 'todos' ? ' act' : '') + '" onclick="setPedMes(\'todos\')">Todos</button>';
+  var info = '';
+  if (pedMes !== 'todos') {
+    var r = pedResumenMes(sel).tot;
+    info = '<span class="ped-mes-info">' + pedMesLargo(sel) + ': <b>' + r.n + '</b> ficha' + (r.n !== 1 ? 's' : '') + ' · pedido <b>' + pedNum(r.und) + '</b> · entregado <b>'
+      + pedNum(r.ent) + '</b> (' + pedPct(r.ent, r.und) + '%) · ✓ ' + r.listos + ' · ~ ' + r.parc + ' · ● ' + r.pend + '</span>';
+  }
+  return '<div class="ped-mes-bar">' + chips + '<button class="ped-mes cierre" onclick="pedAbrirCierre(\'' + sel + '\')" title="Resumen del mes por cliente y meses ya cerrados">📊 Cierre de mes</button>' + info + '</div>';
+}
+function pedAbrirCierre(k) {
+  pedCierreKey = (k && k !== 'todos') ? k : pedMesActual();
+  pedPintarCierre();
+  document.getElementById('cierreOv').classList.add('open');
+}
+function pedCerrarCierre() { document.getElementById('cierreOv').classList.remove('open'); }
+function pedCierreElegir(k) { pedCierreKey = k; pedPintarCierre(); }
+function pedCierreFila(cli, n, und, ent, pct, l, p, r, total) {
+  return '<tr' + (total ? ' class="tot"' : '') + '><td>' + escHtml(cli) + '</td><td>' + n + '</td><td>' + pedNum(und) + '</td><td>' + pedNum(ent) + '</td><td><b>' + pct + '%</b></td><td>' + l + '</td><td>' + p + '</td><td>' + r + '</td></tr>';
+}
+function pedCierreTabla(filas, total) {
+  return '<div style="overflow-x:auto"><table class="ped-ct"><thead><tr><th>Cliente</th><th>Fichas</th><th>Pedido</th><th>Entregado</th><th>%</th><th title="Completas">✓</th><th title="Parciales">~</th><th title="Sin entregas">●</th></tr></thead><tbody>' + filas + total + '</tbody></table></div>';
+}
+function pedPintarCierre() {
+  var cierres = PED.cierres || [], keys = {};
+  keys[pedMesActual()] = 1;
+  (PED.modelo || []).forEach(function(x) { keys[pedMesDeSol(x.s)] = 1; });
+  cierres.forEach(function(c) { keys[c.periodo_key] = 1; });
+  var cerrados = {};
+  cierres.forEach(function(c) { cerrados[c.periodo_key] = 1; });
+  var lista = Object.keys(keys).filter(function(k) { return k !== '0000-00'; }).sort().reverse();
+  var chips = lista.map(function(k) {
+    return '<button class="ped-mes' + (k === pedCierreKey ? ' act' : '') + '" onclick="pedCierreElegir(\'' + k + '\')">' + pedMesCorto(k) + (cerrados[k] ? ' 🔒' : '') + '</button>';
+  }).join('');
+  var snaps = cierres.filter(function(c) { return c.periodo_key === pedCierreKey; }), cuerpo;
+  if (snaps.length) {
+    var t = { n: 0, und: 0, ent: 0, l: 0, p: 0, r: 0 };
+    var filas = snaps.slice().sort(function(a, b) { return b.und_total - a.und_total; }).map(function(c) {
+      var ent = (c.und_verde || 0) + (c.und_ambar_ent || 0);
+      t.n += c.n_total; t.und += c.und_total; t.ent += ent; t.l += c.n_listos; t.p += c.n_parciales; t.r += c.n_pendientes;
+      return pedCierreFila(c.cliente, c.n_total, c.und_total, ent, c.pct_entregado, c.n_listos, c.n_parciales, c.n_pendientes);
+    }).join('');
+    var fc = snaps[0].fecha_cierre ? fmtFechaLetras(String(snaps[0].fecha_cierre).slice(0, 10)) : '';
+    cuerpo = '<div class="ped-mes-nota">🔒 Mes CERRADO el ' + escHtml(fc) + ' · cifras congeladas. Las fichas que quedaron incompletas pasaron al mes siguiente.</div>'
+      + pedCierreTabla(filas, pedCierreFila('TOTAL', t.n, t.und, t.ent, pedPct(t.ent, t.und), t.l, t.p, t.r, true));
+  } else {
+    var r = pedResumenMes(pedCierreKey);
+    cuerpo = '<div class="ped-mes-nota">' + (pedCierreKey > pedMesActual() ? '📅 Mes PRÓXIMO: fichas programadas.' : '⏳ Mes en curso: cifras EN VIVO. Se cierra solo al empezar el mes siguiente.') + '</div>'
+      + (r.filas.length ? pedCierreTabla(r.filas.map(function(g) { return pedCierreFila(g.cli, g.n, g.und, g.ent, pedPct(g.ent, g.und), g.listos, g.parc, g.pend); }).join(''),
+                                         pedCierreFila('TOTAL', r.tot.n, r.tot.und, r.tot.ent, pedPct(r.tot.ent, r.tot.und), r.tot.listos, r.tot.parc, r.tot.pend, true))
+                        : '<div class="ped-vacio">Sin fichas en este mes.</div>');
+  }
+  document.getElementById('cierreBox').innerHTML = '<div class="ped-h"><b>📊 Cierre de mes · ' + escHtml(pedMesLargo(pedCierreKey)) + '</b><button class="ped-x" onclick="pedCerrarCierre()" style="margin-left:auto;background:none;border:none;font-size:18px;cursor:pointer">✕</button></div>'
+    + '<div class="ped-mes-bar" style="margin:8px 0">' + chips + '</div>' + cuerpo;
 }
 
 function pedModelo() {
@@ -2706,7 +2835,8 @@ function renderPedidos() {
   PED.modelo = m;
   etPrepara();
   var aeAct = document.activeElement, etEnfoque = !!(aeAct && aeAct.id === 'etBuscar'), etPos = etEnfoque ? aeAct.selectionStart : 0;
-  var vivas = m.filter(function(x) { return x.viva && x.saldo > 0; });
+  var vivasTodas = m.filter(function(x) { return x.viva && x.saldo > 0; }); // sin filtrar por mes: el bloque "En proceso" las usa
+  var vivas = vivasTodas.filter(pedEnMesSel);
   var ahora = new Date();
   document.getElementById('pedAct').textContent = vivas.length + ' pedido' + (vivas.length !== 1 ? 's' : '') + ' con saldo · actualizado ' + String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
   document.getElementById('pedAviso').innerHTML = PED.lotesOk ? ''
@@ -2714,7 +2844,7 @@ function renderPedidos() {
 
   // 1) En proceso
   var proc = [];
-  vivas.forEach(function(x) { x.abiertos.forEach(function(l) { proc.push({ x: x, l: l }); }); });
+  vivasTodas.forEach(function(x) { x.abiertos.forEach(function(l) { proc.push({ x: x, l: l }); }); });
   var htmlProc = proc.length ? '<div class="ped-proc">' + proc.map(function(p) {
     var pct = Math.min(100, Math.round(p.l.hecho / p.l.cantidad * 100));
     return '<div class="ped-pc" onclick="abrirPedido(\'' + escHtml(String(p.x.id)) + '\')">'
@@ -2732,7 +2862,7 @@ function renderPedidos() {
   // solo ve —y solo puede cargar a— la ficha nueva. Sin una vigente, la completada sigue a la vista PED_COMPLETADAS_DIAS días, solo lectura.
   var vigentes = {};
   m.forEach(function(x) { if (x.viva && x.sku) vigentes[x.cliente + '|' + x.sku] = 1; });
-  var visibles = m.filter(function(x) { return (x.viva && x.saldo > 0) || x.sobre || (x.completada && !(x.sku && vigentes[x.cliente + '|' + x.sku])); });
+  var visibles = m.filter(function(x) { return (x.viva && x.saldo > 0) || x.sobre || (x.completada && !(x.sku && vigentes[x.cliente + '|' + x.sku])); }).filter(pedEnMesSel);
   var porCli = {}, clis = [];
   visibles.forEach(function(x) {
     if (!porCli[x.cliente]) { porCli[x.cliente] = []; clis.push(x.cliente); }
@@ -2847,8 +2977,8 @@ function renderPedidos() {
     + '<input class="et-busca" id="etBuscar" placeholder="🔍 Requi, SKU, cliente, pedido o factura…" value="' + escHtml(entBusca) + '" oninput="etBuscarInput(this.value)" autocomplete="off"></div>'
     + '<div id="etCuerpo">' + etR.html + '</div></div>';
 
-  document.getElementById('pedCuerpo').innerHTML =
-    '<div class="ped-sec-t clic' + pedCol('proc') + '"' + pedClic('proc') + '><span class="ped-chev">▾</span>🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc.replace('class="ped-proc"', 'class="ped-proc' + pedCol('proc') + '"')
+  document.getElementById('pedCuerpo').innerHTML = pedMesBarHtml(m)
+    + '<div class="ped-sec-t clic' + pedCol('proc') + '"' + pedClic('proc') + '><span class="ped-chev">▾</span>🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc.replace('class="ped-proc"', 'class="ped-proc' + pedCol('proc') + '"')
     + '<div class="ped-sec-t">📋 ' + (pedAgrupar === 'tipo' ? 'Por entregar según el tipo de tapa' : (pedAgrupar === 'prioridad' ? 'Pedidos por prioridad' : 'Todos los pedidos por cliente')) + ' <i>toca un pedido para marcarlo en proceso</i>' + modoBtns + '</div>' + htmlGrid
     + '<div class="ped-sec-t clic' + pedCol('comp') + '"' + pedClic('comp') + '><span class="ped-chev">▾</span>📦 Entregados — ingresos PT con su requi</div>' + htmlComp.replace('class="ped-comp"', 'class="ped-comp' + pedCol('comp') + '"').replace('class="ped-mas"', 'class="ped-mas' + pedCol('comp') + '"');
 
