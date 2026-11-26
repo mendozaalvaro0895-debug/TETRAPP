@@ -440,6 +440,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-modo{display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
 .cp-modo button{border:none;background:var(--card);padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;color:var(--gray)}
 .cp-modo button.act{background:var(--teal);color:#fff}
+/* Meses (nov/2026): barra sobre Fichas de Trabajo + ventana de cierre */
+.cp-mes-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px}
+.cp-mes{border:1.5px solid var(--border);background:var(--card);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:800;cursor:pointer;color:var(--gray);text-align:left;line-height:1.2}
+.cp-mes i{display:block;font-style:normal;font-weight:600;font-size:9px;opacity:.85}
+.cp-mes.act{background:var(--teal);border-color:var(--teal);color:#fff}
+.cp-mes.fut:not(.act){border-style:dashed;color:#1e5fa8}
+.cp-mes-info{font-size:11px;color:var(--gray);margin-left:6px}
+.cp-mes-info b{color:var(--ink)}
+.cp-mes-nota{font-size:11px;color:var(--gray);background:var(--bg);border-radius:8px;padding:8px 10px;margin-bottom:10px}
+.cierre-t th,.cierre-t td{padding:6px 8px;font-size:12px;border-bottom:1px solid var(--border)}
+.cierre-t .num{text-align:right;font-family:var(--mono)}
 /* Buscador de fichas (encabezado de Fichas de Trabajo): el desplegable es position:fixed porque .fich-wrap recorta con overflow:hidden */
 .fich-bus{position:relative;flex:1 1 260px;max-width:380px;min-width:170px;margin-left:auto}
 .fich-bus input{width:100%;box-sizing:border-box;padding:6px 26px 6px 28px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;background:#fff;color:var(--ink);font-family:inherit}
@@ -1142,6 +1153,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
   </div>
 </div>
 
+<!-- MODAL CIERRE DE MES (resumen por cliente; mes en curso en vivo, meses cerrados congelados) -->
+<div class="overlay" id="modalCierreTapas" onclick="if(event.target===this)cerrarCierreTapas()">
+  <div class="modal" style="max-width:760px;width:96%">
+    <div class="mh">
+      <div><div class="mh-title" id="cierreTitulo">—</div></div>
+      <button class="m-close" onclick="cerrarCierreTapas()">✕</button>
+    </div>
+    <div class="mb" id="cierreCuerpo"></div>
+  </div>
+</div>
+
 <!-- MODAL VINCULAR FACTURA A UNA FICHA (confirmación manual del cruce con ventas) -->
 <div class="overlay" id="modalFactVinc" style="z-index:10400" onclick="if(event.target===this)factCerrarVincular()">
   <div class="modal" style="max-width:820px;width:94%">
@@ -1191,6 +1213,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
             <option value="programada">🟡 Programada</option>
             <option value="vela">🌙 Vela</option>
           </select>
+        </div>
+        <div class="fg">
+          <div class="fl">Mes del pedido</div>
+          <select class="fs" id="fMesPedido" title="A qué mes se le cuenta este pedido. Elige uno próximo para programarlo; al cerrar el mes lo no completado pasa solo al siguiente"></select>
         </div>
       </div>
 
@@ -2093,6 +2119,7 @@ async function mostrarDetalle(id) {
       ${bloqueSobreentregadaTapas(s)}
       ${bloqueStockEspecialTapas(s)}
       ${bloqueDescontinuadaTapas(s)}
+      ${bloqueMesTapas(s)}
       ${bloqueMarcaTapasFicha(s)}
       ${bloqueParcialesTapas(s)}
       ${bloqueComentariosFicha(s)}
@@ -2729,6 +2756,7 @@ function abrirForm() {
   var fl = document.getElementById('fLimite'); fl.value = ''; fl.min = fechaHoy(); // obligatoria (salvo parciales/pendiente): se elige al ingresar la solicitud
   setPlazoForm('fecha');
   document.getElementById('fPrioSelect').value = 'normal';
+  poblarMesPedidoTapas(document.getElementById('fMesPedido'), '', mesActualTapas());
   renderLineas();
   document.getElementById('overlay').classList.add('open');
   autoAjustarCamposSku();
@@ -2781,6 +2809,7 @@ async function editarFichaTapas(id) {
   var fl = document.getElementById('fLimite'); fl.min = ''; fl.value = s.fechaLimite || '';
   setPlazoForm(s.plazoTipo || 'fecha');
   document.getElementById('fPrioSelect').value = s.prio || 'normal';
+  poblarMesPedidoTapas(document.getElementById('fMesPedido'), periodoFichaTapas(s).key, periodoFichaTapas(s).key);
   renderLineas();
   document.getElementById('overlay').classList.add('open');
   autoAjustarCamposSku();
@@ -2808,6 +2837,8 @@ async function guardarEdicionFicha(l, cliente, fLimite) {
       prioridad: document.getElementById('fPrioSelect').value,
       notas: document.getElementById('fNotas').value
     };
+    var mesSel = document.getElementById('fMesPedido').value;
+    if (mesSel && mesSel !== periodoFichaTapas(s).key) cambio.periodo_efectivo = periodoEfectivoAGuardar(mesSel, mesCreacionFichaTapas(s));
     if (plazoForm !== 'fecha' || (s.plazoTipo || 'fecha') !== 'fecha') cambio.plazo_tipo = plazoForm;
     var r = await db.from('solicitudes').update(cambio).eq('id', s.dbId).select('id');
     if (r.error || !(r.data || []).length) throw r.error || new Error('sin permiso para editar (solo master)');
@@ -3116,6 +3147,8 @@ async function guardar() {
     progreso_pct: 0,
     notas: document.getElementById('fNotas').value
   };
+  var mesPed = document.getElementById('fMesPedido').value;
+  if (mesPed && mesPed !== mesActualTapas()) cabecera.periodo_efectivo = mesPed; // pedido programado para un mes próximo (null = mes de creación)
   if (plazoForm !== 'fecha') cabecera.plazo_tipo = plazoForm; // solo se manda si hace falta: así no depende del SQL para el caso normal
 
   const linea = {
@@ -4514,6 +4547,250 @@ function periodoFichaTapas(s) {
   return { key: key, largo: (MESES_FICHA_L[m] || '—') + ' ' + y };
 }
 
+// ══ MES DEL PEDIDO + CIERRE MENSUAL (nov/2026; calcado de Serigrafía) ═══════════════════════════════
+// Cada ficha pertenece a un MES: el de su creación (hora de Guatemala) o, si se programó/trasladó, solicitudes.periodo_efectivo
+// ('YYYY-MM'; null = mes de creación). Se elige al crear la ficha ("Mes del pedido": el actual o uno próximo, para programar), se
+// puede cambiar después desde su ventana (master) y, AUTOMÁTICAMENTE al entrar un mes nuevo, `verificarCierresTapas` congela el resumen
+// del mes vencido por cliente (tabla periodo_cierres, area='tapas') y traslada al mes en curso las fichas que no se completaron.
+var MESES_FICHA_C = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+var fichasMes = ''; // '' = mes en curso · 'todos' · 'YYYY-MM'
+var cierresTapas = {};      // 'CLIENTE§YYYY-MM' -> fila de periodo_cierres
+var cierresTapasOk = false;
+var cierreTapasEnProceso = false;
+
+function mesActualTapas() { return fechaHoy().slice(0, 7); }
+function mesKeyLargoTapas(key) {
+  var m = parseInt(String(key).slice(5, 7), 10) - 1;
+  return (MESES_FICHA_L[m] || '—') + ' ' + String(key).slice(0, 4);
+}
+function mesKeyCortoTapas(key) {
+  var m = parseInt(String(key).slice(5, 7), 10) - 1;
+  return (MESES_FICHA_C[m] || '—') + ' ' + String(key).slice(0, 4);
+}
+function sumarMesKeyTapas(key, n) {
+  var y = parseInt(key.slice(0, 4), 10), m = parseInt(key.slice(5, 7), 10) - 1 + n;
+  var d = new Date(y, m, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+// Mes en que se CREÓ la ficha (sin el traslado manual)
+function mesCreacionFichaTapas(s) {
+  var d = new Date(s.createdAt);
+  if (isNaN(d.getTime())) return '0000-00';
+  return new Date(d.getTime() - 6 * 3600 * 1000).toISOString().slice(0, 7);
+}
+// Opciones del selector "Mes del pedido": el actual, los 2 siguientes y, al editar, el mes en que ya está la ficha
+function mesPedidoOpcionesTapas(extra) {
+  var hoy = mesActualTapas();
+  var opts = [hoy, sumarMesKeyTapas(hoy, 1), sumarMesKeyTapas(hoy, 2)];
+  if (extra && /^\d{4}-\d{2}$/.test(extra) && opts.indexOf(extra) < 0) opts.push(extra);
+  opts.sort();
+  return opts;
+}
+function poblarMesPedidoTapas(sel, extra, valor) {
+  if (!sel) return;
+  var hoy = mesActualTapas();
+  sel.innerHTML = mesPedidoOpcionesTapas(extra).map(function(k) {
+    return '<option value="' + k + '">' + mesKeyLargoTapas(k) + (k === hoy ? ' (actual)' : '') + '</option>';
+  }).join('');
+  sel.value = valor || hoy;
+}
+// Valor a guardar en periodo_efectivo: null cuando el mes elegido es el de creación
+function periodoEfectivoAGuardar(mesElegido, mesCreacion) {
+  return (mesElegido && mesElegido !== mesCreacion) ? mesElegido : null;
+}
+
+// ── Cambiar el mes de una ficha ya creada (solo master; ventana de la ficha) ──
+function bloqueMesTapas(s) {
+  if (!fichaViva(s)) return '';
+  var idq = escHtml(String(s.id)), actual = periodoFichaTapas(s).key;
+  var opts = mesPedidoOpcionesTapas(actual).map(function(k) {
+    return '<option value="' + k + '"' + (k === actual ? ' selected' : '') + '>' + mesKeyLargoTapas(k) + (k === mesActualTapas() ? ' (actual)' : '') + '</option>';
+  }).join('');
+  return '<div class="dc"><div class="dc-b" style="font-size:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    + '<span>📅 <b>Mes del pedido</b> (a qué mes se le cuenta; sirve para programar el próximo o pasar una ficha incompleta al siguiente):</span>'
+    + '<select class="fs" style="width:auto;padding:3px 8px" onchange="cambiarMesFichaTapas(\'' + idq + '\', this.value)">' + opts + '</select></div></div>';
+}
+async function cambiarMesFichaTapas(id, mes) {
+  var s = solicitudes.find(function(x) { return x.id === id; });
+  if (!s || !/^\d{4}-\d{2}$/.test(mes)) return;
+  var valor = periodoEfectivoAGuardar(mes, mesCreacionFichaTapas(s));
+  var r = await db.from('solicitudes').update({ periodo_efectivo: valor }).eq('id', s.dbId).select('id');
+  if (r.error || !(r.data || []).length) { showToast('❌ No se pudo cambiar el mes' + (r.error ? ': ' + r.error.message : ' (sin permiso)'), '#B83232'); return; }
+  s.periodoEfectivo = valor || '';
+  renderListas();
+  if (typeof renderFichasTapas === 'function') renderFichasTapas();
+  if (selId) mostrarDetalle(selId);
+  if (fichaModalId) mostrarDetalle(fichaModalId);
+  showToast('📅 ' + (s.id_display || 'Ficha') + ' pasó a ' + mesKeyLargoTapas(mes));
+}
+
+// ── Resumen de un mes: por cliente, sobre TODAS las fichas del mes (completadas, parciales y pendientes) ──
+function tierMesTapas(s) {
+  var ent = entregadoTotalFichaTapas(s), tot = s.cant || 0;
+  if (s.estado === 'lista' || (tot > 0 && ent >= tot)) return 2;
+  return ent > 0 ? 1 : 0;
+}
+function resumenMesTapas(key) {
+  var porCli = {}, tot = { n: 0, und: 0, ent: 0, listos: 0, parc: 0, pend: 0 };
+  solicitudes.forEach(function(s) {
+    if (periodoFichaTapas(s).key !== key) return;
+    var c = s.cliente || '—', und = s.cant || 0, ent = Math.min(entregadoTotalFichaTapas(s), und), t = tierMesTapas(s);
+    var g = porCli[c] = porCli[c] || { cli: c, n: 0, und: 0, ent: 0, listos: 0, parc: 0, pend: 0 };
+    [g, tot].forEach(function(o) {
+      o.n++; o.und += und; o.ent += ent;
+      if (t === 2) o.listos++; else if (t === 1) o.parc++; else o.pend++;
+    });
+  });
+  var filas = Object.keys(porCli).map(function(k) { return porCli[k]; }).sort(function(a, b) { return b.und - a.und; });
+  return { filas: filas, tot: tot };
+}
+function pctTapas(ent, und) { return und > 0 ? Math.round(ent / und * 100) : 0; }
+
+// ── Barra de meses sobre Fichas de Trabajo ──
+function setFichasMes(k) { fichasMes = k; renderFichasTapas(); }
+function fichaEnMesSel(x) {
+  if (fichasMes === 'todos') return true;
+  var sel = fichasMes || mesActualTapas();
+  if (periodoFichaTapas(x.s).key === sel) return true;
+  return sel === mesActualTapas() && x.completada; // las completadas recientes siguen a la vista unos días, sea cual sea su mes
+}
+function fichMesBarHtml(modelo) {
+  var sel = fichasMes || mesActualTapas(), hoy = mesActualTapas();
+  var meses = {}; meses[hoy] = { n: 0, saldo: 0 };
+  modelo.forEach(function(x) {
+    if (!((x.viva && x.saldo > 0) || x.sobre)) return;
+    var k = periodoFichaTapas(x.s).key;
+    var m = meses[k] = meses[k] || { n: 0, saldo: 0 };
+    m.n++; m.saldo += x.saldo;
+  });
+  var keys = Object.keys(meses).sort();
+  var chips = keys.map(function(k) {
+    return '<button class="cp-mes' + (k === sel ? ' act' : '') + (k > hoy ? ' fut' : '') + '" onclick="setFichasMes(\'' + k + '\')" title="' + escHtml(mesKeyLargoTapas(k)) + '">'
+      + mesKeyCortoTapas(k) + (k === hoy ? ' · actual' : (k > hoy ? ' · próximo' : '')) + '<i>' + meses[k].n + ' · ' + meses[k].saldo.toLocaleString() + ' und</i></button>';
+  }).join('') + '<button class="cp-mes' + (fichasMes === 'todos' ? ' act' : '') + '" onclick="setFichasMes(\'todos\')">Todos</button>';
+  var info = '';
+  if (fichasMes !== 'todos') {
+    var r = resumenMesTapas(sel).tot;
+    info = '<span class="cp-mes-info">' + mesKeyLargoTapas(sel) + ': <b>' + r.n + '</b> ficha' + (r.n !== 1 ? 's' : '') + ' · pedido <b>' + r.und.toLocaleString() + '</b> · entregado <b>'
+      + r.ent.toLocaleString() + '</b> (' + pctTapas(r.ent, r.und) + '%) · ✓ ' + r.listos + ' · ~ ' + r.parc + ' · ● ' + r.pend + '</span>';
+  }
+  return '<div class="cp-mes-bar">' + chips + '<button class="btn btn-g btn-xs" onclick="abrirCierreTapas(\'' + sel + '\')" title="Resumen del mes por cliente y meses ya cerrados">📊 Cierre de mes</button>' + info + '</div>';
+}
+
+// ── Ventana "Cierre de mes": resumen por cliente (en vivo o congelado) ──
+var cierreVerKey = '';
+function abrirCierreTapas(key) {
+  cierreVerKey = (key && key !== 'todos') ? key : mesActualTapas();
+  pintarCierreTapas();
+  document.getElementById('modalCierreTapas').classList.add('open');
+}
+function cerrarCierreTapas() { document.getElementById('modalCierreTapas').classList.remove('open'); }
+function cierreTapasElegir(k) { cierreVerKey = k; pintarCierreTapas(); }
+function pintarCierreTapas() {
+  var keys = {};
+  keys[mesActualTapas()] = 1;
+  solicitudes.forEach(function(s) { keys[periodoFichaTapas(s).key] = 1; });
+  Object.keys(cierresTapas).forEach(function(c) { keys[cierresTapas[c].periodo_key] = 1; });
+  var lista = Object.keys(keys).filter(function(k) { return k !== '0000-00'; }).sort().reverse();
+  var cerrado = lista.filter(function(k) { return Object.keys(cierresTapas).some(function(c) { return cierresTapas[c].periodo_key === k; }); });
+  var chips = lista.map(function(k) {
+    return '<button class="cp-mes' + (k === cierreVerKey ? ' act' : '') + '" onclick="cierreTapasElegir(\'' + k + '\')">' + mesKeyCortoTapas(k) + (cerrado.indexOf(k) >= 0 ? ' 🔒' : '') + '</button>';
+  }).join('');
+  var cuerpo;
+  var snaps = Object.keys(cierresTapas).map(function(c) { return cierresTapas[c]; }).filter(function(r) { return r.periodo_key === cierreVerKey; });
+  if (snaps.length) {
+    // mes CERRADO: cifras congeladas al momento del cierre
+    var tot = { n: 0, und: 0, ent: 0, l: 0, p: 0, r: 0 };
+    var filas = snaps.sort(function(a, b) { return b.und_total - a.und_total; }).map(function(r) {
+      var ent = (r.und_verde || 0) + (r.und_ambar_ent || 0);
+      tot.n += r.n_total; tot.und += r.und_total; tot.ent += ent; tot.l += r.n_listos; tot.p += r.n_parciales; tot.r += r.n_pendientes;
+      return cierreFilaHtml(r.cliente, r.n_total, r.und_total, ent, r.pct_entregado, r.n_listos, r.n_parciales, r.n_pendientes);
+    }).join('');
+    var fc = snaps[0].fecha_cierre ? fmtFechaLetras(String(snaps[0].fecha_cierre).slice(0, 10)) : '';
+    cuerpo = '<div class="cp-mes-nota">🔒 Mes CERRADO el ' + escHtml(fc) + ' · cifras congeladas (no cambian aunque las fichas sigan avanzando). Las fichas que quedaron incompletas pasaron al mes siguiente.</div>'
+      + cierreTablaHtml(filas, cierreFilaHtml('TOTAL', tot.n, tot.und, tot.ent, pctTapas(tot.ent, tot.und), tot.l, tot.p, tot.r, true));
+  } else {
+    var r = resumenMesTapas(cierreVerKey);
+    var filas2 = r.filas.map(function(g) { return cierreFilaHtml(g.cli, g.n, g.und, g.ent, pctTapas(g.ent, g.und), g.listos, g.parc, g.pend); }).join('');
+    var esFut = cierreVerKey > mesActualTapas();
+    cuerpo = '<div class="cp-mes-nota">' + (esFut ? '📅 Mes PRÓXIMO: fichas programadas.' : '⏳ Mes en curso: cifras EN VIVO. Se cierra solo al empezar el mes siguiente: se congela este resumen y las fichas incompletas pasan al nuevo mes.') + '</div>'
+      + (r.filas.length ? cierreTablaHtml(filas2, cierreFilaHtml('TOTAL', r.tot.n, r.tot.und, r.tot.ent, pctTapas(r.tot.ent, r.tot.und), r.tot.listos, r.tot.parc, r.tot.pend, true))
+                        : '<div class="empty" style="padding:20px;text-align:center;color:var(--gray)">Sin fichas en este mes</div>');
+  }
+  document.getElementById('cierreTitulo').textContent = '📊 Cierre de mes · ' + mesKeyLargoTapas(cierreVerKey);
+  document.getElementById('cierreCuerpo').innerHTML = '<div class="cp-mes-bar" style="margin-bottom:10px">' + chips + '</div>' + cuerpo;
+}
+function cierreFilaHtml(cli, n, und, ent, pct, l, p, r, total) {
+  return '<tr' + (total ? ' style="font-weight:800;background:var(--teal-xl)"' : '') + '><td>' + escHtml(cli) + '</td><td class="num">' + n + '</td><td class="num">' + (und || 0).toLocaleString() + '</td><td class="num">'
+    + (ent || 0).toLocaleString() + '</td><td class="num"><b>' + pct + '%</b></td><td class="num">' + l + '</td><td class="num">' + p + '</td><td class="num">' + r + '</td></tr>';
+}
+function cierreTablaHtml(filas, filaTotal) {
+  return '<div style="overflow-x:auto"><table class="dt cierre-t"><thead><tr><th>Cliente</th><th class="num">Fichas</th><th class="num">Pedido</th><th class="num">Entregado</th><th class="num">%</th><th class="num" title="Completas">✓</th><th class="num" title="Parciales">~</th><th class="num" title="Sin entregas">●</th></tr></thead><tbody>'
+    + filas + filaTotal + '</tbody></table></div>';
+}
+
+// ── Cierre AUTOMÁTICO al entrar un mes nuevo (solo master; mismo criterio que Serigrafía) ──
+async function cargarCierresTapas() {
+  try {
+    var r = await db.from('periodo_cierres').select('*').eq('area', 'tapas');
+    if (r.error) throw r.error;
+    cierresTapas = {};
+    (r.data || []).forEach(function(row) { cierresTapas[row.cliente + '§' + row.periodo_key] = row; });
+    cierresTapasOk = true;
+  } catch (e) { console.warn('periodo_cierres:', e); }
+}
+async function verificarCierresTapas() {
+  if (cierreTapasEnProceso || typeof TETRA === 'undefined' || TETRA.rol !== 'master') return;
+  await cargarCierresTapas();
+  if (!cierresTapasOk) return;
+  var perHoy = mesActualTapas(), grupos = {};
+  solicitudes.forEach(function(s) {
+    var key = periodoFichaTapas(s).key;
+    if (key >= perHoy || key === '0000-00') return;               // solo meses ya vencidos
+    var cli = s.cliente || '(Sin cliente)', gk = cli + '§' + key;
+    if (cierresTapas[gk]) return;                                   // ya cerrado
+    (grupos[gk] = grupos[gk] || { cli: cli, key: key, items: [] }).items.push(s);
+  });
+  var keys = Object.keys(grupos);
+  if (!keys.length) return;
+  cierreTapasEnProceso = true;
+  var cerrados = {}, movidas = 0;
+  try {
+    for (var i = 0; i < keys.length; i++) {
+      var g = grupos[keys[i]], und = 0, ent = 0, nL = 0, nP = 0, nR = 0, uV = 0, uA = 0, uR = 0, uAE = 0, snap = [], pend = [];
+      g.items.forEach(function(s) {
+        var c = s.cant || 0, e = Math.min(entregadoTotalFichaTapas(s), c), t = tierMesTapas(s);
+        und += c; ent += e;
+        if (t === 2) { nL++; uV += c; } else if (t === 1) { nP++; uA += c; uAE += e; snap.push({ codigo: s.id_display, cliente: s.cliente || '—', cant: c, ent: e }); } else { nR++; uR += c; }
+        if (fichaViva(s) && !fichaYaEntregadaTapas(s)) pend.push(s.dbId); // lo no completado pasa al mes en curso
+      });
+      if (pend.length) {
+        var ru = await db.from('solicitudes').update({ periodo_efectivo: perHoy }).in('id', pend);
+        if (ru.error) throw ru.error;
+        movidas += pend.length;
+      }
+      var rc = await db.from('periodo_cierres').insert({
+        cliente: g.cli, periodo_key: g.key, periodo_label: mesKeyLargoTapas(g.key), pct_entregado: pctTapas(ent, und), n_total: g.items.length,
+        n_listos: nL, n_parciales: nP, n_pendientes: nR, und_total: und, und_verde: uV, und_ambar: uA, und_rojo: uR, und_ambar_ent: uAE,
+        parciales_snap: snap, area: 'tapas'
+      }).select().single();
+      if (rc.error) throw rc.error;
+      cierresTapas[keys[i]] = rc.data;
+      cerrados[g.key] = true;
+    }
+  } catch (e) {
+    console.error('Error al cerrar el mes de Tapas:', e);
+    showToast('⚠️ No se pudo completar el cierre de mes: ' + (e.message || e), '#B83232');
+  } finally {
+    cierreTapasEnProceso = false;
+  }
+  var meses = Object.keys(cerrados).sort().map(mesKeyLargoTapas);
+  if (meses.length) {
+    await cargarSolicitudes();
+    showToast('📁 Cierre guardado: ' + meses.join(', ') + (movidas ? ' · ' + movidas + ' ficha' + (movidas !== 1 ? 's' : '') + ' pasaron a ' + mesKeyLargoTapas(perHoy) : ''), '#1A6B5B');
+  }
+}
+
 // Fecha límite de entrega: en rojo si ya venció y la ficha sigue viva, en ámbar si vence en ≤2 días
 function limiteFichaTapas(s) {
   var tp = s.plazoTipo || 'fecha';
@@ -5790,13 +6067,14 @@ function renderFichasCompactasTapas() {
   var busEnfocado = !!(ae && ae.id === 'fichBuscar');
   var busCursor = busEnfocado ? ae.selectionStart : 0;
   var modelo = modeloFichasCompactas();
-  var vivas = modelo.filter(function(x) { return x.viva && x.saldo > 0; });
+  var vivasTodas = modelo.filter(function(x) { return x.viva && x.saldo > 0; }); // sin filtrar por mes: el bloque "En proceso" y la barra de meses las usan
+  var vivas = vivasTodas.filter(fichaEnMesSel);
   // Las COMPLETADAS por Tapas se muestran también (al final y transparentes) pero no cuentan como saldo por entregar
-  var visibles = modelo.filter(function(x) { return (x.viva && x.saldo > 0) || x.sobre || x.completada; });
+  var visibles = modelo.filter(function(x) { return (x.viva && x.saldo > 0) || x.sobre || x.completada; }).filter(fichaEnMesSel);
   var saldoVivo = function(x) { return x.completada ? 0 : x.saldo; };
 
   var proc = [];
-  vivas.forEach(function(x) { x.abiertos.forEach(function(l) { proc.push({ x: x, l: l }); }); });
+  vivasTodas.forEach(function(x) { x.abiertos.forEach(function(l) { proc.push({ x: x, l: l }); }); });
   var htmlProc = proc.length ? '<div class="cp-proc">' + proc.map(function(p) {
     var pct = Math.min(100, Math.round(p.l.hecho / p.l.cantidad * 100));
     return '<div class="cp-pc" onclick="abrirFichaTapas(\'' + escHtml(String(p.x.id)) + '\')">'
@@ -5897,6 +6175,7 @@ function renderFichasCompactasTapas() {
     +   '<button class="' + (fichasAgrupar === 'prioridad' ? 'act' : '') + '" onclick="setFichasAgrupar(\'prioridad\')">Por prioridad</button></span>'
     +   '<button class="btn btn-t btn-sm" onclick="abrirForm()">+ Nueva Solicitud</button></div>'
     + '<div class="fich-body">'
+    + fichMesBarHtml(modelo)
     + (proc.length ? '<div class="cp-sec clic' + cpCol('proc') + '"' + cpClic('proc') + '><span class="cp-chev">▾</span>🔵 En proceso <i>(' + proc.length + ' lote' + (proc.length !== 1 ? 's' : '') + ')</i></div>' + htmlProc.replace('class="cp-proc"', 'class="cp-proc' + cpCol('proc') + '"') : '')
     + cuerpo
     + '</div></div>';
@@ -7110,6 +7389,7 @@ async function init() {
   await cargarMovimientos(); // alimenta el bloque "Entregados" del Inicio
   await refrescarVentasFact(); // facturación de lo entregado (cruce con ventas)
   await cargarRechazos();
+  verificarCierresTapas(); // cierre automático del mes vencido (solo master; no bloquea el arranque)
 
   // Poblar select de operadores en modal rechazo
   poblarSelectOperadoresRechazo();
