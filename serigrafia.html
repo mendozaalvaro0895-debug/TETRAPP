@@ -503,6 +503,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .asist-grid-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px}
 .asist-grid-hdr{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .asist-grid-scroll{overflow-x:auto;scrollbar-width:thin}
+.asist-grid-tit{cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--ink)}
+.asist-grid-tit .chev{display:inline-block;width:14px;text-align:center;font-size:11px;color:var(--serig-m);transition:transform .15s}
+.asist-grid-wrap.plegado .chev{transform:rotate(-90deg)}
+.asist-grid-wrap.plegado .asist-grid-hdr{border-bottom:0}
+.asist-grid-wrap.plegado .asist-grid-scroll,.asist-grid-wrap.plegado .asist-grid-leyenda{display:none}
 .asist-grid-table{border-collapse:collapse;width:max-content;min-width:100%}
 .ag-th{position:sticky;top:0;background:var(--card);z-index:2;padding:4px 2px;text-align:center;font-size:9px;font-weight:700;color:var(--gray-l);border-bottom:1.5px solid var(--border);min-width:26px;width:26px}
 .ag-th.hoy{color:var(--serig-m);font-weight:900}
@@ -4912,6 +4917,16 @@ async function toggleFeriado(fecha) {
   renderAsistGrid();
 }
 
+// Asistencia Mensual desplegable: el estado (plegada/abierta) se recuerda en este equipo
+function asistPlegada() {
+  try { return localStorage.getItem('serig_asist_plegada') === '1'; } catch (e) { return false; }
+}
+function toggleAsistPlegada() {
+  var nuevo = !asistPlegada();
+  try { localStorage.setItem('serig_asist_plegada', nuevo ? '1' : '0'); } catch (e) {}
+  document.querySelectorAll('.asist-grid-wrap').forEach(function(w) { w.classList.toggle('plegado', nuevo); });
+}
+
 async function renderAsistGrid() {
   var _agTargets = ['asistGrid', 'personalAsist'].map(function(id){ return document.getElementById(id); }).filter(Boolean);
   if (!_agTargets.length) return;
@@ -5060,9 +5075,9 @@ async function renderAsistGrid() {
   var _lockTxt = asistLocked ? '🔒 Bloqueada' : '🔓 Editable';
   var _lockClr = asistLocked ? '' : ';color:var(--serig-m);border-color:var(--serig-m)';
   var _agHtml =
-    '<div class="asist-grid-wrap">' +
+    '<div class="asist-grid-wrap' + (asistPlegada() ? ' plegado' : '') + '">' +
       '<div class="asist-grid-hdr">' +
-        '<span style="font-size:12px;font-weight:800;color:var(--ink)">📋 Asistencia Mensual</span>' +
+        '<span class="asist-grid-tit" onclick="toggleAsistPlegada()" title="Mostrar / ocultar la tabla de asistencia"><span class="chev">▾</span>📋 Asistencia Mensual</span>' +
         '<div style="display:flex;align-items:center;gap:8px">' +
           '<span style="font-size:11px;font-weight:600;color:var(--text);text-transform:capitalize;min-width:130px;text-align:center">' + mesNombre + '</span>' +
           '<div style="display:flex;flex-direction:column;gap:4px;align-items:stretch">' +
@@ -5077,7 +5092,7 @@ async function renderAsistGrid() {
           '<th class="ag-th ag-th-name">Operador</th>' + thDays +
         '</tr></thead><tbody>' + tableRows + '</tbody></table>' +
       '</div>' +
-      '<div style="display:flex;gap:14px;padding:6px 14px;border-top:1px solid var(--border);flex-wrap:wrap">' +
+      '<div class="asist-grid-leyenda" style="display:flex;gap:14px;padding:6px 14px;border-top:1px solid var(--border);flex-wrap:wrap">' +
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#dcfce7;border:1px solid #86efac"></span>Presente</span>' +
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#fee2e2;border:1px solid #fca5a5"></span>Ausente (✗)</span>' +
         '<span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray)"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:#fef3c7;border:1px solid #fde68a"></span>Tarde (!)</span>' +
