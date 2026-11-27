@@ -552,6 +552,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-chip.completada.open .cp-mini-x{display:block;margin-top:4px}
 /* Ficha ABIERTA a la que ya se le entregó todo lo pedido (o más): no se oculta; se ve transparente y ámbar al final de su grupo, para decidir si se marca completada o se amplía la cantidad */
 /* SOMBRA de una ficha URGENTE (nov/2026): la ficha real está en el bloque "🔴 Urgentes"; en su tipo / cliente / "Demás pedidos" queda este rastro transparente */
+/* Bloque Urgentes agrupado por cliente (nov/2026): una franja de encabezado por cliente que ocupa toda la fila de la grilla */
+.cp-urg-cli{grid-column:1/-1;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#B83232;border-bottom:1px solid #FCA5A5;padding:6px 2px 2px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.cp-urg-cli:first-child{padding-top:0}
+.cp-urg-cli i{font-style:normal;font-weight:600;color:var(--gray);letter-spacing:0;text-transform:none;font-size:10px}
 .cp-chip.sombra{background:transparent;border:1.5px dashed #FCA5A5;box-shadow:none;opacity:.6;padding:3px 7px;line-height:1.25;cursor:pointer;transition:opacity .15s}
 .cp-chip.sombra:hover{opacity:1}
 .cp-chip.sombra .cp-sombra-tag{display:block;font-size:9px;font-weight:800;letter-spacing:.3px;color:#B83232;margin-top:1px}
@@ -6139,11 +6143,22 @@ function renderFichasCompactasTapas() {
   // Las urgentes NO desaparecen de su tipo / cliente: ahí queda su SOMBRA (al final del grupo, no suma al saldo del grupo)
   var agruparSombra = function(arr) { return { reales: arr.filter(noUrg).sort(ordenChipsCompactos), sombras: arr.filter(esUrgTop).sort(ordenChipsCompactos) }; };
   var pintarGrupo = function(g, conCli) { return g.reales.map(function(x) { return buildChipCompacto(x, conCli); }).concat(g.sombras.map(function(x) { return chipSombraUrgTapas(x, conCli); })).join(''); };
+  // Las urgentes se muestran AGRUPADAS POR CLIENTE (A→Z): una franja con el cliente, sus pedidos y su saldo, y debajo sus fichas
+  var urgPorCliente = function(items) {
+    var por = {}, cls = [];
+    items.forEach(function(x) { if (!por[x.cliente]) { por[x.cliente] = []; cls.push(x.cliente); } por[x.cliente].push(x); });
+    cls.sort(function(a, b) { return a.localeCompare(b); });
+    return cls.map(function(c) {
+      var arr = por[c];
+      return '<div class="cp-urg-cli">' + escHtml(c) + '<i>' + arr.length + ' pedido' + (arr.length !== 1 ? 's' : '') + ' · por entregar <b>' + arr.reduce(function(a, x) { return a + saldoVivo(x); }, 0).toLocaleString() + '</b> und</i></div>'
+        + arr.map(function(x) { return buildChipCompacto(x, false); }).join('');
+    }).join('');
+  };
   var bloqueUrgTop = function() {
     if (!urgTop.length) return '';
     return '<div class="cp-tipo' + cpCol('prio:🔴 Urgentes') + '"><div class="cp-tipo-h urg"' + cpClic('prio:🔴 Urgentes') + '><span class="cp-chev">▾</span><span class="cp-tipo-n">🔴 Urgentes</span>'
       + '<span class="cp-tipo-s">' + urgTop.length + ' pedido' + (urgTop.length !== 1 ? 's' : '') + ' · por entregar <b>' + urgTop.reduce(function(a, x) { return a + saldoVivo(x); }, 0).toLocaleString() + '</b> und</span></div>'
-      + '<div class="cp-tipo-c">' + urgTop.map(function(x) { return buildChipCompacto(x, true); }).join('') + '</div></div>';
+      + '<div class="cp-tipo-c">' + urgPorCliente(urgTop) + '</div></div>';
   };
   var notaUrgArriba = function(n) { return n ? ' · <span style="color:#B83232;font-weight:800">🔴 ' + n + ' urgente' + (n !== 1 ? 's' : '') + ' arriba</span>' : ''; };
 
@@ -6181,7 +6196,7 @@ function renderFichasCompactasTapas() {
     var bloque = function(titulo, items, cls, sombras) {
       return '<div class="cp-tipo' + cpCol('prio:' + titulo) + '"><div class="cp-tipo-h' + (cls || '') + '"' + cpClic('prio:' + titulo) + '><span class="cp-chev">▾</span><span class="cp-tipo-n">' + titulo + '</span>'
         + '<span class="cp-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + items.reduce(function(a, x) { return a + saldoVivo(x); }, 0).toLocaleString() + '</b> und</span></div>'
-        + '<div class="cp-tipo-c">' + items.map(function(x) { return buildChipCompacto(x, true); }).concat((sombras || []).map(function(x) { return chipSombraUrgTapas(x, true); })).join('') + '</div></div>';
+        + '<div class="cp-tipo-c">' + (cls === ' urg' ? [urgPorCliente(items)] : items.map(function(x) { return buildChipCompacto(x, true); })).concat((sombras || []).map(function(x) { return chipSombraUrgTapas(x, true); })).join('') + '</div></div>';
     };
     var esUrg = function(x) { return x.s.prio === 'urgente'; };
     if (!visibles.length) cuerpo = '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>';
