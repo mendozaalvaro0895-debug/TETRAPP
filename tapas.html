@@ -8939,7 +8939,7 @@ async function renderProdMensualTapas(inst) {
     if (esHoy) bStyle += ';outline:1px dashed var(--teal);outline-offset:1px;border-radius:3px 3px 0 0';
     var tip = !esFuturo && val ? ' title="' + f + ': ' + val.toLocaleString() + ' und"' : '';
     var clickProd = (!esFuturo && val) ? ' onclick="verDetalleProdDiaTapas(\'' + f + '\',event)"' : '';
-    var colStyle = 'flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end'
+    var colStyle = 'flex:1 0 20px;min-width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end'
       + (!esFuturo && val ? ';cursor:pointer' : '') + (esDom ? ';background:rgba(0,0,0,.04);border-radius:3px' : '');
     var lblClr = esDom ? 'var(--amber)' : 'var(--gray-l)';
     cols += '<div' + clickProd + ' style="' + colStyle + '"' + tip + '>'
@@ -8984,7 +8984,7 @@ async function renderProdMensualTapas(inst) {
       var px = val ? Math.max(Math.round((val / maxValC) * 160), 5) : 2;
       var bg = gray ? (val ? '#94a3b8' : 'var(--border)') : (val > 0 ? 'var(--teal)' : 'var(--border)');
       var clr2 = isDom ? 'var(--amber)' : (gray ? '#94a3b8' : 'var(--gray-l)');
-      return '<div style="flex:0 0 20px;width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end' + (isDom ? ';background:rgba(0,0,0,.04);border-radius:3px' : '') + '">'
+      return '<div style="flex:1 0 20px;min-width:20px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end' + (isDom ? ';background:rgba(0,0,0,.04);border-radius:3px' : '') + '">'
         + '<div style="width:100%;height:' + px + 'px;background:' + bg + ';border-radius:3px 3px 0 0;opacity:' + (isDom ? '.5' : gray ? '.85' : '1') + '"></div>'
         + '<div style="height:26px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:2px">'
         +   '<div style="font-size:7px;line-height:1.25;color:' + clr2 + '">' + dd2 + '</div>'
@@ -9017,20 +9017,20 @@ async function renderProdMensualTapas(inst) {
     } else {
       chartHtml = rowLabel(prevLabel, totalPrev, promPrev, '#64748b')
         + '<div style="overflow-x:auto;scrollbar-width:thin;padding:0 14px 4px">'
-        +   '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:max-content">' + barsPrev + '</div>'
+        +   '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:100%;min-width:max-content">' + barsPrev + '</div>'
         + '</div>'
         + '<div style="margin:2px 14px 4px;border-top:2px solid var(--border)"></div>'
         + rowLabel(mesStr, totalMes, promDia, 'var(--teal)')
         + '<div style="overflow-x:auto;scrollbar-width:thin;padding:0 14px 4px">'
-        +   '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:max-content">' + barsAct + '</div>'
+        +   '<div style="display:flex;align-items:flex-end;gap:3px;height:182px;width:100%;min-width:max-content">' + barsAct + '</div>'
         + '</div>';
     }
   } else {
     if (st.vistaLinea) {
       chartHtml = '<div style="padding:8px 14px">' + _buildLineaAcumSvgTapas({ ym: selMes, dias: diasMes, porFecha: porFecha, todayStr: hoy, mesLabel: mesStr }) + '</div>';
     } else {
-      chartHtml = '<div style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px;max-width:715px">'
-        + '<div style="display:flex;align-items:flex-end;gap:3px;min-height:210px;width:max-content">' + cols + '</div>'
+      chartHtml = '<div style="overflow-x:auto;scrollbar-width:thin;padding:10px 14px 8px">'
+        + '<div style="display:flex;align-items:flex-end;gap:3px;min-height:210px;width:100%;min-width:max-content">' + cols + '</div>'
       + '</div>';
     }
   }
