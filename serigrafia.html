@@ -503,6 +503,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .asist-grid-wrap{background:var(--card);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px}
 .asist-grid-hdr{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .asist-grid-scroll{overflow-x:auto;scrollbar-width:thin}
+.sin-fantasma{margin-top:4px;padding:4px 9px;border:1.5px dashed #b6bfcc;border-radius:8px;background:rgba(226,232,240,.35);opacity:.6;filter:grayscale(.85);cursor:pointer;transition:opacity .15s}
+.sin-fantasma:hover{opacity:.95}
+.sf-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sf-cod{font-family:var(--mono);font-size:10px;font-weight:800;color:var(--gray)}
+.sf-tag{font-size:9px;font-weight:800;color:var(--serig-m);background:#fff;border:1px solid #CFC6E6;border-radius:10px;padding:1px 8px}
+.sf-cant{margin-left:auto;font-size:11px;font-weight:700;color:var(--gray);white-space:nowrap}
+.sf-d{margin-top:1px;font-size:10px;color:var(--gray);line-height:1.3}
 .asist-grid-tit{cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--ink)}
 .asist-grid-tit .chev{display:inline-block;width:14px;text-align:center;font-size:11px;color:var(--serig-m);transition:transform .15s}
 .asist-grid-wrap.plegado .chev{transform:rotate(-90deg)}
@@ -3345,6 +3352,12 @@ function boardBuildSinBlock(items, enLinea) {
             boardBuildCardSinRow(item, solEsc, cliEsc) +
           '</div>';
         }).join('');
+        // Referencia en gris de las fichas que ya están en una línea (siguen contando en el resumen)
+        if (!cerrado && grupo.extra && grupo.extra.length) {
+          cardsHtml += grupo.extra.slice().sort(function(a, b) {
+            return String(a.solCodigo || '').localeCompare(String(b.solCodigo || ''));
+          }).map(boardBuildCardFantasma).join('');
+        }
         // Colapsado: solo si el usuario lo colapsó a mano (lo guardado manda). Por defecto TODOS los
         // períodos van desplegados: así ninguna ficha completada queda escondida en un mes anterior.
         var gkEsc     = gk.replace(/'/g, "\\'");
@@ -3371,7 +3384,7 @@ function boardBuildSinBlock(items, enLinea) {
               '</div>' +
             '</div>' +
           '</div>' +
-          '<div class="sin-grupo-cards">' + (cardsHtml || (cerrado ? '<div class="sin-grupo-vacio">Todos los pedidos de este período se trasladaron al mes actual</div>' : (grupo.extra && grupo.extra.length ? '<div class="sin-grupo-vacio">Todos los pedidos de este período están en líneas de producción</div>' : ''))) + '</div>' +
+          '<div class="sin-grupo-cards">' + (cardsHtml || (cerrado ? '<div class="sin-grupo-vacio">Todos los pedidos de este período se trasladaron al mes actual</div>' : '')) + '</div>' +
         '</div>';
       });
 
@@ -3416,6 +3429,24 @@ function boardBuildSinBlock(items, enLinea) {
     '</div>' +
     '<div class="board-sin-cards" id="bc-0">' + gruposHtml + '</div>' +
     '</div>';
+}
+
+// Referencia GRIS y transparente de una ficha que ya está en una línea de producción: no se arrastra ni cambia
+// de estado aquí (se gestiona en el calendario); un clic abre su detalle.
+function boardBuildCardFantasma(item) {
+  var ent = entregadoDeFicha(item.solId);
+  var tot = item.cant || 0;
+  var lista = item.estado === 'lista';
+  var lineas = (item.lineasNom || []).join(', ');
+  var etiqueta = (lista ? '✓ Completada' : '▶ En proceso') + (lineas ? ' en ' + lineas : ' en línea');
+  var cant = (ent > 0 ? ent.toLocaleString() + ' / ' : '') + tot.toLocaleString() + ' und';
+  var desc = (item.sku ? item.sku + ' · ' : '') + (item.desc || '—');
+  return '<div class="sin-fantasma" onclick="mostrarDetalle(\'' + item.solId + '\')" title="Esta ficha ya está en el calendario de producción (' + escHtml(lineas) + '). Clic para ver el detalle.">' +
+    '<div class="sf-h"><span class="sf-cod">' + escHtml(item.solCodigo) + '</span>' +
+      '<span class="sf-tag">' + escHtml(etiqueta) + '</span>' +
+      '<span class="sf-cant">' + escHtml(cant) + '</span></div>' +
+    '<div class="sf-d">' + escHtml(desc) + '</div>' +
+  '</div>';
 }
 
 // Encabezado de una línea en la matriz semanal (nombre, pendientes y unidades)
@@ -3857,8 +3888,17 @@ function renderBoard() {
     if (ca > cb) return 1;
     return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
   });
-  var enLineaCont = [];
-  LINEAS_PRODUCCION.forEach(function(ln) { (lanes[ln.id] || []).forEach(function(it) { enLineaCont.push(it); }); });
+  var enLineaCont = [], enLineaPorSol = {};
+  LINEAS_PRODUCCION.forEach(function(ln) {
+    (lanes[ln.id] || []).forEach(function(it) {
+      // una ficha puede estar en varias líneas: se cuenta una sola vez y se anotan todas (para la referencia gris de Sin asignar)
+      var ya = enLineaPorSol[it.solId];
+      if (ya) { if (ya.lineasNom.indexOf(ln.nombre) < 0) ya.lineasNom.push(ln.nombre); return; }
+      var c = Object.assign({}, it, { lineasNom: [ln.nombre] });
+      enLineaPorSol[it.solId] = c;
+      enLineaCont.push(c);
+    });
+  });
   contSin.innerHTML = boardBuildSinBlock(lanes[0].concat(sinExtra), enLineaCont);
   var _scTop = contLines.scrollTop, _scLeft = contLines.scrollLeft;
   contLines.innerHTML = boardBuildMatriz(lanes);
