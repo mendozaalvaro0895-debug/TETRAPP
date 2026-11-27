@@ -7185,6 +7185,14 @@ function buildProduccionHtml(manuales) {
       return '<div class="prod-empty">No hay entregados registrados aún</div>';
     }
 
+    // Orden por FECHA de la requi (más reciente primero); a igual fecha, la última registrada primero
+    // (la lista ya viene en orden de registro descendente). No altera entregasCache.
+    manuales = manuales.map(function(m, i) { return { m: m, i: i }; }).sort(function(a, b) {
+      var fa = a.m.fecha || '', fb = b.m.fecha || '';
+      if (fa !== fb) return fa < fb ? 1 : -1;
+      return a.i - b.i;
+    }).map(function(x) { return x.m; });
+
     // Filas manuales — UNA fila por producto, agrupadas por requi con color alternado
     var rowsManuales = manuales.map(function(m, grpIdx) {
       var lineas = (m.lineas && m.lineas.length) ? m.lineas : [{ cliente: m.cliente || '', desc: m.desc || '—', cant: m.cant || 0, sku: m.sku || '', solId: m.solId || '', solCodigo: m.solCodigo || '' }];
