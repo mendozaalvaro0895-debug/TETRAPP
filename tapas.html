@@ -2499,6 +2499,8 @@ function aplicarCodigoCliente(renderizar) {
 }
 
 function clienteCambiadoForm() {
+  if (document.getElementById('fCli').value === '__nuevo__') { if (!pedirClienteNuevoForm()) return; }
+  else cliFormPrevio = document.getElementById('fCli').value;
   autorrellenarDesdeFichas(true);
   aplicarCodigoCliente(true);
 }
@@ -2730,8 +2732,29 @@ function poblarClientesTapas(seleccionado) {
   var actual = seleccionado !== undefined ? seleccionado : sel.value;
   sel.innerHTML = '<option value="">— Selecciona cliente —</option>' + lista.map(function(c) {
     return '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>';
-  }).join('');
+  }).join('') + '<option value="__nuevo__">➕ Cliente nuevo (primera compra)…</option>';
   sel.value = actual || '';
+  cliFormPrevio = sel.value;
+}
+
+// Cliente que no está en la lista (primera compra): la última opción del desplegable pide el nombre, lo deja elegido y, al guardar la ficha, ya
+// cuenta como cliente (la lista se arma con los clientes de las fichas existentes). Escribirlo igual que sale en la factura (así cruza con ventas).
+var cliFormPrevio = '';
+function pedirClienteNuevoForm() {
+  var sel = document.getElementById('fCli');
+  var n = prompt('Nombre del cliente nuevo (primera compra). Escríbelo igual que saldrá en la factura:');
+  n = String(n || '').replace(/\s+/g, ' ').trim().toUpperCase();
+  if (!n) { sel.value = cliFormPrevio; return false; }
+  var ya = Array.prototype.filter.call(sel.options, function(o) { return o.value && o.value !== '__nuevo__' && o.value.toUpperCase() === n; })[0];
+  if (ya) { sel.value = ya.value; showToast('Ese cliente ya estaba en la lista: ' + ya.value); }
+  else {
+    var op = document.createElement('option');
+    op.value = n; op.textContent = n;
+    sel.insertBefore(op, sel.querySelector('option[value="__nuevo__"]'));
+    sel.value = n;
+  }
+  cliFormPrevio = sel.value;
+  return true;
 }
 
 var editandoFichaId = null; // id de la ficha que se está editando (null = solicitud nueva)
