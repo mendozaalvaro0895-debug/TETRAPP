@@ -551,6 +551,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:10
 .cp-mini-x{display:none}
 .cp-chip.completada.open .cp-mini-x{display:block;margin-top:4px}
 /* Ficha ABIERTA a la que ya se le entregó todo lo pedido (o más): no se oculta; se ve transparente y ámbar al final de su grupo, para decidir si se marca completada o se amplía la cantidad */
+/* SOMBRA de una ficha URGENTE (nov/2026): la ficha real está en el bloque "🔴 Urgentes"; en su tipo / cliente / "Demás pedidos" queda este rastro transparente */
+.cp-chip.sombra{background:transparent;border:1.5px dashed #FCA5A5;box-shadow:none;opacity:.6;padding:3px 7px;line-height:1.25;cursor:pointer;transition:opacity .15s}
+.cp-chip.sombra:hover{opacity:1}
+.cp-chip.sombra .cp-sombra-tag{display:block;font-size:9px;font-weight:800;letter-spacing:.3px;color:#B83232;margin-top:1px}
 .cp-chip.sobre{background:#FFFBEB;border-color:#F59E0B;box-shadow:inset 3px 0 0 #F59E0B;opacity:.62;transition:opacity .15s}
 .cp-chip.sobre:hover,.cp-chip.sobre.open{opacity:1}
 .cp-sobre-tag{display:block;font-size:9.5px;font-weight:800;letter-spacing:.3px;color:#92400E;margin-bottom:2px}
@@ -5805,6 +5809,18 @@ function chipCompletadoTapas(x, conCliente) {
     + '</div>';
 }
 
+// SOMBRA de una ficha urgente: transparente, borde punteado y la nota "En URGENTES" (la ficha completa está en el bloque rojo de arriba)
+function chipSombraUrgTapas(x, conCliente) {
+  var idq = escHtml(String(x.id));
+  return '<div class="cp-chip sombra" onclick="abrirFichaTapas(\'' + idq + '\')" title="Esta ficha es URGENTE: se atiende en el bloque rojo de arriba. Clic para abrirla">'
+    + '<div class="cp-mini-1"><span class="ck">🔴</span><span class="cod">' + escHtml(x.codigo) + '</span>'
+    +   (conCliente ? '<span class="cli">' + escHtml(x.cliente) + '</span>' : '')
+    +   '<span class="rat" title="Saldo por entregar">' + x.saldo.toLocaleString() + '</span></div>'
+    + '<div class="cp-mini-2"><b>' + escHtml(x.sku || 'sin SKU') + '</b>' + escHtml(x.descSola) + '</div>'
+    + '<span class="cp-sombra-tag">🔴 En URGENTES</span>'
+    + '</div>';
+}
+
 // Ficha abierta con todo lo pedido ya entregado (con requi): sigue visible, transparente y ámbar
 function chipSobreentregadoTapas(x, conCliente) {
   var idq = escHtml(String(x.id));
@@ -6120,6 +6136,9 @@ function renderFichasCompactasTapas() {
   var esUrgTop = function(x) { return x.s.prio === 'urgente' && !x.completada && !x.sobre; };
   var noUrg = function(x) { return !esUrgTop(x); };
   var urgTop = visibles.filter(esUrgTop).sort(ordenChipsCompactos);
+  // Las urgentes NO desaparecen de su tipo / cliente: ahí queda su SOMBRA (al final del grupo, no suma al saldo del grupo)
+  var agruparSombra = function(arr) { return { reales: arr.filter(noUrg).sort(ordenChipsCompactos), sombras: arr.filter(esUrgTop).sort(ordenChipsCompactos) }; };
+  var pintarGrupo = function(g, conCli) { return g.reales.map(function(x) { return buildChipCompacto(x, conCli); }).concat(g.sombras.map(function(x) { return chipSombraUrgTapas(x, conCli); })).join(''); };
   var bloqueUrgTop = function() {
     if (!urgTop.length) return '';
     return '<div class="cp-tipo' + cpCol('prio:🔴 Urgentes') + '"><div class="cp-tipo-h urg"' + cpClic('prio:🔴 Urgentes') + '><span class="cp-chev">▾</span><span class="cp-tipo-n">🔴 Urgentes</span>'
@@ -6146,12 +6165,12 @@ function renderFichasCompactasTapas() {
         + '<b>' + saldoDe(t).toLocaleString() + '</b><span>' + escHtml(t) + '</span><i>' + porTipo[t].length + ' pedido' + (porTipo[t].length !== 1 ? 's' : '') + '</i></div>';
     }).join('');
     var secciones = tipos.map(function(t) {
-      var items = porTipo[t].filter(noUrg).sort(ordenChipsCompactos);
-      if (!items.length) return '';
+      var g = agruparSombra(porTipo[t]), items = g.reales;
+      if (!items.length && !g.sombras.length) return '';
       var saldoSec = items.reduce(function(a, x) { return a + saldoVivo(x); }, 0);
       return '<div class="cp-tipo' + cpCol('tipo:' + t) + '" id="cptipo-' + escHtml(t.replace(/[^A-Za-z0-9]/g, '_')) + '"><div class="cp-tipo-h"' + cpClic('tipo:' + t) + '><span class="cp-chev">▾</span><span class="cp-tipo-n">' + escHtml(t) + '</span>'
         + '<span class="cp-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + saldoSec.toLocaleString() + '</b> und' + notaUrgArriba(porTipo[t].length - items.length) + '</span></div>'
-        + '<div class="cp-tipo-c">' + items.map(function(x) { return buildChipCompacto(x, true); }).join('') + '</div></div>';
+        + '<div class="cp-tipo-c">' + pintarGrupo(g, true) + '</div></div>';
     }).join('');
     cuerpo = tipos.length
       ? bloqueUrgTop() + '<div class="cp-sec">Por entregar según el tipo de tapa <i>clic en un total para ir a su grupo</i></div><div class="cp-resumen">' + resumen + '</div>' + secciones
@@ -6159,10 +6178,10 @@ function renderFichasCompactasTapas() {
   } else if (fichasAgrupar === 'prioridad') {
     // Por PRIORIDAD: primero los URGENTES y luego los demás, cada grupo ordenado por fecha límite
     var porFecha = ordenChipsCompactos; // dentro de cada bloque: las que más falta fabricar primero y las cubiertas por stock al final
-    var bloque = function(titulo, items, cls) {
+    var bloque = function(titulo, items, cls, sombras) {
       return '<div class="cp-tipo' + cpCol('prio:' + titulo) + '"><div class="cp-tipo-h' + (cls || '') + '"' + cpClic('prio:' + titulo) + '><span class="cp-chev">▾</span><span class="cp-tipo-n">' + titulo + '</span>'
         + '<span class="cp-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · por entregar <b>' + items.reduce(function(a, x) { return a + saldoVivo(x); }, 0).toLocaleString() + '</b> und</span></div>'
-        + '<div class="cp-tipo-c">' + items.map(function(x) { return buildChipCompacto(x, true); }).join('') + '</div></div>';
+        + '<div class="cp-tipo-c">' + items.map(function(x) { return buildChipCompacto(x, true); }).concat((sombras || []).map(function(x) { return chipSombraUrgTapas(x, true); })).join('') + '</div></div>';
     };
     var esUrg = function(x) { return x.s.prio === 'urgente'; };
     if (!visibles.length) cuerpo = '<div class="empty" style="padding:24px;text-align:center;color:var(--gray)">📭 No hay pedidos con saldo pendiente</div>';
@@ -6170,18 +6189,18 @@ function renderFichasCompactasTapas() {
       var urg = visibles.filter(function(x) { return esUrg(x) && !x.completada && !x.sobre; }).sort(porFecha);
       var resto = visibles.filter(function(x) { return !esUrg(x) || x.completada || x.sobre; }).sort(porFecha);
       cuerpo = (urg.length ? bloque('🔴 Urgentes', urg, ' urg') : '<div class="empty" style="padding:16px;text-align:center;color:var(--gray)">No hay pedidos urgentes</div>')
-        + (resto.length ? bloque('Demás pedidos', resto, '') : '');
+        + ((resto.length || urg.length) ? bloque('Demás pedidos', resto, '', urg) : '');
     }
   } else {
     var filas = clis.map(function(c) {
-      var items = porCli[c].filter(noUrg).sort(ordenChipsCompactos);
-      if (!items.length) return '';
+      var g = agruparSombra(porCli[c]), items = g.reales;
+      if (!items.length && !g.sombras.length) return '';
       var saldoTot = items.reduce(function(a, x) { return a + saldoVivo(x); }, 0);
       var urg = porCli[c].length - items.length; // sus urgentes están en el bloque de arriba
       return '<div class="cp-tipo' + cpCol('cli:' + c) + '"><div class="cp-tipo-h"' + cpClic('cli:' + c) + '><span class="cp-chev">▾</span><span class="cp-tipo-n">' + escHtml(c) + '</span>'
         + '<span class="cp-tipo-s">' + items.length + ' pedido' + (items.length !== 1 ? 's' : '') + ' · saldo <b>' + saldoTot.toLocaleString() + '</b> und'
         + notaUrgArriba(urg) + '</span></div>'
-        + '<div class="cp-tipo-c cp-cli-c">' + items.map(function(x) { return buildChipCompacto(x, false); }).join('') + '</div></div>';
+        + '<div class="cp-tipo-c cp-cli-c">' + pintarGrupo(g, false) + '</div></div>';
     }).join('');
     cuerpo = bloqueUrgTop() + '<div class="cp-sec">Todos los pedidos por cliente <i>clic en un cliente para abrir o cerrar sus fichas</i></div>'
       + (clis.length ? filas
